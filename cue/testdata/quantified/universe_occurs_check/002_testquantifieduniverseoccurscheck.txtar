@@ -1,0 +1,7 @@
+Quantified CUE: UniverseOccursCheck
+
+-- in.cue --
+@test(validate, conflict, at="out")
+
+id(A): func(x: A) -> A: x
+out: id[id]

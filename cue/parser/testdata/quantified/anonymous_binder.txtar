@@ -1,0 +1,6 @@
+An existential binder requires a name.
+
+#error
+
+-- in.cue --
+x: exists _ int

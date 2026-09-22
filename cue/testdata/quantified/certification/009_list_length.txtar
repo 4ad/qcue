@@ -1,0 +1,7 @@
+Quantified CUE: Certification/list length
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f(A): func(xs: [...A]) -> int: len(xs)

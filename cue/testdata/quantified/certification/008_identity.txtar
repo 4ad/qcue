@@ -1,0 +1,7 @@
+Quantified CUE: Certification/identity
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f(A): func(x: A) -> A: x

@@ -1,0 +1,7 @@
+Quantified CUE: Certification/flat map
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f(A, B): func(g: func(A) -> [...B], xs: [...A]) -> [...B]: [for x in xs for y in g(x) {y}]

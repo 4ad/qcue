@@ -1,0 +1,8 @@
+Quantified CUE: Certification/unchecked captured witness
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, incomplete, at="f")
+
+x: int
+f: func() -> int: x

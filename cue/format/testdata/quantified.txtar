@@ -1,0 +1,78 @@
+Quantified syntax must round trip under both formatter versions.
+
+-- syntax01.input --
+bridge: extern func(int) -> int !bridge
+
+-- syntax02.input --
+codec: exists A {decode: func(bytes) -> A !decode}
+
+-- syntax03.input --
+x: f[int, string](1)
+
+-- syntax04.input --
+Box(A, B: A) = {left: A, right: B}
+
+-- syntax05.input --
+f: func<A: number, B>(A) -> B
+
+-- syntax06.input --
+module(A): {
+exists State
+empty: State
+push: func(A, State) -> State
+}
+
+-- syntax07.input --
+p: seal #Counter with (State = int & >=0) {zero: 0}
+
+-- syntax08.input --
+r: (open p as (A, P) {out: P.read(P.zero)}).out
+
+-- syntax09.input --
+id(A): func(x: A) -> A: x
+
+-- syntax10.input --
+use: func(p: forall A func(A) -> A) -> [int, string]
+
+-- syntax11.input --
+p: exists (A: number, B: A) {value: B}
+
+-- syntax12.input --
+p: (forall A A) | int
+
+-- syntax13.input --
+p: (exists A {value: A}).value
+
+-- syntax14.input --
+p: forall (A in Type(1): number) [...A]
+-- out/format/syntax01.golden --
+bridge: extern func(int) -> int !bridge
+-- out/format/syntax02.golden --
+codec: exists (A) {decode: func(bytes) -> A !decode}
+-- out/format/syntax03.golden --
+x: f[int][string](1)
+-- out/format/syntax04.golden --
+Box(A, B: A) = {left: A, right: B}
+-- out/format/syntax05.golden --
+f: forall (A: number, B) func(A) -> B
+-- out/format/syntax06.golden --
+module: forall (A) exists (State) {
+	empty: State
+	push:  func(A, State) -> State
+}
+-- out/format/syntax07.golden --
+p: seal #Counter with (State = int & >=0) {zero: 0}
+-- out/format/syntax08.golden --
+r: (open p as (A, P) {out: P.read(P.zero)}).out
+-- out/format/syntax09.golden --
+id: forall (A) func(x: A) -> A: x
+-- out/format/syntax10.golden --
+use: func(p: forall (A) func(A) -> A) -> [int, string]
+-- out/format/syntax11.golden --
+p: exists (A: number, B: A) {value: B}
+-- out/format/syntax12.golden --
+p: (forall (A) A) | int
+-- out/format/syntax13.golden --
+p: (exists (A) {value: A}).value
+-- out/format/syntax14.golden --
+p: forall (A in Type(1): number) [...A]

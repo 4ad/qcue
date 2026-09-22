@@ -1,0 +1,8 @@
+Quantified CUE: Capabilities/overlapping results
+
+-- in.cue --
+@test(validate, conflict, at="out")
+
+f: func(x: int) -> number: 1
+f: func(number) -> int
+out: f(3)

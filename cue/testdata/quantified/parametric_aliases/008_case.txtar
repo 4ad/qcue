@@ -1,0 +1,20 @@
+Quantified CUE: ParametricAliases/let N = int & >=0 Box(A: N) = {value: A} out: {let N = string,  unused: N, value: Box(3)}.value
+
+-- in.cue --
+@test(json, {"value":3}, at="out")
+
+let N = int & >=0
+Box(A: N) = {value: A}
+out: {let N = string, _unused: N, value: Box(3)}.value
+-- out/eval/stats --
+Leaks:  0
+Freed:  11
+Reused: 2
+Allocs: 9
+Retain: 0
+
+Unifications: 7
+Conjuncts:    11
+Disjuncts:    0
+
+NumCloseIDs: 2

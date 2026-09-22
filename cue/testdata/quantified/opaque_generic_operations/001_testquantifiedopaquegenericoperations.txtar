@@ -1,0 +1,21 @@
+Quantified CUE: OpaqueGenericOperations
+
+-- in.cue --
+@test(json, ["hello",1,[],1,1], at="out")
+
+#I: exists State {
+seed: State
+read: func(State) -> int
+keep(A): func(A, State) -> {value: A, state: State}
+empty(A): func() -> [...A]
+}
+p: seal #I with (State = int) {
+seed: 1
+read: func(x: int) -> int: x
+keep(A): func(x: A, s: int) -> {value: A, state: int}: {value: x, state: s}
+empty(A): func() -> [...A]: []
+}
+out: (open p as (S, P) {
+let pair = P.keep("hello", P.seed)
+out: [pair.value, P.read(pair.state), P.empty[int](), P.read(P.keep(P.seed, P.seed).value), P.read(P.keep({value: P.seed}, P.seed).value.value)]
+}).out

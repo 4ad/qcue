@@ -1,0 +1,19 @@
+Paper example 004: Refining a polymorphic record across declarations
+
+#paper: 4
+#mode: evaluation
+
+-- paper.cue.txt --
+r(A): {wrap: func(A) -> {value: A}}
+r(B): {wrap: func(B) -> {tag: "wrapped"}}
+
+// Unified description, after alpha-renaming:
+r(T): {wrap: func(T) -> {value: T, tag: "wrapped"}}
+-- in.cue --
+@test(validate, at="r")
+
+r(A): {wrap: func(A) -> {value: A}}
+r(B): {wrap: func(B) -> {tag: "wrapped"}}
+
+// Unified description, after alpha-renaming:
+r(T): {wrap: func(T) -> {value: T, tag: "wrapped"}}

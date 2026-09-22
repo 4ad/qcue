@@ -1,0 +1,7 @@
+Quantified CUE: Instantiation/independent calls
+
+-- in.cue --
+@test(json, [3,"hello",true], at="out")
+
+id(A): func(x: A) -> A: x
+out: [id(3), id("hello"), id(true)]

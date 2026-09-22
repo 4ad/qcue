@@ -1,0 +1,6 @@
+Quantified syntax and its desugared AST.
+
+-- in.cue --
+p: exists A {value: A, show: func(A) -> string}
+-- debug.txt --
+p: exists (A) {value: A, show: func(A) -> string}

@@ -1,0 +1,9 @@
+Quantified CUE: PartialCapabilities/original contract retained
+
+-- in.cue --
+@test(json, 3, at="out")
+
+f: func(x: int, y: int) -> int: x + y
+f: func(1, 2) -> 3
+p: f(1, ...)
+out: p(2)

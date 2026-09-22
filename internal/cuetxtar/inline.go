@@ -37,7 +37,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -795,8 +794,12 @@ func selectActiveDirectives(records []attrRecord, path cue.Path, version string)
 	// assertions and must both survive deduplication.
 	byDirective := make(map[string]parsedTestAttr)
 	hasVersioned := make(map[string]bool)
+	var order []string
 	for _, c := range candidates {
 		key := directiveKey(c.pa)
+		if _, ok := byDirective[key]; !ok {
+			order = append(order, key)
+		}
 		if c.versioned {
 			byDirective[key] = c.pa
 			hasVersioned[key] = true
@@ -805,7 +808,11 @@ func selectActiveDirectives(records []attrRecord, path cue.Path, version string)
 		}
 	}
 
-	result := slices.Collect(maps.Values(byDirective))
+	// Stable source order keeps multi-assertion diagnostics reproducible.
+	var result []parsedTestAttr
+	for _, key := range order {
+		result = append(result, byDirective[key])
+	}
 	// Append todo-form directives last; they are additive and not deduplicated.
 	result = append(result, todoDirectives...)
 	return result
@@ -886,6 +893,8 @@ func (r *inlineRunner) runDirective(t testing.TB, path cue.Path, val cue.Value, 
 		return
 	}
 	switch pa.directive {
+	case "validate", "json", "subsume":
+		r.runValueAssertion(t, path, val, pa)
 	case "eq":
 		r.runEqInline(t, path, val, pa)
 	case "err":

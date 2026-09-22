@@ -1,0 +1,23 @@
+Paper example 008: A particular client and a universally capable producer
+
+#paper: 8
+#mode: evaluation
+
+-- paper.cue.txt --
+job: {
+    x: number
+    f: func(x) -> string
+    result: f(x)
+}
+job: {x: int & >=0}
+job: {x: 7, f: func(n: int) -> string: "\(n)"}
+-- in.cue --
+@test(json, "7", at="job.result")
+
+job: {
+    x: number
+    f: func(x) -> string
+    result: f(x)
+}
+job: {x: int & >=0}
+job: {x: 7, f: func(n: int) -> string: "\(n)"}

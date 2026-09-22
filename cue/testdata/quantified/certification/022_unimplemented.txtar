@@ -1,0 +1,7 @@
+Quantified CUE: Certification/unimplemented
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, incomplete, at="f")
+
+f(A): func(A) -> A

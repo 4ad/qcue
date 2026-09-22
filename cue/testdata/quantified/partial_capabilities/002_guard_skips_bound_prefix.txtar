@@ -1,0 +1,9 @@
+Quantified CUE: PartialCapabilities/guard skips bound prefix
+
+-- in.cue --
+@test(validate, conflict, at="out")
+
+f: func(x: string, y: int) -> int: y
+p: f("prefix", ...)
+p: func(int) -> 3
+out: p(2)

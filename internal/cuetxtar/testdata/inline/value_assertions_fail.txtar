@@ -1,0 +1,47 @@
+Incorrect public API expectations must fail, including an incomplete value
+mistaken for a contradiction or an abstract call mistaken for a result.
+
+-- in/test.cue --
+wrong: 3 @test(json, 4)
+unknown: int @test(validate, concrete) @test(validate, conflict)
+conflict: 1 & "x" @test(validate, concrete, incomplete)
+complete: 3 @test(validate, concrete, incomplete)
+pending: func(int) -> int @test(validate, functions)
+abstract: func(int) -> int
+result: abstract(3) @test(json, 3)
+broad: number
+narrow: int
+@test(subsume, narrow, broad)
+@test(subsume, broad, narrow, fail)
+@test(json, 4, at="wrong")
+-- out/run/errors.txt --
+subsumption narrow >= broad: value not an instance
+subsumption broad >= narrow: <nil>
+path wrong: JSON = 3, <nil>; want 4
+path wrong: JSON = 3, <nil>; want 4
+path unknown: validation failed: unknown: incomplete value int
+path unknown: expected a definite conflict
+path conflict: expected incompleteness; ordinary validation: conflict: conflicting values 1 and "x" (mismatched types int and string); demanded validation: conflict: conflicting values 1 and "x" (mismatched types int and string)
+path complete: expected incompleteness; ordinary validation: <nil>; demanded validation: <nil>
+path pending: validation failed: pending: function conformance remains unproved
+path result: JSON = , cue: marshal error: result: cannot convert incomplete value "&(pending function result, int)" to JSON; want 3
+-- out/update/test.cue --
+wrong: 3 @test(json, 4)
+unknown: int @test(validate, concrete) @test(validate, conflict)
+conflict: 1 & "x" @test(validate, concrete, incomplete)
+complete: 3 @test(validate, concrete, incomplete)
+pending: func(int) -> int @test(validate, functions)
+abstract: func(int) -> int
+result: abstract(3) @test(json, 3)
+broad: number
+narrow: int
+@test(subsume, narrow, broad)
+@test(subsume, broad, narrow, fail)
+@test(json, 4, at="wrong")
+-- out/update/out/errors.txt --
+[eval] conflict: conflicting values 1 and "x" (mismatched types int and string):
+    ./test.cue:3:11
+    ./test.cue:3:15
+-- out/status.txt --
+update: output passes run
+force:  identical to update

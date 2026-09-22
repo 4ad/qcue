@@ -1,0 +1,11 @@
+Quantified CUE: ParametricAliases/Loop(A) = Loop(A)          out: Loop(int)
+
+#inlinetest:exclude Formation errors use golden compiler diagnostics.
+
+-- in.cue --
+
+Loop(A) = Loop(A)
+         out: Loop(int)
+-- out/evalalpha --
+cyclic parametric alias Loop:
+    ./in.cue:2:1

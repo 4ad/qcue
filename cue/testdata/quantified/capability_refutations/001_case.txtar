@@ -1,0 +1,6 @@
+Quantified CUE: CapabilityRefutations/f: (func( | ) -> int) & (func( | ) -> string)
+
+-- in.cue --
+@test(validate, at="f")
+
+f: (func(_|_) -> int) & (func(_|_) -> string)

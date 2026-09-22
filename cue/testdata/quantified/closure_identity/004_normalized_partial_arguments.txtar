@@ -1,0 +1,8 @@
+Quantified CUE: ClosureIdentity/normalized partial arguments
+
+-- in.cue --
+@test(json, 3, at="r")
+
+add: func(a: int, b: int) -> int: a + b
+f: add(1, ...) & add(a: 1, ...)
+r: f(2)

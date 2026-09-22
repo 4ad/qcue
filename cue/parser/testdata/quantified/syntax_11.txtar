@@ -1,0 +1,6 @@
+Quantified syntax and its desugared AST.
+
+-- in.cue --
+id(A): func(x: A) -> A: x
+-- debug.txt --
+id: forall (A) func(x: A) -> A: x

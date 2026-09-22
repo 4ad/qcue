@@ -1,0 +1,10 @@
+Quantified CUE: UniverseLiterals
+
+#inlinetest:exclude Formation errors use golden compiler diagnostics.
+
+-- in.cue --
+
+f: forall (A in Type(9223372036854775807)) func(A) -> A
+-- out/evalalpha --
+f: universe level exceeds the supported integer range:
+    ./in.cue:2:12

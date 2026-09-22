@@ -1,0 +1,8 @@
+Quantified CUE: CapabilitySubsumption/func(int) -> int / func(int) -> int !bridge
+
+-- in.cue --
+@test(validate)
+@test(subsume, a, b, fail)
+
+a: func(int) -> int
+b: func(int) -> int !bridge

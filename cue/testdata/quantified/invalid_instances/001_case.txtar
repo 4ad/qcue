@@ -1,0 +1,24 @@
+Quantified CUE: InvalidInstances/id(A): func(x: A) -> A: x          out: id[int]("wrong")
+
+-- in.cue --
+@test(validate, conflict)
+
+id(A): func(x: A) -> A: x
+         out: id[int]("wrong")
+-- out/errors.txt --
+[eval] conflicting values "wrong" and int (mismatched types string and int):
+    ./in.cue:3:25
+    ./in.cue:4:18
+    ./in.cue:4:23
+-- out/eval/stats --
+Leaks:  0
+Freed:  227
+Reused: 163
+Allocs: 64
+Retain: 0
+
+Unifications: 226
+Conjuncts:    479
+Disjuncts:    0
+
+NumCloseIDs: 31

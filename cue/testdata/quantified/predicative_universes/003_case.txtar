@@ -1,0 +1,7 @@
+Quantified CUE: PredicativeUniverses/f: forall (A in Type(0)) func(x: A) -> A: x out: f[[...(forall B func(B) -> B)]]
+
+-- in.cue --
+@test(validate, conflict, at="out")
+
+f: forall (A in Type(0)) func(x: A) -> A: x
+out: f[[...(forall B func(B) -> B)]]

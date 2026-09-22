@@ -1,0 +1,21 @@
+Quantified CUE: InvalidInstances/pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]          out: pair[string]("a", "b")
+
+-- in.cue --
+@test(validate, conflict)
+
+pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]
+         out: pair[string]("a", "b")
+-- out/errors.txt --
+[eval] out: type argument string does not satisfy bound of A:
+    ./in.cue:4:15
+    ./in.cue:4:20
+-- out/eval/stats --
+Leaks:  0
+Freed:  3
+Reused: 0
+Allocs: 3
+Retain: 0
+
+Unifications: 3
+Conjuncts:    3
+Disjuncts:    0

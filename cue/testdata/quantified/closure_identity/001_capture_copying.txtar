@@ -1,0 +1,8 @@
+Quantified CUE: ClosureIdentity/capture copying
+
+-- in.cue --
+@test(json, 5, at="r")
+
+x: {n: 3, f: func(y: int) -> int: y + n}
+f: x.f & (x & {g: 1}).f
+r: f(2)

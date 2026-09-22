@@ -1,0 +1,23 @@
+Quantified CUE: ComparablePackages
+
+-- in.cue --
+@test(json, [true,false], at="out")
+
+#ComparablePair: exists A {
+    left: A
+    right: A
+    equal: func(A, A) -> bool
+}
+compare: func(p: #ComparablePair) -> bool:
+    (open p as (A, P) {out: P.equal(P.left, P.right)}).out
+p: seal #ComparablePair with (A = int) {
+    left: 3
+    right: 3
+    equal: func(x: int, y: int) -> bool: x == y
+}
+q: seal #ComparablePair with (A = string) {
+    left: "a"
+    right: "b"
+    equal: func(x: string, y: string) -> bool: x == y
+}
+out: [compare(p), compare(q)]

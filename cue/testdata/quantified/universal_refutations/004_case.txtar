@@ -1,0 +1,7 @@
+Quantified CUE: UniversalRefutations/bad: forall A func(A) -> A          bad: func(x: int) -> int: x
+
+-- in.cue --
+@test(validate, conflict, at="bad")
+
+bad: forall A func(A) -> A
+         bad: func(x: int) -> int: x

@@ -168,7 +168,7 @@ func parseTestAttr(astAttr *ast.Attribute) (parsedTestAttr, error) {
 			// at= is accepted by eq, err, and shareID; each validates it
 			// in its own handler.
 			switch result.directive {
-			case "eq", "err", "shareID":
+			case "eq", "err", "shareID", "validate", "json":
 				// Validated in their respective handlers.
 			default:
 				return result, fmt.Errorf("@test(%s): unknown flag %q", result.directive, kv.Key())
@@ -491,12 +491,34 @@ func appendPath(base cue.Path, label ast.Label, hidPkg string) cue.Path {
 // with the same name but different at= values are independent assertions and
 // must both survive deduplication in selectActiveDirectives.
 func directiveKey(pa parsedTestAttr) string {
+	key := pa.directive
 	for i := 1; i < len(pa.raw.Fields); i++ {
 		if kv := pa.raw.Fields[i]; kv.Key() == "at" {
-			return pa.directive + "\x00" + kv.Value()
+			key += "\x00" + kv.Value()
 		}
 	}
-	return pa.directive
+	// Different validation demands and ordered subsumption pairs are
+	// independent assertions, even when attached to the same value.
+	switch pa.directive {
+	case "validate":
+		for _, option := range []string{"concrete", "functions"} {
+			for _, kv := range pa.raw.Fields[1:] {
+				if kv.Key() == "" && strings.TrimSpace(kv.Text()) == option {
+					key += "\x00" + option
+					break
+				}
+			}
+		}
+	case "subsume":
+		n := 0
+		for _, kv := range pa.raw.Fields[1:] {
+			if kv.Key() == "" && n < 2 {
+				key += "\x00" + strings.TrimSpace(kv.Text())
+				n++
+			}
+		}
+	}
+	return key
 }
 
 // parseAtPath parses an at= selector string into a cue.Path.

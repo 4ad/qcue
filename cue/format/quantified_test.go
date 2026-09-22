@@ -16,6 +16,9 @@ package format_test
 
 import (
 	"fmt"
+	"strings"
+
+	"golang.org/x/tools/txtar"
 	"testing"
 
 	"cuelang.org/go/cue/format"
@@ -32,24 +35,17 @@ func TestQuantifiedRoundTrip(t *testing.T) {
 	for _, v2 := range []bool{false, true} {
 		t.Run(fmt.Sprint(v2), func(t *testing.T) {
 			cueexperiment.Flags.FormatV2 = v2
-			for _, src := range []string{
-				`bridge: extern func(int) -> int !bridge`,
-				`codec: exists A {decode: func(bytes) -> A !decode}`,
-				`x: f[int, string](1)`,
-				`Box(A, B: A) = {left: A, right: B}`,
-				`f: func<A: number, B>(A) -> B`,
-				"module(A): {\nexists State\nempty: State\npush: func(A, State) -> State\n}",
-				`p: seal #Counter with (State = int & >=0) {zero: 0}`,
-				`r: (open p as (A, P) {out: P.read(P.zero)}).out`,
-				`id(A): func(x: A) -> A: x`,
-				`use: func(p: forall A func(A) -> A) -> [int, string]`,
-				`p: exists (A: number, B: A) {value: B}`,
-				`p: (forall A A) | int`,
-				`p: (exists A {value: A}).value`,
-				`p: forall (A in Type(1): number) [...A]`,
-			} {
-				t.Run(src, func(t *testing.T) {
-					in := "@experiment(quantified)\n" + src + "\n"
+			a, err := txtar.ParseFile("testdata/quantified.txtar")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range a.Files {
+				if !strings.HasSuffix(file.Name, ".input") {
+					continue
+				}
+
+				t.Run(file.Name, func(t *testing.T) {
+					in := string(file.Data)
 					f, err := parser.ParseFile("test.cue", in)
 					if err != nil {
 						t.Fatal(err)

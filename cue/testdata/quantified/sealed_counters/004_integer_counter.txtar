@@ -1,0 +1,28 @@
+Quantified CUE: SealedCounters/integer counter
+
+-- in.cue --
+@test(json, 2, at="out")
+
+#Counter: exists State {
+    zero: State
+    next: func(State) -> State
+    read: func(State) -> (int & >=0)
+}
+counterV1: seal #Counter with (State = int & >=0) {
+    zero: 0
+    next: func(x: int & >=0) -> (int & >=0): x + 1
+    read: func(x: int & >=0) -> (int & >=0): x
+}
+let CounterRep = close({count: int & >=0})
+counterV2: seal #Counter with (State = CounterRep) {
+    zero: {count: 0}
+    next: func(s: CounterRep) -> CounterRep: {count: s.count + 1}
+    read: func(s: CounterRep) -> (int & >=0): s.count
+}
+useCounter(S): func(c: {
+    zero: S
+    next: func(S) -> S
+    read: func(S) -> (int & >=0)
+}) -> (int & >=0): c.read(c.next(c.next(c.zero)))
+
+out: (open counterV1 as (S, C) {out: useCounter[S](C)}).out

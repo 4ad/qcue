@@ -1,0 +1,6 @@
+Quantified ContextualKeywords.
+
+-- in.cue --
+p: open (
+// subject
+q & q) as (A, Q) {out: Q.read(Q.zero)}

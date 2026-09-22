@@ -1,0 +1,19 @@
+Paper example 017: Quantifier block elaboration
+
+#paper: 17
+#mode: evaluation
+
+-- paper.cue.txt --
+x: exists (T: U) forall (V: W) {
+    value: T
+    transform: func(V) -> V
+}
+-- in.cue --
+@test(validate, at="x")
+
+U: _
+W: _
+x: exists (T: U) forall (V: W) {
+    value: T
+    transform: func(V) -> V
+}

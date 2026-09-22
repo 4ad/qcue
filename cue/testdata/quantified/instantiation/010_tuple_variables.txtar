@@ -1,0 +1,7 @@
+Quantified CUE: Instantiation/tuple variables
+
+-- in.cue --
+@test(json, ["x",1], at="out")
+
+swap(A, B): func(p: [A, B]) -> [B, A]: [p[1], p[0]]
+out: swap([1, "x"])

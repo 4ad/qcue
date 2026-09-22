@@ -1,0 +1,9 @@
+Quantified CUE: OpaqueUniverseBoundary
+
+-- in.cue --
+@test(validate, conflict, at="p")
+
+#I: exists (A in Type(0)) {value: A}
+p: seal #I with (A = forall (B in Type(0)) func(B) -> B) {
+value: func<B>(x: B) -> B: x
+}

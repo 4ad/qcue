@@ -1,0 +1,8 @@
+Quantified CUE: ClosureIdentity/unrelated captures
+
+-- in.cue --
+@test(json, 2, at="r")
+
+x: {unused: int, f: func(y: int) -> int: y}
+f: (x & {unused: 1}).f & (x & {unused: 2}).f
+r: f(2)

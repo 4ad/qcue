@@ -1,0 +1,21 @@
+Quantified CUE: OpaqueCallbacks
+
+-- in.cue --
+@test(json, [1,4,5], at="out")
+
+#I: exists A {
+    seed: A
+    read: func(A) -> int
+    apply: func(func(A) -> A, A) -> A
+    build: func(int) -> (func(A) -> A)
+}
+p: seal #I with (A = int) {
+    seed: 1
+    read: func(x: int) -> int: x
+    apply: func(f: func(int) -> int, x: int) -> int: f(x)
+    build: func(n: int) -> (func(int) -> int): func(x: int) -> int: x + n
+}
+out: (open p as (T, P) {
+    let identity = func(x: T) -> T: x
+    out: [P.read(P.apply(identity, P.seed)), P.read(P.build(3)(P.seed)), P.read(P.build(4)(P.seed))]
+}).out

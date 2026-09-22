@@ -1,0 +1,19 @@
+Paper example 034: A value-dependent closure
+
+#paper: 34
+#mode: evaluation
+
+-- paper.cue.txt --
+withPrefix: func(prefix: string) -> func(string) -> string:
+    func(s: string) -> string: prefix + s
+
+warn: withPrefix("warning: ")
+message: warn("retry")        // "warning: retry"
+-- in.cue --
+@test(json, "warning: retry", at="message")
+
+withPrefix: func(prefix: string) -> func(string) -> string:
+    func(s: string) -> string: prefix + s
+
+warn: withPrefix("warning: ")
+message: warn("retry")        // "warning: retry"

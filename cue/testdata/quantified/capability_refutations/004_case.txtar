@@ -1,0 +1,7 @@
+Quantified CUE: CapabilityRefutations/f: func(a: int) -> int          f: func(b: int) -> int: b
+
+-- in.cue --
+@test(validate, conflict, at="f")
+
+f: func(a: int) -> int
+         f: func(b: int) -> int: b

@@ -1,0 +1,19 @@
+Quantified CUE: UniverseLiterals/0b0
+
+-- in.cue --
+@test(json, 3, at="out")
+
+f: forall (A in Type(0b0)) func(x: A) -> A: x
+out: f[int](3)
+-- out/eval/stats --
+Leaks:  0
+Freed:  227
+Reused: 163
+Allocs: 64
+Retain: 0
+
+Unifications: 227
+Conjuncts:    481
+Disjuncts:    0
+
+NumCloseIDs: 31

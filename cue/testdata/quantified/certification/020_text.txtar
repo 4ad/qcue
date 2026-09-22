@@ -1,0 +1,7 @@
+Quantified CUE: Certification/text
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f: func(x: int) -> string: "\(x)"

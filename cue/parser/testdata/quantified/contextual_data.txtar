@@ -1,0 +1,4 @@
+Quantified keywords remain ordinary data identifiers.
+
+-- in.cue --
+forall: 1, exists: 2, x: forall, y: exists, z: forall(1)

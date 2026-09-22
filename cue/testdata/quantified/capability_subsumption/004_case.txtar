@@ -1,0 +1,8 @@
+Quantified CUE: CapabilitySubsumption/forall (A, B: A) func(B) -> A / forall (X, Y: X) func(Y) -> X
+
+-- in.cue --
+@test(validate)
+@test(subsume, a, b)
+
+a: forall (A, B: A) func(B) -> A
+b: forall (X, Y: X) func(Y) -> X

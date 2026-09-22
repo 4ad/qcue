@@ -1,0 +1,18 @@
+Paper example 055: A predicate used as an ordinary constraint
+
+#paper: 55
+#mode: evaluation
+
+-- paper.cue.txt --
+positive: func(x: int) -> bool: x > 0
+#Positive: {value: int, _valid: true & positive(value)}
+n: (#Positive & {value: 7}).value   // 7
+bad: #Positive & {value: -1}       // _|_
+-- in.cue --
+@test(validate, conflict, at="bad")
+@test(json, 7, at="n")
+
+positive: func(x: int) -> bool: x > 0
+#Positive: {value: int, _valid: true & positive(value)}
+n: (#Positive & {value: 7}).value   // 7
+bad: #Positive & {value: -1}       // _|_

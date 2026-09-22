@@ -1,0 +1,13 @@
+Paper example 090: A concrete result with a residual guard
+
+#paper: 90
+#mode: evaluation
+
+-- paper.cue.txt --
+x: int
+r: 3 & (x + 1)
+-- in.cue --
+@test(validate, concrete, incomplete, at="r")
+
+x: int
+r: 3 & (x + 1)

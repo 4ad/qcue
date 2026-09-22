@@ -1,0 +1,18 @@
+Paper example 082: A module law strengthened by universals
+
+#paper: 82
+#mode: evaluation
+#inlinetest:exclude Not an executable S_H/A example; see TestQuantifiedPaperIndex.
+#skip
+Dependent profile D (out of scope).
+
+-- paper.cue.txt --
+#CounterLawful: exists State {
+    zero: State
+    next: func(State) -> State
+    read: func(State) -> (int & >=0)
+    _zeroLaw: true & (read(zero) == 0)
+    forall (s in State) {
+        _stepLaw: true & (read(next(s)) == read(s) + 1)
+    }
+}

@@ -1,0 +1,10 @@
+A fallback does not allow a quantified block.
+
+#error
+
+-- in.cue --
+@experiment(quantified,try)
+x: [if true {1} else {
+forall A
+y: A
+}]

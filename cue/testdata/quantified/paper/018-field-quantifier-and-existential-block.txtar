@@ -1,0 +1,21 @@
+Paper example 018: Field quantifier and existential block
+
+#paper: 18
+#mode: evaluation
+
+-- paper.cue.txt --
+x(V: W): {
+    exists T: U
+    value: T
+    transform: func(V) -> V
+}
+-- in.cue --
+@test(validate, at="x")
+
+U: _
+W: _
+x(V: W): {
+    exists T: U
+    value: T
+    transform: func(V) -> V
+}

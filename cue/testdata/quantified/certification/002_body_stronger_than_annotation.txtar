@@ -1,0 +1,8 @@
+Quantified CUE: Certification/body stronger than annotation
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f: func(x: number) -> number: 1
+f: func(number) -> int

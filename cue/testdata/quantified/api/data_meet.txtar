@@ -1,0 +1,23 @@
+Quantified CUE public API: TestQuantifiedDataMeet
+
+#skip
+#inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
+
+-- case01.cue --
+
+@experiment(quantified)
+empty(A): [...A]
+impossible(A): A
+impossibleRecord(A): {value: A}
+optional(A): {value?: A}
+union: forall A (A | int)
+
+
+-- case02.cue --
+[]
+
+-- case03.cue --
+{}
+
+-- case04.cue --
+"x"

@@ -1,0 +1,11 @@
+Quantified CUE: ParametricAliases/Box(A) = {value: A}          out: Box(int, string)
+
+#inlinetest:exclude Formation errors use golden compiler diagnostics.
+
+-- in.cue --
+
+Box(A) = {value: A}
+         out: Box(int, string)
+-- out/evalalpha --
+out: alias Box requires 1 type arguments:
+    ./in.cue:3:15

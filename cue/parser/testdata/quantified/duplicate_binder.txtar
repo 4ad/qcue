@@ -1,0 +1,6 @@
+A quantifier may not bind the same name twice.
+
+#error
+
+-- in.cue --
+x: forall (A, A) A

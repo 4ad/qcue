@@ -1,0 +1,5 @@
+Quantified ContextualKeywords.
+
+-- in.cue --
+f: forall (A // binder
+) func(A) -> A

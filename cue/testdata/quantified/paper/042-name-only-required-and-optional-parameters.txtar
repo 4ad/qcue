@@ -1,0 +1,19 @@
+Paper example 042: Name-only required and optional parameters
+
+#paper: 42
+#mode: evaluation
+
+-- paper.cue.txt --
+key: func(a!: int, note?: string) -> int: a
+x: key(a: 4)                // 4; note is absent
+z: key(a: 4, note: "audit") // 4
+bad: key(4)                 // invalid packet: a is name-only
+-- in.cue --
+@test(validate, conflict, at="bad")
+@test(json, 4, at="x")
+@test(json, 4, at="z")
+
+key: func(a!: int, note?: string) -> int: a
+x: key(a: 4)                // 4; note is absent
+z: key(a: 4, note: "audit") // 4
+bad: key(4)                 // invalid packet: a is name-only

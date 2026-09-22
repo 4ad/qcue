@@ -1,0 +1,23 @@
+Paper example 085: Sharing two values under one witness
+
+#paper: 85
+#mode: evaluation
+
+-- paper.cue.txt --
+#ComparablePair: exists A {
+    left: A
+    right: A
+    equal: func(A, A) -> bool
+}
+compare: func(p: #ComparablePair) -> bool:
+    (open p as (A, P) {out: P.equal(P.left, P.right)}).out
+-- in.cue --
+@test(validate, at="compare")
+
+#ComparablePair: exists A {
+    left: A
+    right: A
+    equal: func(A, A) -> bool
+}
+compare: func(p: #ComparablePair) -> bool:
+    (open p as (A, P) {out: P.equal(P.left, P.right)}).out

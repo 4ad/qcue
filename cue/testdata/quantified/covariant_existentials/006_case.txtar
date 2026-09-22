@@ -1,0 +1,6 @@
+Quantified CUE: CovariantExistentials/exists (A: int & >0) A / 1
+
+-- in.cue --
+@test(validate, concrete, at="out")
+
+out: (exists (A: int & >0) A) & (1)

@@ -1,0 +1,25 @@
+Quantified CUE public API: TestQuantifiedCompositeInstanceObligations
+
+#skip
+#inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
+
+-- case01.cue --
+module(A): {id: func(x: A) -> A: x}
+out: module[int].id("x")
+
+-- case02.cue --
+module(A: number): {id: func(x: A) -> A: x}
+out: module[string].id("x")
+
+-- case03.cue --
+module(A): {value: A}
+out: module[int].value
+
+-- case04.cue --
+module(A in Type(0)): {id: func(x: A) -> A: x}
+out: module[forall (B in Type(0)) func(B) -> B]
+
+-- case05.cue --
+@experiment(quantified)
+module(A): {value: int, id: func(x: A) -> A: x}
+out: module[string].value

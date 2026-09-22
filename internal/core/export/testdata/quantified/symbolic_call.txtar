@@ -1,0 +1,7 @@
+Quantified export: symbolic call.
+
+-- in.cue --
+f(A): func(A) -> A
+out: f(3)
+-- out/export --
+f(3)

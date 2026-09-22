@@ -1,0 +1,24 @@
+Paper example 040: Unresolved alternatives and defaults
+
+#paper: 40
+#mode: evaluation
+
+-- paper.cue.txt --
+f: (func(x: int) -> int: x) |
+   (func(x: int) -> int: x + 1)
+a: f(3)                     // incomplete operational choice
+
+preferred: *(func(x: int) -> int: x) |
+            (func(x: int) -> int: x + 1)
+b: preferred(3)             // 3, under legacy default selection
+-- in.cue --
+@test(validate, concrete, incomplete, at="a")
+@test(json, 3, at="b")
+
+f: (func(x: int) -> int: x) |
+   (func(x: int) -> int: x + 1)
+a: f(3)                     // incomplete operational choice
+
+preferred: *(func(x: int) -> int: x) |
+            (func(x: int) -> int: x + 1)
+b: preferred(3)             // 3, under legacy default selection

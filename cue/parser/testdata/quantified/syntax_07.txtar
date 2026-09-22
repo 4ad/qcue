@@ -1,0 +1,10 @@
+Quantified syntax and its desugared AST.
+
+-- in.cue --
+module(A): {
+exists State
+empty: State
+push: func(A, State) -> State
+}
+-- debug.txt --
+module: forall (A) exists (State) {empty: State, push: func(A, State) -> State}

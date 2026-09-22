@@ -1,0 +1,8 @@
+Quantified CUE: CompositeInstances/module(A): {id: func(x: A) -> A: x, value: int} module: {value: 7} out: [module[int].value, module[string].value]
+
+-- in.cue --
+@test(json, [7,7], at="out")
+
+module(A): {id: func(x: A) -> A: x, value: int}
+module: {value: 7}
+out: [module[int].value, module[string].value]

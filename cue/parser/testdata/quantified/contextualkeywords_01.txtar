@@ -1,0 +1,8 @@
+Quantified ContextualKeywords.
+
+-- in.cue --
+forall: func(x: int) -> int: x
+exists: forall
+seal: forall
+open: forall
+out: [forall(1), exists(2), seal(3), open(4)]

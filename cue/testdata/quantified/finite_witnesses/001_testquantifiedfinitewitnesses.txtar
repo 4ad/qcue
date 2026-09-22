@@ -1,0 +1,18 @@
+Quantified CUE: FiniteWitnesses
+
+-- in.cue --
+@test(validate, conflict, at="bad")
+@test(validate, conflict, at="independent")
+@test(validate, conflict, at="empty")
+@test(json, {"a":2,"b":2}, at="x")
+@test(json, {"ok":true}, at="dependent")
+@test(validate, at="vacuous")
+
+x: exists (n in 1 | 2) {a: n, b: n}
+x: {a: 2}
+bad: exists (n in 1 | 2) {a: n, b: n}
+bad: {a: 1, b: 2}
+dependent: forall (n in 0 | 1) exists (m in 0 | 1) {ok: true & (n == m)}
+independent: exists (m in 0 | 1) forall (n in 0 | 1) {ok: true & (n == m)}
+empty: exists (n in _|_) {value: n}
+vacuous: forall (n in _|_) _|_

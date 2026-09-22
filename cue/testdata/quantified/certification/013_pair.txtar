@@ -1,0 +1,7 @@
+Quantified CUE: Certification/pair
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f(A, B): func(x: A, y: B) -> [A, B]: [x, y]

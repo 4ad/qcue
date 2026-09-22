@@ -1,0 +1,29 @@
+Paper example 084: Eliminating a first-class package
+
+#paper: 84
+#mode: evaluation
+
+-- paper.cue.txt --
+describe: func(p: #Showable) -> string:
+    (open p as (A, P) {out: P.show(P.value)}).out
+text: map(describe, items)     // ["7", "hello"]
+-- in.cue --
+@test(json, ["7","hello"], at="text")
+
+#Showable: exists A {
+    value: A
+    show: func(A) -> string
+}
+p: seal #Showable with (A = int) {
+    value: 7
+    show: func(x: int) -> string: "\(x)"
+}
+q: seal #Showable with (A = string) {
+    value: "hello"
+    show: func(x: string) -> string: x
+}
+items: [p, q]
+map(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [for x in xs {g(x)}]
+describe: func(p: #Showable) -> string:
+    (open p as (A, P) {out: P.show(P.value)}).out
+text: map(describe, items)     // ["7", "hello"]

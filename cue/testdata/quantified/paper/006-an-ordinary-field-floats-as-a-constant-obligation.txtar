@@ -1,0 +1,19 @@
+Paper example 006: An ordinary field floats as a constant obligation
+
+#paper: 6
+#mode: evaluation
+
+-- paper.cue.txt --
+r(A): {id: func(A) -> A}
+r:    {label: "utilities"}
+
+// Type universes are nonempty:
+r(A): {id: func(A) -> A, label: "utilities"}
+-- in.cue --
+@test(validate, at="r")
+
+r(A): {id: func(A) -> A}
+r:    {label: "utilities"}
+
+// Type universes are nonempty:
+r(A): {id: func(A) -> A, label: "utilities"}

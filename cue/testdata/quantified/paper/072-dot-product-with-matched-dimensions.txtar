@@ -1,0 +1,13 @@
+Paper example 072: Dot product with matched dimensions
+
+#paper: 72
+#mode: evaluation
+#inlinetest:exclude Not an executable S_H/A example; see TestQuantifiedPaperIndex.
+#skip
+Dependent profile D (out of scope).
+
+-- paper.cue.txt --
+addNumber: func(x: number, y: number) -> number: x + y
+
+dot(n in Nat): func(xs: Vec(number, n), ys: Vec(number, n)) ->
+    number: fold(addNumber, 0, [for i, x in xs {x * ys[i]}])

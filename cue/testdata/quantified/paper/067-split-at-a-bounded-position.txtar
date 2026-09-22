@@ -1,0 +1,15 @@
+Paper example 067: Split at a bounded position
+
+#paper: 67
+#mode: evaluation
+#inlinetest:exclude Not an executable S_H/A example; see TestQuantifiedPaperIndex.
+#skip
+Dependent profile D (out of scope).
+
+-- paper.cue.txt --
+split(A, n in Nat, k in int & >=0 & <=n): func(
+    xs: Vec(A, n), cut: k,
+) -> {left: Vec(A, k), right: Vec(A, n - k)}: {
+    left: xs[:cut]
+    right: xs[cut:]
+}

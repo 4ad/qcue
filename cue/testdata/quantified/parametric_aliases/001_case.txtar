@@ -1,0 +1,20 @@
+Quantified CUE: ParametricAliases/Box(A) = {value: A} Nested(B) = Box(Box(B)) out: Nested(string) & {value: value: "x"}
+
+-- in.cue --
+@test(json, {"value":{"value":"x"}}, at="out")
+
+Box(A) = {value: A}
+Nested(B) = Box(Box(B))
+out: Nested(string) & {value: value: "x"}
+-- out/eval/stats --
+Leaks:  0
+Freed:  8
+Reused: 2
+Allocs: 6
+Retain: 0
+
+Unifications: 7
+Conjuncts:    12
+Disjuncts:    0
+
+NumCloseIDs: 2

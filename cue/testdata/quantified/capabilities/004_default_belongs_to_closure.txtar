@@ -1,0 +1,8 @@
+Quantified CUE: Capabilities/default belongs to closure
+
+-- in.cue --
+@test(json, 20, at="out")
+
+f: func(x: int = 20) -> int: x
+f: func(int = 10) -> int
+out: f()

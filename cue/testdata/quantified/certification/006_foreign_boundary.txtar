@@ -1,0 +1,8 @@
+Quantified CUE: Certification/foreign boundary
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, incomplete, at="f")
+
+external: extern func(int) -> int !bridge
+f: func(x: int) -> int: external(x)

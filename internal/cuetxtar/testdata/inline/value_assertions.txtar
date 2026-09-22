@@ -1,0 +1,30 @@
+Validation and JSON observation assert distinct public API requests.
+Incomplete obligations must remain consistent; definite contradictions must not.
+
+-- in/test.cue --
+value: 3 @test(json, 3) @test(validate, concrete)
+unknown: int @test(validate) @test(validate, concrete, incomplete)
+conflict: 1 & "x" @test(validate, conflict)
+id(A): func(x: A) -> A: x @test(validate, functions)
+pending: func(int) -> int @test(validate, functions, incomplete)
+broad: number
+narrow: int
+@test(subsume, broad, narrow)
+@test(subsume, narrow, broad, fail)
+-- out/update/test.cue --
+value: 3 @test(json, 3) @test(validate, concrete)
+unknown: int @test(validate) @test(validate, concrete, incomplete)
+conflict: 1 & "x" @test(validate, conflict)
+id(A): func(x: A) -> A: x @test(validate, functions)
+pending: func(int) -> int @test(validate, functions, incomplete)
+broad: number
+narrow: int
+@test(subsume, broad, narrow)
+@test(subsume, narrow, broad, fail)
+-- out/update/out/errors.txt --
+[eval] conflict: conflicting values 1 and "x" (mismatched types int and string):
+    ./test.cue:3:11
+    ./test.cue:3:15
+-- out/status.txt --
+update: output passes run
+force:  identical to update

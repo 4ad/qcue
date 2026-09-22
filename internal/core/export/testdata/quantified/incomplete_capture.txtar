@@ -1,0 +1,9 @@
+Quantified export: incomplete capture.
+
+#incomplete
+
+-- in.cue --
+x: int
+out: func() -> int: x
+-- out/export --
+captured value x cannot be exported independently

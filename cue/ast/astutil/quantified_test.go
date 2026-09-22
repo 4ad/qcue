@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"testing"
 
+	"golang.org/x/tools/txtar"
+
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/parser"
@@ -25,15 +27,7 @@ import (
 )
 
 func TestQuantifiedScopes(t *testing.T) {
-	f, err := parser.ParseFile("test.cue", `
-@experiment(quantified)
-let A = int
-q: forall (A: A, B: A) {
-    outer: A
-    inner: exists A {a: A, b: B}
-}
-outside: A
-`)
+	f, err := quantifiedScopeFile(t, "quantifier_scopes.cue")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,28 +68,8 @@ outside: A
 	astutil.Apply(copied, nil, nil)
 }
 
-func TestQuantifiedDuplicateBinders(t *testing.T) {
-	for _, src := range []string{`x: forall (A, A) A`, `x: exists _ int`} {
-		f, err := parser.ParseFile("test.cue", "@experiment(quantified)\n"+src)
-		if err != nil {
-			continue // ParseFile performs resolution as part of parsing.
-		}
-		var found bool
-		astutil.Resolve(f, func(token.Pos, string, ...interface{}) { found = true })
-		if !found {
-			t.Fatalf("no binding error for %s", src)
-		}
-	}
-}
-
 func TestAliasAndOpenScopes(t *testing.T) {
-	f, err := parser.ParseFile("test.cue", `
-@experiment(quantified)
-let A = int
-Box(A, B: A) = {a: A, b: B}
-p: seal #Package with (A = A) {value: 1}
-x: open p as (A, P) {a: A, p: P}
-`)
+	f, err := quantifiedScopeFile(t, "alias_open_scopes.cue")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,4 +93,19 @@ x: open p as (A, P) {a: A, p: P}
 	if clone.Body.(*ast.StructLit).Elts[0].(*ast.Field).Value.(*ast.Ident).Node != clone.Type {
 		t.Fatal("copy did not preserve opening scope")
 	}
+}
+
+func quantifiedScopeFile(t *testing.T, name string) (*ast.File, error) {
+	t.Helper()
+	a, err := txtar.ParseFile("testdata/quantified.txtar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range a.Files {
+		if f.Name == name {
+			return parser.ParseFile(name, f.Data)
+		}
+	}
+	t.Fatalf("missing %s", name)
+	return nil, nil
 }

@@ -1,0 +1,7 @@
+Quantified CUE: Certification/projection
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f(A): func(x: {value: A}) -> A: x.value

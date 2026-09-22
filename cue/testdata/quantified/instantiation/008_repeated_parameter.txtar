@@ -1,0 +1,7 @@
+Quantified CUE: Instantiation/repeated parameter
+
+-- in.cue --
+@test(json, [1,2.5], at="out")
+
+pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]
+out: pair(1, 2.5)

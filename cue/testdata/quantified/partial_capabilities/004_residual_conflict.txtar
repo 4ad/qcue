@@ -1,0 +1,9 @@
+Quantified CUE: PartialCapabilities/residual conflict
+
+-- in.cue --
+@test(validate, conflict, at="out")
+
+add: func(x: int, y: int) -> int: x + y
+p: add(1, ...)
+p: func(int) -> 4
+out: p(2)

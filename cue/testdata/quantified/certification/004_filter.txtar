@@ -1,0 +1,7 @@
+Quantified CUE: Certification/filter
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f(A): func(g: func(A) -> bool, xs: [...A]) -> [...A]: [for x in xs if g(x) {x}]

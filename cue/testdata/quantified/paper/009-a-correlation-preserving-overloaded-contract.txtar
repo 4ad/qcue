@@ -1,0 +1,11 @@
+Paper example 009: A correlation-preserving overloaded contract
+
+#paper: 9
+#mode: evaluation
+
+-- paper.cue.txt --
+convert: (func(int) -> string) & (func(string) -> int)
+-- in.cue --
+@test(validate, at="convert")
+
+convert: (func(int) -> string) & (func(string) -> int)

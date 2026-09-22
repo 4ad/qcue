@@ -1,0 +1,4 @@
+Quantified ContextualKeywords.
+
+-- in.cue --
+f: extern func(int) -> int !bridge

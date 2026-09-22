@@ -1,0 +1,8 @@
+Quantified CUE: Capabilities/body refines approximation
+
+-- in.cue --
+@test(json, 1, at="out")
+
+f: func(x: number) -> number: 1
+f: func(number) -> int
+out: f(3)

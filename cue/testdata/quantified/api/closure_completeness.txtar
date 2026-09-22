@@ -1,0 +1,26 @@
+Quantified CUE public API: TestQuantifiedClosureCompleteness
+
+#skip
+#inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
+
+-- case01.cue --
+n: int
+f: func() -> int: n
+
+-- case02.cue --
+n: int
+f: func(x: int = n) -> int: x
+
+-- case03.cue --
+#N: int
+f: func(x: #N) -> #N: x
+
+-- case04.cue --
+let N = int
+f: func(x: N) -> N: x
+
+-- case05.cue --
+f: func(xs: [...int]) -> int: ({
+if len(xs) == 0 {out: 0}
+if len(xs) > 0 {out: xs[0] + f(xs[1:])}
+}).out

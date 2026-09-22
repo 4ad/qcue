@@ -1,0 +1,13 @@
+Paper example 089: A local bound contradiction
+
+#paper: 89
+#mode: evaluation
+
+-- paper.cue.txt --
+x: <0
+y: x & >0
+-- in.cue --
+@test(validate, conflict, at="y")
+
+x: <0
+y: x & >0

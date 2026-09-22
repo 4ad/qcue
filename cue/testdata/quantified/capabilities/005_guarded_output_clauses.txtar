@@ -1,0 +1,11 @@
+Quantified CUE: Capabilities/guarded output clauses
+
+-- in.cue --
+@test(json, ["negative","nonnegative"], at="out")
+
+classify: func(x: int) -> ("negative" | "nonnegative"): {
+    if x < 0 {out: "negative"}
+    if x >= 0 {out: "nonnegative"}
+}.out
+classify: (func(int & <0) -> "negative") & (func(int & >=0) -> "nonnegative")
+out: [classify(-3), classify(2)]

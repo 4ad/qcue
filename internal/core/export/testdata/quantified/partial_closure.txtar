@@ -1,0 +1,9 @@
+Quantified export: partial closure.
+
+#incomplete
+
+-- in.cue --
+add: func(x: int, y: int) -> int: x + y
+out: add(1, ...)
+-- out/export --
+partial closure cannot be exported without its bound argument environment

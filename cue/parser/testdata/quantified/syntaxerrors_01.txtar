@@ -1,0 +1,6 @@
+Quantified SyntaxErrors.
+
+#error
+
+-- in.cue --
+x: forall () int

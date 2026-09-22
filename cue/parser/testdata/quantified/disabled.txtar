@@ -1,0 +1,9 @@
+Explicit opt-out rejects quantified syntax.
+
+#error
+
+-- in.cue --
+@experiment(quantified=false)
+x: forall A A
+-- error.txt --
+requires @experiment(quantified)

@@ -1,0 +1,10 @@
+Quantified CUE: StructuralRecursion/sum: func(seed: int, xs: [...int]) -> int: {              if len(xs) == 0 {out: seed}              if len(xs) > 0 {out: sum(seed + xs[0], xs[1:])}          }.out          out: sum(0, [1, 2, 3])
+
+-- in.cue --
+@test(json, 6, at="out")
+
+sum: func(seed: int, xs: [...int]) -> int: {
+             if len(xs) == 0 {out: seed}
+             if len(xs) > 0 {out: sum(seed + xs[0], xs[1:])}
+         }.out
+         out: sum(0, [1, 2, 3])

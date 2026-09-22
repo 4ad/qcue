@@ -1,0 +1,7 @@
+Quantified CUE: Certification/optional presence
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, incomplete, at="f")
+
+f: func(x?: int) -> int: x

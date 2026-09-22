@@ -1,0 +1,8 @@
+Quantified CUE: Capabilities/additional optional slot
+
+-- in.cue --
+@test(json, [1,3], at="out")
+
+f: func(x: int, y: int = 1) -> int: y
+f: func(int) -> 1
+out: [f(0), f(0, 3)]

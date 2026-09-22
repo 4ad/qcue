@@ -1,0 +1,6 @@
+Quantified syntax and its desugared AST.
+
+-- in.cue --
+bridge: extern func(int) -> int !bridge
+-- debug.txt --
+bridge: extern func(int) -> int !bridge

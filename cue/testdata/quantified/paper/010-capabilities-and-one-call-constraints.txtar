@@ -1,0 +1,20 @@
+Paper example 010: Capabilities and one-call constraints
+
+#paper: 10
+#mode: evaluation
+
+-- paper.cue.txt --
+wide:   func(number) -> string
+wide:   func(x: int) -> string: "ok"  // incompatible coverage
+
+narrow: func(int) -> string
+narrow: func(x: number) -> string: "ok" // conforming implementation
+-- in.cue --
+@test(validate, at="narrow")
+@test(validate, conflict, at="wide")
+
+wide:   func(number) -> string
+wide:   func(x: int) -> string: "ok"  // incompatible coverage
+
+narrow: func(int) -> string
+narrow: func(x: number) -> string: "ok" // conforming implementation

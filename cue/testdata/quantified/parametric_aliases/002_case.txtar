@@ -1,0 +1,20 @@
+Quantified CUE: ParametricAliases/Box(A) = {value: A} Pair(A, B) = [A, B] out: {box: Box(int) & {value: 7}, pair: Pair(int, string) & [3, "x"]}
+
+-- in.cue --
+@test(json, {"box":{"value":7},"pair":[3,"x"]}, at="out")
+
+Box(A) = {value: A}
+Pair(A, B) = [A, B]
+out: {box: Box(int) & {value: 7}, pair: Pair(int, string) & [3, "x"]}
+-- out/eval/stats --
+Leaks:  0
+Freed:  12
+Reused: 3
+Allocs: 9
+Retain: 0
+
+Unifications: 9
+Conjuncts:    16
+Disjuncts:    0
+
+NumCloseIDs: 2

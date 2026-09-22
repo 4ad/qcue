@@ -1,0 +1,10 @@
+Quantified CUE: Instantiation/composition
+
+-- in.cue --
+@test(json, "5", at="out")
+
+compose(A, B, C): func(g: func(B) -> C, f: func(A) -> B) ->
+    func(A) -> C: func(x: A) -> C: g(f(x))
+inc: func(x: int) -> int: x + 1
+text: func(x: int) -> string: "\(x)"
+out: compose(text, inc)(4)

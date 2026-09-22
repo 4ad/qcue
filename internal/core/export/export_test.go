@@ -404,42 +404,35 @@ func TestNoPanicCyclicBuiltinValidator(t *testing.T) {
 	})
 }
 
+// API assertions distinguish typed incomplete export errors from residual syntax.
 func TestQuantifiedIncompleteExport(t *testing.T) {
-	for _, src := range []string{
-		`f(A): func(A) -> A
-out: f(3)`,
-		`add: func(x: int, y: int) -> int: x + y
-out: add(1, ...)`,
-		`x: int
-out: func() -> int: x`,
-		`#I: exists A {value: A}
-out: seal #I with (A = int) {value: 123456789}`,
-	} {
-		t.Run(src, func(t *testing.T) {
-			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src).LookupPath(cue.ParsePath("out"))
-			if !v.Exists() {
-				t.Fatal(v.Err())
+	test := cuetxtar.TxTarTest{Root: "testdata/quantified", Name: "export"}
+	test.Run(t, func(t *cuetxtar.Test) {
+		v := cuecontext.New().BuildInstance(t.Instance()).LookupPath(cue.ParsePath("out"))
+		if !v.Exists() {
+			t.Fatal(v.Err())
+		}
+		r, x := value.ToInternal(v)
+		node, err := export.All.Value(r, "", x)
+		if !t.HasTag("incomplete") {
+			if err != nil {
+				t.Fatal(err)
 			}
-			r, x := value.ToInternal(v)
-			node, err := export.All.Value(r, "", x)
-			if err == nil {
-				if string(formatNode(t, node)) != "f(3)" {
-					t.Fatalf("lost residual export: %s", formatNode(t, node))
-				}
-				return
+			t.Write(formatNode(t.T, node))
+			return
+		}
+		found := false
+		for _, cause := range errors.Errors(err) {
+			if _, ok := cause.(*export.IncompleteError); ok {
+				found = true
 			}
-			found := false
-			for _, cause := range errors.Errors(err) {
-				if _, ok := cause.(*export.IncompleteError); ok {
-					found = true
-				}
-			}
-			if !found {
-				t.Fatalf("unexpected export failure: %v", err)
-			}
-			if _, ok := v.Syntax(cue.Final()).(*ast.BadExpr); !ok {
-				t.Fatal("Syntax did not report an incomplete export")
-			}
-		})
-	}
+		}
+		if !found {
+			t.Fatalf("expected typed incomplete export error; got %v", err)
+		}
+		t.WriteErrors(err)
+		if _, ok := v.Syntax(cue.Final()).(*ast.BadExpr); !ok {
+			t.Fatal("Syntax did not report an incomplete export")
+		}
+	})
 }

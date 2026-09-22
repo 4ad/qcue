@@ -1,0 +1,29 @@
+Quantified CUE public API: TestQuantifiedFileOrder
+
+#skip
+#inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
+
+-- case01.cue --
+wrap(A): func(A) -> {value: A}
+
+-- case02.cue --
+wrap(A): func(A) -> {tag: "wrapped"}
+
+-- case03.cue --
+wrap(A): func(x: A) -> {value: A, tag: "wrapped"}: {value: x, tag: "wrapped"}
+out: wrap(1)
+
+-- case04.cue --
+f: func(x: number) -> number: 1
+
+-- case05.cue --
+f: func(number) -> int
+
+-- case06.cue --
+out: f(1.5)
+
+-- case07.cue --
+{"value":1,"tag":"wrapped"}
+
+-- case08.cue --
+1

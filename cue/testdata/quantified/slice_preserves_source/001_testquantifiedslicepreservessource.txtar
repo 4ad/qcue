@@ -1,0 +1,12 @@
+Quantified CUE: SlicePreservesSource
+
+-- in.cue --
+@test(json, {"tail":[2,3],"head":1,"original":[1,2,3],"last":[3]}, at="out")
+
+f: func(xs: [...int]) -> _: {
+    tail: xs[1:]
+    head: xs[0]
+    original: xs
+    last: xs[2:]
+}
+out: f([1, 2, 3])

@@ -1,0 +1,6 @@
+Quantified CUE: UniversalRefutations/bad(A): func(x: A) -> A: 0
+
+-- in.cue --
+@test(validate, conflict, at="bad")
+
+bad(A): func(x: A) -> A: 0

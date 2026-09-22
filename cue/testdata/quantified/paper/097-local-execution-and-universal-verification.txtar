@@ -1,0 +1,15 @@
+Paper example 097: Local execution and universal verification
+
+#paper: 97
+#mode: evaluation
+
+-- paper.cue.txt --
+externalArithmetic: extern func(int) -> int !bridge
+f: func(x: int) -> int: externalArithmetic(x)
+r: f(0)
+-- in.cue --
+@test(validate, concrete, incomplete, at="r")
+
+externalArithmetic: extern func(int) -> int !bridge
+f: func(x: int) -> int: externalArithmetic(x)
+r: f(0)

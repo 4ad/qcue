@@ -1,0 +1,17 @@
+Paper example 001: Descriptions and completions
+
+#paper: 1
+#mode: evaluation
+
+-- paper.cue.txt --
+config: {
+    x: int
+    y: x + 1
+}
+-- in.cue --
+@test(validate, concrete, incomplete, at="config")
+
+config: {
+    x: int
+    y: x + 1
+}

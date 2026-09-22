@@ -1,0 +1,6 @@
+Quantified CUE: CapabilityRefutations/f: (func(int) -> int) & (func(int) -> bool)
+
+-- in.cue --
+@test(validate, conflict, at="f")
+
+f: (func(int) -> int) & (func(int) -> bool)

@@ -1,0 +1,7 @@
+Quantified CUE: RecursionRequiresDescent/loop: func(xs: [...int]) -> int: loop(xs)          out: loop([1])
+
+-- in.cue --
+@test(validate, conflict, at="out")
+
+loop: func(xs: [...int]) -> int: loop(xs)
+         out: loop([1])

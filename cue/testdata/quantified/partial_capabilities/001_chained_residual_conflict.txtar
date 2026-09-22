@@ -1,0 +1,10 @@
+Quantified CUE: PartialCapabilities/chained residual conflict
+
+-- in.cue --
+@test(validate, conflict, at="out")
+
+f: func(x: string, y: int, z: int) -> int: y + z
+p: f("prefix", ...)
+p: func(int, int) -> 4
+q: p(1, ...)
+out: q(2)

@@ -1,0 +1,7 @@
+Quantified CUE: Certification/nested function
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f(A): func(x: A) -> (func(int) -> A): func(y: int) -> A: x

@@ -1,0 +1,9 @@
+Quantified CUE: PartialCapabilities/residual result
+
+-- in.cue --
+@test(json, 3, at="out")
+
+add: func(x: int, y: int) -> int: x + y
+p: add(1, ...)
+p: func(int) -> 3
+out: p(2)

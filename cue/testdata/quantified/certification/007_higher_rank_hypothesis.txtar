@@ -1,0 +1,7 @@
+Quantified CUE: Certification/higher rank hypothesis
+
+-- in.cue --
+@test(validate, at="f")
+@test(validate, functions, at="f")
+
+f: func(id: forall A func(A) -> A) -> [int, string]: [id(3), id("x")]

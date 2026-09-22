@@ -1,0 +1,21 @@
+Quantified CUE: ParametricAliases/Box(A: number) = {value: A}          out: Box(string)
+
+-- in.cue --
+@test(validate, conflict)
+
+Box(A: number) = {value: A}
+         out: Box(string)
+-- out/errors.txt --
+[eval] out: type argument string does not satisfy bound of A:
+    ./in.cue:4:15
+    ./in.cue:4:19
+-- out/eval/stats --
+Leaks:  0
+Freed:  2
+Reused: 0
+Allocs: 2
+Retain: 0
+
+Unifications: 2
+Conjuncts:    2
+Disjuncts:    0
