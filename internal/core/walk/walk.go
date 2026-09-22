@@ -104,6 +104,7 @@ func (w *Visitor) node(n adt.Node) {
 	case *adt.IndexExpr:
 		w.node(x.X)
 		w.node(x.Index)
+		w.node(x.TypeIndex)
 
 	case *adt.SliceExpr:
 		w.node(x.X)

@@ -29,7 +29,7 @@ func TestNativeFunctions(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(`
 @experiment(aliasv2)
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import "list"
 
@@ -146,7 +146,7 @@ func TestNativeFunctionErrors(t *testing.T) {
 		{
 			name: "attached constraint follows positional match",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(_~n: int) -> int: n
 f: func(input: <10) -> int
@@ -157,7 +157,7 @@ out: f(input: 15)
 		{
 			name: "different contract labels on one positional slot",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 out: (func(a: int) -> int) & (func(b: int) -> int)
 `,
@@ -166,7 +166,7 @@ out: (func(a: int) -> int) & (func(b: int) -> int)
 		{
 			name: "attached constraint follows positional call",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(_~n: int) -> int: n
 f: func(input: <10) -> int
@@ -177,7 +177,7 @@ out: f(15)
 		{
 			name: "name-only constraint follows sibling contract label",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 T1: func(x?: <10, ...) -> int
 T2: func(x: int, ...) -> int
@@ -189,7 +189,7 @@ out: f(x: 20)
 		{
 			name: "builtin name-only constraint follows sibling contract label",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import "strings"
 
@@ -203,7 +203,7 @@ out: f(s: "ABC")
 		{
 			name: "builtin default is constrained by attached signature",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import "path"
 
@@ -216,7 +216,7 @@ out: f("a\\b")
 		{
 			name: "validator constructor rejects full-call first label",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import "strings"
 
@@ -227,7 +227,7 @@ out: strings.MinRunes(s: 3)
 		{
 			name: "validator constructor rejects full-call trailing label",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import "strings"
 
@@ -238,7 +238,7 @@ out: strings.MinRunes(min: 3)
 		{
 			name: "different attached contract labels conflict",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(_~n: int) -> int: n
 f: func(input: int) -> int
@@ -250,7 +250,7 @@ out: f
 		{
 			name: "attached contract label duplicates positional argument",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(_~n: int) -> int: n
 f: func(input: int) -> int
@@ -261,7 +261,7 @@ out: f(1, input: 2)
 		{
 			name: "parameter matching is one-to-one",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 out: (func(int, int) -> int) & (func(int) -> int: 1)
 `,
@@ -270,7 +270,7 @@ out: (func(int, int) -> int) & (func(int) -> int: 1)
 		{
 			name: "attached contract-label conflict",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(_~a: int, _~b: int) -> int: a + b
 f: func(x: int, y: int) -> int
@@ -282,7 +282,7 @@ out: f
 		{
 			name: "attached contract-label conflict merging tightened values",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(_~a: int, _~b: int) -> int: a + b
 left: f & (func(x: int, y: int) -> int)
@@ -294,7 +294,7 @@ out: left & right
 		{
 			name: "attached contract-label ambiguity beyond open head",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 out: (func(...) -> int) & (func(x: int, ...) -> int) & (func(int, x: int, ...) -> int)
 `,
@@ -303,7 +303,7 @@ out: (func(...) -> int) & (func(x: int, ...) -> int) & (func(int, x: int, ...) -
 		{
 			name: "attached contract label collides with name-only parameter",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(_~v: int, x!: int) -> int: v + x
 f: func(x: int, ...) -> int
@@ -314,7 +314,7 @@ out: f
 		{
 			name: "builtin attached contract-label conflict",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import "strings"
 
@@ -328,7 +328,7 @@ out: f
 		{
 			name: "cannot tighten after partial application",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(_~a: int, _~b: int) -> int: a + b
 p: f(1, ...)
@@ -339,7 +339,7 @@ out: p & (func(b: int) -> int)
 		{
 			name: "incompatible types merging tightened builtins",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import "path"
 
@@ -352,7 +352,7 @@ out: short & long
 		{
 			name: "return constraint",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 out: (func() -> string: 1)()
 `,
@@ -361,7 +361,7 @@ out: (func() -> string: 1)()
 		{
 			name: "name-only positional",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(a!: int) -> int: a
 out: f(1)
@@ -371,7 +371,7 @@ out: f(1)
 		{
 			name: "missing positional",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(int) -> int: 1
 out: f()
@@ -381,7 +381,7 @@ out: f()
 		{
 			name: "missing named",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(a: int) -> int: a
 out: f()
@@ -391,7 +391,7 @@ out: f()
 		{
 			name: "labeled builtin",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 out: len(x: "foo")
 `,
@@ -400,7 +400,7 @@ out: len(x: "foo")
 		{
 			name: "positional after labeled call",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 sum: func(a: int, b: int) -> int: a + b
 out: sum(a: 1, 2)
@@ -410,7 +410,7 @@ out: sum(a: 1, 2)
 		{
 			name: "duplicate positional and labeled",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 sum: func(a: int, b: int) -> int: a + b
 out: sum(1, a: 2)
@@ -420,7 +420,7 @@ out: sum(1, a: 2)
 		{
 			name: "return type refers to parameter",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 a: string
 f: func(a: int) -> a: a
@@ -431,7 +431,7 @@ out: f(1)
 		{
 			name: "parameter constraint refers to parameter",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 a: int | *7
 f: func(a: string, b: a) -> int: b
@@ -442,7 +442,7 @@ out: f("x")
 		{
 			name: "dependent parameter reserved",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(x: int, y: >x) -> int: x
 out: f(5, 10)
@@ -452,7 +452,7 @@ out: f(5, 10)
 		{
 			name: "anonymous after named",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 bad: func(a: int, int) -> int: 1
 out: bad(1, 2)
@@ -462,7 +462,7 @@ out: bad(1, 2)
 		{
 			name: "alias-bound positional after named",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 bad: func(a: int, _~x: int) -> int: x
 out: bad(1, 2)
@@ -472,7 +472,7 @@ out: bad(1, 2)
 		{
 			name: "duplicate parameter",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 bad: func(a: int, a: int) -> int: a
 out: bad(1, 2)
@@ -482,7 +482,7 @@ out: bad(1, 2)
 		{
 			name: "dual alias parameter",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 bad: func(_~(K,V): int) -> int: V
 out: bad(1)
@@ -492,7 +492,7 @@ out: bad(1)
 		{
 			name: "recursive default",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(n: int = f()) -> int: n
 out: f()
@@ -502,7 +502,7 @@ out: f()
 		{
 			name: "mutual recursive default",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(n: int = g()) -> int: n
 g: func(n: int = f()) -> int: n
@@ -531,6 +531,7 @@ out: f()
 func TestNativeFunctionsRequireExperiment(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(`
+@experiment(quantified=false)
 sum: func(a: int, b: int) -> int: a + b
 `)
 	err := v.Err()
@@ -544,7 +545,7 @@ sum: func(a: int, b: int) -> int: a + b
 
 func TestNativeFunctionProgrammaticCallArgOrder(t *testing.T) {
 	f, err := parser.ParseFile("input.cue", `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 sum: func(a: int, b: int) -> int: a + b
 out: sum(1, b: 2)
@@ -582,6 +583,7 @@ out: sum(1, b: 2)
 func TestFuncIdentifierWithoutFunctionsExperiment(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(`
+@experiment(quantified=false)
 func: len
 out: func("foo")
 `)
@@ -610,7 +612,7 @@ func TestCallUnresolvedDisjunction(t *testing.T) {
 		{
 			name: "functions",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(a: int) -> int: a
 g: func(a: int) -> int: a + 1
@@ -632,7 +634,7 @@ out: h("Hello")
 		{
 			name: "mixed function and non-function",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(a: int) -> int: a
 h: f | 1
@@ -665,7 +667,7 @@ out: h(1)
 	t.Run("default resolves", func(t *testing.T) {
 		ctx := cuecontext.New()
 		v := ctx.CompileString(`
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(a: int) -> int: a
 g: func(a: int) -> int: a + 1
@@ -699,7 +701,7 @@ func TestNativeFunctionRecursionIsCycle(t *testing.T) {
 		{
 			name: "direct",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(n: int) -> int: f(n)
 out: f(1)
@@ -708,7 +710,7 @@ out: f(1)
 		{
 			name: "mutual",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 f: func(n: int) -> int: g(n)
 g: func(n: int) -> int: f(n)
@@ -718,7 +720,7 @@ out: f(1)
 		{
 			name: "fibonacci",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 fib: func(n: int) -> int: fib(n-1) + fib(n-2)
 out: fib(5)
@@ -748,7 +750,7 @@ out: fib(5)
 // re-appear in one reference chain at nesting depth >= 3.
 func TestNativeFunctionNestingIsNotCycle(t *testing.T) {
 	const prelude = `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 sum:   func(a: int, b: int) -> int: a + b
 twice: func(n: int) -> int: sum(n, n)
@@ -821,7 +823,7 @@ func TestNativeFunctionsInDisjunction(t *testing.T) {
 	t.Run("recursion fails the branch", func(t *testing.T) {
 		ctx := cuecontext.New()
 		v := ctx.CompileString(`
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 x: {
 	loop: func(n: int) -> int: loop(n)
@@ -843,7 +845,7 @@ x: {
 	t.Run("nesting evaluates in the branch", func(t *testing.T) {
 		ctx := cuecontext.New()
 		v := ctx.CompileString(`
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 x: {
 	sum:   func(a: int, b: int) -> int: a + b
@@ -877,7 +879,7 @@ func TestNativeFunctionErrorsHideInternals(t *testing.T) {
 		{
 			name: "recursion",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 fn:  func(n: int) -> int: fn(n)
 out: fn(1)
@@ -887,7 +889,7 @@ out: fn(1)
 		{
 			name: "return constraint conflict",
 			in: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 out: (func() -> string: 1)()
 `,

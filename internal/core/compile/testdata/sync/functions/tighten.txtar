@@ -8,7 +8,7 @@
 # surface when the function is called; two declared defaults for the same
 # parameter are unified when the signatures are.
 -- in.cue --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 tighten: {
 	T: func(a: int, ...) -> number

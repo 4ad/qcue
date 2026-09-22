@@ -4,7 +4,7 @@
 # without the optimization, each call adds avoidable evaluator work.
 #inlinetest:exclude skip — performance regression guarded by out/eval/stats
 -- in.cue --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import "list"
 

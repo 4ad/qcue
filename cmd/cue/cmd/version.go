@@ -28,7 +28,7 @@ import (
 func newVersionCmd(c *Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "print the CUE version and build information",
+		Short: "print the qcue version, CUE language version, and extensions",
 		Long:  ``,
 		RunE:  mkRunE(c, runVersion),
 	}
@@ -42,8 +42,11 @@ func runVersion(cmd *Command, args []string) error {
 	if !ok {
 		return errors.New("unknown error reading build-info")
 	}
-	fmt.Fprintf(w, "cue version %s\n\n", cueversion.ModuleVersion())
+	fmt.Fprintf(w, "qcue version %s\n\n", cueversion.ModuleVersion())
 	fmt.Fprintf(w, "CUE language version %s\n\n", cueversion.LanguageVersion())
+	fmt.Fprintln(w, "Quantified CUE extensions: S_H (higher-rank quantifiers), A (opaque packages)")
+	fmt.Fprintln(w, "quantified: enabled by default for CUE v0.18.0 and later")
+	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Go version %s\n", runtime.Version())
 	for _, s := range bi.Settings {
 		if s.Value == "" {

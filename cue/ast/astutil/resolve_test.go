@@ -98,19 +98,19 @@ func TestResolveFuncSignatureScopes(t *testing.T) {
 	}{{
 		desc: "nested function in return type resolves own parameter in body",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(x: int) -> (func(a: int) -> int: a): 1
 `,
 	}, {
 		desc: "nested function in parameter constraint resolves own parameter in body",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(g: int | *(func(a: int) -> int: a + 1)) -> int: 1
 `,
 	}, {
 		desc: "nested function in body may refer to outer parameter in its signature",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(x: int) -> int: {
 	g:   func(y: x) -> int: y
 	out: g(x)
@@ -119,7 +119,7 @@ f: func(x: int) -> int: {
 	}, {
 		desc: "parameter constraint referring to sibling parameter is reserved",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(x: int, y: x) -> int: x
 `,
 		wantErr: []string{
@@ -128,7 +128,7 @@ f: func(x: int, y: x) -> int: x
 	}, {
 		desc: "return type referring to parameter is reserved",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(x: int) -> x: x
 `,
 		wantErr: []string{
@@ -137,7 +137,7 @@ f: func(x: int) -> x: x
 	}, {
 		desc: "nested signature reserves its own parameters",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(x: int) -> (func(a: int, b: a) -> int): 1
 `,
 		wantErr: []string{
@@ -146,7 +146,7 @@ f: func(x: int) -> (func(a: int, b: a) -> int): 1
 	}, {
 		desc: "nested function in outer signature cannot refer to outer parameter",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(x: int) -> (func(a: int) -> int: x): 1
 `,
 		wantErr: []string{
@@ -155,14 +155,14 @@ f: func(x: int) -> (func(a: int) -> int: x): 1
 	}, {
 		desc: "parameter default resolves in the enclosing scope",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 base: 1
 f: func(x: int = base) -> int: x
 `,
 	}, {
 		desc: "parameter default referring to sibling parameter is reserved",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(x: int, y: int = x) -> int: y
 `,
 		wantErr: []string{
@@ -171,7 +171,7 @@ f: func(x: int, y: int = x) -> int: y
 	}, {
 		desc: "nested function in parameter default resolves own parameter in body",
 		src: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(g: _ = (func(a: int) -> int: a + 1)) -> int: 1
 `,
 	}}

@@ -440,7 +440,8 @@ func TestMain(m *testing.M) {
 		}
 	}
 	testscript.Main(m, map[string]func(){
-		"cue": func() { os.Exit(cuecmd.Main()) },
+		"cue":  func() { os.Exit(cuecmd.Main()) },
+		"qcue": func() { os.Exit(cuecmd.Main()) },
 		// Until https://github.com/rogpeppe/go-internal/issues/93 is fixed,
 		// or we have some other way to use "exec" without caring about success,
 		// this is an easy way for us to mimic `? exec cue`.

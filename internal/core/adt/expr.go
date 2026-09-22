@@ -1144,6 +1144,7 @@ type IndexExpr struct {
 	Src        *ast.IndexExpr
 	X          Expr
 	Index      Expr
+	TypeIndex  Expr // singleton decoding applies only to type application
 	Optional   bool // true if index has ? suffix (e.g., foo[0]?)
 	Quantified bool // permits explicit type application
 }
@@ -1159,9 +1160,13 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 	// Type application uses predicates as arguments, so it must precede
 	// the ordinary index path, which requires a concrete string or integer.
 	if x.Quantified {
+		index := x.TypeIndex
+		if index == nil {
+			index = x.Index
+		}
 		if v := ctx.unifyNode(x.X, state); v != nil {
 			if f, ok := Unwrap(v).(*FuncValue); ok && len(typeParameters(f.Env)) != 0 {
-				arg, _ := ctx.Evaluate(ctx.Env(0), x.Index)
+				arg, _ := ctx.Evaluate(ctx.Env(0), index)
 				inst, b := f.instantiate(ctx, map[*TypeParameter]Value{
 					typeParameters(f.Env)[0]: arg,
 				})
@@ -1174,7 +1179,7 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 				return v
 			}
 			if v, ok := v.(*Vertex); ok {
-				if inst, handled := instantiateSubject(ctx, v, x.Index); handled {
+				if inst, handled := instantiateSubject(ctx, v, index); handled {
 					return inst
 				}
 			}

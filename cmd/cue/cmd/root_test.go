@@ -102,17 +102,17 @@ func TestVersion(t *testing.T) {
 	// Note that we can't use the test binary for this purpose,
 	// given that binaries built via "go test" don't get stamped with version information.
 	//
-	// TODO: use "go tool cue", mimicking "go install ./cmd/cue && cue",
+	// TODO: use "go tool qcue", mimicking "go install ./cmd/qcue && qcue",
 	// once https://go.dev/issue/75033 is resolved.
 	// Until then, "go tool" never stamps the main module version,
 	// and "go run" only does when -buildvcs is explicitly enabled.
-	out, err := exec.Command("go", "run", "-buildvcs=true", "..", "version").CombinedOutput()
+	out, err := exec.Command("go", "run", "-buildvcs=true", "../../qcue", "version").CombinedOutput()
 	qt.Assert(t, qt.IsNil(err), qt.Commentf("%s", out))
 
 	got := string(out)
 
 	for _, expr := range []string{
-		`^cue version v0\.\d+\.\d+`,
+		`^qcue version v0\.\d+\.\d+`,
 		`\s+CUE language version ` + regexp.QuoteMeta(cueversion.LanguageVersion()),
 		`\s+Go version go1\.\d+`,
 		`\s+-buildmode\s`,
@@ -141,7 +141,7 @@ func TestInterrupt(t *testing.T) {
 	// Run the same tool binary for each of the test cases.
 	// This helps because we need to wait for the signal handler to be set up,
 	// and having to also wait for `go build` to finish at the same time is messy.
-	toolOut, err := exec.CommandContext(t.Context(), "go", "tool", "-n", "cue").Output()
+	toolOut, err := exec.CommandContext(t.Context(), "go", "tool", "-n", "qcue").Output()
 	qt.Assert(t, qt.IsNil(err))
 	toolPath := strings.TrimSpace(string(toolOut))
 

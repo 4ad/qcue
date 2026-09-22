@@ -40,6 +40,6 @@ require (
 )
 
 tool (
-	cuelang.org/go/cmd/cue
+	cuelang.org/go/cmd/qcue
 	golang.org/x/tools/cmd/stringer
 )

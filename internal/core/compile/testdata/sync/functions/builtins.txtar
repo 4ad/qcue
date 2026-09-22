@@ -13,7 +13,7 @@
 # kind-level compatibility where the constraint is literally a basic type;
 # all other constraints surface when the tightened builtin is called.
 -- in.cue --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import (
 	"list"

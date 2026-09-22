@@ -22,8 +22,8 @@ start the daemon with --listen, and configure each editor to run
 running.
 
 Usage:
-  cue lsp [flags]
-  cue lsp [command]
+  qcue lsp [flags]
+  qcue lsp [command]
 
 Available Commands:
   serve       run a CUE language server
@@ -42,4 +42,4 @@ Global Flags:
   -i, --ignore         proceed in the presence of errors
   -s, --simplify       simplify output
 
-Use "cue lsp [command] --help" for more information about a command.
+Use "qcue lsp [command] --help" for more information about a command.

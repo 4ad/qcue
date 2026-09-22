@@ -16,7 +16,7 @@ cmp stdout expect-out
 module: "mod.test"
 language: version: "v0.18.0"
 -- in.cue --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 package p
 

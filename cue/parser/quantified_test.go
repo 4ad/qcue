@@ -72,7 +72,7 @@ func TestQuantifiedSyntaxErrors(t *testing.T) {
 			}
 		})
 	}
-	_, err := ParseFile("test.cue", `x: forall A A`)
+	_, err := ParseFile("test.cue", "@experiment(quantified=false)\nx: forall A A")
 	if err == nil || !strings.Contains(err.Error(), "requires @experiment(quantified)") {
 		t.Fatalf("unexpected disabled syntax error: %v", err)
 	}

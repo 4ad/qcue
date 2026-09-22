@@ -35,6 +35,12 @@ func parseExperiments(x ...string) (m map[string]bool) {
 		}
 		for elem := range strings.SplitSeq(a, ",") {
 			elem = strings.TrimSpace(elem)
+			if name, value, ok := strings.Cut(elem, "="); ok {
+				if enabled, err := strconv.ParseBool(strings.TrimSpace(value)); err == nil {
+					m[strings.TrimSpace(name)] = enabled
+					continue
+				}
+			}
 			m[elem] = true
 		}
 	}

@@ -6,7 +6,7 @@ stdout 'Hello world!'
 cmp stderr short-stderr
 
 -- short-stderr --
-unknown command "hello" for "cue"
+unknown command "hello" for "qcue"
 -- task_tool.cue --
 package home
 

@@ -5,7 +5,7 @@ nested inside struct and list literals and comprehensions in the body,
 whose fields never surface as arcs of rooted vertices.
 
 -- in.cue --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 retref: {
 	x: int
@@ -57,7 +57,7 @@ comprbody: {
 comprbody: x: 5
 -- out/trim --
 == in.cue
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 retref: {
 	x: int

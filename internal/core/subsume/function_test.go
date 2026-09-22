@@ -44,7 +44,7 @@ func TestFunctions(t *testing.T) {
 		err string
 		in  string
 	}
-	const exp = "@experiment(functions)\n"
+	const exp = "@experiment(functions,quantified=false)\n"
 	testCases := []subsumeTest{
 		// Type ⊑ type: open and closed signatures.
 		{

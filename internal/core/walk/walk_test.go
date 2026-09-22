@@ -34,7 +34,7 @@ import (
 // names that collide with names referenced only by a type constraint.
 func TestFeaturesFuncCallRef(t *testing.T) {
 	const config = `
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 lim: 10
 T:   func(n: <lim, ...) -> _

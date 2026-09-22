@@ -1,0 +1,23 @@
+exec qcue version
+stdout '^qcue version '
+stdout '^CUE language version v0.18.0$'
+stdout 'S_H \(higher-rank quantifiers\), A \(opaque packages\)'
+stdout '^quantified: enabled by default'
+
+exec qcue export main.cue -e 'out[0]'
+stdout '^3$'
+exec qcue export main.cue -e 'out[1]'
+stdout '^"hello"$'
+
+! exec qcue eval invalid.cue
+stderr 'quantifier syntax requires @experiment\(quantified\)'
+
+-- cue.mod/module.cue --
+module: "test.example/quantified"
+language: version: "v0.18.0"
+-- main.cue --
+id(A): func(x: A) -> A: x
+out: [id(3), id[string]("hello")]
+-- invalid.cue --
+@experiment(quantified=false)
+x: forall A A

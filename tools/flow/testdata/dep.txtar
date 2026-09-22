@@ -200,14 +200,14 @@ graph TD
 	let INDEX = int
 }
 -- out/run-v3/t3/stats --
-Leaks:  3
+Leaks:  6
 Freed:  0
 Reused: 0
-Allocs: 3
+Allocs: 6
 Retain: 0
 
-Unifications: 1
-Conjuncts:    1
+Unifications: 2
+Conjuncts:    2
 Disjuncts:    0
 ResolveDep:   2
 -- diff/-out/run-v3/t3/stats<==>+out/run/t3/stats --
@@ -216,17 +216,19 @@ diff old new
 +++ new
 @@ -1,9 +1,10 @@
 -Leaks:  1
-+Leaks:  3
++Leaks:  6
  Freed:  0
  Reused: 0
 -Allocs: 1
 -Retain: 1
-+Allocs: 3
++Allocs: 6
 +Retain: 0
  
- Unifications: 1
- Conjuncts:    1
+-Unifications: 1
+-Conjuncts:    1
 -Disjuncts:    1
++Unifications: 2
++Conjuncts:    2
 +Disjuncts:    0
 +ResolveDep:   2
 -- out/run/t3/stats --
@@ -596,14 +598,14 @@ Unifications: 0
 Conjuncts:    0
 Disjuncts:    0
 -- out/run-v3/stats/totals --
-Leaks:  3
+Leaks:  6
 Freed:  0
 Reused: 0
-Allocs: 3
+Allocs: 6
 Retain: 0
 
-Unifications: 1
-Conjuncts:    1
+Unifications: 2
+Conjuncts:    2
 Disjuncts:    0
 ResolveDep:   12
 -- diff/-out/run-v3/stats/totals<==>+out/run/stats/totals --
@@ -612,17 +614,19 @@ diff old new
 +++ new
 @@ -1,9 +1,10 @@
 -Leaks:  1
-+Leaks:  3
++Leaks:  6
  Freed:  0
  Reused: 0
 -Allocs: 1
 -Retain: 1
-+Allocs: 3
++Allocs: 6
 +Retain: 0
  
- Unifications: 1
- Conjuncts:    1
+-Unifications: 1
+-Conjuncts:    1
 -Disjuncts:    1
++Unifications: 2
++Conjuncts:    2
 +Disjuncts:    0
 +ResolveDep:   12
 -- out/run/stats/totals --

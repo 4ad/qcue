@@ -1600,7 +1600,7 @@ func (p *parser) parseFunc() (expr ast.Expr) {
 
 	// "func" might be used as an identifier, in which case bail out early.
 	switch p.tok {
-	case token.COLON, token.BIND, token.OPTION,
+	case token.COLON, token.BIND, token.OPTION, token.NOT,
 		token.COMMA, token.EOF:
 
 		return &ast.Ident{

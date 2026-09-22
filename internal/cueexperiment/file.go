@@ -16,7 +16,6 @@ package cueexperiment
 
 import (
 	"fmt"
-	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -34,6 +33,7 @@ import (
 // default.
 //
 //	preview:     the version from when the experiment was introduced.
+//	default:     the version from when it is enabled unless opted out.
 //	stable:      the version from when it is permanently set to true.
 //	withdrawn:   results in an error if the user attempts to use the flag.
 //
@@ -111,7 +111,7 @@ type File struct {
 	// Quantified enables predicative higher-rank quantifiers and opaque
 	// existential modules, including the capability semantics of functions.
 	// See doc/quantified-cue.tex, profiles S_H and A.
-	Quantified bool `experiment:"preview:v0.18.0"`
+	Quantified bool `experiment:"preview:v0.18.0,default:v0.18.0"`
 }
 
 // LanguageVersion returns the language version of the file or "" if no language
@@ -138,9 +138,17 @@ func NewFile(version string, experiments ...string) (*File, error) {
 	// TODO: cash versions for a given version where there is no experiment
 	// string.
 	m := parseExperiments(experiments...)
+	names := make([]string, 0, len(m))
+	for name, enabled := range m {
+		if !enabled {
+			name += "=false"
+		}
+		names = append(names, name)
+	}
+	slices.Sort(names)
 	f := &File{
 		version:     version,
-		experiments: strings.Join(slices.Sorted(maps.Keys(m)), ","),
+		experiments: strings.Join(names, ","),
 	}
 
 	if err := parseConfig(f, version, m); err != nil {

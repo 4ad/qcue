@@ -711,7 +711,7 @@ func TestSanitizeCrossFileShadowing(t *testing.T) {
 // only from a parameter constraint or only from the return type of a function
 // literal is marked as used, so that Sanitize does not strip it.
 func TestSanitizeFuncSignatureImports(t *testing.T) {
-	const src = `@experiment(functions)
+	const src = `@experiment(functions,quantified=false)
 
 import (
 	"time"
@@ -734,7 +734,7 @@ f: func(x: time.Duration) -> math.MaxFloat64: 1.0
 // from a parameter default is marked as used, so that Sanitize does not strip
 // it. The default is resolved in the same scope as the parameter constraint.
 func TestSanitizeFuncParamDefaultImports(t *testing.T) {
-	const src = `@experiment(functions)
+	const src = `@experiment(functions,quantified=false)
 
 import "time"
 

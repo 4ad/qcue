@@ -1423,8 +1423,11 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		r := &adt.IndexExpr{
 			Src:        n,
 			X:          c.valueExpr(n.X),
-			Index:      c.typeExpr(n.Index),
+			Index:      c.valueExpr(n.Index),
 			Quantified: c.experiments.Quantified,
+		}
+		if r.Quantified {
+			r.TypeIndex = c.typeExpr(n.Index)
 		}
 		if c.typePosition && ordinaryWitnessReference(r) {
 			return &adt.WitnessReference{X: r}

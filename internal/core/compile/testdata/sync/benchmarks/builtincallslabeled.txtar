@@ -5,7 +5,7 @@
 # builtincallspos.txtar; comparing the two isolates the cost of
 # labeled-argument binding.
 -- in.cue --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 import (
 	"list"

@@ -128,7 +128,7 @@ func TestPostfixSpread(t *testing.T) {
 // not to the parameter, and a comment after the last parameter would
 // swallow the closing parenthesis on a shared line.
 func TestFuncParamComments(t *testing.T) {
-	const head = "@experiment(functions)\n\n"
+	const head = "@experiment(functions,quantified=false)\n\n"
 	sources := []struct{ src, comment string }{{
 		src:     head + "f: func(a: int = // after the bind token\n\t2) -> int: a\n",
 		comment: "// after the bind token",

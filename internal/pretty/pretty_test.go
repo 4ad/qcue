@@ -879,7 +879,7 @@ x: {
 			// always fills Params.
 			name: "func_legacy_args",
 			node: &ast.File{Decls: []ast.Decl{
-				&ast.Attribute{Text: "@experiment(functions)"},
+				&ast.Attribute{Text: "@experiment(functions,quantified=false)"},
 				&ast.Field{
 					Label:    &ast.Ident{NamePos: token.Newline.Pos(), Name: "f"},
 					TokenPos: token.Blank.Pos(),
@@ -894,7 +894,7 @@ x: {
 			}},
 			cfg: &pretty.Config{Width: 80, Indent: "\t"},
 			want: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(int, string) -> bool`[1:],
 		},
 		{
@@ -903,7 +903,7 @@ f: func(int, string) -> bool`[1:],
 			// parser never produces this shape.
 			name: "func_nil_param_skipped",
 			node: &ast.File{Decls: []ast.Decl{
-				&ast.Attribute{Text: "@experiment(functions)"},
+				&ast.Attribute{Text: "@experiment(functions,quantified=false)"},
 				&ast.Field{
 					Label:    &ast.Ident{NamePos: token.Newline.Pos(), Name: "f"},
 					TokenPos: token.Blank.Pos(),
@@ -919,7 +919,7 @@ f: func(int, string) -> bool`[1:],
 			}},
 			cfg: &pretty.Config{Width: 80, Indent: "\t"},
 			want: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(int) -> int`[1:],
 		},
 		{
@@ -937,7 +937,7 @@ f: func(int) -> int`[1:],
 					List:     []*ast.Comment{{Text: "// doc"}},
 				})
 				return &ast.File{Decls: []ast.Decl{
-					&ast.Attribute{Text: "@experiment(functions)"},
+					&ast.Attribute{Text: "@experiment(functions,quantified=false)"},
 					&ast.Field{
 						Label:    &ast.Ident{NamePos: token.Newline.Pos(), Name: "f"},
 						TokenPos: token.Blank.Pos(),
@@ -950,7 +950,7 @@ f: func(int) -> int`[1:],
 			}(),
 			cfg: &pretty.Config{Width: 80, Indent: "\t"},
 			want: `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(
 	// doc
 	a: int,

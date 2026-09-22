@@ -11,7 +11,7 @@ import (
 	"cuelang.org/go/internal/core/runtime"
 )
 
-//go:generate go tool cue exp gengotypes .
+//go:generate go tool qcue exp gengotypes .
 
 //go:embed crd.cue
 var crdCUE []byte

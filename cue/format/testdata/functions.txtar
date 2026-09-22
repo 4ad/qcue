@@ -1,5 +1,5 @@
 -- functions.input --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 sum: func(
     _~x: int,
@@ -53,7 +53,7 @@ openMulti: func(
     ...
 ) -> int
 -- out/format/functions.golden --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 sum: func(
 	_~(x): int,

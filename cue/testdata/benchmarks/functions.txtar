@@ -7,7 +7,7 @@
 # beyond what the shallow (depth <= 4) cases in functions/native.txtar can
 # detect.
 -- in.cue --
-@experiment(functions)
+@experiment(functions,quantified=false)
 
 sum:   func(a: int, b: int) -> int: a + b
 twice: func(n: int) -> int: sum(n, n)

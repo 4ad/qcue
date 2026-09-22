@@ -38,8 +38,8 @@ Run "cue help commands" for more details on authoring tasks and
 workflow commands.
 
 Usage:
-  cue cmd [flags] <name> [inputs]
-  cue cmd [command]
+  qcue cmd [flags] <name> [inputs]
+  qcue cmd [command]
 
 Available Commands:
   echo        echo something back
@@ -56,4 +56,4 @@ Global Flags:
   -i, --ignore         proceed in the presence of errors
   -s, --simplify       simplify output
 
-Use "cue cmd [command] --help" for more information about a command.
+Use "qcue cmd [command] --help" for more information about a command.

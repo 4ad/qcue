@@ -85,7 +85,7 @@ func TestCompile(t *testing.T) {
 
 func TestOpenFunctionBodyRejected(t *testing.T) {
 	file, err := parser.ParseFile("test.cue", `
-@experiment(functions)
+@experiment(functions,quantified=false)
 f: func(a: int) -> int: a
 `)
 	if err != nil {

@@ -1347,7 +1347,8 @@ bar: 2
 			out: "frontStyle: {\"key\": \"value\", \"key2\": \"value2\", \"foo\": bar}",
 		},
 		{
-			desc: "function types",
+			desc:    "function types",
+			version: "v0.17.0",
 			in: `
 			f0: func(): int
 			f1: func(int): int
@@ -1361,7 +1362,7 @@ bar: 2
 		},
 		{
 			desc: "functions experiment",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			sum: func(a: int, b: int) -> int: a + b
 			add1: func(_~x: int) -> int: x + 1
 			pick: func(a: int | *5) -> int: a
@@ -1369,39 +1370,39 @@ bar: 2
 			pos: sum(1, 2)
 			mixed: sum(1, b: 2)
 			named: sum(a: 1, b: 2)`,
-			out: "@experiment(functions), sum: func(a: int, b: int) -> int: a+b, add1: func(_~x: int) -> int: x+1, pick: func(a: int|*5) -> int: a, keyword: func(a!: int, b?: int) -> int: a, pos: sum(1, 2), mixed: sum(1, b: 2), named: sum(a: 1, b: 2)",
+			out: "@experiment(functions,quantified=false), sum: func(a: int, b: int) -> int: a+b, add1: func(_~x: int) -> int: x+1, pick: func(a: int|*5) -> int: a, keyword: func(a!: int, b?: int) -> int: a, pos: sum(1, 2), mixed: sum(1, b: 2), named: sum(a: 1, b: 2)",
 		},
 		{
 			desc: "open function signatures",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			t0: func(...) -> int
 			t1: func(a: int, ...) -> number
 			t2: func(int, ...) -> int`,
-			out: "@experiment(functions), t0: func(...) -> int, t1: func(a: int, ...) -> number, t2: func(int, ...) -> int",
+			out: "@experiment(functions,quantified=false), t0: func(...) -> int, t1: func(a: int, ...) -> number, t2: func(int, ...) -> int",
 		},
 		{
 			desc: "open function signature with body",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(a: int, ...) -> int: a`,
-			out: "@experiment(functions), f: func(a: int, ...) -> int: a\nopen function signature cannot have a body",
+			out: "@experiment(functions,quantified=false), f: func(a: int, ...) -> int: a\nopen function signature cannot have a body",
 		},
 		{
 			desc: "partial application call",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			a: add(1, ...)
 			b: add(x: 1, ...)
 			c: add(...)`,
-			out: "@experiment(functions), a: add(1, ...), b: add(x: 1, ...), c: add(...)",
+			out: "@experiment(functions,quantified=false), a: add(1, ...), b: add(x: 1, ...), c: add(...)",
 		},
 		{
 			desc: "parameter attributes",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(a: int @tag(x), b: int @foo() @bar(), c: int @baz()) -> int: a + b`,
-			out: "@experiment(functions), f: func(a: int @tag(x), b: int @foo() @bar(), c: int @baz()) -> int: a+b",
+			out: "@experiment(functions,quantified=false), f: func(a: int @tag(x), b: int @foo() @bar(), c: int @baz()) -> int: a+b",
 		},
 		{
 			desc: "function parameter defaults",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			named: func(a: int = 2) -> int: a
 			required: func(a!: int = 2) -> int: a
 			alias: func(_~x: int = 2) -> int: x
@@ -1412,82 +1413,83 @@ bar: 2
 			disj: func(a: int = 1 | 2) -> int: a
 			multi: func(a: int = 2, b: string = "x") -> string: b
 			nested: func(f: func(int) -> int = func(x: int) -> int: x) -> int: f(1)`,
-			out: `@experiment(functions), named: func(a: int = 2) -> int: a, required: func(a!: int = 2) -> int: a, alias: func(_~x: int = 2) -> int: x, blank: func(_: int = 2) -> int: 1, anon: func(int = 2) -> int: 1, attr: func(a: int = 2 @tag(x)) -> int: a, open: func(a: int = 2, ...) -> int, disj: func(a: int = 1|2) -> int: a, multi: func(a: int = 2, b: string = "x") -> string: b, nested: func(f: func(int) -> int = func(x: int) -> int: x) -> int: f(1)`,
+			out: `@experiment(functions,quantified=false), named: func(a: int = 2) -> int: a, required: func(a!: int = 2) -> int: a, alias: func(_~x: int = 2) -> int: x, blank: func(_: int = 2) -> int: 1, anon: func(int = 2) -> int: 1, attr: func(a: int = 2 @tag(x)) -> int: a, open: func(a: int = 2, ...) -> int, disj: func(a: int = 1|2) -> int: a, multi: func(a: int = 2, b: string = "x") -> string: b, nested: func(f: func(int) -> int = func(x: int) -> int: x) -> int: f(1)`,
 		},
 		{
 			desc: "function parameter default on optional parameter",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(a?: int = 1) -> int: a`,
-			out: "@experiment(functions), f: func(a?: int = 1) -> int: a\noptional parameter a cannot have a default; declare it as a! instead",
+			out: "@experiment(functions,quantified=false), f: func(a?: int = 1) -> int: a\noptional parameter a cannot have a default; declare it as a! instead",
 		},
 		{
 			desc: "variadic parameter",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(a: int, ...int) -> int`,
-			out: "@experiment(functions), f: func(a: int, ...) -> int\nvariadic parameters are not supported",
+			out: "@experiment(functions,quantified=false), f: func(a: int, ...) -> int\nvariadic parameters are not supported",
 		},
 		{
 			desc: "parameter after ellipsis",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(..., a: int) -> int`,
-			out: "@experiment(functions), f: func(a: int, ...) -> int\nparameter after ... in parameter list",
+			out: "@experiment(functions,quantified=false), f: func(a: int, ...) -> int\nparameter after ... in parameter list",
 		},
 		{
 			desc: "duplicate ellipsis parameter",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			t: func(a: int, ..., ...) -> int`,
-			out: "@experiment(functions), t: func(a: int, ...) -> int\nduplicate ... in parameter list",
+			out: "@experiment(functions,quantified=false), t: func(a: int, ...) -> int\nduplicate ... in parameter list",
 		},
 		{
 			desc: "attribute after ellipsis parameter",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(a: int, ... @x()) -> int`,
-			out: "@experiment(functions), f: func(a: int, ...) -> int\nattributes are not allowed after ... in a parameter list",
+			out: "@experiment(functions,quantified=false), f: func(a: int, ...) -> int\nattributes are not allowed after ... in a parameter list",
 		},
 		{
 			desc: "let in parameter list",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(let x = 1, a: int) -> int: a`,
-			out: "@experiment(functions), f: func(<*ast.BadExpr>, a: int) -> int: a\nlet declarations are not allowed in a parameter list",
+			out: "@experiment(functions,quantified=false), f: func(<*ast.BadExpr>, a: int) -> int: a\nlet declarations are not allowed in a parameter list",
 		},
 		{
 			desc: "attribute declaration in parameter list",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(@tag(x), a: int) -> int: a`,
-			out: "@experiment(functions), f: func(<*ast.BadExpr>, a: int) -> int: a\nattribute declarations are not allowed in a parameter list",
+			out: "@experiment(functions,quantified=false), f: func(<*ast.BadExpr>, a: int) -> int: a\nattribute declarations are not allowed in a parameter list",
 		},
 		{
 			desc: "multi-part label in parameter list",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(a: b: int) -> int: 1`,
-			out: "@experiment(functions), f: func(a: b) -> int: 1\nmultiple labels are not allowed in a parameter list",
+			out: "@experiment(functions,quantified=false), f: func(a: b) -> int: 1\nmultiple labels are not allowed in a parameter list",
 		},
 		{
 			desc: "pattern constraint in parameter list",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func([string]: int) -> int: 1`,
-			out: "@experiment(functions), f: func([string]) -> int: 1\npattern constraints are not allowed in a parameter list",
+			out: "@experiment(functions,quantified=false), f: func([string]) -> int: 1\npattern constraints are not allowed in a parameter list",
 		},
 		{
 			desc: "definition in parameter list",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(#a: int) -> int: 1`,
-			out: "@experiment(functions), f: func(#a: int) -> int: 1\ndefinitions are not allowed in a parameter list",
+			out: "@experiment(functions,quantified=false), f: func(#a: int) -> int: 1\ndefinitions are not allowed in a parameter list",
 		},
 		{
 			desc: "optional anonymous parameter",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func(_?: int) -> int: 1`,
-			out: "@experiment(functions), f: func(_?: int) -> int: 1\nan anonymous parameter cannot be marked optional or required",
+			out: "@experiment(functions,quantified=false), f: func(_?: int) -> int: 1\nan anonymous parameter cannot be marked optional or required",
 		},
 		{
 			desc: "quoted label in parameter list",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			f: func("a-b": int) -> int: 1`,
-			out: "@experiment(functions), f: func(\"a-b\") -> int: 1\na parameter name must be an identifier",
+			out: "@experiment(functions,quantified=false), f: func(\"a-b\") -> int: 1\na parameter name must be an identifier",
 		},
 		{
-			desc: "func literal experiment missing",
+			desc:    "func literal experiment missing",
+			version: "v0.17.0",
 			in: `
 			sum: func(a: int, b: int) -> int: a + b
 			`,
@@ -1518,7 +1520,8 @@ bar: 2
 			out: `a: 1, x: func("\(a): 1")`,
 		},
 		{
-			desc: "arrow scans as subtraction without experiment",
+			desc:    "arrow scans as subtraction without experiment",
+			version: "v0.17.0",
 			in: `
 			a: 3->2
 			`,
@@ -1526,7 +1529,8 @@ bar: 2
 			out: "a: 3->2",
 		},
 		{
-			desc: "labeled call experiment missing",
+			desc:    "labeled call experiment missing",
+			version: "v0.17.0",
 			in: `
 			x: f(a: 1)
 			`,
@@ -1534,20 +1538,21 @@ bar: 2
 		},
 		{
 			desc: "definition as argument label",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			x: f(#a: 1)
 			`,
-			out: "@experiment(functions), x: f(#a: 1)\ndefinitions are not allowed as argument labels",
+			out: "@experiment(functions,quantified=false), x: f(#a: 1)\ndefinitions are not allowed as argument labels",
 		},
 		{
 			desc: "blank argument label",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			x: f(_: 1)
 			`,
-			out: "@experiment(functions), x: f(_: 1)\n_ is not allowed as an argument label",
+			out: "@experiment(functions,quantified=false), x: f(_: 1)\n_ is not allowed as an argument label",
 		},
 		{
-			desc: "partial application without experiment",
+			desc:    "partial application without experiment",
+			version: "v0.17.0",
 			in: `
 			x: add(1, ...)
 			`,
@@ -1555,38 +1560,38 @@ bar: 2
 		},
 		{
 			desc: "positional argument after labeled argument",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			x: f(a: 1, 2)
 			`,
-			out: "@experiment(functions), x: f(a: 1, 2)\npositional argument after labeled argument",
+			out: "@experiment(functions,quantified=false), x: f(a: 1, 2)\npositional argument after labeled argument",
 		},
 		{
 			desc: "positional argument after later labeled argument",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			x: f(1, b: 2, 3)
 			`,
-			out: "@experiment(functions), x: f(1, b: 2, 3)\npositional argument after labeled argument",
+			out: "@experiment(functions,quantified=false), x: f(1, b: 2, 3)\npositional argument after labeled argument",
 		},
 		{
 			desc: "positional parameter after named parameter",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			x: func(a: int, int) -> int: 1
 			`,
-			out: "@experiment(functions), x: func(a: int, int) -> int: 1\npositional parameter after named parameter",
+			out: "@experiment(functions,quantified=false), x: func(a: int, int) -> int: 1\npositional parameter after named parameter",
 		},
 		{
 			desc: "function duplicate parameter",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			x: func(a: int, a: string) -> int: 1
 			`,
-			out: "@experiment(functions), x: func(a: int, a: string) -> int: 1\nparameter \"a\" redeclared in same scope",
+			out: "@experiment(functions,quantified=false), x: func(a: int, a: string) -> int: 1\nparameter \"a\" redeclared in same scope",
 		},
 		{
 			desc: "alias-bound positional parameter after named parameter",
-			in: `@experiment(functions)
+			in: `@experiment(functions,quantified=false)
 			x: func(a: int, _~x: int) -> int: x
 			`,
-			out: "@experiment(functions), x: func(a: int, _~x: int) -> int: x\npositional parameter after named parameter",
+			out: "@experiment(functions,quantified=false), x: func(a: int, _~x: int) -> int: x\npositional parameter after named parameter",
 		},
 		{
 			desc: "postfix ... operator with experiment",
@@ -1768,7 +1773,7 @@ func TestFunctionOrderingErrors(t *testing.T) {
 // "->" scans as two tokens, so that 3->2 parses as the binary expression
 // 3 - (>2), as it did before the experiment was introduced.
 func TestArrowWithoutExperiment(t *testing.T) {
-	f, err := ParseFile("input", "a: 3->2", AllErrors)
+	f, err := ParseFile("input", "a: 3->2", AllErrors, Version("v0.17.0"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
