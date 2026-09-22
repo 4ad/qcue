@@ -44,11 +44,16 @@ func (p *parser) quantifierAhead(block bool) bool {
 		return false
 	}
 	depth := 1
+	ranged := false
 	if tok == token.RPAREN {
 		depth = 0
 	}
 	for depth > 0 {
 		switch next() {
+		case token.IN:
+			if depth == 1 {
+				ranged = true
+			}
 		case token.LPAREN:
 			depth++
 		case token.RPAREN:
@@ -63,6 +68,12 @@ func (p *parser) quantifierAhead(block bool) bool {
 		return true
 	case token.COMMA:
 		return block
+	case token.ADD, token.SUB, token.NOT, token.MUL,
+		token.LSS, token.LEQ, token.GEQ, token.GTR,
+		token.NEQ, token.MAT, token.NMAT, token.EQL:
+		// A range binder cannot be a call argument. Without that marker,
+		// preserve ordinary expressions such as forall(x) + 1.
+		return ranged
 	}
 	return false
 }
