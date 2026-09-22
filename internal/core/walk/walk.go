@@ -129,6 +129,22 @@ func (w *Visitor) node(n adt.Node) {
 	case *adt.OpenExpr:
 		w.node(x.X)
 
+	case *adt.PackageSeal:
+		w.node(x.Interface)
+		for _, a := range x.Witnesses {
+			w.node(a)
+		}
+		w.node(x.Body)
+
+	case *adt.PackageOpen:
+		w.node(x.Value)
+		w.node(x.Body)
+
+	case *adt.Existential:
+		w.node(x.Template)
+
+	case *adt.OpaqueType, *adt.OpaqueValue, *adt.OpaqueCall:
+
 	case *adt.CallExpr:
 		w.node(x.Fun)
 		for _, arg := range x.Args {

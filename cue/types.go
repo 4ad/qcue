@@ -84,6 +84,10 @@ const (
 
 	// TopKind represents the top value.
 	TopKind Kind = adt.TopKind
+
+	// OpaqueKind is an abstract value exposed by a sealed interface. Its
+	// private representation cannot be selected, converted, or serialized.
+	OpaqueKind Kind = adt.OpaqueKind
 )
 
 // An structValue represents a JSON object.

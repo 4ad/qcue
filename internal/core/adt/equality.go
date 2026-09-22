@@ -159,6 +159,14 @@ func equalTerminal(ctx *OpContext, v, w Value, flags Flag) bool {
 		_, ok := w.(*Top)
 		return ok
 
+	case *OpaqueValue:
+		y, ok := w.(*OpaqueValue)
+		return ok && x.carrier == y.carrier && Equal(ctx, x.private, y.private, flags)
+
+	case *OpaqueType:
+		y, ok := w.(*OpaqueType)
+		return ok && x.carrier == y.carrier
+
 	case *Num, *String, *Bool, *Bytes, *Null:
 		return BinOpBool(ctx, errOnDiffType, EqualOp, v, w)
 

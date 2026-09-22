@@ -376,6 +376,14 @@ func (n *nodeContext) markStructLit(s *StructLit, ci CloseInfo) {
 // scheduleVertexConjuncts injects the conjuncst of src n. If src was not fully
 // evaluated, it subscribes dst for future updates.
 func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo CloseInfo) {
+	if arc.sealed != nil {
+		if n.node.sealed != nil && n.node.sealed != arc.sealed {
+			n.addBottom(n.ctx.NewErrf("conflicting opaque package identities"))
+			return
+		}
+		n.node.sealed = arc.sealed
+		n.node.sealedOpened = n.node.sealedOpened || arc.sealedOpened
+	}
 	// A function call reference carries its payload on the reference itself:
 	// the anchor arc it resolves to exists only to give the structural cycle
 	// detector a stable identity per function and deliberately has no

@@ -74,6 +74,10 @@ func BinOp(c *OpContext, node Node, op Op, left, right Value) Value {
 	if err := CombineErrors(c.src, left, right); err != nil {
 		return err
 	}
+	if _, ok := Unwrap(left).(*OpaqueValue); ok && (op == EqualOp || op == NotEqualOp) {
+		equal := Equal(c, Unwrap(left), Unwrap(right), 0)
+		return c.NewBool(op == EqualOp && equal || op == NotEqualOp && !equal)
+	}
 
 	switch op {
 	case EqualOp:

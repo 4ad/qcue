@@ -163,6 +163,158 @@ out: wrap("x")`, `{"value":"x"}`},
 	}
 }
 
+const quantifiedCounters = `
+@experiment(quantified)
+#Counter: exists State {
+    zero: State
+    next: func(State) -> State
+    read: func(State) -> (int & >=0)
+}
+counterV1: seal #Counter with (State = int & >=0) {
+    zero: 0
+    next: func(x: int & >=0) -> (int & >=0): x + 1
+    read: func(x: int & >=0) -> (int & >=0): x
+}
+let CounterRep = close({count: int & >=0})
+counterV2: seal #Counter with (State = CounterRep) {
+    zero: {count: 0}
+    next: func(s: CounterRep) -> CounterRep: {count: s.count + 1}
+    read: func(s: CounterRep) -> (int & >=0): s.count
+}
+useCounter(S): func(c: {
+    zero: S
+    next: func(S) -> S
+    read: func(S) -> (int & >=0)
+}) -> (int & >=0): c.read(c.next(c.next(c.zero)))
+`
+
+func TestQuantifiedSealedCounters(t *testing.T) {
+	for _, tt := range []struct{ name, expr, want string }{
+		{"integer counter", `(open counterV1 as (S, C) {out: useCounter[S](C)}).out`, `2`},
+		{"record counter", `(open counterV2 as (S, C) {out: useCounter[S](C)}).out`, `2`},
+		{"copy", `(open (counterV1 & counterV1) as (S, C) {out: useCounter[S](C)}).out`, `2`},
+		{"copy with metadata", `(open (counterV1 & {name: "counter"}) as (S, C) {out: useCounter[S](C)}).out`, `2`},
+		{"equal abstract states", `(open counterV2 as (S, C) {out: C.read(C.next(C.zero) & C.next(C.zero))}).out`, `1`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString(quantifiedCounters + "\nout: " + tt.expr)
+			got, err := v.LookupPath(cue.MakePath(cue.Str("out"))).MarshalJSON()
+			if err != nil {
+				t.Fatalf("%v (root: %v)", err, v.Err())
+			}
+			if string(got) != tt.want {
+				t.Fatalf("got %s; want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedSealGenerativity(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(quantifiedCounters + `
+make: func() -> #Counter: seal #Counter with (State = int & >=0) {
+    zero: 0
+    next: func(x: int & >=0) -> (int & >=0): x + 1
+    read: func(x: int & >=0) -> (int & >=0): x
+}
+a: make()
+b: make()
+copy: a
+good: (open (a & copy) as (S, C) {out: useCounter[S](C)}).out
+bad: a & b
+`)
+	if got, err := v.LookupPath(cue.MakePath(cue.Str("good"))).Int64(); got != 2 || err != nil {
+		t.Fatalf("copied seal: %d, %v (root: %v)", got, err, v.Err())
+	}
+	if err := v.LookupPath(cue.MakePath(cue.Str("bad"))).Err(); err == nil {
+		t.Fatal("independently constructed seals unified")
+	}
+}
+
+func TestQuantifiedComparablePackages(t *testing.T) {
+	v := cuecontext.New().CompileString(`
+@experiment(quantified)
+#ComparablePair: exists A {
+    left: A
+    right: A
+    equal: func(A, A) -> bool
+}
+compare: func(p: #ComparablePair) -> bool:
+    (open p as (A, P) {out: P.equal(P.left, P.right)}).out
+p: seal #ComparablePair with (A = int) {
+    left: 3
+    right: 3
+    equal: func(x: int, y: int) -> bool: x == y
+}
+q: seal #ComparablePair with (A = string) {
+    left: "a"
+    right: "b"
+    equal: func(x: string, y: string) -> bool: x == y
+}
+out: [compare(p), compare(q)]
+`)
+	got, err := v.LookupPath(cue.MakePath(cue.Str("out"))).MarshalJSON()
+	if err != nil {
+		t.Fatalf("%v (root: %v)", err, v.Err())
+	}
+	if string(got) != `[true,false]` {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestQuantifiedOpaqueBoundaries(t *testing.T) {
+	for _, expr := range []string{
+		`counterV1.zero`,
+		`counterV2["zero"]`,
+		`(open counterV1 as (S, C) {out: C.zero + 1}).out`,
+		`(open counterV2 as (S, C) {out: C.zero.count}).out`,
+		`(open counterV1 as (S, C) {out: C.read(C.zero & C.next(C.zero))}).out`,
+		`(open counterV1 as (S, C) {out: C.read(counterV2.zero)}).out`,
+		`(open counterV1 as (S, C) {out: C.zero}).out`,
+		`(open counterV1 as (S, C) {out: C.next}).out`,
+		`(open counterV1 as (S, C) {out: C}).out`,
+	} {
+		t.Run(expr, func(t *testing.T) {
+			v := cuecontext.New().CompileString(quantifiedCounters + "\nout: " + expr)
+			if err := v.LookupPath(cue.MakePath(cue.Str("out"))).Validate(); err == nil {
+				t.Fatal("invalid opaque observation was accepted")
+			}
+		})
+	}
+}
+
+func TestQuantifiedFirstClassPackages(t *testing.T) {
+	v := cuecontext.New().CompileString(`
+@experiment(quantified)
+#Showable: exists A {
+    value: A
+    show: func(A) -> string
+}
+p: seal #Showable with (A = int) {
+    value: 7
+    show: func(x: int) -> string: "\(x)"
+}
+q: seal #Showable with (A = string) {
+    value: "hello"
+    show: func(x: string) -> string: x
+}
+items: [p, q]
+describe: func(p: #Showable) -> string:
+    (open p as (A, P) {out: P.show(P.value)}).out
+map(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [
+    for x in xs {g(x)}
+]
+out: map(describe, items)
+`)
+	got, err := v.LookupPath(cue.MakePath(cue.Str("out"))).MarshalJSON()
+	if err != nil {
+		t.Fatalf("%v (root: %v)", err, v.Err())
+	}
+	if string(got) != `["7","hello"]` {
+		t.Fatalf("got %s", got)
+	}
+}
+
 // The paper's self-unification examples exercise descriptor identity across
 // copied environments, not just references to the same evaluator pointer.
 func TestQuantifiedClosureIdentity(t *testing.T) {

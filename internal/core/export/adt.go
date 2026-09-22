@@ -236,6 +236,9 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 	case *adt.AliasApplication:
 		return ast.Clone(x.Src)
 
+	case *adt.PackageSeal, *adt.PackageOpen, *adt.OpaqueCall:
+		return ast.NewIdent("_")
+
 	case *adt.TypeReference:
 		return ast.Clone(x.Src)
 

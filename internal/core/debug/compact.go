@@ -331,6 +331,26 @@ func (w *printer) compactNode(n adt.Node) {
 	case *adt.TypeReference:
 		w.string(x.Src.Name)
 
+	case *adt.Existential:
+		w.node(x.Template)
+
+	case *adt.PackageSeal:
+		w.string("seal ")
+		w.node(x.Interface)
+
+	case *adt.PackageOpen:
+		w.string("open ")
+		w.node(x.Value)
+
+	case *adt.OpaqueType:
+		w.string("opaque type")
+
+	case *adt.OpaqueValue:
+		w.string("opaque value")
+
+	case *adt.OpaqueCall:
+		w.string("opaque operation")
+
 	case *adt.AliasApplication:
 		w.string("alias(")
 		for i, a := range x.Args {

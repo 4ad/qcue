@@ -207,6 +207,12 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 	case *adt.FuncValue:
 		result = e.withFuncTypes(e.funcSrc(x.Src), x.Types)
 
+	case *adt.Existential:
+		result = ast.Clone(x.Template.Src)
+
+	case *adt.OpaqueType, *adt.OpaqueValue:
+		result = ast.NewIdent("_")
+
 	case *adt.Vertex:
 		result = e.vertex(x)
 

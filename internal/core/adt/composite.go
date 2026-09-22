@@ -162,6 +162,10 @@ func (e *Environment) up(ctx *OpContext, count int32) *Environment {
 // It maintains source information such as a list of conjuncts that contributed
 // to the value.
 type Vertex struct {
+	// sealed is the shared existential package identity. It is preserved by
+	// copying and never contains observable private representation fields.
+	sealed       *sealedPackage
+	sealedOpened bool
 	// Parent links to a parent Vertex. This parent should only be used to
 	// access the parent's Label field to find the relative location within a
 	// tree.

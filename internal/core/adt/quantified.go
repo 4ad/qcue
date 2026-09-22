@@ -103,8 +103,7 @@ func (a *AliasApplication) evaluate(c *OpContext, state Flags) Value {
 
 func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 	if q.Src.Exists {
-		return &Bottom{Src: q.Src, Code: IncompleteError,
-			Err: c.Newf("existential witness remains unresolved")}
+		return &Existential{Template: q, Env: c.Env(0)}
 	}
 	scope := c.newInlineVertex(nil, nil)
 	scope.BaseValue = &StructMarker{}

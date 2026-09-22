@@ -211,6 +211,7 @@ type OpContext struct {
 	// record the callee that produced them and are matched on that identity.
 	// See [FuncValue.call] and [funcCallResult].
 	funcCallResults map[funcCallResultKey][]funcCallResult
+	sealedViews     map[sealKey]*Vertex
 
 	// anonParamLabels caches the labels of the synthetic activation arcs
 	// that bind the arguments of anonymous positional function parameters,
