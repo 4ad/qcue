@@ -236,7 +236,7 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 	case *adt.AliasApplication:
 		return ast.Clone(x.Src)
 
-	case *adt.PackageSeal, *adt.PackageOpen, *adt.OpaqueCall:
+	case *adt.PackageSeal, *adt.PackageOpen, *adt.OpaqueCall, *adt.OpaqueScope:
 		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
 
 	case *adt.TypeReference:

@@ -751,6 +751,35 @@ func (f *FuncValue) checkResultScopes(c *OpContext, value Value) Value {
 	return value
 }
 
+// OpaqueScope protects values contributed by a pattern or an open list tail
+// when a later refinement materializes them. The original subject supplies
+// the constraints in their lexical environments, including the matched label.
+type OpaqueScope struct {
+	subject *Vertex
+	owner   *sealedPackage
+}
+
+func (*OpaqueScope) Source() ast.Node { return nil }
+func (*OpaqueScope) node()            {}
+func (*OpaqueScope) expr()            {}
+func (*OpaqueScope) declNode()        {}
+func (*OpaqueScope) elemNode()        {}
+
+func (s *OpaqueScope) evaluate(c *OpContext, state Flags) Value {
+	label := c.Env(0).DynamicLabel
+	if label == InvalidLabel {
+		return &Bottom{Code: IncompleteError, Err: c.Newf("abstract scope awaits a concrete field")}
+	}
+	field := c.newInlineVertex(nil, nil)
+	field.Label = label
+	s.subject.MatchAndInsert(c, field)
+	field.Finalize(c)
+	if abstractEscapes(c, field, s.owner, make(map[Value]bool)) {
+		return c.NewErrf("abstract type escapes its opening scope through a field constraint")
+	}
+	return protectAbstractScope(c, field, s.owner, make(map[Value]bool))
+}
+
 // Retain non-escape obligations on returned closures, including closures
 // nested in records and lists. The extra view is conjoined with the original
 // vertex, preserving its presence, pattern and validation constraints.
@@ -761,6 +790,28 @@ func protectAbstractScope(c *OpContext, value Value, owner *sealedPackage, seen 
 	}
 	seen[value] = true
 	defer delete(seen, value)
+	if v, ok := value.(*Vertex); ok {
+		// Optional fields may not have been demanded by the enclosing
+		// record. Their closures still need the deferred escape check.
+		v.Finalize(c)
+	}
+	if d, ok := Unwrap(value).(*Disjunction); ok {
+		copy := *d
+		copy.Values = slices.Clone(d.Values)
+		changed := false
+		for i, term := range d.Values {
+			copy.Values[i] = protectAbstractScope(c, term, owner, seen)
+			changed = changed || copy.Values[i] != term
+		}
+		if !changed {
+			return value
+		}
+		// Keep branch guards and preference information on the original
+		// subject as well as on the protected alternatives.
+		result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, &copy), MakeRootConjunct(nil, value))
+		result.Finalize(c)
+		return result
+	}
 	if f, ok := Unwrap(value).(*FuncValue); ok {
 		if slices.Contains(f.scopes, owner) {
 			return value
@@ -780,7 +831,7 @@ func protectAbstractScope(c *OpContext, value Value, owner *sealedPackage, seen 
 	var extra Expr
 	if v.IsList() {
 		list := &ListLit{}
-		changed := false
+		changed := !v.IsClosedList() && v.PatternConstraints != nil
 		for a := range v.Elems() {
 			x := protectAbstractScope(c, a, owner, seen)
 			changed = changed || x != a
@@ -790,17 +841,24 @@ func protectAbstractScope(c *OpContext, value Value, owner *sealedPackage, seen 
 			return value
 		}
 		if !v.IsClosedList() {
-			list.Elems = append(list.Elems, &Ellipsis{Value: &Top{}})
+			list.Elems = append(list.Elems, &Ellipsis{Value: &OpaqueScope{subject: v, owner: owner}})
 		}
 		extra = list
 	} else {
 		record := &StructLit{}
 		for _, a := range v.Arcs {
-			if a.ArcType != ArcMember || a.Label.IsLet() {
+			if a.Label.IsLet() {
 				continue
 			}
 			if x := protectAbstractScope(c, a, owner, seen); x != a {
-				record.Decls = append(record.Decls, &Field{Label: a.Label, Value: x})
+				record.Decls = append(record.Decls, &Field{Label: a.Label, ArcType: a.ArcType, Value: x})
+			}
+		}
+		if pcs := v.PatternConstraints; pcs != nil {
+			for _, pc := range pcs.Pairs {
+				record.Decls = append(record.Decls, &BulkOptionalField{
+					Filter: pc.Pattern, Value: &OpaqueScope{subject: v, owner: owner},
+				})
 			}
 		}
 		if len(record.Decls) == 0 {

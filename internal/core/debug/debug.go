@@ -787,7 +787,7 @@ func (w *printer) node(n adt.Node) {
 	case *adt.OpaqueValue:
 		w.string("opaque value")
 
-	case *adt.OpaqueCall:
+	case *adt.OpaqueCall, *adt.OpaqueScope:
 		w.string("opaque operation")
 
 	case *adt.AbstractResult:

@@ -183,6 +183,24 @@ func TestQuantifiedSelectedExport(t *testing.T) {
 	}
 }
 
+func TestQuantifiedScopeRefinement(t *testing.T) {
+	for _, name := range []string{"optional", "union", "pattern", "list"} {
+		t.Run(name, func(t *testing.T) {
+			ctx := cuecontext.New()
+			v := ctx.CompileString(quantifiedAPIText(t, "scope_refinement", "base.cue") + "\n" +
+				quantifiedAPIText(t, "scope_refinement", name+".cue"))
+			if err := v.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			r := v.Unify(ctx.CompileString(quantifiedAPIText(t, "scope_refinement", name+"-refine.cue")))
+			out := r.LookupPath(cue.ParsePath("out"))
+			if err := out.Validate(); !out.Exists() || err == nil || !strings.Contains(err.Error(), "abstract type escapes") {
+				t.Fatalf("refinement lost the opening scope: %v", err)
+			}
+		})
+	}
+}
+
 func TestQuantifiedWitnessCorrelation(t *testing.T) {
 	for _, tt := range []struct {
 		name, src string
