@@ -376,6 +376,15 @@ func (n *nodeContext) markStructLit(s *StructLit, ci CloseInfo) {
 // scheduleVertexConjuncts injects the conjuncst of src n. If src was not fully
 // evaluated, it subscribes dst for future updates.
 func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo CloseInfo) {
+	for _, s := range arc.schemes {
+		found := false
+		for _, existing := range n.node.schemes {
+			found = found || existing.origin == s.origin
+		}
+		if !found {
+			n.node.schemes = append(n.node.schemes, s)
+		}
+	}
 	if arc.sealed != nil {
 		if n.node.sealed != nil && n.node.sealed != arc.sealed {
 			n.addBottom(n.ctx.NewErrf("conflicting opaque package identities"))

@@ -166,6 +166,11 @@ type Vertex struct {
 	// copying and never contains observable private representation fields.
 	sealed       *sealedPackage
 	sealedOpened bool
+
+	// schemes retain universal introductions on a composite subject. Type
+	// selection changes its view, while the original value graph is shared.
+	schemes []subjectScheme
+
 	// Parent links to a parent Vertex. This parent should only be used to
 	// access the parent's Label field to find the relative location within a
 	// tree.

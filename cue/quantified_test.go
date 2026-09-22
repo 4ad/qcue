@@ -1224,3 +1224,62 @@ out: [pair.value, P.read(pair.state), P.empty[int](), P.read(P.keep(P.seed, P.se
 		t.Fatalf("got %s, %v; want [\"hello\",1,[],1,1]", got, err)
 	}
 }
+
+func TestQuantifiedCompositeInstances(t *testing.T) {
+	for _, tt := range []struct{ src, want string }{
+		{`module(A): {id: func(x: A) -> A: x}
+out: module[int].id(3)`, `3`},
+		{`module(A, B): {pair: func(x: A, y: B) -> [A, B]: [x, y]}
+out: module[int, string].pair(3, "x")`, `[3,"x"]`},
+		{`module(A): {nested: {id: func(x: A) -> A: x}, empty: [...A]}
+out: [module[int].nested.id(3), module[string].nested.id("x"), module[int].empty]`, `[3,"x",[]]`},
+		{`module(A): {id: func(x: A) -> A: x, value: int}
+module: {value: 7}
+out: [module[int].value, module[string].value]`, `[7,7]`},
+		{`module(A): {id: func(x: A) -> A: x}
+let selected = module[int]
+out: (selected.id & module.id)(3)`, `3`},
+	} {
+		t.Run(tt.src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON()
+			if err != nil || string(got) != tt.want {
+				t.Fatalf("got %s, %v; want %s", got, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedCompositeInstanceObligations(t *testing.T) {
+	for _, src := range []string{
+		`module(A): {id: func(x: A) -> A: x}
+out: module[int].id("x")`,
+		`module(A: number): {id: func(x: A) -> A: x}
+out: module[string].id("x")`,
+		`module(A): {value: A}
+out: module[int].value`,
+		`module(A in Type(0)): {id: func(x: A) -> A: x}
+out: module[forall (B in Type(0)) func(B) -> B]`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
+				t.Fatal("selection lost its subject or binder obligations")
+			}
+		})
+	}
+	v := cuecontext.New().CompileString(`@experiment(quantified)
+module(A): {value: int, id: func(x: A) -> A: x}
+out: module[string].value`)
+	out := v.LookupPath(cue.ParsePath("out"))
+	if err := out.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := out.Validate(cue.Concrete(true)); err == nil {
+		t.Fatal("selection chose an independent data witness")
+	}
+	got, err := v.FillPath(cue.ParsePath("module.value"), 7).LookupPath(cue.ParsePath("out")).Int64()
+	if err != nil || got != 7 {
+		t.Fatalf("subject refinement: %d, %v; want 7", got, err)
+	}
+}

@@ -132,6 +132,9 @@ func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 	}
 	body := universalDataMinimum(c, q.Body, params)
 	v, _ := c.Evaluate(env, body)
+	if vertex, ok := v.(*Vertex); ok && vertex.Kind()&(StructKind|ListKind) != 0 {
+		vertex.schemes = append(vertex.schemes, subjectScheme{origin: env, env: env})
+	}
 	return v
 }
 

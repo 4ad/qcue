@@ -1173,6 +1173,16 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 				v.Finalize(ctx)
 				return v
 			}
+			if v, ok := v.(*Vertex); ok {
+				if inst, handled := instantiateSubject(ctx, v, x.Index); handled {
+					return inst
+				}
+			}
+			if _, ok := Unwrap(v).(*Universal); ok {
+				ctx.AddBottom(&Bottom{Src: x.Source(), Code: IncompleteError,
+					Err: ctx.Newf("quantified subject instance remains unresolved")})
+				return emptyNode
+			}
 		}
 	}
 	// TODO: support byte index.
