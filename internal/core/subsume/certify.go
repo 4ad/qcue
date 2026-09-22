@@ -20,41 +20,19 @@ import (
 	"cuelang.org/go/internal/core/adt"
 )
 
-// Certify checks quantified-profile implementations under arbitrary packets
-// and rigid type variables. This is deliberately independent of evaluation's
-// finite counterexample search. Unsupported proof obligations are incomplete,
-// not contradictory, and the target annotation is never evidence for itself.
-func Certify(ctx *adt.OpContext, root *adt.Vertex) *adt.Bottom {
+// ValidateFunction checks an implementation's contracts under arbitrary
+// packets and rigid type variables. Concrete validation calls this alongside
+// the checks on the closure's implementation identity and captured values.
+// Unsupported proofs remain incomplete; successful concrete calls and the
+// target annotation itself are not evidence of universal conformance.
+func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 	p := &certifier{ctx: ctx, active: make(map[*adt.Function]bool),
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope)}
-	seen := make(map[*adt.Vertex]bool)
-	var visit func(*adt.Vertex) *adt.Bottom
-	visit = func(v *adt.Vertex) *adt.Bottom {
-		v = v.DerefValue()
-		if seen[v] {
-			return nil
-		}
-		seen[v] = true
-		v.Finalize(ctx)
-		if b := v.Bottom(); b != nil {
-			return b
-		}
-		if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok && f.Fn.Quantified {
-			if !p.implementation(f) {
-				return &adt.Bottom{Src: f.Source(), Code: adt.IncompleteError,
-					Err: ctx.Newf("function conformance remains unproved")}
-			}
-		}
-		for _, a := range v.Arcs {
-			if a.ArcType == adt.ArcMember && !a.Label.IsLet() && a.Label.IsRegular() {
-				if b := visit(a); b != nil {
-					return b
-				}
-			}
-		}
-		return nil
+	if !p.implementation(f) {
+		return &adt.Bottom{Src: f.Source(), Code: adt.IncompleteError,
+			Err: ctx.Newf("function conformance remains unproved")}
 	}
-	return visit(root)
+	return nil
 }
 
 type proofScope struct {
@@ -143,7 +121,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 	values := make(map[adt.Feature]adt.Value)
 	for i, j := range matches {
 		arg := target.Fn.Params[i]
-		if arg.ArcType == adt.ArcOptional || arg.Default != nil {
+		if arg.ArcType == adt.ArcOptional {
 			// An optional packet has presence branches. The current rule
 			// leaves their joint proof pending instead of assuming presence.
 			return false
@@ -151,6 +129,16 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 		v := p.schema(target.Env, arg.Value)
 		if v == nil {
 			return false
+		}
+		if arg.Default != nil {
+			// The contract admits omission. Prove that the implementation's
+			// own default supplies a value in the same domain as an explicit
+			// argument, so the body proof covers both cases. A target's
+			// default must never stand in for the implementation's default.
+			defaultExpr := source.Fn.Params[j].Default
+			if defaultExpr == nil || !p.includes(v, p.expr(source.Env, defaultExpr)) {
+				return false
+			}
 		}
 		values[source.Fn.Params[j].Local] = v
 		p.assume(v, make(map[adt.Value]bool))

@@ -1,0 +1,10 @@
+A quantified contract on a legacy closure also requires conformance.
+The implementation's original experiment setting cannot bypass validation.
+
+-- legacy.cue --
+@experiment(functions,quantified=false)
+f: func(x: int & >0) -> (int & >=0): x - 1
+-- in.cue --
+@test(validate)
+@test(validate, concrete, incomplete, at="f")
+f: func(int & >0) -> (int & >=0)

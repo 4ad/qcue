@@ -1,0 +1,10 @@
+Validate the chosen default's contract, not every unchosen alternative.
+An unproved default must not be accepted because another branch is proved.
+
+-- in.cue --
+@test(validate, concrete, at="good")
+@test(validate, concrete, incomplete, at="bad")
+proved: func(x: int) -> int: x
+pending: func(x: int & >0) -> (int & >=0): x - 1
+good: *proved | pending
+bad: proved | *pending

@@ -31,6 +31,12 @@ type ValidateConfig struct {
 	// AllErrors continues descending into a Vertex, even if errors are found.
 	AllErrors bool
 
+	// CheckFunction validates the contracts of a concrete function value.
+	// Public validation supplies the conformance checker here. Internal
+	// evaluation can still inspect a closure's concrete representation while
+	// retaining its unresolved contract, without claiming conformance.
+	CheckFunction func(*OpContext, *FuncValue) *Bottom
+
 	// TODO: omitOptional, if this is becomes relevant.
 }
 
@@ -186,10 +192,14 @@ func (v *validator) validate(x *Vertex) {
 			}
 		}
 	}
-	if f, ok := x.BaseValue.(*FuncValue); ok && f.Fn.Quantified && v.checkConcrete() {
+	if f, ok := x.BaseValue.(*FuncValue); ok && capabilityMode(f.Fn, f.Types) && v.checkConcrete() {
 		if !concreteCapture(v.ctx, f) {
 			v.add(&Bottom{Src: f.Source(), Code: IncompleteError,
 				Err: v.ctx.Newf("function implementation or captured values remain unresolved")})
+		} else if v.CheckFunction != nil {
+			if b := v.CheckFunction(v.ctx, f); b != nil {
+				v.add(b)
+			}
 		}
 	}
 

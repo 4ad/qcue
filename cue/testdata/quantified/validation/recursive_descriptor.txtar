@@ -1,0 +1,12 @@
+A recursive closure has a complete identity, but its termination and
+universal contract proof remain incomplete. Ground execution still works.
+
+-- in.cue --
+@test(validate)
+@test(validate, concrete, incomplete, at="f")
+@test(json, 3, at="observation")
+f: func(xs: [...int]) -> int: ({
+    if len(xs) == 0 {out: 0}
+    if len(xs) > 0 {out: xs[0] + f(xs[1:])}
+}).out
+observation: f([1, 2])

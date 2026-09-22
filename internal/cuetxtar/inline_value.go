@@ -67,8 +67,6 @@ func (r *inlineRunner) runValueAssertion(t testing.TB, path cue.Path, val cue.Va
 			switch arg {
 			case "concrete":
 				opts = append(opts, cue.Concrete(true))
-			case "functions":
-				opts = append(opts, cue.VerifyFunctions(true))
 			case "incomplete", "conflict":
 				if outcome != "success" {
 					t.Fatal("duplicate validation outcome")

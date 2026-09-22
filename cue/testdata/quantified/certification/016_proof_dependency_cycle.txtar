@@ -2,7 +2,7 @@ Quantified CUE: Certification/proof dependency cycle
 
 -- in.cue --
 @test(validate, at="f")
-@test(validate, functions, incomplete, at="f")
+@test(validate, concrete, incomplete, at="f")
 
 f: func(x: int) -> int: g(x)
 g: func(x: int) -> int: f(x)

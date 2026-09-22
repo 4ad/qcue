@@ -1,0 +1,18 @@
+Concrete validation checks functions inside records and lists, and
+retains every unresolved sibling contract. Schema declarations alone do not
+require an implementation until they become an ordinary value.
+
+-- in.cue --
+@test(validate)
+@test(validate, concrete, incomplete, at="record")
+@test(validate, concrete, incomplete, at="items")
+@test(validate, concrete, at="instance")
+@test(validate, concrete, at="schemaOnly")
+record: {
+    f: func(x: int & >0) -> (int & >=0): x - 1
+    g: func(y: int & >0) -> (int & >=0): y - 1
+}
+items: [record.f]
+#Schema: {operation: func(int) -> int}
+instance: #Schema & {operation: func(x: int) -> int: x}
+schemaOnly: {#Function: func(int) -> int, optional?: func(int) -> int}

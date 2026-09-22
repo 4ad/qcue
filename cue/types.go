@@ -1136,6 +1136,8 @@ func (v Value) IsClosedRecursively() bool {
 // (not relying on default values), a terminal error, a list, or a struct.
 // It does not verify that values of lists or structs are concrete themselves.
 // To check whether there is a concrete default, use this method on [Value.Default].
+// Use [Value.Validate] with [Concrete] to check runtime captures and function
+// contracts; this shallow check does not establish implementation conformance.
 func (v Value) IsConcrete() bool {
 	if v.v == nil {
 		return false // any is neither concrete, not a list or struct.
@@ -2094,7 +2096,6 @@ func mkPath(r *runtime.Runtime, a []Selector, v *adt.Vertex) (root *adt.Vertex, 
 
 type options struct {
 	concrete         bool // enforce that values are concrete
-	verifyFunctions  bool // demand proofs of quantified implementation contracts
 	raw              bool // show original values
 	hasHidden        bool
 	omitHidden       bool
@@ -2145,7 +2146,9 @@ func Schema() Option {
 
 // Concrete ensures that all values are concrete.
 //
-// For [Value.Validate] this means it returns an error if this is not the case.
+// For [Value.Validate] this means it returns an error if this is not the case,
+// and requires quantified function implementations to satisfy their declared
+// contracts. An unresolved conformance proof reports incompleteness.
 // In other cases a non-concrete value will be replaced with an error.
 //
 // It applies to [Value.Syntax], [Value.Fields], and [Value.Validate].
@@ -2296,8 +2299,7 @@ func (o *options) updateOptions(opts []Option) {
 // [Concrete] are used. The [Final] option can be used to check for missing
 // required fields.
 //
-// It honors the [Concrete], [DisallowCycles], [Final], and [VerifyFunctions]
-// options.
+// It honors the [Concrete], [DisallowCycles], and [Final] options.
 func (v Value) Validate(opts ...Option) error {
 	o := options{}
 	o.updateOptions(opts)
@@ -2307,27 +2309,14 @@ func (v Value) Validate(opts ...Option) error {
 		Final:          o.final,
 		DisallowCycles: o.disallowCycles,
 		AllErrors:      true,
+		CheckFunction:  subsume.ValidateFunction,
 	}
 
 	b := adt.Validate(v.ctx(), v.v, cfg)
 	if b != nil {
 		return v.toErr(b)
 	}
-	if o.verifyFunctions {
-		if b := subsume.Certify(v.ctx(), v.v); b != nil {
-			return v.toErr(b)
-		}
-	}
 	return nil
-}
-
-// VerifyFunctions requires structural proofs of the contracts on function
-// implementations in the quantified experiment. It applies to [Value.Validate].
-// Unlike [Concrete], it checks conformance on arbitrary admitted arguments,
-// including rigid type variables. A contract outside the supported proof
-// fragment reports incompleteness; successful calls alone are not a proof.
-func VerifyFunctions(verify bool) Option {
-	return func(o *options) { o.verifyFunctions = verify }
 }
 
 // Walk descends into all values of v, calling f. If f returns false, Walk

@@ -90,19 +90,26 @@ callback is not silently generalized. Ground calls support finite list
 comprehensions and recursive calls with a demonstrated decrease in one fixed
 finite list argument. Other recursive calls retain cycle or incomplete errors.
 
-There are three distinct validation requests:
+Validation distinguishes retaining constraints from requiring a complete value:
 
 | Request | Meaning |
 | --- | --- |
 | `value.Validate()` | Report established contradictions; allow residual obligations. |
-| `value.Validate(cue.Concrete(true))` | Require materialized values, executable closures, and complete runtime captures. |
-| `value.Validate(cue.VerifyFunctions(true))` | Require structural proofs of function implementation contracts for arbitrary admitted inputs. |
+| `value.Validate(cue.Concrete(true))` | Require materialized values, complete runtime captures, and function implementations proved to satisfy their declared contracts for arbitrary admitted inputs. |
 
-The CLI proof request is `qcue vet --verify-functions file.cue`. The proof checker
-handles annotated structural bodies, higher-rank arguments, records, lists,
-projections, finite comprehensions, and supported pure primitives. It does not
-use a target annotation as evidence for itself. A successful concrete call is
-not a universal conformance certificate.
+`qcue vet file.cue` requires concrete validation, including function type
+conformance. An unresolved contract makes validation incomplete; use `qcue vet -c`
+to see the detailed errors. There is no separate function-verification flag.
+`qcue vet -c=false` explicitly permits incomplete constraints for further
+refinement and does not establish that every retained implementation satisfies
+its type. Definitions and absent optional fields remain schemas until demanded
+as ordinary values, following CUE's usual concreteness rules.
+
+The conformance checker handles annotated structural bodies, higher-rank
+arguments, records, lists, projections, finite comprehensions, supported pure
+primitives, and defaults proved to belong to the argument domain. It does not use
+a target annotation as evidence for itself. Knowing a closure's code and captures,
+or successfully evaluating one call, does not discharge its declared contract.
 
 Unproved arithmetic implications, recursive termination proofs, optional
 presence branches, arbitrary quantified Boolean inclusion, and general

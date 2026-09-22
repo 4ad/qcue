@@ -5,8 +5,8 @@ Incomplete obligations must remain consistent; definite contradictions must not.
 value: 3 @test(json, 3) @test(validate, concrete)
 unknown: int @test(validate) @test(validate, concrete, incomplete)
 conflict: 1 & "x" @test(validate, conflict)
-id(A): func(x: A) -> A: x @test(validate, functions)
-pending: func(int) -> int @test(validate, functions, incomplete)
+id(A): func(x: A) -> A: x @test(validate, concrete)
+pending: func(int) -> int @test(validate, concrete, incomplete)
 broad: number
 narrow: int
 @test(subsume, broad, narrow)
@@ -15,8 +15,8 @@ narrow: int
 value: 3 @test(json, 3) @test(validate, concrete)
 unknown: int @test(validate) @test(validate, concrete, incomplete)
 conflict: 1 & "x" @test(validate, conflict)
-id(A): func(x: A) -> A: x @test(validate, functions)
-pending: func(int) -> int @test(validate, functions, incomplete)
+id(A): func(x: A) -> A: x @test(validate, concrete)
+pending: func(int) -> int @test(validate, concrete, incomplete)
 broad: number
 narrow: int
 @test(subsume, broad, narrow)

@@ -52,6 +52,7 @@ adding a semantic case.
 | [universal_refutations](universal_refutations/) | Concrete counterexamples to universal descriptions |
 | [universe_literals](universe_literals/) | Formation errors for invalid universe level literals |
 | [universe_occurs_check](universe_occurs_check/) | Predicative cycles and self-application |
+| [validation](validation/) | Ordinary concrete validation of function contracts, defaults, nested values, and residual proofs |
 
 ## Other layers
 
@@ -77,7 +78,7 @@ to select the value without changing the program's lexical scopes:
 
 ```cue
 @test(json, [3, "hello"], at="out")
-@test(validate, functions, at="id")
+@test(validate, concrete, at="id")
 id(A): func(x: A) -> A: x
 out: [id(3), id("hello")]
 ```
@@ -88,10 +89,8 @@ The directives express different observations:
 | --- | --- |
 | `@test(json, VALUE)` | JSON export succeeds and equals the expected concrete value. |
 | `@test(validate)` | Ordinary validation succeeds; residual obligations are allowed. |
-| `@test(validate, concrete)` | Values, closures, and runtime captures are concrete. |
-| `@test(validate, functions)` | Function implementation contracts have universal proofs. |
-| `@test(validate, concrete, incomplete)` | Ordinary validation succeeds, but materialization remains incomplete. |
-| `@test(validate, functions, incomplete)` | Ordinary validation succeeds, but conformance remains unproved. |
+| `@test(validate, concrete)` | Values and runtime captures are concrete, and function implementations satisfy their declared contracts. |
+| `@test(validate, concrete, incomplete)` | Ordinary validation permits the residual, but materialization or function conformance remains incomplete. |
 | `@test(validate, conflict)` | Ordinary validation reports an established contradiction. |
 | `@test(subsume, broad, narrow)` | The first path's value subsumes the second. |
 | `@test(subsume, narrow, broad, fail)` | Subsumption fails in that direction. |
@@ -101,6 +100,10 @@ The directives express different observations:
 `@test(eq, ...)`, error assertions, and other CUE txtar directives also work.
 Formation errors prevent inline evaluation: those fixtures use the standard
 `out/evalalpha` diagnostic golden and a documented `#inlinetest:exclude` marker.
+
+Function contract checks use the same `concrete` demand as all other values.
+There is no separate proof option. The [certification](certification/) cases
+exercise the supported proof rules through ordinary concrete validation.
 
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Paper exclusions state their reason, and the paper index

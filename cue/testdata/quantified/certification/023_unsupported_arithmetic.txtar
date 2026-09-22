@@ -2,6 +2,6 @@ Quantified CUE: Certification/unsupported arithmetic
 
 -- in.cue --
 @test(validate, at="f")
-@test(validate, functions, incomplete, at="f")
+@test(validate, concrete, incomplete, at="f")
 
 f: func(x: int & >0) -> (int & >=0): x - 1

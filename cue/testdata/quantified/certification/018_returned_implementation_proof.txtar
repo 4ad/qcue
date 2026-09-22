@@ -2,6 +2,6 @@ Quantified CUE: Certification/returned implementation proof
 
 -- in.cue --
 @test(validate, at="f")
-@test(validate, functions, incomplete, at="f")
+@test(validate, concrete, incomplete, at="f")
 
 f: func() -> (func(int) -> int): func(x: int) -> int: "wrong"

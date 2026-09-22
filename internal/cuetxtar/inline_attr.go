@@ -501,12 +501,10 @@ func directiveKey(pa parsedTestAttr) string {
 	// independent assertions, even when attached to the same value.
 	switch pa.directive {
 	case "validate":
-		for _, option := range []string{"concrete", "functions"} {
-			for _, kv := range pa.raw.Fields[1:] {
-				if kv.Key() == "" && strings.TrimSpace(kv.Text()) == option {
-					key += "\x00" + option
-					break
-				}
+		for _, kv := range pa.raw.Fields[1:] {
+			if kv.Key() == "" && strings.TrimSpace(kv.Text()) == "concrete" {
+				key += "\x00concrete"
+				break
 			}
 		}
 	case "subsume":

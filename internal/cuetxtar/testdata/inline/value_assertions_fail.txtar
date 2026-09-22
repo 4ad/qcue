@@ -6,7 +6,7 @@ wrong: 3 @test(json, 4)
 unknown: int @test(validate, concrete) @test(validate, conflict)
 conflict: 1 & "x" @test(validate, concrete, incomplete)
 complete: 3 @test(validate, concrete, incomplete)
-pending: func(int) -> int @test(validate, functions)
+pending: func(int) -> int @test(validate, concrete)
 abstract: func(int) -> int
 result: abstract(3) @test(json, 3)
 broad: number
@@ -23,14 +23,14 @@ path unknown: validation failed: unknown: incomplete value int
 path unknown: expected a definite conflict
 path conflict: expected incompleteness; ordinary validation: conflict: conflicting values 1 and "x" (mismatched types int and string); demanded validation: conflict: conflicting values 1 and "x" (mismatched types int and string)
 path complete: expected incompleteness; ordinary validation: <nil>; demanded validation: <nil>
-path pending: validation failed: pending: function conformance remains unproved
+path pending: validation failed: pending: function implementation or captured values remain unresolved
 path result: JSON = , cue: marshal error: result: cannot convert incomplete value "&(pending function result, int)" to JSON; want 3
 -- out/update/test.cue --
 wrong: 3 @test(json, 4)
 unknown: int @test(validate, concrete) @test(validate, conflict)
 conflict: 1 & "x" @test(validate, concrete, incomplete)
 complete: 3 @test(validate, concrete, incomplete)
-pending: func(int) -> int @test(validate, functions)
+pending: func(int) -> int @test(validate, concrete)
 abstract: func(int) -> int
 result: abstract(3) @test(json, 3)
 broad: number

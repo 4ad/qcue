@@ -1,0 +1,9 @@
+An implementation cannot use a hidden helper's unproved annotation as its
+own proof. Hidden schema fields remain exempt from data completeness, but
+calling them retains the dependency on their actual implementation.
+
+-- in.cue --
+@test(validate)
+@test(validate, concrete, incomplete, at="f")
+_helper: func(x: int & >0) -> (int & >=0): x - 1
+f: func(x: int & >0) -> (int & >=0): _helper(x)
