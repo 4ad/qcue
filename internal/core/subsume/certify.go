@@ -156,6 +156,11 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 	if !ok {
 		return false
 	}
+	if boundary, ok := source.Fn.Body.(*adt.OpaqueCall); ok {
+		advertised, implementation, required, ok := boundary.ProofTypes(p.ctx, source.Env)
+		return ok && p.implementation(implementation) &&
+			p.function(implementation, required) && s.capabilitySignature(target, advertised)
+	}
 	target, ok = s.completeProtocol(target, source)
 	if !ok {
 		return false

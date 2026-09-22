@@ -186,6 +186,18 @@ func (*OpaqueType) declNode()                  {}
 func (*OpaqueType) elemNode()                  {}
 func (*OpaqueType) Kind() Kind                 { return OpaqueKind }
 func (*OpaqueType) Concreteness() Concreteness { return Constraint }
+
+// Subsumes compares public carrier identity without inspecting representation.
+func (x *OpaqueType) Subsumes(v Value) bool {
+	switch v := Unwrap(v).(type) {
+	case *OpaqueType:
+		return x.carrier == v.carrier
+	case *OpaqueValue:
+		return x.carrier == v.carrier
+	}
+	return false
+}
+
 func (x *OpaqueType) validate(c *OpContext, v Value) *Bottom {
 	if y, ok := Unwrap(v).(*OpaqueValue); ok && y.carrier == x.carrier {
 		return nil

@@ -14,6 +14,7 @@ v1: (open counterV1 as (S, C) {out: useCounter[S](C)}).out
 v2: (open counterV2 as (S, C) {out: useCounter[S](C)}).out
 // Both observations are 2.
 -- in.cue --
+@test(validate, concrete, at="useCounter")
 @test(json, 2, at="v1")
 @test(json, 2, at="v2")
 

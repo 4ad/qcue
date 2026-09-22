@@ -1,0 +1,125 @@
+// Copyright 2026 CUE Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package adt
+
+// ProofTypes exposes the adapter's proof obligations to the conformance
+// checker, without making its private implementation visible to clients or
+// ordinary traversals. The transport theorem applies only to schemas whose
+// transport is known to be total in the appropriate direction.
+func (s *OpaqueCall) ProofTypes(c *OpContext, env *Environment) (advertised FuncType, implementation *FuncValue, required FuncType, ok bool) {
+	bindings := make(map[*TypeParameter]Value)
+	for e := env; e != nil; e = e.Up {
+		if e.types != nil {
+			for param, value := range e.types.arguments {
+				if s.owner.carriers[param] == nil {
+					bindings[param] = value
+				}
+			}
+		}
+	}
+	public := instantiateEnvironment(s.env, bindings)
+	private, b := s.owner.privateTypeEnvironment(c, public, make(map[Value]bool))
+	if b != nil {
+		return advertised, nil, required, false
+	}
+	for _, param := range s.signature.Params {
+		if !s.owner.totalTransport(c, public, param.Value, !s.outward, make(map[Value]bool)) {
+			return advertised, nil, required, false
+		}
+	}
+	if !s.owner.totalTransport(c, public, s.signature.Ret, s.outward, make(map[Value]bool)) {
+		return advertised, nil, required, false
+	}
+	advertised = FuncType{Fn: s.signature, Env: public}
+	required = FuncType{Fn: s.signature, Env: private}
+	if !s.outward {
+		advertised, required = required, advertised
+	}
+	return advertised, s.private, required, true
+}
+
+func (p *sealedPackage) totalTransport(c *OpContext, env *Environment, schema Expr, outward bool, active map[Value]bool) bool {
+	if schema == nil {
+		return true
+	}
+	value, complete := c.Evaluate(env, schema)
+	if !complete || value == nil {
+		return false
+	}
+	if v, ok := value.(*Vertex); ok {
+		v.Finalize(c)
+		value = v.DerefValue()
+	}
+	value = Unwrap(value)
+	if active[value] {
+		return false
+	}
+	active[value] = true
+	defer delete(active, value)
+	switch v := value.(type) {
+	case *Top, *BasicType, *Null, *Bool, *Num, *String, *Bytes, *BoundValue:
+		return true
+	case *OpaqueType:
+		return v.carrier.owner == p
+	case *Disjunction:
+		var kinds Kind
+		for _, branch := range v.Values {
+			source := branch
+			if outward {
+				var b *Bottom
+				source, b = p.privatePredicate(c, branch, make(map[Value]bool))
+				if b != nil {
+					return false
+				}
+			}
+			// Disjoint source kinds suffice to select exactly one arm.
+			// Overlapping arms require a stronger transport equivalence
+			// proof and therefore remain residual here.
+			if kinds&source.Kind() != 0 || !p.totalTransport(c, nil, branch, outward, active) {
+				return false
+			}
+			kinds |= source.Kind()
+		}
+		return true
+	case *FuncValue:
+		if len(typeParameters(v.Env)) != 0 || v.Fn.Open || len(v.Types) != 0 {
+			return false
+		}
+		for _, param := range v.Fn.Params {
+			if !p.totalTransport(c, v.Env, param.Value, !outward, active) {
+				return false
+			}
+		}
+		return p.totalTransport(c, v.Env, v.Fn.Ret, outward, active)
+	case *Vertex:
+		if v.Bottom() != nil || v.sealed != nil {
+			return false
+		}
+		for _, arc := range v.Arcs {
+			if !arc.Label.IsLet() && !p.totalTransport(c, nil, arc, outward, active) {
+				return false
+			}
+		}
+		if pc := v.PatternConstraints; pc != nil {
+			for _, pair := range pc.Pairs {
+				if !p.totalTransport(c, nil, pair.Constraint, outward, active) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	return false
+}

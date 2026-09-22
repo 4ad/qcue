@@ -101,6 +101,10 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		return false
 	case *adt.WitnessType:
 		return false
+	case *adt.OpaqueType:
+		return x.Subsumes(b)
+	case *adt.OpaqueValue:
+		return adt.Equal(s.ctx, x, b, adt.CheckStructural)
 
 	case *adt.Bottom:
 		// isBottom(b) was already tested above.
