@@ -397,16 +397,8 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 			if v == nil {
 				continue
 			}
-			if universeOccurs(c, p, v, make(map[Value]bool)) {
-				return nil, c.NewErrf("type argument for %s requires an infinite universe level", p.Src.Name.Name)
-			}
-			level, known := universeOf(c, v, make(map[Expr]bool))
-			if p.ExplicitLevel && level > p.Level {
-				return nil, c.NewErrf("type argument for %s has universe level %d, exceeding Type(%d)", p.Src.Name.Name, level, p.Level)
-			}
-			if !known {
-				return nil, &Bottom{Src: p.Src, Code: IncompleteError,
-					Err: c.Newf("unresolved universe level for %s", p.Src.Name.Name)}
+			if b := checkTypeUniverse(c, p, v); b != nil {
+				return nil, b
 			}
 			if p.Bound == nil {
 				continue
@@ -491,6 +483,14 @@ func (f *FuncValue) inferInstance(c *OpContext, bindings []funcArg) (*FuncValue,
 	}
 	for p, v := range args {
 		if v == nil {
+			if len(f.Fn.Params) == 0 && p.ValueRange == nil {
+				// A call without inputs admits every instance of its
+				// universal clause. The empty predicate is always an
+				// admissible subtype and gives the strongest covariant
+				// data result. It is a use-site type, not a program witness.
+				args[p] = &Bottom{Code: EvalError, Err: c.Newf("empty type instance")}
+				continue
+			}
 			return nil, &Bottom{Src: p.Src, Code: IncompleteError,
 				Err: c.Newf("cannot infer type argument %s", p.Src.Name.Name)}
 		}
@@ -509,6 +509,11 @@ func inferTypeArguments(c *OpContext, env *Environment, pattern Expr, value Valu
 		// incorrectly retain that argument cell's local sharing topology.
 		if scalar := Unwrap(value); scalar != nil {
 			value = scalar
+		}
+		if v, ok := value.(*Vertex); ok && concreteCapture(c, v) {
+			// A supplied data witness contributes its value predicate. Its
+			// activation's old annotation scopes are not part of that type.
+			value = v.ToDataAll(c)
 		}
 		if prev, ok := args[p.Param]; ok {
 			if prev == nil {

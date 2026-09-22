@@ -14,6 +14,21 @@
 
 package adt
 
+func checkTypeUniverse(c *OpContext, p *TypeParameter, v Value) *Bottom {
+	if universeOccurs(c, p, v, make(map[Value]bool)) {
+		return c.NewErrf("type argument for %s requires an infinite universe level", p.Src.Name.Name)
+	}
+	level, known := universeOf(c, v, make(map[Expr]bool))
+	if p.ExplicitLevel && level > p.Level {
+		return c.NewErrf("type argument for %s has universe level %d, exceeding Type(%d)", p.Src.Name.Name, level, p.Level)
+	}
+	if !known {
+		return &Bottom{Src: p.Src, Code: IncompleteError,
+			Err: c.Newf("unresolved universe level for %s", p.Src.Name.Name)}
+	}
+	return nil
+}
+
 // Universes are cumulative. Base predicates and monomorphic constructors
 // preserve their largest component level; a type quantifier raises the level
 // above its domain. Unannotated binders can be instantiated at a larger level,
@@ -71,6 +86,9 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 			if !a.Label.IsLet() && !add(a) {
 				return level, false
 			}
+		}
+		if v.IsData() {
+			return level, true
 		}
 		// Open list tails and record patterns need formation checks too.
 		for conj := range v.LeafConjuncts() {

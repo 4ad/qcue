@@ -33,14 +33,42 @@ func (c *compiler) functionCaptures(src *ast.Func, fn *adt.Function) []adt.Expr 
 	}, nil)
 	seen := make(map[ast.Node]bool)
 	var captures []adt.Expr
-	w := walk.Visitor{Before: func(n adt.Node) bool {
+	var w walk.Visitor
+	typePosition := false
+	w.Before = func(n adt.Node) bool {
 		if n == nil {
+			return false
+		}
+		switch x := n.(type) {
+		case *adt.Function:
+			saved := typePosition
+			for _, p := range x.Params {
+				typePosition = true
+				w.Elem(p.Value)
+				typePosition = false
+				w.Elem(p.Default)
+			}
+			typePosition = true
+			w.Elem(x.Ret)
+			typePosition = false
+			w.Elem(x.Body)
+			typePosition = saved
+			return false
+		case *adt.WitnessReference:
+			// A value used as a singleton remains a runtime dependency.
+			// Other references in annotations describe erased predicates.
+			saved := typePosition
+			typePosition = false
+			w.Elem(x.X)
+			typePosition = saved
 			return false
 		}
 		if _, ok := n.(adt.Resolver); !ok {
 			if r, ok := n.(*adt.TypeReference); !ok || r.Param.ValueRange == nil {
 				return true
 			}
+		} else if typePosition {
+			return false
 		}
 		id, ok := n.Source().(*ast.Ident)
 		if !ok || local[id.Scope] {
@@ -54,6 +82,9 @@ func (c *compiler) functionCaptures(src *ast.Func, fn *adt.Function) []adt.Expr 
 		if _, imported := id.Node.(*ast.ImportSpec); imported {
 			return false
 		}
+		if scope, ok := id.Scope.(*ast.OpenExpr); ok && id.Node == scope.Type {
+			return false
+		}
 		key := id.Node
 		if key == nil {
 			key = id
@@ -63,7 +94,7 @@ func (c *compiler) functionCaptures(src *ast.Func, fn *adt.Function) []adt.Expr 
 			captures = append(captures, c.resolve(id))
 		}
 		return false
-	}}
+	}
 	w.Elem(fn)
 	return captures
 }

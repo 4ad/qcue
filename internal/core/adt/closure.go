@@ -20,10 +20,20 @@ import "slices"
 // compute. Unknown captures retain an equality obligation: comparing two
 // upper approximations is not evidence that their witnesses are equal.
 func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
-	if a.Fn != b.Fn {
-		return proofRefuted
-	}
 	result := proofEstablished
+	if a.Fn != b.Fn {
+		x, xok := a.Fn.Body.(*OpaqueCall)
+		y, yok := b.Fn.Body.(*OpaqueCall)
+		if !xok || !yok || x.owner != y.owner || x.signature != y.signature || x.outward != y.outward {
+			return proofRefuted
+		}
+		// Adapter allocation is not a new public code identity. Its
+		// descriptor consists of the boundary and the wrapped closure.
+		result = closureIdentity(c, x.private, y.private)
+		if result == proofRefuted {
+			return result
+		}
+	}
 	compare := func(x Expr, xe *Environment, y Expr, ye *Environment) {
 		if x == y && xe == ye {
 			return
@@ -68,7 +78,16 @@ func concreteCapture(c *OpContext, v Value) bool {
 	functions := make(map[funcAnchorKey]bool)
 	var check func(Value) bool
 	check = func(v Value) bool {
-		if v == nil || seen[v] {
+		if v == nil {
+			return false
+		}
+		// A recursive closure has a finite descriptor graph. Reaching an
+		// already checked closure closes that graph coinductively; a data
+		// cycle still requires a concrete supplied value.
+		if f, ok := Unwrap(v).(*FuncValue); ok && functions[funcAnchorKey{fn: f.Fn, env: f.Env}] {
+			return true
+		}
+		if seen[v] {
 			return false
 		}
 		seen[v] = true
@@ -93,11 +112,14 @@ func concreteCapture(c *OpContext, v Value) bool {
 		}
 		if f, ok := v.(*FuncValue); ok {
 			key := funcAnchorKey{fn: f.Fn, env: f.Env}
-			if IsFuncType(f) || functions[key] || len(f.identities) != 0 {
+			if IsFuncType(f) || f.checkIdentities(c) != nil {
 				return false
 			}
 			functions[key] = true
 			defer delete(functions, key)
+			if adapter, ok := f.Fn.Body.(*OpaqueCall); ok && !check(adapter.private) {
+				return false
+			}
 			for _, x := range f.Fn.Captures {
 				v, _ := c.Evaluate(f.Env, x)
 				if !check(v) {

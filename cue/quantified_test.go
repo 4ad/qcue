@@ -1128,3 +1128,99 @@ out: wrap(1)`},
 		}
 	}
 }
+
+func TestQuantifiedClosureCompleteness(t *testing.T) {
+	for _, tt := range []struct {
+		name, src string
+		complete  bool
+	}{
+		{"body capture", `n: int
+f: func() -> int: n`, false},
+		{"default capture", `n: int
+f: func(x: int = n) -> int: x`, false},
+		{"erased schema", `#N: int
+f: func(x: #N) -> #N: x`, true},
+		{"erased schema alias", `let N = int
+f: func(x: N) -> N: x`, true},
+		{"recursive descriptor", `f: func(xs: [...int]) -> int: ({
+if len(xs) == 0 {out: 0}
+if len(xs) > 0 {out: xs[0] + f(xs[1:])}
+}).out`, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			f := v.LookupPath(cue.ParsePath("f"))
+			if !f.Exists() || f.Validate() != nil {
+				t.Fatal(v.Err())
+			}
+			if err := f.Validate(cue.Concrete(true)); (err == nil) != tt.complete {
+				t.Fatalf("concrete: %v; want complete %v", err, tt.complete)
+			}
+			if !tt.complete {
+				if err := v.FillPath(cue.ParsePath("n"), 1).LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); err != nil {
+					t.Fatalf("concrete capture refinement: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestQuantifiedOpaqueCompositeTransport(t *testing.T) {
+	for _, tt := range []struct{ schema, body, observation, want string }{
+		{`Box(A) = {value?: A}`, `{value: 3}`, `P.read(P.box.value)`, `3`},
+		{`Box(A) = {value?: A}`, `{}`, `P.read(P.seed)`, `1`},
+		{`Box(A) = {[string]: A}`, `{one: 2, two: 3}`, `[P.read(P.box.one), P.read(P.box.two)]`, `[2,3]`},
+		{`Box(A) = [...A]`, `[2, 3]`, `[P.read(P.box[0]), P.read(P.box[1])]`, `[2,3]`},
+	} {
+		t.Run(tt.schema+tt.body, func(t *testing.T) {
+			v := cuecontext.New().CompileString(`@experiment(quantified)
+` + tt.schema + `
+#I: exists A {seed: A, box: Box(A), read: func(A) -> int}
+p: seal #I with (A = int) {
+seed: 1
+box: ` + tt.body + `
+read: func(x: int) -> int: x
+}
+out: (open p as (T, P) {out: ` + tt.observation + `}).out`)
+			got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON()
+			if err != nil || string(got) != tt.want {
+				t.Fatalf("got %s, %v; want %s", got, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedOpaqueUniverseBoundary(t *testing.T) {
+	v := cuecontext.New().CompileString(`@experiment(quantified)
+#I: exists (A in Type(0)) {value: A}
+p: seal #I with (A = forall (B in Type(0)) func(B) -> B) {
+value: func<B>(x: B) -> B: x
+}`)
+	if err := v.LookupPath(cue.ParsePath("p")).Validate(); err == nil {
+		t.Fatal("representation witness exceeded the existential universe")
+	}
+}
+
+func TestQuantifiedOpaqueGenericOperations(t *testing.T) {
+	v := cuecontext.New().CompileString(`@experiment(quantified)
+#I: exists State {
+seed: State
+read: func(State) -> int
+keep(A): func(A, State) -> {value: A, state: State}
+empty(A): func() -> [...A]
+}
+p: seal #I with (State = int) {
+seed: 1
+read: func(x: int) -> int: x
+keep(A): func(x: A, s: int) -> {value: A, state: int}: {value: x, state: s}
+empty(A): func() -> [...A]: []
+}
+out: (open p as (S, P) {
+let pair = P.keep("hello", P.seed)
+out: [pair.value, P.read(pair.state), P.empty[int](), P.read(P.keep(P.seed, P.seed).value), P.read(P.keep({value: P.seed}, P.seed).value.value)]
+}).out`)
+	got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON()
+	if err != nil || string(got) != `["hello",1,[],1,1]` {
+		t.Fatalf("got %s, %v; want [\"hello\",1,[],1,1]", got, err)
+	}
+}

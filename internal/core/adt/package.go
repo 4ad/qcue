@@ -206,6 +206,9 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 		if v == nil {
 			return nil
 		}
+		if b := checkTypeUniverse(c, param, v); b != nil {
+			return b
+		}
 		carrier := &opaqueCarrier{owner: p, parameter: param, representation: v}
 		p.carriers[param] = carrier
 		private[param], public[param] = v, &OpaqueType{carrier: carrier}
@@ -251,6 +254,9 @@ func quantifiedEnvironment(c *OpContext, e *Existential, args map[*TypeParameter
 // transport follows the interface shape. Private record fields are never
 // copied into the public view simply because the representation has them.
 func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, value Value, outward bool) Value {
+	if b, ok := Unwrap(value).(*Bottom); ok {
+		return b
+	}
 	if r, ok := schema.(*TypeReference); ok {
 		carrier := p.carriers[r.Param]
 		if carrier == nil {
@@ -272,6 +278,12 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 	}
 	switch x := schema.(type) {
 	case *StructLit:
+		for _, d := range x.Decls {
+			if _, ok := d.(*Field); !ok {
+				template, _ := c.Evaluate(env, schema)
+				return p.transportResolved(c, template, value, outward)
+			}
+		}
 		v, ok := value.(*Vertex)
 		if !ok {
 			return c.NewErrf("interface requires a record")
@@ -372,6 +384,10 @@ func opaqueTypeOf(value Value) *opaqueCarrier {
 	switch v := Unwrap(value).(type) {
 	case *OpaqueType:
 		return v.carrier
+	case *OpaqueValue:
+		// A generic argument can be inferred as this value's singleton.
+		// Transport still crosses the same abstract carrier boundary.
+		return v.carrier
 	case *Conjunction:
 		for _, term := range v.Values {
 			if carrier := opaqueTypeOf(term); carrier != nil {
@@ -383,6 +399,9 @@ func opaqueTypeOf(value Value) *opaqueCarrier {
 }
 
 func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, outward bool) Value {
+	if b, ok := Unwrap(value).(*Bottom); ok {
+		return b
+	}
 	if carrier := opaqueTypeOf(schema); carrier != nil && carrier.owner == p {
 		if !outward {
 			if v, ok := Unwrap(value).(*OpaqueValue); ok && v.carrier == carrier {
@@ -426,14 +445,31 @@ func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, out
 	}
 	out := &StructLit{}
 	for _, field := range typ.Arcs {
-		if field.ArcType != ArcMember && field.ArcType != ArcRequired {
+		if field.Label.IsLet() {
 			continue
 		}
 		a := v.LookupRaw(field.Label)
-		if a == nil {
+		if a == nil || a.ArcType != ArcMember {
+			if field.ArcType == ArcOptional {
+				continue
+			}
 			return c.NewErrf("missing interface field %s", field.Label.SelectorString(c))
 		}
 		out.Decls = append(out.Decls, &Field{Label: field.Label,
+			Value: p.transportResolved(c, field, a, outward)})
+	}
+	for _, a := range v.Arcs {
+		if a.ArcType != ArcMember || !a.Label.IsRegular() || typ.LookupRaw(a.Label) != nil {
+			continue
+		}
+		field := c.newInlineVertex(nil, nil)
+		field.Label = a.Label
+		typ.MatchAndInsert(c, field)
+		if len(field.Conjuncts) == 0 {
+			continue
+		}
+		field.Finalize(c)
+		out.Decls = append(out.Decls, &Field{Label: a.Label,
 			Value: p.transportResolved(c, field, a, outward)})
 	}
 	result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, out))
@@ -466,6 +502,56 @@ func (*OpaqueCall) declNode()        {}
 func (*OpaqueCall) elemNode()        {}
 
 func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
+	bindings := make(map[*TypeParameter]Value)
+	for e := c.Env(0); e != nil; e = e.Up {
+		if e.types != nil {
+			for p, v := range e.types.arguments {
+				bindings[p] = v
+			}
+		}
+	}
+	// The adapter's code is shared across all erased instances, but its
+	// input and output transport must use this call's selected predicates.
+	env := instantiateEnvironment(s.env, bindings)
+	private := s.private
+	publicParams, privateParams := typeParameters(s.env), typeParameters(private.Env)
+	if len(publicParams) == len(privateParams) && len(publicParams) != 0 {
+		args := make(map[*TypeParameter]Value)
+		for i, p := range publicParams {
+			v := bindings[p]
+			if s.outward {
+				switch x := Unwrap(v).(type) {
+				case *OpaqueType:
+					if x.carrier.owner == s.owner {
+						v = x.carrier.representation
+					}
+				case *OpaqueValue:
+					if x.carrier.owner == s.owner {
+						v = x.private
+					}
+				default:
+					if abstractEscapes(c, v, s.owner, make(map[Value]bool)) {
+						if concreteCapture(c, v) {
+							v = s.owner.transportResolved(c, v, v, false)
+						} else if len(private.Fn.Params) != 0 {
+							// Infer a private instance from the transported
+							// inputs when a composite abstract predicate
+							// has no direct private representation.
+							v = nil
+						} else {
+							return &Bottom{Code: IncompleteError, Err: c.Newf("abstract type argument transport remains unresolved")}
+						}
+					}
+				}
+			}
+			args[privateParams[i]] = v
+		}
+		var b *Bottom
+		private, b = private.instantiate(c, args)
+		if b != nil {
+			return b
+		}
+	}
 	call := &CallExpr{}
 	for i, p := range s.signature.Params {
 		label := p.Local
@@ -483,7 +569,7 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 		if value == nil {
 			continue
 		}
-		v := s.owner.transport(c, s.env, p.Value, value, !s.outward)
+		v := s.owner.transport(c, env, p.Value, value, !s.outward)
 		if b, ok := v.(*Bottom); ok {
 			return b
 		}
@@ -494,11 +580,11 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 			call.ArgLabels = append(call.ArgLabels, p.Label)
 		}
 	}
-	v := s.private.call(c, call, state)
+	v := private.call(c, call, state)
 	if b, ok := Unwrap(v).(*Bottom); ok {
 		return b
 	}
-	return s.owner.transport(c, s.env, s.signature.Ret, v, s.outward)
+	return s.owner.transport(c, env, s.signature.Ret, v, s.outward)
 }
 
 type PackageOpen struct {
