@@ -2085,6 +2085,7 @@ func mkPath(r *runtime.Runtime, a []Selector, v *adt.Vertex) (root *adt.Vertex, 
 
 type options struct {
 	concrete         bool // enforce that values are concrete
+	verifyFunctions  bool // demand proofs of quantified implementation contracts
 	raw              bool // show original values
 	hasHidden        bool
 	omitHidden       bool
@@ -2286,7 +2287,8 @@ func (o *options) updateOptions(opts []Option) {
 // [Concrete] are used. The [Final] option can be used to check for missing
 // required fields.
 //
-// It honors the [Concrete], [DisallowCycles], and [Final] options.
+// It honors the [Concrete], [DisallowCycles], [Final], and [VerifyFunctions]
+// options.
 func (v Value) Validate(opts ...Option) error {
 	o := options{}
 	o.updateOptions(opts)
@@ -2302,7 +2304,21 @@ func (v Value) Validate(opts ...Option) error {
 	if b != nil {
 		return v.toErr(b)
 	}
+	if o.verifyFunctions {
+		if b := subsume.Certify(v.ctx(), v.v); b != nil {
+			return v.toErr(b)
+		}
+	}
 	return nil
+}
+
+// VerifyFunctions requires structural proofs of the contracts on function
+// implementations in the quantified experiment. It applies to [Value.Validate].
+// Unlike [Concrete], it checks conformance on arbitrary admitted arguments,
+// including rigid type variables. A contract outside the supported proof
+// fragment reports incompleteness; successful calls alone are not a proof.
+func VerifyFunctions(verify bool) Option {
+	return func(o *options) { o.verifyFunctions = verify }
 }
 
 // Walk descends into all values of v, calling f. If f returns false, Walk

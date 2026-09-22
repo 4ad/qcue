@@ -32,6 +32,10 @@ By default, vet ensures that the result of validation is concrete
 by reporting an error if any resulting regular fields have non-concrete values.
 Use -c=false to not require concreteness, or -c to show these error messages.
 
+With --verify-functions, vet also requires proofs of implementation contracts
+in the quantified experiment. Unproved contracts are reported as incomplete,
+even when individual calls produce concrete results.
+
 vet can also validate non-CUE files in these file formats:
 
   Format       Extensions
@@ -60,6 +64,8 @@ Examples:
 The -d flag can be repeated to validate against multiple schemas at once.
 `
 
+const flagVerifyFunctions flagName = "verify-functions"
+
 func newVetCmd(c *Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vet [flags] [inputs]",
@@ -73,6 +79,8 @@ func newVetCmd(c *Command) *cobra.Command {
 
 	cmd.Flags().BoolP(string(flagConcrete), "c", false,
 		"require the evaluation to be concrete, or set -c=false to allow incomplete values")
+	cmd.Flags().Bool(string(flagVerifyFunctions), false,
+		"require proofs of quantified function implementation contracts")
 
 	return cmd
 }
@@ -117,6 +125,7 @@ func doVet(cmd *Command, args []string) error {
 			}
 		}
 		opt := []cue.Option{
+			cue.VerifyFunctions(flagVerifyFunctions.Bool(cmd)),
 			cue.Attributes(true),
 			cue.Definitions(true),
 			cue.Hidden(true),
@@ -153,7 +162,7 @@ func vetFiles(cmd *Command, b *buildPlan) error {
 		v := iter.value()
 
 		// Always concrete when checking against concrete files.
-		err := v.Validate(cue.Concrete(true))
+		err := v.Validate(cue.Concrete(true), cue.VerifyFunctions(flagVerifyFunctions.Bool(cmd)))
 		printError(cmd, err)
 	}
 	if err := iter.err(); err != nil {

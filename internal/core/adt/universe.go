@@ -35,6 +35,8 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		return ok
 	}
 	switch v := v.(type) {
+	case *RigidType:
+		return v.Param.Level, true
 	case *FuncValue:
 		for _, p := range typeParameters(v.Env) {
 			if p.ValueRange == nil {

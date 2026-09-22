@@ -81,11 +81,19 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		// TODO: this would work better if all equal nodes shared the same
 		// node link.
 		return deref(a) == deref(b)
+	case *adt.RigidType:
+		if b.Bound != nil {
+			return s.values(a, b.Bound)
+		}
 	}
 
 	switch x := a.(type) {
 	case *adt.Top:
 		return true
+	case *adt.RigidType:
+		// Only identity (handled above) proves inclusion in an arbitrary
+		// type. Its upper bound is never a substitute for that type.
+		return false
 
 	case *adt.Bottom:
 		// isBottom(b) was already tested above.

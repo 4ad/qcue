@@ -347,6 +347,9 @@ func (w *printer) compactNode(n adt.Node) {
 
 	case *adt.OpaqueType:
 		w.string("opaque type")
+	case *adt.RigidType:
+		w.string("rigid ")
+		w.string(x.Param.Src.Name.Name)
 
 	case *adt.OpaqueValue:
 		w.string("opaque value")

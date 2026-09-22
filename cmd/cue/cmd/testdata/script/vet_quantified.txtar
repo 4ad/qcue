@@ -1,0 +1,27 @@
+exec cue vet --verify-functions structural.cue
+! stderr .
+exec cue vet -c=false residual.cue
+! stderr .
+! exec cue vet -c=false --verify-functions residual.cue
+stderr 'function conformance remains unproved'
+exec cue export residual.cue -e observation
+stdout '^0$'
+
+-- structural.cue --
+@experiment(quantified)
+package proof
+
+identity(A): func(x: A) -> A: x
+pair(A, B): func(x: A, y: B) -> [A, B]: [x, y]
+map(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [
+    for x in xs {g(x)}
+]
+useBoth: func(f: forall A func(A) -> A) -> [int, string]: [f(1), f("one")]
+
+-- residual.cue --
+@experiment(quantified)
+package proof
+
+// This true arithmetic fact is outside the structural proof fragment.
+positive: func(x: int & >0) -> (int & >=0): x - 1
+observation: positive(1)

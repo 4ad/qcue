@@ -218,6 +218,8 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 
 	case *adt.OpaqueType, *adt.OpaqueValue:
 		result = ast.NewIdent("_")
+	case *adt.RigidType:
+		result = e.bottom(&adt.Bottom{Err: errors.Newf(token.NoPos, "proof variable cannot be exported")})
 
 	case *adt.Vertex:
 		result = e.vertex(x)

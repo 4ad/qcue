@@ -748,6 +748,17 @@ func TestQuantifiedCapabilitySubsumption(t *testing.T) {
 		a, b string
 		want bool
 	}{
+		{`forall A func(A) -> A`, `forall B func(B) -> B`, true},
+		{`forall (A: int) func(A) -> A`, `forall B func(B) -> B`, true},
+		{`forall A func(A) -> A`, `forall (B: int) func(B) -> B`, false},
+		{`func(int) -> int`, `forall A func(A) -> A`, true},
+		{`func(forall A func(A) -> A) -> int`, `func(forall B func(B) -> B) -> int`, true},
+		{`forall (A, B) func(A) -> B`, `forall (X, Y) func(X) -> X`, false},
+		{`forall (A, B: A) func(B) -> A`, `forall (X, Y: X) func(Y) -> X`, true},
+		{`func(int) -> int`, `func(int) -> int !bridge`, false},
+		{`func(int) -> int !bridge`, `func(int) -> int`, true},
+		{`func(int) -> int !bridge`, `func(int) -> int !bridge`, true},
+		{`func(int) -> int !bridge`, `func(int) -> int !io`, false},
 		{`func(int) -> number`, `func(number) -> int`, true},
 		{`func(number) -> int`, `func(int) -> number`, false},
 		{`func(int) -> number`, `func(int) -> string`, false},
@@ -857,6 +868,57 @@ out: f[[...(forall B func(B) -> B)]]`, true},
 			err := out.Validate()
 			if (err != nil) != tt.bad {
 				t.Fatalf("validation = %v; want error %v", err, tt.bad)
+			}
+		})
+	}
+}
+
+func TestQuantifiedCertification(t *testing.T) {
+	for _, tt := range []struct {
+		name, src string
+		proved    bool
+	}{
+		{"identity", `f(A): func(x: A) -> A: x`, true},
+		{"pair", `f(A, B): func(x: A, y: B) -> [A, B]: [x, y]`, true},
+		{"swap", `f(A, B): func(x: [A, B]) -> [B, A]: [x[1], x[0]]`, true},
+		{"record", `f(A): func(x: A) -> {value: A}: {value: x}`, true},
+		{"projection", `f(A): func(x: {value: A}) -> A: x.value`, true},
+		{"primitive", `f: func(x: int) -> int: x + 1`, true},
+		{"body stronger than annotation", `f: func(x: number) -> number: 1
+f: func(number) -> int`, true},
+		{"higher rank hypothesis", `f: func(id: forall A func(A) -> A) -> [int, string]: [id(3), id("x")]`, true},
+		{"nested function", `f(A): func(x: A) -> (func(int) -> A): func(y: int) -> A: x`, true},
+		{"map", `f(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [for x in xs {g(x)}]`, true},
+		{"flat map", `f(A, B): func(g: func(A) -> [...B], xs: [...A]) -> [...B]: [for x in xs for y in g(x) {y}]`, true},
+		{"filter", `f(A): func(g: func(A) -> bool, xs: [...A]) -> [...A]: [for x in xs if g(x) {x}]`, true},
+		{"text", `f: func(x: int) -> string: "\(x)"`, true},
+		{"list length", `f(A): func(xs: [...A]) -> int: len(xs)`, true},
+		{"actual callback proof", `g: func(x: int) -> int: "wrong"
+apply: func(h: func(int) -> int, x: int) -> int: h(x)
+f: func(x: int) -> int: apply(g, x)`, false},
+		{"returned implementation proof", `f: func() -> (func(int) -> int): func(x: int) -> int: "wrong"`, false},
+		{"unimplemented", `f(A): func(A) -> A`, false},
+		{"unsupported arithmetic", `f: func(x: int & >0) -> (int & >=0): x - 1`, false},
+		{"unchecked captured witness", `x: int
+f: func() -> int: x`, false},
+		{"proof dependency cycle", `f: func(x: int) -> int: g(x)
+g: func(x: int) -> int: f(x)`, false},
+		{"foreign boundary", `external: extern func(int) -> int !bridge
+f: func(x: int) -> int: external(x)`, false},
+		{"effectful callback", `f: func(g: func(int) -> int !bridge, x: int) -> int: g(x)`, false},
+		{"optional presence", `f: func(x?: int) -> int: x`, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			f := v.LookupPath(cue.ParsePath("f"))
+			if !f.Exists() {
+				t.Fatal(v.Err())
+			}
+			if err := f.Validate(); err != nil {
+				t.Fatalf("ordinary validation: %v", err)
+			}
+			if err := f.Validate(cue.VerifyFunctions(true)); (err == nil) != tt.proved {
+				t.Fatalf("certification: %v; want proof %v", err, tt.proved)
 			}
 		})
 	}

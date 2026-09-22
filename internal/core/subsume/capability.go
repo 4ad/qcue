@@ -57,7 +57,18 @@ func (s *subsumer) capabilitySignature(target, source adt.FuncType) bool {
 	if target == source {
 		return true
 	}
+	var ok bool
+	target, source, ok = s.capabilityScopes(target, source)
+	if !ok {
+		return false
+	}
+
 	a, b := target.Fn, source.Fn
+	if b.Src != nil && b.Src.Effect != nil {
+		if a.Src == nil || a.Src.Effect == nil || a.Src.Effect.Name != b.Src.Effect.Name {
+			return false
+		}
+	}
 	if a.Open {
 		// The shared protocol row is unresolved. Do not replace it with a
 		// promise that arbitrary additional packets succeed.
@@ -90,4 +101,42 @@ func (s *subsumer) capabilitySignature(target, source adt.FuncType) bool {
 		}
 	}
 	return s.funcConstraint(target.Env, a.Ret, source.Env, b.Ret)
+}
+
+// capabilityScopes introduces shared rigid parameters, or selects a use-site
+// instance, before comparing the ordinary arrow constructors.
+func (s *subsumer) capabilityScopes(target, source adt.FuncType) (adt.FuncType, adt.FuncType, bool) {
+	params, candidates := adt.FunctionTypeParameters(target), adt.FunctionTypeParameters(source)
+	if len(params) > 0 {
+		if len(params) != len(candidates) {
+			return target, source, false
+		}
+		for i, p := range params {
+			q := candidates[i]
+			if q.ExplicitLevel && p.Level > q.Level {
+				return target, source, false
+			}
+			if !s.funcConstraint(source.Env, q.Bound, target.Env, p.Bound) {
+				return target, source, false
+			}
+			var bound adt.Value = &adt.Top{}
+			if p.Bound != nil {
+				var ok bool
+				bound, ok = s.evalFuncConstraint(target.Env, p.Bound)
+				if !ok {
+					return target, source, false
+				}
+			}
+			rigid := &adt.RigidType{Param: p, Bound: bound}
+			target = adt.BindFunctionTypes(target, []adt.Value{rigid})
+			source = adt.BindFunctionTypes(source, []adt.Value{rigid})
+		}
+	} else if len(candidates) != 0 {
+		var b *adt.Bottom
+		source, b = adt.InstantiateFunctionType(s.ctx, source, target)
+		if b != nil {
+			return target, source, false
+		}
+	}
+	return target, source, true
 }

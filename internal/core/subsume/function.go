@@ -373,6 +373,12 @@ func (s *subsumer) evalFuncConstraint(env *adt.Environment, x adt.Expr) (adt.Val
 	if !complete {
 		return nil, false
 	}
+	if vertex, ok := v.(*adt.Vertex); ok {
+		vertex.Finalize(s.ctx)
+		if vertex.Bottom() != nil {
+			return nil, false
+		}
+	}
 	if _, ok := v.(*adt.Bottom); ok {
 		return nil, false
 	}
