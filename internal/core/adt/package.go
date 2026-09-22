@@ -384,6 +384,16 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 			}
 		}
 		fn := *x
+		fn.Params = slices.Clone(x.Params)
+		for i := range fn.Params {
+			if fn.Params[i].Default != nil {
+				// The public contract admits omission; it does not supply
+				// the private closure's default. Leave the slot absent so
+				// the adapter forwards omission through the boundary.
+				fn.Params[i].Default = nil
+				fn.Params[i].ArcType = ArcOptional
+			}
+		}
 		fn.Captures = nil
 		fn.Body = &OpaqueCall{owner: p, private: f, signature: x, env: env, outward: outward}
 		fnEnv := env
@@ -601,7 +611,9 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 			return b
 		}
 	}
-	call := &CallExpr{}
+	protocol, _ := private.residualSignature()
+	matches := matchFuncParams(s.signature, protocol, false)
+	arguments := make(map[int]Value)
 	for i, p := range s.signature.Params {
 		label := p.Local
 		if label == InvalidLabel {
@@ -609,7 +621,7 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 		}
 		var value Value
 		for _, a := range c.Env(0).Vertex.Arcs {
-			if a.Label == label {
+			if a.Label == label && a.ArcType == ArcMember {
 				a.Finalize(c)
 				value = a
 				break
@@ -622,12 +634,32 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 		if b, ok := v.(*Bottom); ok {
 			return b
 		}
-		call.Args = append(call.Args, v)
-		if p.Positional {
-			call.ArgLabels = append(call.ArgLabels, InvalidLabel)
-		} else {
-			call.ArgLabels = append(call.ArgLabels, p.Label)
+		if matches[i] < 0 {
+			return c.NewErrf("private operation does not accept an interface argument")
 		}
+		arguments[matches[i]] = v
+	}
+	// Preserve original slots when an earlier positional parameter was
+	// omitted. Later supplied arguments must use their labels in that case;
+	// compacting them into positional slots would change the call packet.
+	call := &CallExpr{}
+	positional := true
+	for i, p := range protocol.Params {
+		v := arguments[i]
+		if v == nil {
+			if p.Positional {
+				positional = false
+			}
+			continue
+		}
+		label := p.Label
+		if p.Positional && positional {
+			label = InvalidLabel
+		} else if label == InvalidLabel {
+			return c.NewErrf("private operation cannot preserve an omitted positional argument")
+		}
+		call.Args = append(call.Args, v)
+		call.ArgLabels = append(call.ArgLabels, label)
 	}
 	v := private.call(c, call, state)
 	if b, ok := Unwrap(v).(*Bottom); ok {
