@@ -807,6 +807,38 @@ func (f *formatter) exprRaw(expr ast.Expr, prec1, depth int) {
 		}
 		f.after(nil)
 
+	case *ast.Quantifier:
+		parens := prec1 > token.LowestPrec
+		if parens {
+			f.print(token.LPAREN, nooverride)
+		}
+		word := "forall"
+		if x.Exists {
+			word = "exists"
+		}
+		f.print(word, blank, token.LPAREN)
+		for i, p := range x.Params {
+			if i > 0 {
+				f.print(token.COMMA, blank)
+			}
+			f.before(p)
+			f.expr0(p.Name, depth)
+			if p.Sort != nil {
+				f.print(blank, token.IN, blank)
+				f.expr0(p.Sort, depth)
+			}
+			if p.Bound != nil {
+				f.print(token.COLON, blank)
+				f.expr0(p.Bound, depth)
+			}
+			f.after(p)
+		}
+		f.print(token.RPAREN, blank)
+		f.expr0(x.Body, depth)
+		if parens {
+			f.print(token.RPAREN, nooverride)
+		}
+
 	case *ast.Func:
 		// A function type's result constraint and a function's body extend
 		// to the end of the expression. In an operand position they would

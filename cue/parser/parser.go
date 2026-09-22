@@ -653,6 +653,9 @@ func (p *parser) parseOperand() (expr ast.Expr) {
 
 	switch p.tok {
 	case token.IDENT:
+		if p.quantifierAhead() {
+			return p.parseQuantifier()
+		}
 		ident := p.parseIdent()
 		// Check for optional reference marker (?)
 		// Don't consume ? if it's followed by : (that's a field constraint, not optional reference)
@@ -997,6 +1000,9 @@ func (p *parser) parseField() (decl ast.Decl) {
 
 	c := p.openComments()
 	defer func() { c.closeNode(p, decl) }()
+	if p.quantifiedFieldAhead() {
+		return p.parseQuantifiedField()
+	}
 
 	pos := p.pos
 	tok := p.tok
@@ -1424,11 +1430,11 @@ func (p *parser) parseFallbackClause(clauses []ast.Clause) *ast.FallbackClause {
 
 func (p *parser) functionsEnabled() bool {
 	return p.cfg.Mode&ParseFuncs != 0 ||
-		(p.experiments != nil && p.experiments.Functions)
+		(p.experiments != nil && p.experiments.Functions) || p.quantifiedEnabled()
 }
 
 func (p *parser) functionsExperimentEnabled() bool {
-	return p.experiments != nil && p.experiments.Functions
+	return (p.experiments != nil && p.experiments.Functions) || p.quantifiedEnabled()
 }
 
 // scannerExperiments returns the experiment state used for scanning. The
@@ -1439,7 +1445,7 @@ func (p *parser) scannerExperiments(forceFunctions bool) *cueexperiment.File {
 	if p.experiments != nil {
 		experiments = *p.experiments
 	}
-	if forceFunctions || p.cfg.Mode&ParseFuncs != 0 {
+	if forceFunctions || p.cfg.Mode&ParseFuncs != 0 || experiments.Quantified {
 		experiments.Functions = true
 	}
 	return &experiments
@@ -2066,6 +2072,7 @@ func (p *parser) checkExpr(x ast.Expr) ast.Expr {
 	case *ast.BasicLit:
 	case *ast.Interpolation:
 	case *ast.Func:
+	case *ast.Quantifier:
 	case *ast.StructLit:
 	case *ast.ListLit:
 	case *ast.ParenExpr:

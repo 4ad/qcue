@@ -252,6 +252,19 @@ func (c *cloner) node(node Node) Node {
 		x.X = clone(c, n.X)
 		return x
 
+	case *Quantifier:
+		x := shallow(c, n)
+		x.Params = cloneList(c, n.Params)
+		x.Body = clone(c, n.Body)
+		return x
+
+	case *TypeParam:
+		x := shallow(c, n)
+		x.Name = clone(c, n.Name)
+		x.Sort = clone(c, n.Sort)
+		x.Bound = clone(c, n.Bound)
+		return x
+
 	case *SelectorExpr:
 		x := shallow(c, n)
 		x.X = clone(c, n.X)

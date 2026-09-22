@@ -424,6 +424,15 @@ func applyCursor(v applyVisitor, c Cursor) {
 	case *ast.Ellipsis:
 		applyIfNotNil(v, c, &n.Type)
 
+	case *ast.TypeParam:
+		apply(v, c, &n.Name)
+		applyIfNotNil(v, c, &n.Sort)
+		applyIfNotNil(v, c, &n.Bound)
+
+	case *ast.Quantifier:
+		applyList(v, c, n.Params)
+		apply(v, c, &n.Body)
+
 	case *ast.Func:
 		// Rewrite the nodes actually present in the AST rather than the
 		// synthesized view of [ast.Func.Parameters], whose discriminator

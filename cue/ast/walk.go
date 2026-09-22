@@ -83,6 +83,15 @@ func Walk(node Node, before func(Node) bool, after func(Node)) {
 		walkIfNotNil(n.Default, before, after)
 		walkList(n.Attrs, before, after)
 
+	case *TypeParam:
+		Walk(n.Name, before, after)
+		walkIfNotNil(n.Sort, before, after)
+		walkIfNotNil(n.Bound, before, after)
+
+	case *Quantifier:
+		walkList(n.Params, before, after)
+		Walk(n.Body, before, after)
+
 	case *Func:
 		// Walk the nodes actually present in the AST rather than the
 		// synthesized view of [Func.Parameters], whose discriminator

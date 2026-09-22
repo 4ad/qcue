@@ -594,6 +594,24 @@ func DebugStr(x interface{}) (out string) {
 		out += DebugStr(v.Path)
 		return out
 
+	case *ast.Quantifier:
+		word := "forall"
+		if v.Exists {
+			word = "exists"
+		}
+		var params []string
+		for _, p := range v.Params {
+			s := DebugStr(p.Name)
+			if p.Sort != nil {
+				s += " in " + DebugStr(p.Sort)
+			}
+			if p.Bound != nil {
+				s += ": " + DebugStr(p.Bound)
+			}
+			params = append(params, s)
+		}
+		return word + " (" + strings.Join(params, ", ") + ") " + DebugStr(v.Body)
+
 	case *ast.Func:
 		params := DebugStr(v.Parameters())
 		if v.Ellipsis != token.NoPos {

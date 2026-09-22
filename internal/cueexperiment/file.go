@@ -107,6 +107,11 @@ type File struct {
 	//
 	// Proposal: https://cuelang.org/issue/4484
 	Functions bool `experiment:"preview:v0.18.0"`
+
+	// Quantified enables predicative higher-rank quantifiers and opaque
+	// existential modules, including the capability semantics of functions.
+	// See doc/quantified-cue.tex, profiles S_H and A.
+	Quantified bool `experiment:"preview:v0.18.0"`
 }
 
 // LanguageVersion returns the language version of the file or "" if no language

@@ -424,6 +424,33 @@ func (s *scope) Before(n ast.Node) bool {
 		}
 		return false
 
+	case *ast.Quantifier:
+		s = newScope(s.file, s, x, nil)
+		defer s.freeScope()
+		for _, p := range x.Params {
+			if p.Sort != nil {
+				ast.Walk(p.Sort, s.Before, nil)
+			}
+			if p.Bound != nil {
+				ast.Walk(p.Bound, s.Before, nil)
+			}
+			if p.Name.Name == "_" {
+				s.errFn(p.Pos(), "quantifier parameter must have a name")
+			} else if s.index[p.Name.Name].node != nil {
+				s.errFn(p.Pos(), "quantifier parameter %q redeclared", p.Name.Name)
+			} else {
+				// A lexical binder may shadow either a field or an alias.
+				// The field/alias redeclaration rule applies within record
+				// scopes, not across this newly introduced binder scope.
+				if s.nameFn != nil {
+					s.nameFn(p.Name.Name)
+				}
+				s.index[p.Name.Name] = entry{node: p, link: p}
+			}
+		}
+		ast.Walk(x.Body, s.Before, nil)
+		return false
+
 	case *ast.Func:
 		// Parameter constraints, parameter defaults, and the return type
 		// resolve in the enclosing scope; only the body gets a

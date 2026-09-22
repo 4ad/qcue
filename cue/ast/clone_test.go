@@ -62,7 +62,7 @@ t: [for x in d {try y = x, {v: y}}]
 // cloneExperimentSrc holds the constructs which are only available
 // with an experiment enabled.
 const cloneExperimentSrc = `
-@experiment(aliasv2,try,functions)
+@experiment(aliasv2,try,functions,quantified)
 package p
 
 a~v: {b: 1}
@@ -72,6 +72,7 @@ f: d.e?
 g: {h: 1}...
 h: func(_~x: int @attr(), y?: string) -> bool: x > 0
 i: h(1, y: "x")
+j: forall (A: number, B in Type(1): A) func(A) -> B
 `
 
 // cloneBadExprSrc and cloneBadDeclSrc do not parse; they exercise the

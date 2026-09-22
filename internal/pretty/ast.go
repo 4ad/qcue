@@ -1068,6 +1068,27 @@ func (c *converter) exprCore(x ast.Expr) doc {
 	case *ast.Func:
 		return c.funcExpr(x)
 
+	case *ast.Quantifier:
+		word := "forall"
+		if x.Exists {
+			word = "exists"
+		}
+		parts := []doc{stringLit(word + " (")}
+		for i, p := range x.Params {
+			if i > 0 {
+				parts = append(parts, stringLit(", "))
+			}
+			parts = append(parts, c.expr(p.Name))
+			if p.Sort != nil {
+				parts = append(parts, stringLit(" in "), c.expr(p.Sort))
+			}
+			if p.Bound != nil {
+				parts = append(parts, stringLit(": "), c.expr(p.Bound))
+			}
+		}
+		parts = append(parts, stringLit(") "), c.expr(x.Body))
+		return cats(parts...)
+
 	case *ast.Alias:
 		// In expression position (including inside pattern labels
 		// like [x=string]) aliases use tight "=" without surrounding
@@ -4745,6 +4766,8 @@ func isLeafLitValue(v ast.Expr) bool {
 // contexts.
 func wrapForPrecedence(doc doc, e ast.Expr, prec int) doc {
 	switch x := e.(type) {
+	case *ast.Quantifier:
+		return cats(lParenLit, doc, rParenLit)
 	case *ast.BinaryExpr:
 		if x.Op.Precedence() < prec {
 			return cats(lParenLit, doc, rParenLit)
