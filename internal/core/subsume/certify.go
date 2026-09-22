@@ -28,9 +28,16 @@ import (
 func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 	p := &certifier{ctx: ctx, active: make(map[*adt.Function]bool),
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope)}
+	return p.validateFunction(ctx, f)
+}
+
+// Reuse the current proof context when validating captured composites.
+// Starting another certifier would forget active proof dependencies and
+// permit cycles through records or lists to justify their own annotations.
+func (p *certifier) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 	if !p.implementation(f) {
 		return &adt.Bottom{Src: f.Source(), Code: adt.IncompleteError,
-			Err: ctx.Newf("function conformance remains unproved")}
+			Err: p.ctx.Newf("function conformance remains unproved")}
 	}
 	return nil
 }
@@ -219,7 +226,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			return f
 		}
 		if vertex, ok := v.(*adt.Vertex); ok {
-			if adt.Validate(p.ctx, vertex, &adt.ValidateConfig{Concrete: true}) != nil {
+			if adt.Validate(p.ctx, vertex, &adt.ValidateConfig{
+				Concrete: true, CheckFunction: p.validateFunction,
+			}) != nil {
 				return nil
 			}
 		} else if v == nil || !adt.IsConcrete(v) {
