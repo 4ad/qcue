@@ -91,6 +91,27 @@ func (p *certifier) frame(up *adt.Environment, values map[adt.Feature]adt.Value)
 	return env
 }
 
+// Captured runtime values must be complete, including conformance of any
+// functions nested inside them. Reuse this proof's dependency context.
+func (p *certifier) captured(v adt.Value) adt.Value {
+	if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok {
+		if !p.implementation(f) {
+			return nil
+		}
+		return f
+	}
+	if vertex, ok := v.(*adt.Vertex); ok {
+		if adt.Validate(p.ctx, vertex, &adt.ValidateConfig{
+			Concrete: true, CheckFunction: p.validateFunction,
+		}) != nil {
+			return nil
+		}
+	} else if v == nil || !adt.IsConcrete(v) {
+		return nil
+	}
+	return v
+}
+
 func (p *certifier) implementation(f *adt.FuncValue) bool {
 	clauses := append([]adt.FuncType{{Fn: f.Fn, Env: f.Env}}, f.Types...)
 	for _, target := range clauses {
@@ -102,7 +123,7 @@ func (p *certifier) implementation(f *adt.FuncValue) bool {
 }
 
 func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
-	if f.Fn.Body == nil || f.IsPartial() || p.active[f.Fn] {
+	if f.Fn.Body == nil || p.active[f.Fn] {
 		return false
 	}
 	if f.Src != nil && (f.Src.Extern.IsValid() || f.Src.Effect != nil) {
@@ -113,8 +134,17 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 	defer func() { p.hypotheses = savedHypotheses }()
 	p.active[f.Fn] = true
 	defer delete(p.active, f.Fn)
+	for i := range f.Fn.Params {
+		env, expr := f.BoundArgument(i)
+		if expr != nil && p.captured(p.schema(env, expr)) == nil {
+			return false
+		}
+	}
 	s := &subsumer{ctx: p.ctx}
 	source := adt.FuncType{Fn: f.Fn, Env: f.Env}
+	if partial := target.Partial(); partial != nil {
+		source.Fn = partial.ResidualSignature()
+	}
 	if target.Fn == f.Fn {
 		// Retained views of the same erased implementation include its
 		// original telescope, even after selecting concrete type arguments.
@@ -134,6 +164,19 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 	}
 	matches := adt.MatchFuncValueParams(target.Fn, &adt.FuncValue{Fn: source.Fn})
 	values := make(map[adt.Feature]adt.Value)
+	if partial := target.Partial(); partial != nil {
+		for i, arg := range f.Fn.Params {
+			env, expr := partial.BoundArgument(i)
+			if expr == nil {
+				continue
+			}
+			v := p.captured(p.schema(env, expr))
+			if !p.includes(p.schema(source.Env, arg.Value), v) {
+				return false
+			}
+			values[arg.Local] = v
+		}
+	}
 	for i, j := range matches {
 		arg := target.Fn.Params[i]
 		if arg.ArcType == adt.ArcOptional {
@@ -226,23 +269,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 			return nil
 		}
-		v := p.schema(env, x)
-		if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok {
-			if !p.implementation(f) {
-				return nil
-			}
-			return f
-		}
-		if vertex, ok := v.(*adt.Vertex); ok {
-			if adt.Validate(p.ctx, vertex, &adt.ValidateConfig{
-				Concrete: true, CheckFunction: p.validateFunction,
-			}) != nil {
-				return nil
-			}
-		} else if v == nil || !adt.IsConcrete(v) {
-			return nil
-		}
-		return v
+		return p.captured(p.schema(env, x))
 	case *adt.SelectorExpr:
 		v, ok := p.expr(env, x.X).(*adt.Vertex)
 		if !ok {

@@ -93,6 +93,20 @@ type FuncType struct {
 	partial *FuncValue
 }
 
+// Partial returns the binding snapshot for a contract attached to a partial
+// closure. A nil snapshot means that the contract describes full packets.
+func (t FuncType) Partial() *FuncValue { return t.partial }
+
+// BoundArgument returns a slot's lexical binding, or a nil expression if the
+// slot remains unbound. The conformance checker uses the same immutable
+// bindings as execution when proving a residual contract.
+func (f *FuncValue) BoundArgument(i int) (*Environment, Expr) {
+	if i >= len(f.args) {
+		return nil, nil
+	}
+	return f.args[i].env, f.args[i].expr
+}
+
 // IsFuncType reports whether v is a bodyless function literal, i.e. a
 // function type rather than a callable function value. It is exported for
 // use by internal/core/subsume.
