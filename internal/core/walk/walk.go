@@ -155,6 +155,14 @@ func (w *Visitor) node(n adt.Node) {
 			w.node(x.Body)
 		}
 
+	case *adt.Quantified:
+		for _, p := range x.Params {
+			w.node(p.Bound)
+		}
+		w.node(x.Body)
+
+	case *adt.TypeReference:
+
 	case *adt.FuncCallRef:
 		// A call reference schedules the referenced function's expressions,
 		// so features used by those expressions are reachable through it.
@@ -208,6 +216,7 @@ func (w *Visitor) node(n adt.Node) {
 	case *adt.ForClause:
 		w.feature(x.Key, x)
 		w.feature(x.Value, x)
+		w.node(x.Src)
 
 	case *adt.IfClause:
 		w.node(x.Condition)

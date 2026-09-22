@@ -86,6 +86,9 @@ type parser struct {
 	// angleParamLevel marks the expression level where > closes a
 	// function-local generic parameter list, rather than a comparison.
 	angleParamLevel int
+	// A colon following an unparenthesized arrow result belongs to the
+	// outer function. Parentheses introduce a new expression level.
+	funcReturnLevel int
 }
 
 func (p *parser) init(filename string, src []byte, opts []Option) {
@@ -1629,20 +1632,24 @@ func (p *parser) parseFunc() (expr ast.Expr) {
 	var effect *ast.Ident
 	var colon token.Pos
 	var body ast.Expr
+	mayHaveBody := !p.quantifiedEnabled() || p.funcReturnLevel != p.exprLev+1
 	if p.tok == token.RARROW {
 		arrow = p.pos
 		p.next()
+		saved := p.funcReturnLevel
+		p.funcReturnLevel = p.exprLev + 1
 		ret = p.parseExpr()
+		p.funcReturnLevel = saved
 		if p.quantifiedEnabled() && p.tok == token.NOT {
 			p.next()
 			effect = p.parseIdent()
 		}
-		if p.tok == token.COLON {
+		if mayHaveBody && p.tok == token.COLON {
 			colon = p.pos
 			p.next()
 			body = p.parseExpr()
 		}
-	} else if p.tok == token.COLON {
+	} else if mayHaveBody && p.tok == token.COLON {
 		colon = p.pos
 		p.next()
 		if p.functionsExperimentEnabled() {

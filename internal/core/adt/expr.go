@@ -1137,10 +1137,11 @@ func (x *SelectorExpr) resolve(c *OpContext, state Flags) *Vertex {
 //	a[index]
 //	a[index]? (optional - returns OptionalUndefined if index doesn't exist)
 type IndexExpr struct {
-	Src      *ast.IndexExpr
-	X        Expr
-	Index    Expr
-	Optional bool // true if index has ? suffix (e.g., foo[0]?)
+	Src        *ast.IndexExpr
+	X          Expr
+	Index      Expr
+	Optional   bool // true if index has ? suffix (e.g., foo[0]?)
+	Quantified bool // permits explicit type application
 }
 
 func (x *IndexExpr) Source() ast.Node {
@@ -1151,6 +1152,25 @@ func (x *IndexExpr) Source() ast.Node {
 }
 
 func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
+	// Type application uses predicates as arguments, so it must precede
+	// the ordinary index path, which requires a concrete string or integer.
+	if x.Quantified {
+		if v := ctx.unifyNode(x.X, state); v != nil {
+			if f, ok := Unwrap(v).(*FuncValue); ok && len(typeParameters(f.Env)) != 0 {
+				arg, _ := ctx.Evaluate(ctx.Env(0), x.Index)
+				inst, b := f.instantiate(ctx, map[*TypeParameter]Value{
+					typeParameters(f.Env)[0]: arg,
+				})
+				if b != nil {
+					ctx.AddBottom(b)
+					return emptyNode
+				}
+				v := ctx.newInlineVertex(nil, nil, MakeRootConjunct(ctx.Env(0), inst))
+				v.Finalize(ctx)
+				return v
+			}
+		}
+	}
 	// TODO: support byte index.
 	n := ctx.node(x, x.X, true, Flags{
 		status:    partial,
@@ -1628,11 +1648,17 @@ func (x *Function) evaluate(c *OpContext, state Flags) Value {
 	if b := x.scheduleDefaultCheck(c, env); b != nil {
 		return b
 	}
-	return &FuncValue{
+	f := &FuncValue{
 		Src: x.Src,
 		Fn:  x,
 		Env: env,
 	}
+	if x.Quantified && x.Body != nil && len(typeParameters(env)) != 0 {
+		if b := refuteGenericFunction(c, f); b != nil {
+			return b
+		}
+	}
+	return f
 }
 
 // hasDefaults reports whether any parameter of x declares a default.
@@ -2183,6 +2209,7 @@ func unresolvedDisjunction(v Value) *Disjunction {
 }
 
 func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
+	callee := x // Stable identity before selecting this call's type instance.
 	if b := x.checkIdentities(c); b != nil {
 		return b
 	}
@@ -2303,6 +2330,13 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		return &FuncValue{Src: x.Src, Fn: x.Fn, Env: x.Env, Types: x.Types,
 			args: bindings, identities: x.identities}
 	}
+	if len(typeParameters(x.Env)) != 0 {
+		inst, b := x.inferInstance(c, bindings)
+		if b != nil {
+			return b
+		}
+		x = inst
+	}
 
 	// Phase 2: complete the call.
 	//
@@ -2320,8 +2354,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	// call site re-entered through recursion is flagged as a structural
 	// cycle. This mirrors `(f & {n: (f & {...}).out}).out`, where the two `f`
 	// references are distinct AST nodes.
-	anchor := c.funcAnchor(x.Fn, x.Env)
-	ref := c.funcCallRef(call, anchor, x)
+	anchor := c.funcAnchor(callee.Fn, callee.Env)
+	ref := c.funcCallRef(call, anchor, callee)
 
 	arcs := make([]*Vertex, 0, len(x.Fn.Params))
 	for i, p := range x.Fn.Params {
@@ -2449,8 +2483,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			c.funcCallResults = map[funcCallResultKey][]funcCallResult{}
 		}
 		c.funcCallResults[resultKey] = append(c.funcCallResults[resultKey],
-			funcCallResult{fn: x.Fn, env: x.Env, types: x.Types, args: x.args,
-				identities: x.identities, result: result})
+			funcCallResult{fn: callee.Fn, env: callee.Env, types: callee.Types, args: callee.args,
+				identities: callee.identities, result: result})
 	}
 
 	return result

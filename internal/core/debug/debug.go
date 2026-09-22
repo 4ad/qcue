@@ -736,6 +736,28 @@ func (w *printer) node(n adt.Node) {
 	case *adt.Function:
 		w.fn(x)
 
+	case *adt.Quantified:
+		if x.Src.Exists {
+			w.string("exists (")
+		} else {
+			w.string("forall (")
+		}
+		for i, p := range x.Params {
+			if i > 0 {
+				w.string(", ")
+			}
+			w.string(p.Src.Name.Name)
+			if p.Bound != nil {
+				w.string(": ")
+				w.node(p.Bound)
+			}
+		}
+		w.string(") ")
+		w.node(x.Body)
+
+	case *adt.TypeReference:
+		w.string(x.Src.Name)
+
 	case *adt.FuncValue:
 		w.funcValue(x)
 

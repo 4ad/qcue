@@ -48,11 +48,21 @@ func mergeCapabilities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
 			if err := refuteCapability(c, &m, t); err != nil {
 				return nil, err
 			}
+			if len(typeParameters(t.Env)) != 0 {
+				if err := refuteGenericCapability(c, &m, t); err != nil {
+					return nil, err
+				}
+			}
 		}
 		for _, u := range clauses[:i] {
 			if u.Fn.Body == nil {
 				if err := refuteArrowIntersection(c, t, u); err != nil {
 					return nil, err
+				}
+				if len(typeParameters(t.Env)) != 0 || len(typeParameters(u.Env)) != 0 {
+					if err := refuteGenericIntersection(c, t, u); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -288,6 +298,31 @@ func (n *nodeContext) scheduleCapabilityResults(ref *FuncCallRef, env *Environme
 	for _, t := range ref.types {
 		if t.Fn.Body != nil {
 			continue
+		}
+		if len(typeParameters(t.Env)) != 0 {
+			bindings := make([]funcArg, len(t.Fn.Params))
+			matches := matchFuncParams(t.Fn, ref.fn, false)
+			for i, j := range matches {
+				if j < 0 {
+					continue
+				}
+				label := ref.fn.Params[j].Local
+				if label == InvalidLabel {
+					label = anonParamLabel(n.ctx, j)
+				}
+				for _, a := range env.Vertex.Arcs {
+					if a.Label == label {
+						bindings[i] = funcArg{expr: a, env: env}
+					}
+				}
+			}
+			f := &FuncValue{Fn: t.Fn, Env: t.Env}
+			inst, b := f.inferInstance(n.ctx, bindings)
+			if b != nil {
+				n.addBottom(b)
+				continue
+			}
+			t.Env = inst.Env
 		}
 		switch capabilityApplies(n.ctx, t, ref.fn, ref.types, env.Vertex) {
 		case proofEstablished:

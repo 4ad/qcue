@@ -230,6 +230,12 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 	case *adt.Function:
 		return e.funcSrc(x.Src)
 
+	case *adt.Quantified:
+		return ast.Clone(x.Src)
+
+	case *adt.TypeReference:
+		return ast.Clone(x.Src)
+
 	case *adt.BinaryExpr:
 		if x.Op == adt.AndOp || x.Op == adt.OrOp {
 			return e.sortBinaryTree(env, x)

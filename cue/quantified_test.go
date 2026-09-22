@@ -21,6 +21,102 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 )
 
+func TestQuantifiedInstantiation(t *testing.T) {
+	for _, tt := range []struct{ name, src, want string }{
+		{"independent calls", `
+id(A): func(x: A) -> A: x
+out: [id(3), id("hello"), id(true)]`, `[3,"hello",true]`},
+		{"explicit arguments", `
+id: func<A>(x: A) -> A: x
+out: [id[int](3), id[string]("hello")]`, `[3,"hello"]`},
+		{"repeated parameter", `
+pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]
+out: pair(1, 2.5)`, `[1,2.5]`},
+		{"tuple variables", `
+swap(A, B): func(p: [A, B]) -> [B, A]: [p[1], p[0]]
+out: swap([1, "x"])`, `["x",1]`},
+		{"nested result", `
+constant(A): func(x: A) -> (forall B func(B) -> A):
+    func<B>(y: B) -> A: x
+out: [constant(3)("x"), constant("hi")(false)]`, `[3,"hi"]`},
+		{"shadowing", `
+f(A): func(x: A) -> _: {g: func<A>(y: A) -> A: y, x: x}
+out: [f(3).g("x"), f("x").g(3)]`, `["x",3]`},
+		{"generic map", `
+map(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [
+    for x in xs {g(x)}
+]
+inc: func(x: int) -> int: x + 1
+text: func(x: int) -> string: "\(x)"
+out: [map(inc, [1, 2, 3]), map(text, [1, 2, 3])]`, `[[2,3,4],["1","2","3"]]`},
+		{"generic callback", `
+flatMap(A, B): func(g: func(A) -> [...B], xs: [...A]) -> [...B]: [
+    for x in xs for y in g(x) {y}
+]
+duplicate(A): func(x: A) -> [A, A]: [x, x]
+out: flatMap(duplicate, [1, 2])`, `[1,1,2,2]`},
+		{"composition", `
+compose(A, B, C): func(g: func(B) -> C, f: func(A) -> B) ->
+    func(A) -> C: func(x: A) -> C: g(f(x))
+inc: func(x: int) -> int: x + 1
+text: func(x: int) -> string: "\(x)"
+out: compose(text, inc)(4)`, `"5"`},
+		{"higher rank callback", `
+id(A): func(x: A) -> A: x
+useBoth: func(p: forall A func(A) -> A) -> [int, string]: [
+    p(7), p("seven"),
+]
+out: useBoth(id)`, `[7,"seven"]`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			got, err := v.LookupPath(cue.MakePath(cue.Str("out"))).MarshalJSON()
+			if err != nil {
+				t.Fatalf("%v (root: %v)", err, v.Err())
+			}
+			if string(got) != tt.want {
+				t.Fatalf("got %s; want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedUniversalRefutations(t *testing.T) {
+	for _, src := range []string{
+		`bad(A): func(x: A) -> A: 0`,
+		`bad(A: number): func(x: A) -> A: x + 1`,
+		`bad(A): func(A) -> A
+         bad: func(int) -> bool`,
+		`bad: forall A func(A) -> A
+         bad: func(x: int) -> int: x`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			if err := v.LookupPath(cue.MakePath(cue.Str("bad"))).Err(); err == nil {
+				t.Fatal("missing universal counterexample")
+			}
+		})
+	}
+}
+
+func TestQuantifiedInvalidInstances(t *testing.T) {
+	for _, src := range []string{
+		`id(A): func(x: A) -> A: x
+         out: id[int]("wrong")`,
+		`pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]
+         out: pair[string]("a", "b")`,
+		`id(A in int): func(x: int) -> int: x
+         out: id(1)`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			if err := v.Validate(); err == nil {
+				t.Fatal("invalid instance was accepted")
+			}
+		})
+	}
+}
+
 // The paper's self-unification examples exercise descriptor identity across
 // copied environments, not just references to the same evaluator pointer.
 func TestQuantifiedClosureIdentity(t *testing.T) {

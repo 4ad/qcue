@@ -139,6 +139,8 @@ type compiler struct {
 
 	fileScope map[adt.Feature]bool
 
+	typeParameters map[*ast.TypeParam]*adt.TypeParameter
+
 	num literal.NumInfo
 
 	errs errors.Error
@@ -646,6 +648,13 @@ func (c *compiler) resolve(n *ast.Ident) adt.Expr {
 			UpCount: upCount,
 			Label:   c.funcParamLocal(f),
 		}
+
+	case *ast.TypeParam:
+		p := c.typeParameters[f]
+		if p == nil {
+			return c.errf(n, "type parameter %s is out of scope", n.Name)
+		}
+		return &adt.TypeReference{Src: n, Param: p, UpCount: upCount}
 
 	// Handle new-style postfix aliases: a~X or a~(K,V)
 	case *ast.Field:
@@ -1270,6 +1279,9 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 	case *ast.Ident:
 		return c.resolve(n)
 
+	case *ast.Quantifier:
+		return c.quantifier(n)
+
 	case *ast.Func:
 		if !c.experiments.Functions && !c.experiments.Quantified {
 			return c.errf(n, "function syntax requires @experiment(functions)")
@@ -1370,9 +1382,10 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 
 	case *ast.IndexExpr:
 		return &adt.IndexExpr{
-			Src:   n,
-			X:     c.expr(n.X),
-			Index: c.expr(n.Index),
+			Src:        n,
+			X:          c.expr(n.X),
+			Index:      c.expr(n.Index),
+			Quantified: c.experiments.Quantified,
 		}
 
 	case *ast.SliceExpr:

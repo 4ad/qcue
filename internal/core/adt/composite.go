@@ -86,6 +86,10 @@ import (
 type Environment struct {
 	Up *Environment
 
+	// types records a lexical quantified scope, independently of ordinary
+	// value cells and their copying rules.
+	types *typeScope
+
 	// Vertex should not be accessed directly in most cases.
 	// Use DerefVertex(ctx) instead to handle overlay mappings correctly.
 	//
@@ -115,7 +119,7 @@ type Environment struct {
 
 // Equal reports whether e and f refer to the same node.
 func (e *Environment) Equal(ctx *OpContext, f *Environment) bool {
-	return e.Up == f.Up && e.DerefVertex(ctx) == f.DerefVertex(ctx)
+	return e.Up == f.Up && e.types == f.types && e.DerefVertex(ctx) == f.DerefVertex(ctx)
 }
 
 type cacheKey struct {
