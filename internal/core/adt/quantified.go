@@ -65,6 +65,42 @@ type typeScope struct {
 	arguments  map[*TypeParameter]Value
 }
 
+// AliasApplication substitutes predicates into an abbreviation. It creates
+// no shared universal subject and binds arguments in the caller's scope.
+type AliasApplication struct {
+	Src      *ast.CallExpr
+	Template *Quantified
+	UpCount  int32
+	Args     []Expr
+}
+
+func (a *AliasApplication) Source() ast.Node { return a.Src }
+func (*AliasApplication) node()              {}
+func (*AliasApplication) expr()              {}
+func (*AliasApplication) declNode()          {}
+func (*AliasApplication) elemNode()          {}
+
+func (a *AliasApplication) evaluate(c *OpContext, state Flags) Value {
+	args := make(map[*TypeParameter]Value, len(a.Args))
+	for i, x := range a.Args {
+		v, _ := c.Evaluate(c.Env(0), x)
+		if v == nil {
+			return nil
+		}
+		args[a.Template.Params[i]] = v
+	}
+	scope := c.newInlineVertex(nil, &StructMarker{})
+	env := &Environment{Up: c.Env(a.UpCount), Vertex: scope,
+		types: &typeScope{quantifier: a.Template}}
+	f := &FuncValue{Env: env}
+	inst, b := f.instantiate(c, args)
+	if b != nil {
+		return b
+	}
+	v, _ := c.Evaluate(inst.Env, a.Template.Body)
+	return v
+}
+
 func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 	if q.Src.Exists {
 		return &Bottom{Src: q.Src, Code: IncompleteError,

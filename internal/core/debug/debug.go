@@ -758,6 +758,17 @@ func (w *printer) node(n adt.Node) {
 	case *adt.TypeReference:
 		w.string(x.Src.Name)
 
+	case *adt.AliasApplication:
+		w.string("alias(")
+		for i, a := range x.Args {
+			if i > 0 {
+				w.string(", ")
+			}
+			w.node(a)
+		}
+		w.string(") ")
+		w.node(x.Template)
+
 	case *adt.FuncValue:
 		w.funcValue(x)
 

@@ -233,6 +233,9 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 	case *adt.Quantified:
 		return ast.Clone(x.Src)
 
+	case *adt.AliasApplication:
+		return ast.Clone(x.Src)
+
 	case *adt.TypeReference:
 		return ast.Clone(x.Src)
 

@@ -161,6 +161,12 @@ func (w *Visitor) node(n adt.Node) {
 		}
 		w.node(x.Body)
 
+	case *adt.AliasApplication:
+		w.node(x.Template)
+		for _, a := range x.Args {
+			w.node(a)
+		}
+
 	case *adt.TypeReference:
 
 	case *adt.FuncCallRef:

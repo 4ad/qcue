@@ -15,6 +15,7 @@
 package compile
 
 import (
+	"slices"
 	"strconv"
 
 	"cuelang.org/go/cue/ast"
@@ -22,12 +23,68 @@ import (
 	"cuelang.org/go/internal/core/adt"
 )
 
+func (c *compiler) aliasTemplate(src *ast.ParametricAlias, level int) adt.Expr {
+	if c.parametricAliases == nil {
+		c.parametricAliases = make(map[*ast.ParametricAlias]adt.Expr)
+	}
+	if x, ok := c.parametricAliases[src]; ok {
+		if x == nil {
+			return c.errf(src, "cyclic parametric alias %s", src.Name.Name)
+		}
+		return x
+	}
+	c.parametricAliases[src] = nil
+	saved := c.stack
+	c.stack = slices.Clone(c.stack[:level+1])
+	q := &ast.Quantifier{Quantifier: src.Pos(), Params: src.Params, Body: src.Body}
+	x := c.quantifiedTemplate(q, src)
+	c.stack = saved
+	c.parametricAliases[src] = x
+	return x
+}
+
+func (c *compiler) aliasApplication(src *ast.CallExpr, id *ast.Ident, alias *ast.ParametricAlias) adt.Expr {
+	if len(src.Args) != len(alias.Params) || src.Ellipsis != token.NoPos {
+		return c.errf(src, "alias %s requires %d type arguments", alias.Name.Name, len(alias.Params))
+	}
+	for _, label := range src.ArgLabels {
+		if label != nil {
+			return c.errf(src, "alias arguments must be positional")
+		}
+	}
+	up := int32(0)
+	level := len(c.stack) - 1
+	for ; level >= 0; level-- {
+		if c.stack[level].scope == id.Scope {
+			break
+		}
+		up += c.stack[level].upCount
+	}
+	if level < 0 {
+		return c.errf(id, "parametric alias %s is out of scope", id.Name)
+	}
+	template := c.aliasTemplate(alias, level)
+	q, ok := template.(*adt.Quantified)
+	if !ok {
+		return template
+	}
+	application := &adt.AliasApplication{Src: src, Template: q, UpCount: up}
+	for _, a := range src.Args {
+		application.Args = append(application.Args, c.expr(a))
+	}
+	return application
+}
+
 func (c *compiler) quantifier(src *ast.Quantifier) adt.Expr {
+	return c.quantifiedTemplate(src, src)
+}
+
+func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.Expr {
 	if !c.experiments.Quantified {
 		return c.errf(src, "quantifier syntax requires @experiment(quantified)")
 	}
 	q := &adt.Quantified{Src: src}
-	c.pushScope(nil, 1, src)
+	c.pushScope(nil, 1, scope)
 	defer c.popScope()
 	if c.typeParameters == nil {
 		c.typeParameters = make(map[*ast.TypeParam]*adt.TypeParameter)

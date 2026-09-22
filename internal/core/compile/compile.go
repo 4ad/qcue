@@ -139,7 +139,8 @@ type compiler struct {
 
 	fileScope map[adt.Feature]bool
 
-	typeParameters map[*ast.TypeParam]*adt.TypeParameter
+	typeParameters    map[*ast.TypeParam]*adt.TypeParameter
+	parametricAliases map[*ast.ParametricAlias]adt.Expr
 
 	num literal.NumInfo
 
@@ -656,6 +657,9 @@ func (c *compiler) resolve(n *ast.Ident) adt.Expr {
 		}
 		return &adt.TypeReference{Src: n, Param: p, UpCount: upCount}
 
+	case *ast.ParametricAlias:
+		return c.errf(n, "parametric alias %s requires type arguments", n.Name)
+
 	// Handle new-style postfix aliases: a~X or a~(K,V)
 	case *ast.Field:
 		var ident *ast.Ident
@@ -775,6 +779,9 @@ func (c *compiler) markAlias(d ast.Decl) {
 
 func (c *compiler) decl(d ast.Decl) adt.Decl {
 	switch x := d.(type) {
+	case *ast.ParametricAlias:
+		c.aliasTemplate(x, len(c.stack)-1)
+		return nil
 	case *ast.BadDecl:
 		return c.errf(d, "")
 
@@ -1451,6 +1458,19 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		return c.expr(n.X)
 
 	case *ast.CallExpr:
+		fun := n.Fun
+		for {
+			p, ok := fun.(*ast.ParenExpr)
+			if !ok {
+				break
+			}
+			fun = p.X
+		}
+		if id, ok := fun.(*ast.Ident); ok {
+			if a, ok := id.Node.(*ast.ParametricAlias); ok {
+				return c.aliasApplication(n, id, a)
+			}
+		}
 		call := &adt.CallExpr{Src: n, Fun: c.expr(n.Fun), Partial: n.Ellipsis != token.NoPos}
 		seenLabel := false
 		for i, a := range n.Args {

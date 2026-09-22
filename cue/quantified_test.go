@@ -117,6 +117,52 @@ func TestQuantifiedInvalidInstances(t *testing.T) {
 	}
 }
 
+func TestQuantifiedParametricAliases(t *testing.T) {
+	for _, tt := range []struct{ src, want string }{
+		{`Box(A) = {value: A}
+Pair(A, B) = [A, B]
+out: {box: Box(int) & {value: 7}, pair: Pair(int, string) & [3, "x"]}`,
+			`{"box":{"value":7},"pair":[3,"x"]}`},
+		{`Box(A) = {value: A}
+Nested(B) = Box(Box(B))
+out: Nested(string) & {value: value: "x"}`, `{"value":{"value":"x"}}`},
+		{`let N = int & >=0
+Box(A: N) = {value: A}
+out: {let N = string, _unused: N, value: Box(3)}.value`, `{"value":3}`},
+		{`Box(A) = {value: A}
+wrap(A): func(x: A) -> Box(A): {value: x}
+out: wrap("x")`, `{"value":"x"}`},
+	} {
+		t.Run(tt.src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			got, err := v.LookupPath(cue.MakePath(cue.Str("out"))).MarshalJSON()
+			if err != nil {
+				t.Fatalf("%v (root: %v)", err, v.Err())
+			}
+			if string(got) != tt.want {
+				t.Fatalf("got %s; want %s", got, tt.want)
+			}
+		})
+	}
+	for _, src := range []string{
+		`Box(A) = {value: A}
+         out: Box(int) & {value: "wrong"}`,
+		`Box(A: number) = {value: A}
+         out: Box(string)`,
+		`Box(A) = {value: A}
+         out: Box(int, string)`,
+		`Loop(A) = Loop(A)
+         out: Loop(int)`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			if v.Validate() == nil {
+				t.Fatal("invalid alias application was accepted")
+			}
+		})
+	}
+}
+
 // The paper's self-unification examples exercise descriptor identity across
 // copied environments, not just references to the same evaluator pointer.
 func TestQuantifiedClosureIdentity(t *testing.T) {
