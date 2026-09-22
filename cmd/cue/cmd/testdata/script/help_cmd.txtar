@@ -51,14 +51,14 @@ command: echo: {
 
 -- cue-cmd.stderr --
 cmd must be run as one of its subcommands
-Run 'cue help cmd' for known subcommands.
+Run 'qcue help cmd' for known subcommands.
 -- cue-help-cmd.stdout --
 cmd executes the named workflow command for each of the named instances.
 
 Workflow commands are defined in tool files, which are regular CUE
 files within the same package with a filename ending in _tool.cue.
 
-Run "cue help commands" for more details on authoring tasks and
+Run "qcue help commands" for more details on authoring tasks and
 workflow commands.
 
 Usage:

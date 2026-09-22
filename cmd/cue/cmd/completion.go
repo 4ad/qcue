@@ -25,27 +25,27 @@ var validCompletionArgs = []string{"bash", "zsh", "fish", "powershell"}
 const completionExample = `
 Bash:
 
-$ source <(cue completion bash)
+$ source <(qcue completion bash)
 
 # To load completions for each session, execute once:
 Linux:
-  $ cue completion bash > /etc/bash_completion.d/cue
+  $ qcue completion bash > /etc/bash_completion.d/qcue
 MacOS:
-  $ cue completion bash > /usr/local/etc/bash_completion.d/cue
+  $ qcue completion bash > /usr/local/etc/bash_completion.d/qcue
 
 Zsh:
 
-$ source <(cue completion zsh)
+$ source <(qcue completion zsh)
 
 # To load completions for each session, execute once:
-$ cue completion zsh > "${fpath[1]}/_cue"
+$ qcue completion zsh > "${fpath[1]}/_qcue"
 
 Fish:
 
-$ cue completion fish | source
+$ qcue completion fish | source
 
 # To load completions for each session, execute once:
-$ cue completion fish > ~/.config/fish/completions/cue.fish
+$ qcue completion fish > ~/.config/fish/completions/qcue.fish
 `
 
 func newCompletionCmd(c *Command) *cobra.Command {

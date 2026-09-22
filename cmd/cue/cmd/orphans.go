@@ -40,7 +40,7 @@ func (b *buildPlan) usePlacement() bool {
 
 func (b *buildPlan) parsePlacementFlags() error {
 	cmd := b.cmd
-	// Flags which only exist for `cue import`.
+	// Flags which only exist for `qcue import`.
 	if b.importing {
 		b.perFile = flagFiles.Bool(cmd)
 	}

@@ -41,10 +41,10 @@ cmp stderr typo_cmd.stdout
 unknown command "unknown" for "qcue"
 -- missing_mod_cmd.out --
 mod must be run as one of its subcommands
-Run 'cue help mod' for known subcommands.
+Run 'qcue help mod' for known subcommands.
 -- unknown_mod_cmd.out --
 mod must be run as one of its subcommands: unknown subcommand "unknown"
-Run 'cue help mod' for known subcommands.
+Run 'qcue help mod' for known subcommands.
 -- unknown_flag.out --
 unknown flag: --unknown
 -- typo_cmd.stdout --

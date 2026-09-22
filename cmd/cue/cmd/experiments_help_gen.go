@@ -45,8 +45,18 @@ Multiple experiments can be enabled:
 	@experiment(structcmp,aliasv2)
 	@experiment(explicitopen)
 
+Experiments in the default stage can be disabled for a file:
+
+	@experiment(quantified=false)
+
+The quantified extension is enabled by default from CUE v0.18.0. It implements
+S_H (higher-rank quantifiers) and A (opaque existential packages). To use the
+previous function experiment's semantics, use:
+
+	@experiment(functions,quantified=false)
+
 The behavior of per-file experiments tracks the language version declared in their module,
-or if none exists, the language version reported by "cue version".
+or if none exists, the language version reported by "qcue version".
 
 Available per-file experiments:
 
@@ -63,15 +73,15 @@ Available per-file experiments:
     alias syntax (X=). It is stable as of v0.18.0, so a file at that
     language version or later must use the postfix syntax.
     Proposal: https://cuelang.org/issue/4014
-    Note: Requires cue fix when upgrading
+    Note: Requires qcue fix when upgrading
 
   explicitopen (preview: v0.15.0, stable: v0.18.0)
     explicitopen enables the postfix ... operator to explicitly open
     closed structs, allowing additional fields to be added. It is stable as
     of v0.18.0, so a file at that language version or later embeds strictly
-    and may use the postfix ... operator; cue fix migrates older files.
+    and may use the postfix ... operator; qcue fix migrates older files.
     Proposal: https://cuelang.org/issue/4032
-    Note: Requires cue fix when upgrading
+    Note: Requires qcue fix when upgrading
 
   try (preview: v0.16.0)
     try enables the try clause and optional reference markers (?).
@@ -94,15 +104,20 @@ Available per-file experiments:
     function bodies.
     Proposal: https://cuelang.org/issue/4484
 
+  quantified (preview: v0.18.0, default: v0.18.0)
+    quantified enables predicative higher-rank quantifiers and opaque
+    existential modules, including the capability semantics of functions.
+    See doc/quantified-cue.tex, profiles S_H and A.
+
 
 ## Global Experiments
 
 Global experiments are enabled via the CUE_EXPERIMENT environment variable:
 
 	export CUE_EXPERIMENT=cmdreferencepkg,keepvalidators
-	cue export myfile.cue
+	qcue export myfile.cue
 
-The behavior of global experiments tracks the language version reported by "cue version".
+The behavior of global experiments tracks the language version reported by "qcue version".
 
 Available global experiments:
 
@@ -142,11 +157,11 @@ Available global experiments:
 
   formatv2 (preview: v0.18.0, default: v0.18.0)
     formatv2 selects the Wadler-Lindig pretty-printer as the
-    implementation behind "cue fmt" and "cue/format".
+    implementation behind "qcue fmt" and "cue/format".
 
   openapiv2 (preview: v0.18.0)
     openapiv2 selects the new whole-document OpenAPI implementation behind
-    the openapi encoding used by "cue import" and "cue export", extracting
+    the openapi encoding used by "qcue import" and "qcue export", extracting
     and generating a complete OpenAPI document rather than only its schemas.
 
   yamlgoccy (preview: v0.18.0, default: v0.18.0)

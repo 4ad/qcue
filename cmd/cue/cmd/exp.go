@@ -203,12 +203,12 @@ writefs takes JSON via stdin in the form of
 		contents!: _
 	}
 
-For example, this tool can be used via "cue cmd" as follows:
+For example, this tool can be used via "qcue cmd" as follows:
 
 	command: gen: exec.Run & {
 		cmd: ["cue", "exp", "writefs"]
 		stdin: json.Marshal({
-			tool: "cue cmd gen"
+			tool: "qcue cmd gen"
 			remove: ["out/*.yaml"]
 			create: {
 				"out/foo.yaml": {contents: {body: "some struct"}}

@@ -11,7 +11,7 @@ env CUE_REGISTRY=main.org=$MEMREGISTRY+insecure,$CUE_REGISTRY
 cd m
 
 ! exec cue mod publish v0.1.0
-stderr '^module is not tidy, use ''cue mod tidy''$'
+stderr '^module is not tidy, use ''qcue mod tidy''$'
 
 -- m/cue.mod/module.cue --
 module: "main.org@v0"

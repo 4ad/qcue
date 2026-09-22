@@ -6,7 +6,9 @@ version v0.18.0 and later. Build with `go install ./cmd/qcue`; the resulting
 `qcue` executable can coexist with an upstream `cue` installation.
 Run `qcue version` for the supported language version and extension profiles.
 
-See [the implementation guide](doc/quantified-cue-implementation.md).
+See [the implementation guide](doc/quantified-cue-implementation.md) and
+[the quantified test index](cue/testdata/quantified/README.md), including all
+paper examples and topic-organized txtar fixtures.
 
 <!--
  Copyright 2018 The CUE Authors
@@ -57,7 +59,7 @@ You need [Go 1.26 or later](https://go.dev/doc/install) to install CUE from sour
 
 You can also `git clone` the repository and build it directly via `go install ./cmd/qcue`.
 
-Built `cue` binaries include version information as reported by `cue version`,
+Built `qcue` binaries include version information as reported by `qcue version`,
 which `go build` derives from the VCS. We recommend that downstream packagers
 build releases from git tags rather than source archives to ensure this works.
 

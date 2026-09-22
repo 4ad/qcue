@@ -33,7 +33,7 @@ per language and are documented in the respective subcommands.
 
 For information on native CUE modules:
 
-    cue help modules
+    qcue help modules
 `,
 	})
 	cmd.AddCommand(newGoCmd(c))

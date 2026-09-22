@@ -16,7 +16,7 @@
 
 package cmd
 
-// cueDebugHelp lists the CUE_DEBUG flags for "cue help environment".
+// cueDebugHelp lists the CUE_DEBUG flags for "qcue help environment".
 var cueDebugHelp = `
 		http
 			http enables JSON logging per HTTP request and response made

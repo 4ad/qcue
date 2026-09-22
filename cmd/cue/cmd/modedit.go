@@ -47,7 +47,7 @@ The --require=path@version and --drop-require=path@majorversion flags add
 and drop a requirement on the given module path and version. Note that
 --require overrides any existing requirements on path. These flags are
 mainly for tools that understand the module graph. Users should prefer
-'cue mod get path@version' which makes other cue.mod adjustments as
+'qcue mod get path@version' which makes other cue.mod adjustments as
 needed to satisfy constraints imposed by other modules.
 
 The --replace=path@majorversion=replacement and

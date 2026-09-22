@@ -55,7 +55,7 @@ is specified).
 For example:
 
 	# Copy from $CUE_REGISTRY (usually the Central Registry) to my.registry.example
-	cue mod mirror --to my.registry.example foo.com/m1@v1.2.3 bar.org@v2
+	qcue mod mirror --to my.registry.example foo.com/m1@v1.2.3 bar.org@v2
 
 will copy the exact module foo.com/m1@v1.2.3 but the latest version
 of bar.org@2, or all v2.x.y versions if --all-versions is given.

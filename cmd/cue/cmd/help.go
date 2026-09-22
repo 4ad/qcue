@@ -36,12 +36,12 @@ import (
 // this how users use it?
 
 // newHelpCmd is similar to the built-in help command from cobra,
-// but knows how to load custom commands in `cue help cmd`.
+// but knows how to load custom commands in `qcue help cmd`.
 func newHelpCmd(c *Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "help [command]",
 		Short:  "show help text for a command or topic",
-		Hidden: true, // not shown as a runnable command in `cue help`
+		Hidden: true, // not shown as a runnable command in `qcue help`
 		Run: func(_ *cobra.Command, args []string) {
 			findCmd := func() (*cobra.Command, bool) {
 				cmd, rest, err := c.Root().Find(args)
@@ -49,7 +49,7 @@ func newHelpCmd(c *Command) *cobra.Command {
 				return cmd, found
 			}
 			cmd, found := findCmd()
-			// Treat `cue help help` as an unknown help topic; just use `cue help`.
+			// Treat `qcue help help` as an unknown help topic; just use `qcue help`.
 			if found && cmd.Name() == "help" {
 				cmd, found = nil, false
 			}
@@ -72,7 +72,7 @@ func newHelpCmd(c *Command) *cobra.Command {
 				tools, err := buildTools(c, pkgArgs)
 				if err == nil {
 					addCustomCommands(c, cmd, commandSection, tools)
-					// For the sake of `cue help cmd mycmd`, find the command again.
+					// For the sake of `qcue help cmd mycmd`, find the command again.
 					cmd, found = findCmd()
 				}
 			}
@@ -97,7 +97,7 @@ func newHelpCmd(c *Command) *cobra.Command {
 }
 
 // We use a custom Cobra help text template for the sake of being a bit more
-// in control of its formatting, as well as the contents of the root `cue help`.
+// in control of its formatting, as well as the contents of the root `qcue help`.
 var helpTemplate = `
 {{- if not .HasParent}}{{/* Special template for the root help. */ -}}
 CUE makes it easy to validate data, write schemas,
@@ -114,7 +114,7 @@ Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
 Use "{{.CommandPath}} help [command]" for more information about a command.
 
 {{/* We want to show additional help topics from the root command's help text
-     even though they are only reachable via 'cue help'. */ -}}
+     even though they are only reachable via 'qcue help'. */ -}}
 Additional help topics:{{range .Commands}}{{if eq .Name "help"}}{{range .Commands}}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}
 {{else}}{{/* Subcommands use a fairly standard template. */ -}}
@@ -142,7 +142,7 @@ var inputsHelp = &cobra.Command{
 	Short: "package list, patterns, and files",
 	Long: `Many commands apply to a set of inputs:
 
-cue <command> [inputs]
+qcue <command> [inputs]
 
 The list [inputs] may specify CUE packages, CUE files, non-CUE
 files or some combinations of those. An empty list specifies
@@ -162,7 +162,7 @@ behavior that might be removed at a later date.
 An absolute import path is of the form P or P@vN where vN is the major
 version of the module containing the package. An import path is mapped
 to a registry location by consulting cue.mod/module.cue and the
-registry configuration (see "cue help modules" and "cue help
+registry configuration (see "qcue help modules" and "qcue help
 registryconfig" for more details).
 
 A package is loaded as a package instance: the unification of all CUE
@@ -187,7 +187,7 @@ import paths.
 
 Directory and file names that begin with "." or "_" are ignored,
 unless explicitly listed as inputs. File with names ending "_tool.cue"
-are ignored unless running "cue cmd" and they are in packages
+are ignored unless running "qcue cmd" and they are in packages
 explicitly mentioned on the command line. Files with names ending
 "_test.cue" are ignored for the time being; they are reserved for
 future testing functionality.
@@ -195,7 +195,7 @@ future testing functionality.
 A package may also be specified as a list of .cue files.
 The special symbol '-' denotes stdin or stdout and defaults to
 the cue file type for stdin. For stdout, the default depends on
-the cue command. A .cue file package may not be combined with
+the qcue command. A .cue file package may not be combined with
 regular packages.
 
 Non-cue files are interpreted based on their file extension or,
@@ -219,13 +219,13 @@ Examples (also see also "flags" and "filetypes" help topics):
 
 # Show the definition of each package named foo for each
 # directory dir under path.
-$ cue def ./path/.../dir:foo
+$ qcue def ./path/.../dir:foo
 
 # Unify each document in foo.yaml with the value Foo in pkg.
-$ cue export ./pkg -d Foo foo.yaml
+$ qcue export ./pkg -d Foo foo.yaml
 
 # Unify data.json with schema.json.
-$ cue export data.json schema: schema.json
+$ qcue export data.json schema: schema.json
 `,
 }
 
@@ -281,7 +281,7 @@ var environmentHelp = &cobra.Command{
 	Use:   "environment",
 	Short: "environment variables",
 	Long: `
-The cue command consults environment variables for configuration.
+The qcue command consults environment variables for configuration.
 If an environment variable is unset or empty, sensible default setting is used.
 
 	CUE_CACHE_DIR
@@ -307,11 +307,11 @@ If an environment variable is unset or empty, sensible default setting is used.
 
 	CUE_REGISTRY
 		The configuration to use when downloading and publishing modules.
-		See "cue help registryconfig" for details.
+		See "qcue help registryconfig" for details.
 
 	CUE_EXPERIMENT
 		Comma-separated list of experiment flags to enable or disable.
-		See "cue help experiments" for details.
+		See "qcue help experiments" for details.
 
 	CUE_DEBUG
 		Comma-separated list of debug flags to enable or disable, such as:
@@ -342,7 +342,7 @@ For a detailed reference on modules:
 
 For information on commands that interact with modules:
 
-	cue help mod
+	qcue help mod
 
 For tutorials on how to use the Central Registry, see:
 
@@ -355,7 +355,7 @@ For a tutorial on how to work with a custom OCI registry for CUE modules:
 
 For information on how to specify the CUE registry:
 
-	cue help registryconfig
+	qcue help registryconfig
 `,
 }
 
@@ -526,20 +526,20 @@ combination with the import command.
 Examples:
 
 # Put a value at a path based on its "kind" and "name" fields.
-$ cue eval -l 'strings.ToLower(kind)' -l name foo.yaml
+$ qcue eval -l 'strings.ToLower(kind)' -l name foo.yaml
 
 # Include a schema under the "myschema" field using the path notation.
-$ cue eval -l myschema: schema: foo.json
+$ qcue eval -l myschema: schema: foo.json
 
 # Base the path values on its kind and file name.
-$ cue eval --with-context -l 'path.Base(filename)' -l data.kind foo.yaml
+$ qcue eval --with-context -l 'path.Base(filename)' -l data.kind foo.yaml
 `,
 }
 
 var filetypeHelp = &cobra.Command{
 	Use:   "filetypes",
 	Short: "supported file types and qualifiers",
-	Long: `The cue tool supports the following file types:
+	Long: `The qcue tool supports the following file types:
 
     Tag         Extensions      Description
     cue         .cue            CUE source files.
@@ -563,7 +563,7 @@ always interpreted as schema. YAML and JSON are always
 interpreted as data. CUE and Go are interpreted as schema by
 default, but may be selected to operate in data mode.
 
-The cue tool will infer a file's type from its extension by
+The qcue tool will infer a file's type from its extension by
 default. The user may override this behavior by using qualifiers.
 A qualifier takes the form
 
@@ -571,13 +571,13 @@ A qualifier takes the form
 
 For instance,
 
-	cue eval json: foo.data
+	qcue eval json: foo.data
 
 specifies that 'foo.data' should be read as a JSON file. File
 formats that do not have a default extension may be represented
 in any data format using the same notation:
 
-	cue def jsonschema: bar.cue foo.yaml openapi+yaml: baz.def
+	qcue def jsonschema: bar.cue foo.yaml openapi+yaml: baz.def
 
 interprets the files bar.cue and foo.yaml as data in the
 respective formats encoding an JSON Schema, while 'baz.def' is
@@ -585,7 +585,7 @@ defined to be a YAML file which contents encode OpenAPI
 definitions.
 
 A qualifier applies to all files following it on the command line
-until the next qualifier. The cue tool does not allow a ':' in
+until the next qualifier. The qcue tool does not allow a ':' in
 relative filenames.
 
 The following tags can be used in qualifiers to further
@@ -629,23 +629,23 @@ form of generated schemas may change from release to release.
 Examples:
 
 # Interpret bar.cue and foo.yaml as OpenAPI data.
-$ cue def openapi: bar.cue foo.yaml
+$ qcue def openapi: bar.cue foo.yaml
 
 # Write a CUE package as OpenAPI encoded as YAML, using
 # an alternate file extension.
-$ cue def -o openapi+yaml:foo.openapi
+$ qcue def -o openapi+yaml:foo.openapi
 
 # Print the data for the current package as YAML.
-$ cue export --out=yaml
+$ qcue export --out=yaml
 
 # Print the string value of the "name" field as a string.
-$ cue export -e name --out=text
+$ qcue export -e name --out=text
 
 # Write the string value of the "name" field to a text file.
-$ cue export -e name -o=foo.txt
+$ qcue export -e name -o=foo.txt
 
 # Write the string value of the "name" field to a file foo.
-$ cue export -e name -o=text:foo
+$ qcue export -e name -o=text:foo
 `,
 }
 
@@ -788,7 +788,7 @@ may be produced by comprehensions or from the result of other tasks,
 which can result in discovering more tasks.
 To avoid this, set the CUE_EXPERIMENT=cmdreferencepkg experiment flag.
 
-Inputs of tasks my refer to outputs of other tasks. The cue tool
+Inputs of tasks my refer to outputs of other tasks. The qcue tool
 does a static analysis of the configuration and only starts tasks
 that are fully specified. Upon completion of each task, cue
 rewrites the instance, filling in the completed task, and
@@ -824,10 +824,10 @@ the terminal:
 
 We run the "hello" workflow command like this:
 
-	$ cue cmd hello
+	$ qcue cmd hello
 	Hello World! Welcome to Amsterdam.
 
-	$ cue cmd --inject who=Jan hello
+	$ qcue cmd --inject who=Jan hello
 	Hello Jan! Welcome to Amsterdam.
 
 

@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This tool generates the cueDebugHelp string used by `cue help environment`
+// This tool generates the cueDebugHelp string used by `qcue help environment`
 // based on the CUE_DEBUG flags defined in internal/cuedebug/cuedebug.go.
 
 package main
@@ -112,7 +112,7 @@ func generate(flags []debugFlag) []byte {
 
 package cmd
 
-// cueDebugHelp lists the CUE_DEBUG flags for "cue help environment".
+// cueDebugHelp lists the CUE_DEBUG flags for "qcue help environment".
 var cueDebugHelp = `, copyright.String("2026"))
 	// Start the content on its own line, stripped with [1:], so that the
 	// generated raw string literal stays aligned with the source.

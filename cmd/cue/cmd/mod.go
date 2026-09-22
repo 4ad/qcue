@@ -25,10 +25,10 @@ func newModCmd(c *Command) *cobra.Command {
 		Long: `Mod groups commands which operate on CUE modules.
 
 Note that support for modules is built into all the cue commands, not
-just 'cue mod'.
+just 'qcue mod'.
 
 See also:
-	cue help modules
+	qcue help modules
 `,
 	})
 

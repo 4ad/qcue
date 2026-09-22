@@ -34,7 +34,7 @@ cmd executes the named workflow command for each of the named instances.
 Workflow commands are defined in tool files, which are regular CUE
 files within the same package with a filename ending in _tool.cue.
 
-Run "cue help commands" for more details on authoring tasks and
+Run "qcue help commands" for more details on authoring tasks and
 workflow commands.
 
 Usage:

@@ -42,14 +42,14 @@ lsp runs a CUE language server.
 
 The server communicates using the Language Server Protocol (LSP), with
 JSONRPC2 over stdin and stdout, and is intended to be run as a child
-process of an editor. Running "cue lsp" with no subcommand is
-equivalent to running "cue lsp serve".
+process of an editor. Running "qcue lsp" with no subcommand is
+equivalent to running "qcue lsp serve".
 
 By default, the server serves a single editor session over stdin and
 stdout. It can instead run as a shared daemon serving several editors:
 start the daemon with --listen, and configure each editor to run
-"cue lsp --remote" to connect to it. With --remote=auto, an editor's
-"cue lsp" starts the daemon automatically if it is not already
+"qcue lsp --remote" to connect to it. With --remote=auto, an editor's
+"qcue lsp" starts the daemon automatically if it is not already
 running.
 `[1:],
 		RunE: mkRunE(c, runLSPServe),
@@ -74,7 +74,7 @@ running.
 		Short: "run a CUE language server",
 		Long: `
 serve runs a CUE language server. This is the default command of
-"cue lsp"; see "cue help lsp" for details.
+"qcue lsp"; see "qcue help lsp" for details.
 `[1:],
 		RunE: mkRunE(c, runLSPServe),
 	})
@@ -94,7 +94,7 @@ func runLSPServe(cmd *Command, args []string) error {
 
 	var ss jsonrpc2.StreamServer
 	if remote := flagRemote.String(cmd); remote != "" {
-		// remoteArgs returns the command line with which "cue lsp
+		// remoteArgs returns the command line with which "qcue lsp
 		// --remote=auto" starts the daemon it will then connect to.
 		remoteListenTimeout := flagRemoteListenTimeout.Duration(cmd)
 		remoteArgs := func(network, address string) []string {

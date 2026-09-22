@@ -45,7 +45,7 @@ This command alters import directives in the current module. By
 default it rewrites any imports in the current module that have a path
 prefix matching oldImportPath to replace that prefix by newImportPath.
 It does not attempt to adjust the contents of the cue.mod/module.cue file:
-use "cue mod get" or "cue mod tidy" for that.
+use "qcue mod get" or "qcue mod tidy" for that.
 
 If oldImportPath is underneath one of the dependency modules,
 only imports in that module will be altered, unless --all-major
@@ -84,24 +84,24 @@ the same import directive.
 
 For example:
 
-	# Change from k8s "cue get go" imports to new curated namespace
-	cue refactor imports k8s.io cuelabs.dev/x/k8s
+	# Change from k8s "qcue get go" imports to new curated namespace
+	qcue refactor imports k8s.io cuelabs.dev/x/k8s
 
 	# Update to use a new major version of the foo.com/bar module.
-	cue refactor imports foo.com/bar@v0 foo.com/bar@v1
+	qcue refactor imports foo.com/bar@v0 foo.com/bar@v1
 
 	# A shorter form of the above, assuming v0 is the default major
 	# version for foo.com/bar.
-	cue refactor imports foo.com/bar@v1
+	qcue refactor imports foo.com/bar@v1
 
 	# Use a different package from the pubsub package directory
-	cue refactor imports github.com/cue-unity/services/pubsub github.com/cue-unity/services/pubsub:otherpkg
+	qcue refactor imports github.com/cue-unity/services/pubsub github.com/cue-unity/services/pubsub:otherpkg
 
 	# Use a different identifier for the import of the pubsub package.
-	cue refactor imports --ident otherPubSub github.com/cue-unity/services/pubsub
+	qcue refactor imports --ident otherPubSub github.com/cue-unity/services/pubsub
 
 	# Update only foo.com/bar, not (say) foo.com/baz/somethingelse
-	cue refactor imports --exact foo.com/bar foo.com/baz
+	qcue refactor imports --exact foo.com/bar foo.com/baz
 `[1:],
 		RunE: mkRunE(c, runRefactorImports),
 		Args: cobra.RangeArgs(1, 2),

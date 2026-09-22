@@ -53,7 +53,7 @@ func newModUploadCmd(c *Command) *cobra.Command {
 		Short: "publish the current module to a registry",
 		Long: `Publish the current module to an OCI registry. It consults
 $CUE_REGISTRY to determine where the module should be published (see
-"cue help environment" for details). Also note that this command does
+"qcue help environment" for details). Also note that this command does
 no dependency or other checks at the moment.
 
 When the --dry-run flag is specified, nothing will actually be written
@@ -75,7 +75,7 @@ https://github.com/opencontainers/image-spec/blob/8f3820ccf8f65db8744e626df17fe8
 	return cmd
 }
 
-// publishInfo defines the format of the JSON printed by `cue mod publish --json`.
+// publishInfo defines the format of the JSON printed by `qcue mod publish --json`.
 type publishInfo struct {
 	Version  string   `json:"version"`
 	Ref      string   `json:"ref"`
@@ -119,7 +119,7 @@ func runModUpload(cmd *Command, args []string) error {
 	}
 	// The tidiness check is informed by cue.mod/local-module.cue even though
 	// that file is not part of the published module: publishing a module.cue
-	// that a full 'cue mod tidy' would update (for example because
+	// that a full 'qcue mod tidy' would update (for example because
 	// local-module.cue selects a higher dependency version) is rejected, so
 	// the published version cannot silently lag behind what the main module
 	// builds against.
@@ -167,7 +167,7 @@ func runModUpload(cmd *Command, args []string) error {
 			mf.Source = &modfile.Source{Kind: "self"}
 		} else {
 			// TODO print filename relative to current directory
-			return fmt.Errorf("publishing a module requires a source field in cue.mod/module.cue; choose a source with 'cue mod edit --source'")
+			return fmt.Errorf("publishing a module requires a source field in cue.mod/module.cue; choose a source with 'qcue mod edit --source'")
 		}
 	}
 	zf, err := os.CreateTemp("", "cue-publish-")

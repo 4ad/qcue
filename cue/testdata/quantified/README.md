@@ -64,6 +64,7 @@ Every additional corpus has `quantified` in its path or filename:
 | AST scopes and cloning | [ast/astutil/testdata/quantified.txtar](../../ast/astutil/testdata/quantified.txtar) | `TestQuantifiedScopes`, `TestAliasAndOpenScopes` |
 | Source exporter | [export/testdata/quantified](../../../internal/core/export/testdata/quantified/) | `TestQuantifiedIncompleteExport` |
 | CLI defaults and version | [quantified_defaults.txtar](../../../cmd/cue/cmd/testdata/script/quantified_defaults.txtar) | `TestScript/quantified_defaults` |
+| CLI language versions | [quantified_versions.txtar](../../../cmd/cue/cmd/testdata/script/quantified_versions.txtar) | `TestScript/quantified_versions` |
 | CLI certification | [quantified_vet.txtar](../../../cmd/cue/cmd/testdata/script/quantified_vet.txtar) | `TestScript/quantified_vet` |
 
 The retained package path `cmd/cue/cmd` is the CLI library. Its executable is

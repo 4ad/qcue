@@ -40,7 +40,7 @@ If the module version (which must be a canonical semver version)
 is omitted, it omits the tag from the reference.
 
 It only consults local information - it works lexically
-with respect to the registry configuration (see "cue help registryconfig")
+with respect to the registry configuration (see "qcue help registryconfig")
 and does not make any network calls to check whether
 the module exists.
 

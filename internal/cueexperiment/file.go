@@ -68,10 +68,10 @@ type File struct {
 	// ExplicitOpen enables the postfix ... operator to explicitly open
 	// closed structs, allowing additional fields to be added. It is stable as
 	// of v0.18.0, so a file at that language version or later embeds strictly
-	// and may use the postfix ... operator; cue fix migrates older files.
+	// and may use the postfix ... operator; qcue fix migrates older files.
 	//
 	// Proposal: https://cuelang.org/issue/4032
-	// Note: Requires cue fix when upgrading
+	// Note: Requires qcue fix when upgrading
 	ExplicitOpen bool `experiment:"preview:v0.15.0,stable:v0.18.0"`
 
 	// AliasV2 enables the use of 'self' identifier to refer to the
@@ -81,7 +81,7 @@ type File struct {
 	// language version or later must use the postfix syntax.
 	//
 	// Proposal: https://cuelang.org/issue/4014
-	// Note: Requires cue fix when upgrading
+	// Note: Requires qcue fix when upgrading
 	AliasV2 bool `experiment:"preview:v0.15.0,stable:v0.18.0"`
 
 	// Try enables the try clause and optional reference markers (?).
@@ -121,7 +121,8 @@ func (f *File) LanguageVersion() string {
 }
 
 // Experiments returns the names of the experiments that were
-// explicitly enabled for the file, in sorted order. It does not
+// explicitly configured for the file, in sorted order. Disabled settings
+// carry an "=false" suffix. The list does not
 // include experiments that are enabled by default for the file's
 // language version.
 func (f *File) Experiments() []string {

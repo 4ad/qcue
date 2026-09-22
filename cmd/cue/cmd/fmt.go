@@ -44,7 +44,7 @@ func newFmtCmd(c *Command) *cobra.Command {
 		Long: `
 fmt rewrites CUE files in the standard format.
 
-Arguments are interpreted as import paths (see 'cue help inputs') and all CUE files
+Arguments are interpreted as import paths (see 'qcue help inputs') and all CUE files
 in them are formatted, including those behind build attributes or without package names.
 
 Use --files to treat arguments as paths to files or directories to recursively format.
@@ -54,13 +54,13 @@ given as explicit arguments.
 Examples:
 
   # Format stdin
-  cue fmt -
+  qcue fmt -
 
   # Fail with a diff if a subset of packages needs formatting
-  cue fmt --diff ./foo/...
+  qcue fmt --diff ./foo/...
 
   # Fail with a list of files if any CUE file in a whole repository needs formatting
-  cue fmt --check --files .
+  qcue fmt --check --files .
 `[1:],
 		RunE: mkRunE(c, func(cmd *Command, args []string) error {
 			check := flagCheck.Bool(cmd)

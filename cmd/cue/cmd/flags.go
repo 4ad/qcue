@@ -87,10 +87,10 @@ func addOutFlags(cmd *cobra.Command) {
 	switch cmd.Name() {
 	case "def", "eval", "export":
 		f.String(string(flagOut), "",
-			`output format (run 'cue help filetypes' for more info)`)
+			`output format (run 'qcue help filetypes' for more info)`)
 	}
 	f.StringP(string(flagOutFile), "o", "",
-		`filename or - for stdout with optional file prefix (run 'cue help filetypes' for more info)`)
+		`filename or - for stdout with optional file prefix (run 'qcue help filetypes' for more info)`)
 	f.BoolP(string(flagForce), "f", false, "overwrite existing regular files")
 }
 
@@ -116,9 +116,9 @@ func addOrphanFlags(cmd *cobra.Command) {
 	f.StringP(string(flagPackage), "p", "", "package name for non-CUE files and CUE output")
 	f.StringArrayP(string(flagSchema), "d", nil,
 		"expression to select schema for evaluating values in non-CUE files")
-	f.StringArrayP(string(flagPath), "l", nil, "CUE expression for single path component (see 'cue help flags' for details)")
+	f.StringArrayP(string(flagPath), "l", nil, "CUE expression for single path component (see 'qcue help flags' for details)")
 	f.Bool(string(flagList), false, "concatenate multiple objects into a list")
-	f.Bool(string(flagWithContext), false, "import as object with contextual data (see 'cue help flags' for details)")
+	f.Bool(string(flagWithContext), false, "import as object with contextual data (see 'qcue help flags' for details)")
 	f.StringArrayP(string(flagProtoPath), "I", nil, "paths in which to search for imports")
 	f.String(string(flagProtoEnum), "int", "mode for rendering enums (int|json)")
 	f.StringP(string(flagGlob), "n", "", "regexp filter for non-CUE file names in directories")

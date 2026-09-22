@@ -307,8 +307,18 @@ Multiple experiments can be enabled:
 	@experiment(structcmp,aliasv2)
 	@experiment(explicitopen)
 
+Experiments in the default stage can be disabled for a file:
+
+	@experiment(quantified=false)
+
+The quantified extension is enabled by default from CUE v0.18.0. It implements
+S_H (higher-rank quantifiers) and A (opaque existential packages). To use the
+previous function experiment's semantics, use:
+
+	@experiment(functions,quantified=false)
+
 The behavior of per-file experiments tracks the language version declared in their module,
-or if none exists, the language version reported by "cue version".
+or if none exists, the language version reported by "qcue version".
 
 Available per-file experiments:
 
@@ -354,9 +364,9 @@ Available per-file experiments:
 Global experiments are enabled via the CUE_EXPERIMENT environment variable:
 
 	export CUE_EXPERIMENT=cmdreferencepkg,keepvalidators
-	cue export myfile.cue
+	qcue export myfile.cue
 
-The behavior of global experiments tracks the language version reported by "cue version".
+The behavior of global experiments tracks the language version reported by "qcue version".
 
 Available global experiments:
 

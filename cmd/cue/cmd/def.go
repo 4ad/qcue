@@ -31,7 +31,7 @@ func newDefCmd(c *Command) *cobra.Command {
 Printing is skipped if validation fails.
 
 Input arguments can be CUE packages, CUE files, non-CUE files, or some
-combinations of those. See "cue help inputs" for more detail.
+combinations of those. See "qcue help inputs" for more detail.
 
 The --expression flag is used to only print parts of a configuration.
 `,

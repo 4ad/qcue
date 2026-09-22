@@ -2,30 +2,42 @@
 
 This implementation follows profiles **S_H** (predicative higher-rank
 quantification) and **A** (opaque existential packages) in
-[the proposal](quantified-cue.tex). Enable it in each participating source file:
+[the proposal](quantified-cue.tex). The `quantified` experiment is **enabled by
+default** for CUE language version `v0.18.0` and later, including standalone files
+and Go API calls with no pinned language version.
 
-```cue
-@experiment(quantified)
+Build and install from this checkout:
+
+```sh
+go install ./cmd/qcue
+qcue version
 ```
 
+The executable is `qcue`, so it can coexist with upstream `cue`. Its version
+output identifies the build, supported CUE language version, S_H and A
+extensions, and default activation. The CLI library keeps the import path
+`cuelang.org/go/cmd/cue/cmd`.
+
 The experiment includes function syntax and the proposal's capability semantics.
-Files using only `@experiment(functions)` keep their existing function semantics.
+The explicit `@experiment(quantified)` attribute remains accepted but is not
+required. To use the previous experimental function semantics in a file, write
+`@experiment(functions,quantified=false)`; `@experiment(quantified=false)` alone
+opts out of the quantifier extension. Modules pinned to earlier language
+versions retain their earlier defaults.
+
 General value-dependent binders and the dependent profile **D** are out of scope.
 Finite literal value ranges, such as `exists (n in 1 | 2)`, are supported as finite
 unions or intersections.
 
-The module language version must be `v0.18.0` or later. In a new directory, use
-`cue mod init --language-version v0.18.0 example.com/quantified` before running
-the CLI examples. For an existing module, set its language version with
-`cue mod edit --language-version v0.18.0`.
+For a new module, use
+`qcue mod init --language-version v0.18.0 example.com/quantified`. For an existing
+module, set its language version with `qcue mod edit --language-version v0.18.0`.
 
 ## Quantifiers and type application
 
 A quantified declaration constrains **one subject** at every type instance:
 
 ```cue
-@experiment(quantified)
-
 id(A): func(x: A) -> A: x
 out: [id(3), id[string]("hello")]
 ```
@@ -45,8 +57,6 @@ checkable.
 A parametric alias abbreviates a description and creates no subject:
 
 ```cue
-@experiment(quantified)
-
 Box(A) = {value: A}
 item: Box(int) & {value: 3}
 ```
@@ -88,7 +98,7 @@ There are three distinct validation requests:
 | `value.Validate(cue.Concrete(true))` | Require materialized values, executable closures, and complete runtime captures. |
 | `value.Validate(cue.VerifyFunctions(true))` | Require structural proofs of function implementation contracts for arbitrary admitted inputs. |
 
-The CLI proof request is `cue vet --verify-functions file.cue`. The proof checker
+The CLI proof request is `qcue vet --verify-functions file.cue`. The proof checker
 handles annotated structural bodies, higher-rank arguments, records, lists,
 projections, finite comprehensions, and supported pure primitives. It does not
 use a target annotation as evidence for itself. A successful concrete call is
@@ -108,8 +118,6 @@ carrier. Opening introduces a local abstract type and a view of the declared
 interface:
 
 ```cue
-@experiment(quantified)
-
 #Counter: exists State {
     zero: State
     next: func(State) -> State
@@ -157,19 +165,26 @@ incompleteness rather than being replaced with a weaker description.
 - `internal/core/adt/package.go` implements existential residuals and opaque
   boundary transport. `internal/core/subsume` separates sufficient inclusion
   checks from implementation certification.
-- `cue/quantified_paper_test.go` checks all **101** listings against the paper's
-  exact source in `cue/testdata/quantified-paper.json`. There are **78 executable
-  examples**, two surface-syntax templates, 20 explicitly excluded D examples,
-  and one implementation-pseudocode listing. Intentional error examples assert
-  their errors; specification-only examples assert their residual status.
-- `cue/quantified_test.go` adds positive, negative, refinement, universe, opacity,
-  identity, file-order, certification, and export tests. Parser, AST, formatter,
-  exporter, and CLI tests cover the surrounding APIs.
+- [The quantified test index](../cue/testdata/quantified/README.md) links every
+  layer's txtar fixtures and explains their assertions. Semantic cases run in
+  the ordinary evaluator corpus under `cue/testdata/quantified/`.
+- [The paper corpus](../cue/testdata/quantified/paper/README.md) contains all
+  **101** exact listings: **78 executable examples**, two parsed surface-syntax
+  templates, 20 explicitly excluded D examples, and one pseudocode listing.
+  `cue/quantified_paper_test.go` checks the corpus against the paper. Intentional
+  errors and specification-only examples assert their errors or residual status.
+- Additional txtar fixtures cover refinement, universes, opacity, identity,
+  file ordering, certification, and export. Small Go harnesses retain checks
+  requiring Go API operations or AST identity; their input programs are txtar
+  sections too. Parser, formatter, AST, exporter, and CLI corpora all have
+  `quantified` in their paths or filenames.
 
-Run the focused corpus with:
+Run the semantic corpus and the paper/API checks with:
 
 ```sh
-go test ./cue -run TestQuantified -count=1
+go test ./internal/core/adt -run TestEvalV3/quantified
+go test ./cue -run TestQuantified
 ```
 
-Run the repository regression suite with `go test ./...`.
+See [the test index](../cue/testdata/quantified/README.md) for focused commands
+for each layer. Run the complete regression suite with `go test ./...`.
