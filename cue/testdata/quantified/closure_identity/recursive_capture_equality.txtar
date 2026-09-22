@@ -1,0 +1,11 @@
+Comparing captures that refer back to the closures being compared must
+retain an unresolved equality obligation instead of overflowing the stack.
+
+-- in.cue --
+@test(validate, concrete, incomplete, at="out")
+
+#P: exists A {value: A}
+p: seal #P with (A = int) {value: 42}
+labels: open p as (A, P) {[string]~Self: func() -> string: Self}
+labels: {word: _}
+out: labels.word()

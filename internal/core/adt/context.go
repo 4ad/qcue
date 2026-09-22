@@ -213,6 +213,7 @@ type OpContext struct {
 	funcCallResults     map[funcCallResultKey][]funcCallResult
 	sealedViews         map[sealKey]*Vertex
 	activeFunctionCalls []functionActivation
+	checkingClosures    map[closureComparison]bool
 
 	// anonParamLabels caches the labels of the synthetic activation arcs
 	// that bind the arguments of anonymous positional function parameters,

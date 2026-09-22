@@ -16,10 +16,24 @@ package adt
 
 import "slices"
 
+type closureComparison struct{ a, b *FuncValue }
+
 // closureIdentity compares operational descriptors, not the functions they
 // compute. Unknown captures retain an equality obligation: comparing two
 // upper approximations is not evidence that their witnesses are equal.
 func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
+	key := closureComparison{a, b}
+	if c.checkingClosures[key] || c.checkingClosures[closureComparison{b, a}] {
+		// A capture may refer back to a closure whose equality is currently
+		// being checked. Retain that cyclic obligation rather than either
+		// assuming equality or recursively demanding it without progress.
+		return proofUnknown
+	}
+	if c.checkingClosures == nil {
+		c.checkingClosures = make(map[closureComparison]bool)
+	}
+	c.checkingClosures[key] = true
+	defer delete(c.checkingClosures, key)
 	result := proofEstablished
 	if a.Fn != b.Fn {
 		x, xok := a.Fn.Body.(*OpaqueCall)
