@@ -258,6 +258,14 @@ func probeBody(x Expr) bool {
 }
 
 func refuteArrowIntersection(c *OpContext, a, b FuncType) *Bottom {
+	// Disjoint successful results do not refute two contracts that admit
+	// the same failure outcome. Such an implementation may raise that
+	// effect at every packet in their overlapping domain.
+	if a.Fn.Src != nil && b.Fn.Src != nil &&
+		a.Fn.Src.Effect != nil && b.Fn.Src.Effect != nil &&
+		a.Fn.Src.Effect.Name == b.Fn.Src.Effect.Name {
+		return nil
+	}
 	if !fixedCapabilityExpr(a.Fn.Ret) || !fixedCapabilityExpr(b.Fn.Ret) ||
 		len(a.Fn.Params) != len(b.Fn.Params) {
 		return nil
