@@ -461,6 +461,9 @@ func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, out
 	if b, ok := Unwrap(value).(*Bottom); ok {
 		return b
 	}
+	if union, ok := Unwrap(schema).(*Disjunction); ok {
+		return p.transportUnion(c, union, value, outward)
+	}
 	if carrier := opaqueTypeOf(schema); carrier != nil && carrier.owner == p {
 		if !outward {
 			if v, ok := Unwrap(value).(*OpaqueValue); ok && v.carrier == carrier {
@@ -486,6 +489,7 @@ func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, out
 	}
 	typ.Finalize(c)
 	v.Finalize(c)
+	typ, v = typ.DerefValue(), v.DerefValue()
 	if typ.IsList() {
 		out := &ListLit{}
 		for a := range v.Elems() {
