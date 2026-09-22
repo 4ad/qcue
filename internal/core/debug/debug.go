@@ -761,6 +761,9 @@ func (w *printer) node(n adt.Node) {
 	case *adt.Existential:
 		w.node(x.Template)
 
+	case *adt.Universal:
+		w.node(x.Template)
+
 	case *adt.PackageSeal:
 		w.string("seal ")
 		w.node(x.Interface)
@@ -777,6 +780,9 @@ func (w *printer) node(n adt.Node) {
 
 	case *adt.OpaqueCall:
 		w.string("opaque operation")
+
+	case *adt.AbstractResult:
+		w.string("pending function result")
 
 	case *adt.AliasApplication:
 		w.string("alias(")

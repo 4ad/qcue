@@ -143,7 +143,10 @@ func (w *Visitor) node(n adt.Node) {
 	case *adt.Existential:
 		w.node(x.Template)
 
-	case *adt.OpaqueType, *adt.OpaqueValue, *adt.OpaqueCall:
+	case *adt.Universal:
+		w.node(x.Template)
+
+	case *adt.OpaqueType, *adt.OpaqueValue, *adt.OpaqueCall, *adt.AbstractResult:
 
 	case *adt.CallExpr:
 		w.node(x.Fun)

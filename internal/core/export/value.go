@@ -210,6 +210,12 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 	case *adt.Existential:
 		result = ast.Clone(x.Template.Src)
 
+	case *adt.Universal:
+		result = ast.Clone(x.Template.Src)
+
+	case *adt.AbstractResult:
+		result = ast.NewIdent("_")
+
 	case *adt.OpaqueType, *adt.OpaqueValue:
 		result = ast.NewIdent("_")
 

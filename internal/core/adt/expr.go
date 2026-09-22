@@ -2222,6 +2222,9 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		return b
 	}
 	if x.Fn == nil || x.Fn.Body == nil {
+		if x.Fn != nil && x.Fn.Quantified {
+			return x.abstractCall(c, call, state)
+		}
 		c.AddErrf("cannot call function without implementation")
 		return nil
 	}

@@ -105,14 +105,88 @@ func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 	if q.Src.Exists {
 		return &Existential{Template: q, Env: c.Env(0)}
 	}
+	if !covariantData(q.Body) && !distributableUniversal(q.Body) {
+		return &Universal{Template: q, Env: c.Env(0)}
+	}
 	scope := c.newInlineVertex(nil, nil)
 	scope.BaseValue = &StructMarker{}
 	env := &Environment{
 		Up: c.Env(0), Vertex: scope,
 		types: &typeScope{quantifier: q},
 	}
+	if covariantData(q.Body) {
+		// Data constructors, intersections, and unions are monotone in
+		// their element predicates. Their universal meet is therefore
+		// attained at bottom, which belongs to every upper-bounded type
+		// telescope. This rule never crosses an arrow's negative domain.
+		env.types.arguments = make(map[*TypeParameter]Value, len(q.Params))
+		for _, p := range q.Params {
+			env.types.arguments[p] = &Bottom{Code: EvalError,
+				Err: c.Newf("universal type parameter has an empty instance")}
+		}
+	}
 	v, _ := c.Evaluate(env, q.Body)
 	return v
+}
+
+// Universals commute with conjunction and fixed record projections, but
+// generally not with a union of arrows. Keep unsupported Boolean placement
+// as one exact scoped predicate rather than strengthening each union arm.
+func distributableUniversal(x Expr) bool {
+	if covariantData(x) {
+		return true
+	}
+	switch x := x.(type) {
+	case *Function, *Quantified:
+		return true
+	case *BinaryExpr:
+		return x.Op == AndOp && distributableUniversal(x.X) && distributableUniversal(x.Y)
+	case *StructLit:
+		for _, d := range x.Decls {
+			f, ok := d.(*Field)
+			if !ok || !distributableUniversal(f.Value) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func covariantData(x Expr) bool {
+	switch x := x.(type) {
+	case nil, *Top, *Bottom, *BasicType, *Num, *String, *Bytes, *Bool, *Null, *TypeReference:
+		return true
+	case *BinaryExpr:
+		return x.Op == AndOp && covariantData(x.X) && covariantData(x.Y)
+	case *DisjunctionExpr:
+		for _, d := range x.Values {
+			if !covariantData(d.Val) {
+				return false
+			}
+		}
+		return true
+	case *StructLit:
+		for _, d := range x.Decls {
+			f, ok := d.(*Field)
+			if !ok || !covariantData(f.Value) {
+				return false
+			}
+		}
+		return true
+	case *ListLit:
+		for _, e := range x.Elems {
+			if rest, ok := e.(*Ellipsis); ok {
+				if !covariantData(rest.Value) {
+					return false
+				}
+			} else if e, ok := e.(Expr); !ok || !covariantData(e) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func (r *TypeReference) evaluate(c *OpContext, state Flags) Value {
@@ -210,6 +284,9 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 // inclusion nor its negation.
 func typeArgumentFits(c *OpContext, bound, arg Value) proofResult {
 	bound, arg = Unwrap(bound), Unwrap(arg)
+	if bound == nil || arg == nil {
+		return proofUnknown
+	}
 	if bound == arg {
 		return proofEstablished
 	}
@@ -255,6 +332,9 @@ func (f *FuncValue) inferInstance(c *OpContext, bindings []funcArg) (*FuncValue,
 				continue
 			}
 			v, _ := c.Evaluate(binding.env, binding.expr)
+			if vertex, ok := v.(*Vertex); ok {
+				vertex.Finalize(c)
+			}
 			_, callback := Unwrap(v).(*FuncValue)
 			if callback != (pass == 1) {
 				continue

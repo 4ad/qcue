@@ -99,6 +99,70 @@ func TestQuantifiedUniversalRefutations(t *testing.T) {
 	}
 }
 
+func TestQuantifiedDataMeet(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`
+@experiment(quantified)
+empty(A): [...A]
+impossible(A): A
+impossibleRecord(A): {value: A}
+optional(A): {value?: A}
+union: forall A (A | int)
+`)
+	for _, path := range []string{"impossible", "impossibleRecord"} {
+		if err := v.LookupPath(cue.ParsePath(path)).Validate(); err == nil {
+			t.Errorf("%s: missing empty-instance refutation", path)
+		}
+	}
+	for path, want := range map[string]string{"empty": `[]`, "optional": `{}`} {
+		got, err := v.LookupPath(cue.ParsePath(path)).MarshalJSON()
+		if err != nil || string(got) != want {
+			t.Errorf("%s: got %s, %v; want %s", path, got, err, want)
+		}
+	}
+	if err := v.LookupPath(cue.ParsePath("union")).Unify(ctx.CompileString(`"x"`)).Err(); err == nil {
+		t.Fatal("universal union lost its empty instance")
+	}
+}
+
+func TestQuantifiedAbstractCall(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`
+@experiment(quantified)
+f(A): func(A) -> A
+r: f(3)
+bad: f(3) & string
+`)
+	if err := v.LookupPath(cue.ParsePath("bad")).Err(); err == nil {
+		t.Fatal("symbolic call failed to propagate its result constraint")
+	}
+	if _, err := v.LookupPath(cue.ParsePath("r")).MarshalJSON(); err == nil {
+		t.Fatal("an arrow hypothesis materialized a result without execution")
+	}
+	v = v.Unify(ctx.CompileString(`@experiment(quantified)
+f(A): func(x: A) -> A: x`))
+	if got, err := v.LookupPath(cue.ParsePath("r")).Int64(); err != nil || got != 3 {
+		t.Fatalf("supplied implementation: %d, %v", got, err)
+	}
+}
+
+func TestQuantifiedAbstractOverloads(t *testing.T) {
+	for _, src := range []string{
+		`f: (func(int) -> string) & (func(string) -> int)
+         out: f("x") & bool`,
+		`f(A: int): func(A, A) -> A
+         f(A: string): func(A, A) -> A
+         out: f("x", "y") & int`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
+				t.Fatal("abstract overload did not propagate the applicable result")
+			}
+		})
+	}
+}
+
 func TestQuantifiedInvalidInstances(t *testing.T) {
 	for _, src := range []string{
 		`id(A): func(x: A) -> A: x

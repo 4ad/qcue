@@ -319,7 +319,11 @@ func (n *nodeContext) scheduleCapabilityResults(ref *FuncCallRef, env *Environme
 			f := &FuncValue{Fn: t.Fn, Env: t.Env}
 			inst, b := f.inferInstance(n.ctx, bindings)
 			if b != nil {
-				n.addBottom(b)
+				// A refuted bound excludes this instance of this guarded
+				// clause. It does not reject a packet admitted elsewhere.
+				if b.IsIncomplete() {
+					n.addBottom(b)
+				}
 				continue
 			}
 			t.Env = inst.Env
