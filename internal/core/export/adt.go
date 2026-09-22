@@ -228,7 +228,7 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 		}
 
 	case *adt.Function:
-		return e.funcSrc(x.Src)
+		return e.funcTypeSrc(adt.FuncType{Fn: x, Env: env})
 
 	case *adt.Quantified:
 		return ast.Clone(x.Src)
@@ -237,7 +237,7 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 		return ast.Clone(x.Src)
 
 	case *adt.PackageSeal, *adt.PackageOpen, *adt.OpaqueCall:
-		return ast.NewIdent("_")
+		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
 
 	case *adt.TypeReference:
 		return ast.Clone(x.Src)

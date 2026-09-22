@@ -19,6 +19,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/format"
 )
 
 func TestQuantifiedInstantiation(t *testing.T) {
@@ -919,6 +920,107 @@ f: func(x: int) -> int: external(x)`, false},
 			}
 			if err := f.Validate(cue.VerifyFunctions(true)); (err == nil) != tt.proved {
 				t.Fatalf("certification: %v; want proof %v", err, tt.proved)
+			}
+		})
+	}
+}
+
+func TestQuantifiedRecordDataProjections(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`
+@experiment(quantified)
+bad(A): {value: A, id: func(A) -> A}
+good(A): {empty: [...A], absent?: A, id: func(x: A) -> A: x}
+out: [good.empty, good.id(1), good.id("one")]
+nested: forall A forall B {value: A | B}
+`)
+	for _, path := range []string{"bad", "nested"} {
+		x := v.LookupPath(cue.ParsePath(path))
+		if !x.Exists() || x.Validate() == nil {
+			t.Fatalf("%s: missing empty-instance refutation (%v)", path, v.Err())
+		}
+	}
+	if got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON(); err != nil || string(got) != `[[],1,"one"]` {
+		t.Fatalf("got %s, %v; want [[],1,\"one\"]", got, err)
+	}
+}
+
+func TestQuantifiedExport(t *testing.T) {
+	for _, tt := range []struct{ src, field, call, want string }{
+		{`id(A): func(x: A) -> A: x`, "id", `f(3)`, `3`},
+		{`id(A): func(x: A) -> A: x
+specialized: id[int]`, "specialized", `f(3)`, `3`},
+		{`id(A: int): func(x: A) -> A: x`, "id", `f(3)`, `3`},
+		{`constant(A): func(x: A) -> (forall B func(B) -> A): func<B>(y: B) -> A: x`, "constant", `f(3)("x")`, `3`},
+		{`make(A): func(x: A) -> (func(int) -> A): func(y: int) -> A: x
+f: make(3)`, "f", `f(0)`, `3`},
+		{`prefix: "> "
+f: func(x: string) -> string: prefix + x`, "f", `f("text")`, `"> text"`},
+		{`f: forall A func(A) -> A`, "f", `f(3) & string`, ``},
+	} {
+		t.Run(tt.src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			field := v.LookupPath(cue.ParsePath(tt.field))
+			if !field.Exists() {
+				t.Fatal(v.Err())
+			}
+			text, err := format.Node(field.Syntax())
+			if err != nil {
+				t.Fatal(err)
+			}
+			rebuilt := cuecontext.New().CompileString("@experiment(quantified)\nf: " + string(text) + "\nout: " + tt.call)
+			out := rebuilt.LookupPath(cue.ParsePath("out"))
+			if !out.Exists() {
+				t.Fatalf("export %s: %v", text, rebuilt.Err())
+			}
+			if tt.want == "" {
+				if out.Validate() == nil {
+					t.Fatalf("export lost universal obligation: %s", text)
+				}
+			} else if got, err := out.MarshalJSON(); err != nil || string(got) != tt.want {
+				t.Fatalf("export %s: got %s, %v; want %s", text, got, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedImplementationConcreteness(t *testing.T) {
+	v := cuecontext.New().CompileString(`
+@experiment(quantified)
+unknown(A): func(A) -> A
+known(A): func(x: A) -> A: x
+`)
+	if err := v.LookupPath(cue.ParsePath("unknown")).Validate(cue.Concrete(true)); err == nil {
+		t.Fatal("bodyless contract was mistaken for an implementation")
+	}
+	if err := v.LookupPath(cue.ParsePath("known")).Validate(cue.Concrete(true)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestQuantifiedCovariantExistentials(t *testing.T) {
+	for _, tt := range []struct {
+		schema, data string
+		valid        bool
+	}{
+		{`exists A A`, `1`, true},
+		{`exists A {left: A, right: A}`, `{left: 1, right: "x"}`, true},
+		{`exists (A: int) A`, `1`, true},
+		{`exists (A: int) A`, `"x"`, false},
+		{`exists (A: int & >0) A`, `1`, true},
+		{`exists (A: int & >0) A`, `0`, false},
+		{`exists (A: int, B: A) {left: A, right: B}`, `{left: 1, right: 2}`, true},
+		{`exists (A: int, B: A) {left: A, right: B}`, `{left: 1, right: "x"}`, false},
+		{`exists A [...A]`, `[1, "x", true]`, true},
+	} {
+		t.Run(tt.schema+" / "+tt.data, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\nout: (" + tt.schema + ") & (" + tt.data + ")")
+			out := v.LookupPath(cue.ParsePath("out"))
+			if !out.Exists() {
+				t.Fatal(v.Err())
+			}
+			if err := out.Validate(cue.Concrete(true)); (err == nil) != tt.valid {
+				t.Fatalf("validation: %v; want success %v", err, tt.valid)
 			}
 		})
 	}

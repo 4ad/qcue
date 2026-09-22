@@ -927,6 +927,15 @@ func (v Value) Syntax(opts ...Option) ast.Node {
 	pkgID := inst.ID()
 
 	bad := func(name string, err error) ast.Node {
+		for _, cause := range errors.Errors(err) {
+			if _, ok := cause.(*export.IncompleteError); ok {
+				x := &ast.BadExpr{}
+				ast.AddComment(x, &ast.CommentGroup{Doc: true, List: []*ast.Comment{
+					{Text: "// export incomplete: " + err.Error()},
+				}})
+				return x
+			}
+		}
 		const format = `"%s: internal error
 Error: %s
 

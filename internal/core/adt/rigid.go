@@ -47,6 +47,20 @@ func (r *RigidType) validate(c *OpContext, value Value) *Bottom {
 // FunctionTypeParameters returns the still-bound universal telescope.
 func FunctionTypeParameters(t FuncType) []*TypeParameter { return typeParameters(t.Env) }
 
+// FunctionTypeArguments returns the lexical substitutions selected for a
+// function value, keyed by source binder identity for faithful syntax export.
+func FunctionTypeArguments(t FuncType) map[*ast.TypeParam]Value {
+	args := make(map[*ast.TypeParam]Value)
+	for env := t.Env; env != nil; env = env.Up {
+		if env.types != nil {
+			for param, value := range env.types.arguments {
+				args[param.Src] = value
+			}
+		}
+	}
+	return args
+}
+
 // BindFunctionTypes opens a telescope with proof variables. It performs no
 // bound checking: callers must prove the corresponding premises. Program
 // instantiation instead uses instantiate, which checks bounds and universes.

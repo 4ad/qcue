@@ -186,6 +186,10 @@ func (v *validator) validate(x *Vertex) {
 			}
 		}
 	}
+	if f, ok := x.BaseValue.(*FuncValue); ok && f.Fn.Quantified && IsFuncType(f) && v.checkConcrete() {
+		v.add(&Bottom{Src: f.Source(), Code: IncompleteError,
+			Err: v.ctx.Newf("function implementation remains unresolved")})
+	}
 
 	for _, a := range x.Arcs {
 		if a.ArcType == ArcRequired && v.Final && v.inDefinition == 0 {

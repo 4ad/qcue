@@ -660,15 +660,11 @@ func (p *parser) parseOperand() (expr ast.Expr) {
 
 	switch p.tok {
 	case token.IDENT:
-		if p.quantifierAhead() {
+		if p.quantifierAhead(false) {
 			return p.parseQuantifier()
 		}
 		if p.quantifiedEnabled() && p.lit == "extern" {
-			s := p.scanner
-			_, next, _ := s.Scan()
-			if p.peekToken.scanned {
-				next = p.peekToken.tok
-			}
+			next := p.quantifiedLookahead()()
 			if next == token.FUNC {
 				extern := p.pos
 				p.next()
@@ -687,12 +683,7 @@ func (p *parser) parseOperand() (expr ast.Expr) {
 			}
 		}
 		if p.quantifiedEnabled() && (p.lit == "seal" || p.lit == "open") {
-			s := p.scanner
-			_, next, _ := s.Scan()
-			if p.peekToken.scanned {
-				next = p.peekToken.tok
-			}
-			if next == token.IDENT || next == token.LPAREN {
+			if p.packageBoundaryAhead() {
 				if p.lit == "seal" {
 					return p.parseSeal()
 				}
@@ -1487,9 +1478,14 @@ func (p *parser) parseFallbackClause(clauses []ast.Clause) *ast.FallbackClause {
 		}
 	}
 	body := p.parseStruct()
+	structure, ok := body.(*ast.StructLit)
+	if !ok {
+		p.errf(body.Pos(), "quantified prefix is not allowed in a comprehension fallback")
+		structure = &ast.StructLit{Lbrace: body.Pos(), Rbrace: body.End()}
+	}
 	return c.closeClause(p, &ast.FallbackClause{
 		Fallback: pos,
-		Body:     body.(*ast.StructLit),
+		Body:     structure,
 	}).(*ast.FallbackClause)
 }
 

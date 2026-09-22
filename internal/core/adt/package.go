@@ -53,6 +53,57 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 			return nil
 		}
 	}
+	if covariantData(e.Template.Body) {
+		// For a covariant data predicate and a covariant upper-bounded
+		// telescope, the existential join is attained at the largest
+		// admissible types. Keep the template for explicit sealing: its
+		// logical simplification does not erase an abstraction boundary.
+		for _, param := range e.Template.Params {
+			if !covariantData(param.Bound) {
+				return e.unresolved(c)
+			}
+		}
+		env := quantifiedEnvironment(c, e, nil)
+		for _, param := range e.Template.Params {
+			var bound Value = &Top{}
+			if param.Bound != nil {
+				var complete bool
+				bound, complete = c.Evaluate(env, param.Bound)
+				if !complete {
+					return e.unresolved(c)
+				}
+			}
+			if param.ExplicitLevel {
+				level, known := universeOf(c, bound, make(map[Expr]bool))
+				if !known || level > param.Level {
+					return e.unresolved(c)
+				}
+			}
+			env = instantiateEnvironment(env, map[*TypeParameter]Value{param: bound})
+		}
+		subject := value
+		if vertex, ok := value.(*Vertex); ok {
+			// Membership concerns the data witness, not another evaluation
+			// of this same existential validator. Other obligations remain
+			// on the original vertex and are validated independently.
+			subject = vertex.ToDataAll(c)
+		}
+		v := c.newInlineVertex(nil, nil, MakeRootConjunct(env, e.Template.Body), MakeRootConjunct(nil, subject))
+		v.Finalize(c)
+		if b := v.Bottom(); b != nil {
+			// The failing child belongs to this private membership check,
+			// not to the original value's graph. Report it at the validator
+			// boundary so recursive validation cannot skip the obligation.
+			copy := *b
+			copy.ChildError, copy.HasRecursive = false, false
+			return &copy
+		}
+		return Validate(c, v, &ValidateConfig{Concrete: true})
+	}
+	return e.unresolved(c)
+}
+
+func (e *Existential) unresolved(c *OpContext) *Bottom {
 	return &Bottom{Src: e.Source(), Code: IncompleteError,
 		Err: c.Newf("existential witness remains unresolved")}
 }

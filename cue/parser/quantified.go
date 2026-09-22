@@ -25,16 +25,87 @@ func (p *parser) quantifiedEnabled() bool {
 
 // quantifierAhead leaves ordinary uses of the contextual keywords alone,
 // including field labels, selectors, and references named forall or exists.
-func (p *parser) quantifierAhead() bool {
+func (p *parser) quantifierAhead(block bool) bool {
 	if p.tok != token.IDENT || (p.lit != "forall" && p.lit != "exists") {
 		return false
 	}
-	s := p.scanner
-	tok := p.peekToken.tok
-	if !p.peekToken.scanned {
-		_, tok, _ = s.Scan()
+	p.inLookahead = true
+	defer func() { p.inLookahead = false }()
+	next := p.quantifiedLookahead()
+	tok := next()
+	if tok == token.IDENT {
+		return true
 	}
-	return tok == token.IDENT || (p.quantifiedEnabled() && tok == token.LPAREN)
+	if !p.quantifiedEnabled() || tok != token.LPAREN {
+		return false
+	}
+	depth := 1
+	for depth > 0 {
+		switch next() {
+		case token.LPAREN:
+			depth++
+		case token.RPAREN:
+			depth--
+		case token.EOF, token.INTERPOLATION:
+			return false
+		}
+	}
+	switch next() {
+	case token.IDENT, token.FUNC, token.LBRACE, token.LBRACK, token.LPAREN,
+		token.INT, token.FLOAT, token.STRING, token.TRUE, token.FALSE, token.NULL, token.BOTTOM:
+		return true
+	case token.COMMA:
+		return block
+	}
+	return false
+}
+
+// quantifiedLookahead reads a copy of the scanner, including an already
+// buffered token. Comments do not change recognition of contextual keywords.
+func (p *parser) quantifiedLookahead() func() token.Token {
+	s := p.scanner
+	peeked := p.peekToken.scanned
+	return func() token.Token {
+		if peeked {
+			peeked = false
+			if p.peekToken.tok != token.COMMENT {
+				return p.peekToken.tok
+			}
+		}
+		for {
+			_, tok, _ := s.Scan()
+			if tok != token.COMMENT {
+				return tok
+			}
+		}
+	}
+}
+
+func (p *parser) packageBoundaryAhead() bool {
+	p.inLookahead = true
+	defer func() { p.inLookahead = false }()
+	next := p.quantifiedLookahead()
+	tok := next()
+	if tok == token.IDENT || tok == token.LBRACE {
+		return true
+	}
+	if tok != token.LPAREN {
+		return false
+	}
+	depth := 1
+	for depth > 0 {
+		switch next() {
+		case token.LPAREN:
+			depth++
+		case token.RPAREN:
+			depth--
+		case token.EOF, token.INTERPOLATION:
+			return false
+		}
+	}
+	// An ordinary call ends here. A package boundary continues with the
+	// contextual separator "as" or "with", checked by the real parser.
+	return next() == token.IDENT
 }
 
 func (p *parser) parseTypeParam() (param *ast.TypeParam) {
@@ -196,7 +267,7 @@ func (p *parser) parseOpen() ast.Expr {
 // embedding, and is returned separately. Bounds can mention earlier binders;
 // resolution happens after the complete lexical tree has been assembled.
 func (p *parser) parseBlockPrefix() (prefix []*ast.Quantifier, first ast.Decl) {
-	for p.quantifiedEnabled() && p.quantifierAhead() {
+	for p.quantifiedEnabled() && p.quantifierAhead(true) {
 		q := &ast.Quantifier{Quantifier: p.pos, Exists: p.lit == "exists"}
 		p.next()
 		if p.tok == token.LPAREN {

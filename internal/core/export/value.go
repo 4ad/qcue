@@ -205,7 +205,11 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 		result = e.builtinValidator(x)
 
 	case *adt.FuncValue:
-		result = e.withFuncTypes(e.funcSrc(x.Src), x.Types)
+		if x.Fn.Quantified && x.IsPartial() {
+			result = e.quantifiedExportError("partial closure cannot be exported without its bound argument environment")
+		} else {
+			result = e.withFuncTypes(e.funcTypeSrc(adt.FuncType{Fn: x.Fn, Env: x.Env}), x.Types)
+		}
 
 	case *adt.Existential:
 		result = ast.Clone(x.Template.Src)
@@ -214,12 +218,12 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 		result = ast.Clone(x.Template.Src)
 
 	case *adt.AbstractResult:
-		result = ast.NewIdent("_")
+		result = e.quantifiedExportError("cannot export an unresolved function execution")
 
 	case *adt.OpaqueType, *adt.OpaqueValue:
-		result = ast.NewIdent("_")
+		result = e.quantifiedExportError("opaque values require an interface codec for export")
 	case *adt.RigidType:
-		result = e.bottom(&adt.Bottom{Err: errors.Newf(token.NoPos, "proof variable cannot be exported")})
+		result = e.quantifiedExportError("proof variable cannot be exported")
 
 	case *adt.Vertex:
 		result = e.vertex(x)
@@ -407,11 +411,7 @@ func (e *exporter) withFuncTypes(x ast.Expr, types []adt.FuncType) ast.Expr {
 		x = &ast.ParenExpr{X: x}
 	}
 	for _, t := range types {
-		var fn *ast.Func
-		if t.Fn != nil {
-			fn = t.Fn.Src
-		}
-		y := e.funcSrc(fn)
+		y := e.funcTypeSrc(t)
 		if _, ok := y.(*ast.Func); ok {
 			y = &ast.ParenExpr{X: y}
 		}
@@ -440,6 +440,87 @@ func (e *exporter) funcSrc(src *ast.Func) ast.Expr {
 	if src == nil {
 		return ast.NewIdent("_")
 	}
+	return e.funcExprSrc(src, "functions")
+}
+
+func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
+	if t.Fn == nil {
+		return e.funcSrc(nil)
+	}
+	if !t.Fn.Quantified {
+		return e.funcSrc(t.Fn.Src)
+	}
+	if t.Fn.Src == nil {
+		return e.quantifiedExportError("function source is unavailable for export")
+	}
+	var src ast.Expr = ast.Clone(t.Fn.Src)
+	params := adt.FunctionTypeParameters(t)
+	if len(params) != 0 {
+		q := &ast.Quantifier{Body: src}
+		for _, p := range params {
+			q.Params = append(q.Params, ast.Clone(p.Src))
+		}
+		src = q
+	}
+	args := adt.FunctionTypeArguments(t)
+	captures := make(map[ast.Node]adt.Value)
+	for _, capture := range t.Fn.Captures {
+		id, ok := capture.Source().(*ast.Ident)
+		if !ok || id.Node == nil {
+			continue
+		}
+		v, complete := e.ctx.Evaluate(t.Env, capture)
+		if !complete || !e.exportableCapture(v, make(map[adt.Value]bool)) {
+			return e.quantifiedExportError("captured value %s cannot be exported independently", id.Name)
+		}
+		if vertex, ok := v.(*adt.Vertex); ok {
+			v = vertex.ToDataAll(e.ctx)
+		}
+		captures[id.Node] = adt.Unwrap(v)
+	}
+	src = astutil.Apply(src, func(c astutil.Cursor) bool {
+		if id, ok := c.Node().(*ast.Ident); ok {
+			if value := captures[id.Node]; value != nil {
+				c.Replace(e.value(value))
+				return false
+			}
+			if param, ok := id.Node.(*ast.TypeParam); ok {
+				if value := args[param]; value != nil {
+					c.Replace(e.value(value))
+					return false
+				}
+			}
+		}
+		return true
+	}, nil).(ast.Expr)
+	return e.funcExprSrc(src, "quantified")
+}
+
+func (e *exporter) exportableCapture(value adt.Value, seen map[adt.Value]bool) bool {
+	if value == nil || seen[value] {
+		return false
+	}
+	seen[value] = true
+	defer delete(seen, value)
+	if value.Kind()&(adt.FuncKind|adt.OpaqueKind) != 0 {
+		return false
+	}
+	if v, ok := value.(*adt.Vertex); ok {
+		v.Finalize(e.ctx)
+		if adt.Validate(e.ctx, v, &adt.ValidateConfig{Concrete: true}) != nil {
+			return false
+		}
+		for _, a := range v.Arcs {
+			if a.ArcType == adt.ArcMember && !a.Label.IsLet() && !e.exportableCapture(a, seen) {
+				return false
+			}
+		}
+		return true
+	}
+	return adt.IsConcrete(value)
+}
+
+func (e *exporter) funcExprSrc(src ast.Expr, experiment string) ast.Expr {
 
 	// Collect the import bindings of the original literal by name.
 	var imports map[string]*ast.ImportSpec
@@ -466,7 +547,7 @@ func (e *exporter) funcSrc(src *ast.Func) ast.Expr {
 	// parsed as the sole embedding of a synthetic file carrying the
 	// experiment attribute.
 	f, err := parser.ParseFile("",
-		fmt.Sprintf("@experiment(functions)\n\n%s", b),
+		fmt.Sprintf("@experiment(%s)\n\n%s", experiment, b),
 		parser.ParseComments)
 	if err != nil {
 		return src
@@ -655,3 +736,19 @@ func (e *exporter) structComposite(v *adt.Vertex, attrs []*ast.Attribute) ast.Ex
 
 	return s
 }
+
+// An unsupported serialization is an export error, not the bottom predicate
+// or a weakened top predicate. The AST placeholder carries the diagnostic for
+// callers of Value.Syntax, whose API has no separate error return.
+func (e *exporter) quantifiedExportError(format string, args ...interface{}) ast.Expr {
+	err := &IncompleteError{errors.Newf(token.NoPos, format, args...)}
+	e.errs = errors.Append(e.errs, err)
+	return e.bottom(&adt.Bottom{Code: adt.IncompleteError, Err: err})
+}
+
+// IncompleteError reports a value or obligation that has no faithful source
+// serialization in the current exporter. It is distinct from a malformed
+// internal representation and from a contradiction in the input program.
+type IncompleteError struct{ incompleteCause }
+
+type incompleteCause = errors.Error

@@ -81,3 +81,35 @@ func TestQuantifiedSyntaxErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestQuantifiedContextualKeywords(t *testing.T) {
+	for _, src := range []string{
+		`forall: func(x: int) -> int: x
+exists: forall
+seal: forall
+open: forall
+out: [forall(1), exists(2), seal(3), open(4)]`,
+		`f: forall (
+// binder
+A) func(A) -> A`,
+		`f: forall (A // binder
+) func(A) -> A`,
+		`f: extern func(int) -> int !bridge`,
+		`p: open (
+// subject
+q & q) as (A, Q) {out: Q.read(Q.zero)}`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			if _, err := ParseFile("test.cue", "@experiment(quantified)\n"+src, ParseComments); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestQuantifiedFallbackError(t *testing.T) {
+	_, err := ParseFile("test.cue", "@experiment(quantified,try)\nx: [if true {1} else {\nforall A\ny: A\n}]")
+	if err == nil {
+		t.Fatal("accepted a quantified fallback")
+	}
+}

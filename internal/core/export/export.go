@@ -479,7 +479,7 @@ func (e *exporter) finalize(n *adt.Vertex, v ast.Expr) (f *ast.File, err errors.
 		return f, errors.Append(e.errs, err)
 	}
 
-	return f, nil
+	return f, e.errs
 }
 
 // markUsedFeatures walks x to record features in usedFeature,

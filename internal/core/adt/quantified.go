@@ -123,19 +123,76 @@ func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 		Up: c.Env(0), Vertex: scope,
 		types: &typeScope{quantifier: q},
 	}
-	if covariantData(q.Body) {
-		// Data constructors, intersections, and unions are monotone in
-		// their element predicates. Their universal meet is therefore
-		// attained at bottom, which belongs to every upper-bounded type
-		// telescope. This rule never crosses an arrow's negative domain.
-		env.types.arguments = make(map[*TypeParameter]Value, len(q.Params))
-		for _, p := range q.Params {
-			env.types.arguments[p] = &Bottom{Code: EvalError,
+	// Universals commute with fixed record projections. Reduce covariant
+	// data fields even when a sibling field is a generic function. Never
+	// substitute bottom through an arrow's negative domain.
+	params := make(map[*TypeParameter]bool)
+	for _, p := range typeParameters(env) {
+		params[p] = true
+	}
+	body := universalDataMinimum(c, q.Body, params)
+	v, _ := c.Evaluate(env, body)
+	return v
+}
+
+func universalDataMinimum(c *OpContext, x Expr, params map[*TypeParameter]bool) Expr {
+	if !covariantData(x) {
+		if record, ok := x.(*StructLit); ok {
+			copy := *record
+			copy.Decls = slices.Clone(record.Decls)
+			for i, d := range copy.Decls {
+				if field, ok := d.(*Field); ok {
+					f := *field
+					f.Value = universalDataMinimum(c, f.Value, params)
+					copy.Decls[i] = &f
+				}
+			}
+			return &copy
+		}
+		return x
+	}
+	switch x := x.(type) {
+	case *TypeReference:
+		if params[x.Param] {
+			return &Bottom{Src: x.Src, Code: EvalError,
 				Err: c.Newf("universal type parameter has an empty instance")}
 		}
+	case *StructLit:
+		copy := *x
+		copy.Decls = slices.Clone(x.Decls)
+		for i, d := range x.Decls {
+			f := *d.(*Field)
+			f.Value = universalDataMinimum(c, f.Value, params)
+			copy.Decls[i] = &f
+		}
+		return &copy
+	case *ListLit:
+		copy := *x
+		copy.Elems = slices.Clone(x.Elems)
+		for i, e := range x.Elems {
+			if rest, ok := e.(*Ellipsis); ok {
+				r := *rest
+				r.Value = universalDataMinimum(c, rest.Value, params)
+				copy.Elems[i] = &r
+			} else {
+				copy.Elems[i] = universalDataMinimum(c, e.(Expr), params).(Elem)
+			}
+		}
+		return &copy
+	case *BinaryExpr:
+		copy := *x
+		copy.X = universalDataMinimum(c, x.X, params)
+		copy.Y = universalDataMinimum(c, x.Y, params)
+		return &copy
+	case *DisjunctionExpr:
+		copy := *x
+		copy.Values = slices.Clone(x.Values)
+		for i, d := range x.Values {
+			copy.Values[i].Val = universalDataMinimum(c, d.Val, params)
+		}
+		return &copy
 	}
-	v, _ := c.Evaluate(env, q.Body)
-	return v
+	return x
 }
 
 func (q *Quantified) evaluateFinite(c *OpContext) Value {
@@ -231,6 +288,8 @@ func covariantData(x Expr) bool {
 	switch x := x.(type) {
 	case nil, *Top, *Bottom, *BasicType, *Num, *String, *Bytes, *Bool, *Null, *TypeReference:
 		return true
+	case *BoundExpr, *BoundValue:
+		return fixedCapabilityExpr(x)
 	case *BinaryExpr:
 		return x.Op == AndOp && covariantData(x.X) && covariantData(x.Y)
 	case *DisjunctionExpr:
