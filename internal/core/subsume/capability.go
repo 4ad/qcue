@@ -14,7 +14,11 @@
 
 package subsume
 
-import "cuelang.org/go/internal/core/adt"
+import (
+	"slices"
+
+	"cuelang.org/go/internal/core/adt"
+)
 
 // Capability inclusion is contravariant in packets and covariant in results.
 // Each target clause needs a proof. One stronger source clause is sufficient;
@@ -62,17 +66,16 @@ func (s *subsumer) capabilitySignature(target, source adt.FuncType) bool {
 	if !ok {
 		return false
 	}
+	target, ok = s.completeProtocol(target, source)
+	if !ok {
+		return false
+	}
 
 	a, b := target.Fn, source.Fn
 	if b.Src != nil && b.Src.Effect != nil {
 		if a.Src == nil || a.Src.Effect == nil || a.Src.Effect.Name != b.Src.Effect.Name {
 			return false
 		}
-	}
-	if a.Open {
-		// The shared protocol row is unresolved. Do not replace it with a
-		// promise that arbitrary additional packets succeed.
-		return false
 	}
 	matches := adt.MatchFuncValueParams(a, &adt.FuncValue{Fn: b})
 	used := make([]bool, len(b.Params))
@@ -101,6 +104,43 @@ func (s *subsumer) capabilitySignature(target, source adt.FuncType) bool {
 		}
 	}
 	return s.funcConstraint(target.Env, a.Ret, source.Env, b.Ret)
+}
+
+// completeProtocol obtains an open contract's existential row from a supplied
+// implementation. A bodyless signature supplies no row witness. Additional
+// slots retain the implementation's domains and omission policy; the known
+// prefix keeps the target's constraints, including its wider input domain.
+func (s *subsumer) completeProtocol(target, source adt.FuncType) (adt.FuncType, bool) {
+	if !target.Fn.Open {
+		return target, true
+	}
+	if source.Fn.Open || source.Fn.Body == nil {
+		return target, false
+	}
+	fn := *target.Fn
+	fn.Open = false
+	fn.Params = slices.Clone(fn.Params)
+	matches := adt.MatchFuncValueParams(target.Fn, &adt.FuncValue{Fn: source.Fn})
+	for i, param := range source.Fn.Params {
+		if slices.Contains(matches, i) {
+			continue
+		}
+		var ok bool
+		if param.Value != nil {
+			param.Value, ok = s.evalFuncConstraint(source.Env, param.Value)
+			if !ok {
+				return target, false
+			}
+		}
+		// Only the presence of a default belongs to the target protocol.
+		// Its value is proved using the implementation's own environment.
+		if param.Default != nil {
+			param.Default = &adt.Top{}
+		}
+		fn.Params = append(fn.Params, param)
+	}
+	target.Fn = &fn
+	return target, true
 }
 
 // capabilityScopes introduces shared rigid parameters, or selects a use-site

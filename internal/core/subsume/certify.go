@@ -156,6 +156,10 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 	if !ok {
 		return false
 	}
+	target, ok = s.completeProtocol(target, source)
+	if !ok {
+		return false
+	}
 	// Prove coverage without using the implementation's result annotation.
 	a, b := *target.Fn, *source.Fn
 	a.Ret, b.Ret = nil, nil
