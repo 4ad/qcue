@@ -148,6 +148,41 @@ func TestQuantifiedExport(t *testing.T) {
 	}
 }
 
+func TestQuantifiedSelectedExport(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		valid bool
+		call  string
+		want  string
+	}{
+		{"valid", true, "f(3)", "3"},
+		{"invalid", false, "f(3)", "0"},
+		{"partial", true, `f(3, "s")`, `[3,"s"]`},
+		{"complete", true, `f(3, "s")`, `[3,"s"]`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString(quantifiedAPIText(t, "selected_export", tt.name+".cue"))
+			f := v.LookupPath(cue.ParsePath("selected"))
+			text, err := format.Node(f.Syntax())
+			if err != nil {
+				t.Fatal(err)
+			}
+			rebuilt := cuecontext.New().CompileString("f: " + string(text) + "\nout: " + tt.call)
+			f = rebuilt.LookupPath(cue.ParsePath("f"))
+			if err := f.Validate(); err != nil {
+				t.Fatalf("export %s: %v", text, err)
+			}
+			if err := f.Validate(cue.Concrete(true)); (err == nil) != tt.valid {
+				t.Fatalf("export %s: conformance %v; want valid=%v", text, err, tt.valid)
+			}
+			out, err := rebuilt.LookupPath(cue.ParsePath("out")).MarshalJSON()
+			if err != nil || string(out) != tt.want {
+				t.Fatalf("export %s: got %s, %v; want %s", text, out, err, tt.want)
+			}
+		})
+	}
+}
+
 func TestQuantifiedWitnessCorrelation(t *testing.T) {
 	for _, tt := range []struct {
 		name, src string

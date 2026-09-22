@@ -1,0 +1,31 @@
+An explicitly selected instance remains the same universally constrained
+subject. Neither selection, conjunction order, nor a composite projection
+can turn an unproved universal implementation into a certified monomorph.
+Valid identities still certify after selection and retain their call views.
+
+-- in.cue --
+@test(validate, concrete, incomplete, at="bad")
+@test(validate, concrete, incomplete, at="badLeft")
+@test(validate, concrete, incomplete, at="badRight")
+@test(validate, concrete, incomplete, at="badRecord")
+@test(validate, concrete, at="good")
+@test(validate, concrete, at="goodLeft")
+@test(validate, concrete, at="goodRight")
+@test(validate, concrete, at="goodRecord")
+@test(json, [3, "s", 4], at="out")
+
+#zero: func() -> int: 0
+#bad(A): func(x: A) -> A: #zero()
+bad: #bad[int]
+badLeft: #bad[int] & #bad
+badRight: #bad & #bad[int]
+#badModule(A): {operation: func(x: A) -> A: #zero()}
+badRecord: #badModule[int].operation
+
+#id(A): func(x: A) -> A: x
+good: #id[int]
+goodLeft: #id[int] & #id
+goodRight: #id & #id[int]
+#module(A): {operation: func(x: A) -> A: x}
+goodRecord: #module[int].operation
+out: [good(3), #id[string]("s"), goodRecord(4)]

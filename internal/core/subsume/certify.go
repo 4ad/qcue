@@ -114,7 +114,15 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 	p.active[f.Fn] = true
 	defer delete(p.active, f.Fn)
 	s := &subsumer{ctx: p.ctx}
-	target, source, ok := s.capabilityScopes(target, adt.FuncType{Fn: f.Fn, Env: f.Env})
+	source := adt.FuncType{Fn: f.Fn, Env: f.Env}
+	if target.Fn == f.Fn {
+		// Retained views of the same erased implementation include its
+		// original telescope, even after selecting concrete type arguments.
+		// Check each such obligation in its own type scope. Runtime capture
+		// equality is checked independently by the closure identity rules.
+		source.Env = target.Env
+	}
+	target, source, ok := s.capabilityScopes(target, source)
 	if !ok {
 		return false
 	}

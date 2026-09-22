@@ -150,6 +150,12 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 	}
 	m := *a
 	m.Types = mergeFuncTypes(a.Types, b.Types)
+	if a.Fn != b.Fn || a.Env != b.Env {
+		// Erased identity does not make distinct signature views
+		// interchangeable. In particular an instantiated view must
+		// retain the universal clause supplied by its other conjunct.
+		m.Types = mergeFuncTypes(m.Types, []FuncType{{Fn: b.Fn, Env: b.Env}})
+	}
 	m.scopes = slices.Clone(a.scopes)
 	for _, p := range b.scopes {
 		if !slices.Contains(m.scopes, p) {

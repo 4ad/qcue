@@ -1174,6 +1174,10 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 					ctx.AddBottom(b)
 					return emptyNode
 				}
+				// Selection changes the call view, not the subject's
+				// obligations. Keep the original universal clause for
+				// certification and subsequent conjunctions.
+				inst.Types = mergeFuncTypes(inst.Types, []FuncType{{Fn: f.Fn, Env: f.Env}})
 				v := ctx.newInlineVertex(nil, nil, MakeRootConjunct(ctx.Env(0), inst))
 				v.Finalize(ctx)
 				return v

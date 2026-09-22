@@ -207,6 +207,8 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 	case *adt.FuncValue:
 		if x.Fn.Quantified && x.IsPartial() {
 			result = e.quantifiedExportError("partial closure cannot be exported without its bound argument environment")
+		} else if x.Fn.Quantified {
+			result = e.quantifiedFuncValue(x)
 		} else {
 			result = e.withFuncTypes(e.funcTypeSrc(adt.FuncType{Fn: x.Fn, Env: x.Env}), x.Types)
 		}
@@ -397,6 +399,35 @@ func (e *exporter) builtin(x *adt.Builtin) ast.Expr {
 	// identity, which silently breaks consumers that recognize builtins by
 	// name (see encoding/jsonschema's generator).
 	return result
+}
+
+// A selected view and its retained universal clause have one code origin.
+// Emit that implementation once, followed by the original type selections.
+// Printing a separate body for each clause would create distinct closures on
+// reimport; printing only the selected body would lose universal obligations.
+func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
+	head := adt.FuncType{Fn: f.Fn, Env: f.Env}
+	origin := head
+	var types []adt.FuncType
+	for _, t := range f.Types {
+		if t.Fn != f.Fn {
+			types = append(types, t)
+			continue
+		}
+		if len(adt.FunctionTypeParameters(t)) > len(adt.FunctionTypeParameters(origin)) {
+			origin = t
+		}
+	}
+	x := e.funcTypeSrc(origin)
+	args := adt.FunctionTypeArguments(head)
+	for _, p := range adt.FunctionTypeParameters(origin) {
+		v := args[p.Src]
+		if v == nil {
+			break
+		}
+		x = &ast.IndexExpr{X: &ast.ParenExpr{X: x}, Index: e.value(v)}
+	}
+	return e.withFuncTypes(x, types)
 }
 
 // withFuncTypes renders the function types a function value, function type,
