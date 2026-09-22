@@ -1283,3 +1283,21 @@ out: module[string].value`)
 		t.Fatalf("subject refinement: %d, %v; want 7", got, err)
 	}
 }
+
+func TestQuantifiedUniverseLiterals(t *testing.T) {
+	for _, level := range []string{"0x0", "0b0", "1_0", "1Ki"} {
+		t.Run(level, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\nf: forall (A in Type(" + level + ")) func(x: A) -> A: x\nout: f[int](3)")
+			got, err := v.LookupPath(cue.ParsePath("out")).Int64()
+			if err != nil || got != 3 {
+				t.Fatalf("got %d, %v; want 3", got, err)
+			}
+		})
+	}
+	for _, level := range []string{"-1", "1.5", "9223372036854775807", "9999999999999999999999999999"} {
+		v := cuecontext.New().CompileString("@experiment(quantified)\nf: forall (A in Type(" + level + ")) func(A) -> A")
+		if err := v.Err(); err == nil {
+			t.Errorf("invalid or overflowing universe level accepted: %s", level)
+		}
+	}
+}

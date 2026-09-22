@@ -1,0 +1,175 @@
+# Quantified CUE: implementation and use
+
+This implementation follows profiles **S_H** (predicative higher-rank
+quantification) and **A** (opaque existential packages) in
+[the proposal](quantified-cue.tex). Enable it in each participating source file:
+
+```cue
+@experiment(quantified)
+```
+
+The experiment includes function syntax and the proposal's capability semantics.
+Files using only `@experiment(functions)` keep their existing function semantics.
+General value-dependent binders and the dependent profile **D** are out of scope.
+Finite literal value ranges, such as `exists (n in 1 | 2)`, are supported as finite
+unions or intersections.
+
+The module language version must be `v0.18.0` or later. In a new directory, use
+`cue mod init --language-version v0.18.0 example.com/quantified` before running
+the CLI examples. For an existing module, set its language version with
+`cue mod edit --language-version v0.18.0`.
+
+## Quantifiers and type application
+
+A quantified declaration constrains **one subject** at every type instance:
+
+```cue
+@experiment(quantified)
+
+id(A): func(x: A) -> A: x
+out: [id(3), id[string]("hello")]
+```
+
+`id(A): ...`, `id: forall A ...`, and `id: func<A>(...) -> ...` introduce lexical
+universal binders. `forall` and `exists` can occur inside signatures and records.
+Quantifier blocks at the beginning of a record bind the rest of that record.
+Binder names may be shadowed; identity follows their declarations, not spelling.
+
+`A: number` is a subtype bound. `A in Type(0)` supplies an explicit predicative
+universe; a quantifier over `Type(n)` lives above level `n`. Ordinary data and
+monomorphic function types inhabit the base universe. Invalid level bounds and
+self-instantiation cycles are rejected. Unknown inferred universe relationships
+remain incomplete; an explicit level annotation can make a higher-rank boundary
+checkable.
+
+A parametric alias abbreviates a description and creates no subject:
+
+```cue
+@experiment(quantified)
+
+Box(A) = {value: A}
+item: Box(int) & {value: 3}
+```
+
+In contrast, `box(A): {value: A}` requires one value belonging to every admissible
+`A`, including the empty type, and is contradictory. `empty(A): [...A]` describes
+the empty list. Type selection also applies to quantified composite subjects:
+`module[int].operation(...)` retains the module's data and universal obligations.
+
+Type-sorted names denote predicates. An ordinary refinable field used in a
+signature denotes its eventual singleton. For example, `x: int` and
+`f: func(x) -> string` describe a function that accepts the particular eventual
+value of `x`. The current approximation `int` cannot discharge that obligation.
+
+## Functions, refinement, and checking
+
+Conjoining function contracts retains every guarded capability clause. An
+implementation keeps its original labels, defaults, omitted-argument behavior,
+and extra-argument policy. Applicable clauses constrain its actual call result.
+An unresolved applicability guard remains an obligation.
+
+Concrete closures compare by code origin, captured runtime values, and bound
+partial arguments. Type arguments are erased. Two different bodies are different
+implementations, even if they happen to return equal results on tested inputs.
+Two copies of one closure retain their identity. Unknown capture equality stays
+incomplete until refinement settles it.
+
+Higher-rank callback contracts can be checked with rigid type variables. A
+polymorphic callback can be instantiated independently at its uses; a monomorphic
+callback is not silently generalized. Ground calls support finite list
+comprehensions and recursive calls with a demonstrated decrease in one fixed
+finite list argument. Other recursive calls retain cycle or incomplete errors.
+
+There are three distinct validation requests:
+
+| Request | Meaning |
+| --- | --- |
+| `value.Validate()` | Report established contradictions; allow residual obligations. |
+| `value.Validate(cue.Concrete(true))` | Require materialized values, executable closures, and complete runtime captures. |
+| `value.Validate(cue.VerifyFunctions(true))` | Require structural proofs of function implementation contracts for arbitrary admitted inputs. |
+
+The CLI proof request is `cue vet --verify-functions file.cue`. The proof checker
+handles annotated structural bodies, higher-rank arguments, records, lists,
+projections, finite comprehensions, and supported pure primitives. It does not
+use a target annotation as evidence for itself. A successful concrete call is
+not a universal conformance certificate.
+
+Unproved arithmetic implications, recursive termination proofs, optional
+presence branches, arbitrary quantified Boolean inclusion, and general
+existential witness synthesis remain incomplete. Effect annotations are retained
+and compared as capabilities; an `extern` declaration does not supply an
+implementation or execute foreign code by itself. Pure certification cannot
+assume a checked callback is pure.
+
+## Opaque packages
+
+Sealing supplies an explicit private representation and creates a fresh abstract
+carrier. Opening introduces a local abstract type and a view of the declared
+interface:
+
+```cue
+@experiment(quantified)
+
+#Counter: exists State {
+    zero: State
+    next: func(State) -> State
+    read: func(State) -> int
+}
+
+counter: seal #Counter with (State = int) {
+    zero: 0
+    next: func(x: int) -> int: x + 1
+    read: func(x: int) -> int: x
+}
+
+out: (open counter as (S, C) {
+    result: C.read(C.next(C.zero))
+}).result
+```
+
+The result is `1`. The private representation is accessible only through the
+boundary adapters. Those adapters transport records, lists, generic operations,
+and higher-order callbacks. Optional and pattern fields follow the interface.
+Private implementation fields are not implicitly exported.
+
+Copies preserve seal identity and exported aliasing. Executing a new seal creates
+a distinct carrier, even when its representation is the same. Abstract values
+cannot be interchanged between carriers or escape an opening, including through
+later calls of returned closures. A closed existential package can leave the
+scope. The initial opaque profile uses unbounded representation binders; a
+transparent bound would expose extra representation structure.
+
+Opaque values and package operations cannot be serialized as their private
+implementations. Observe ordinary data through public operations before exporting
+JSON. Source export preserves supported generic functions and concrete captures;
+unsupported captures, independent partial closures, and opaque operations report
+incompleteness rather than being replaced with a weaker description.
+
+## Implementation map and regression coverage
+
+- `cue/ast`, `cue/parser`, and `cue/format` define lexical syntax and its round
+  trips. `internal/core/compile` records binder identity and runtime captures.
+- `internal/core/adt/quantified.go`, `subject.go`, `universe.go`, and `witness.go`
+  handle type instances, shared subjects, universe checks, and correlated values.
+- `internal/core/adt/capability.go`, `closure.go`, `abstract.go`, and `recursion.go`
+  implement call obligations, operational identity, symbolic calls, and checked
+  finite-list descent.
+- `internal/core/adt/package.go` implements existential residuals and opaque
+  boundary transport. `internal/core/subsume` separates sufficient inclusion
+  checks from implementation certification.
+- `cue/quantified_paper_test.go` checks all **101** listings against the paper's
+  exact source in `cue/testdata/quantified-paper.json`. There are **78 executable
+  examples**, two surface-syntax templates, 20 explicitly excluded D examples,
+  and one implementation-pseudocode listing. Intentional error examples assert
+  their errors; specification-only examples assert their residual status.
+- `cue/quantified_test.go` adds positive, negative, refinement, universe, opacity,
+  identity, file-order, certification, and export tests. Parser, AST, formatter,
+  exporter, and CLI tests cover the surrounding APIs.
+
+Run the focused corpus with:
+
+```sh
+go test ./cue -run TestQuantified -count=1
+```
+
+Run the repository regression suite with `go test ./...`.

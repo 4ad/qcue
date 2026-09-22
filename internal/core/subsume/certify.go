@@ -15,8 +15,9 @@
 package subsume
 
 import (
-	"cuelang.org/go/internal/core/adt"
 	"maps"
+
+	"cuelang.org/go/internal/core/adt"
 )
 
 // Certify checks quantified-profile implementations under arbitrary packets

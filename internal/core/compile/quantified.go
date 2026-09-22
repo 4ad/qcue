@@ -15,8 +15,8 @@
 package compile
 
 import (
+	"math"
 	"slices"
-	"strconv"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/token"
@@ -110,11 +110,16 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 			if !ok || level.Kind != token.INT {
 				return c.errf(p, "universe level must be a nonnegative integer literal")
 			}
-			n, err := strconv.Atoi(level.Value)
-			if err != nil || n < 0 {
+			num, ok := c.parse(level).(*adt.Num)
+			if !ok {
 				return c.errf(p, "invalid universe level")
 			}
-			param.Level = n
+			n, err := num.X.Int64()
+			if err != nil || n < 0 || n >= math.MaxInt {
+				// Reserve room for the strict level increase at a binder.
+				return c.errf(p, "universe level exceeds the supported integer range")
+			}
+			param.Level = int(n)
 			param.ExplicitLevel = true
 		}
 		param.Bound = c.typeExpr(p.Bound)
