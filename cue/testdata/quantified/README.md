@@ -32,6 +32,7 @@ adding a semantic case.
 | [finite_witnesses](finite_witnesses/) | Finite literal value binders |
 | [first_class_packages](first_class_packages/) | Existential packages as inputs and outputs |
 | [implementation_concreteness](implementation_concreteness/) | Materialization versus implementation conformance |
+| [inference](inference/) | Empty containers, unused type binders, and unresolved speculative instances |
 | [instantiation](instantiation/) | Implicit and explicit type application |
 | [invalid_instances](invalid_instances/) | Rejected binder domains and invalid instances |
 | [opaque_boundaries](opaque_boundaries/) | Abstract values, escaping operations, and opacity errors |
@@ -104,6 +105,17 @@ Formation errors prevent inline evaluation: those fixtures use the standard
 Function contract checks use the same `concrete` demand as all other values.
 There is no separate proof option. The [certification](certification/) cases
 exercise the supported proof rules through ordinary concrete validation.
+
+Audit regressions cover retained universal obligations after selection and
+source export, captured callbacks, partial closures, completed open protocols,
+and opaque operation proofs. The opaque boundary cases exercise union transport
+and omission defaults; the escape cases also refine optional fields, patterns,
+and list tails after opening. Existential instances retain their captured
+predicates, effect intersections retain shared admitted outcomes, and recursive
+closure equality stays incomplete without overflowing the evaluator stack.
+The [quantified fragment fixture](certification/quantified_fragment.txtar) records
+both supported universal checks and the general Boolean predicates that remain
+residual. Successful concrete calls alone are not certification assertions.
 
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Paper exclusions state their reason, and the paper index

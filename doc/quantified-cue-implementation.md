@@ -65,6 +65,10 @@ In contrast, `box(A): {value: A}` requires one value belonging to every admissib
 `A`, including the empty type, and is contradictory. `empty(A): [...A]` describes
 the empty list. Type selection also applies to quantified composite subjects:
 `module[int].operation(...)` retains the module's data and universal obligations.
+Selecting a function instance likewise retains its original universal contract;
+certifying one selected instance cannot certify an invalid generic body.
+Calls with empty containers or unused binders can infer the empty predicate,
+provided the selected instance admits every supplied argument.
 
 Type-sorted names denote predicates. An ordinary refinable field used in a
 signature denotes its eventual singleton. For example, `x: int` and
@@ -107,16 +111,33 @@ as ordinary values, following CUE's usual concreteness rules.
 
 The conformance checker handles annotated structural bodies, higher-rank
 arguments, records, lists, projections, finite comprehensions, supported pure
-primitives, and defaults proved to belong to the argument domain. It does not use
-a target annotation as evidence for itself. Knowing a closure's code and captures,
-or successfully evaluating one call, does not discharge its declared contract.
+primitives, and defaults proved to belong to the argument domain. Partial
+closures retain the original implementation obligations; attached residual
+contracts are checked using the saved argument slots. Bound and captured
+callbacks require their own proofs, including callbacks inside composites.
+An implementation supplies the remaining row of an open signature, preserving
+required parameters and omission defaults. A bodyless open signature retains
+an unresolved row. The checker does not use a target annotation as evidence for
+itself. Knowing a closure's code and captures, or successfully evaluating one
+call, does not discharge its declared contract.
 
 Unproved arithmetic implications, recursive termination proofs, optional
 presence branches, arbitrary quantified Boolean inclusion, and general
 existential witness synthesis remain incomplete. Effect annotations are retained
 and compared as capabilities; an `extern` declaration does not supply an
 implementation or execute foreign code by itself. Pure certification cannot
-assume a checked callback is pure.
+assume a checked callback is pure. Two effectful clauses with disjoint result
+types are not contradictory solely on that basis when they admit a shared effect.
+
+Quantified checking currently consists of finite literal enumeration, extremal
+instances for covariant data, distribution through conjunction and fixed record
+fields, and rigid-variable proofs for supported arrows. General universal
+Boolean predicates, such as `forall A ((func(A) -> A) | (func() -> int))`, remain
+exact residual obligations. The current checker has no general decision rule
+for these predicates, even when a supplied implementation happens to satisfy
+one branch uniformly. Parsing and retaining such a predicate does not imply
+that concrete validation can discharge it. See the
+[checking-fragment regressions](../cue/testdata/quantified/certification/quantified_fragment.txtar).
 
 ## Opaque packages
 
@@ -144,8 +165,19 @@ out: (open counter as (S, C) {
 
 The result is `1`. The private representation is accessible only through the
 boundary adapters. Those adapters transport records, lists, generic operations,
-and higher-order callbacks. Optional and pattern fields follow the interface.
-Private implementation fields are not implicitly exported.
+unions, and higher-order callbacks. Union branches are matched in the source
+representation before transport; overlapping branches remain incomplete when
+they would expose different public values. Optional and pattern fields follow
+the interface. Private implementation fields are not implicitly exported.
+Omission passes through an adapter, so the private implementation chooses its
+own default rather than receiving the interface's default as an argument.
+
+Concrete validation certifies opaque operations by proving the private
+implementation and its interface contract, then checking that transport is
+total for the supported schema. This includes monomorphic structural operations,
+callbacks, and unions whose source branches have disjoint kinds. Unknown generic
+transport, recursive schemas, and overlapping transports can still leave an
+operation incomplete even when individual concrete calls succeed.
 
 Copies preserve seal identity and exported aliasing. Executing a new seal creates
 a distinct carrier, even when its representation is the same. Abstract values
@@ -153,6 +185,10 @@ cannot be interchanged between carriers or escape an opening, including through
 later calls of returned closures. A closed existential package can leave the
 scope. The initial opaque profile uses unbounded representation binders; a
 transparent bound would expose extra representation structure.
+Delayed escape checks persist through optional fields, disjunctions, patterns,
+and open list tails, including values materialized by later API refinement.
+Membership in another instance of an existential interface checks its captured
+predicates against the same sealed witness; sharing a template is insufficient.
 
 Opaque values and package operations cannot be serialized as their private
 implementations. Observe ordinary data through public operations before exporting
