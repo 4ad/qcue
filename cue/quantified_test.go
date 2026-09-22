@@ -126,3 +126,113 @@ out: f(0)
 		}
 	}
 }
+
+func TestQuantifiedCapabilities(t *testing.T) {
+	for _, tt := range []struct {
+		name, src, want string
+	}{
+		{"contravariant coverage", `
+narrow: func(int) -> string
+narrow: func(x: number) -> string: "ok"
+out: [narrow(1), narrow(1.5)]`, `["ok","ok"]`},
+		{"overlapping results", `
+f: func(x: int) -> number: 1
+f: func(number) -> int
+out: f(3)`, ``}, // The wider domain must be rejected despite the constant body.
+		{"body refines approximation", `
+f: func(x: number) -> number: 1
+f: func(number) -> int
+out: f(3)`, `1`},
+		{"guarded output clauses", `
+classify: func(x: int) -> ("negative" | "nonnegative"): {
+    if x < 0 {out: "negative"}
+    if x >= 0 {out: "nonnegative"}
+}.out
+classify: (func(int & <0) -> "negative") & (func(int & >=0) -> "nonnegative")
+out: [classify(-3), classify(2)]`, `["negative","nonnegative"]`},
+		{"default belongs to closure", `
+f: func(x: int = 20) -> int: x
+f: func(int = 10) -> int
+out: f()`, `20`},
+		{"additional optional slot", `
+f: func(x: int, y: int = 1) -> int: y
+f: func(int) -> 1
+out: [f(0), f(0, 3)]`, `[1,3]`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			out := v.LookupPath(cue.MakePath(cue.Str("out")))
+			if tt.want == "" {
+				if err := out.Err(); err == nil {
+					t.Fatal("missing capability conflict")
+				}
+				return
+			}
+			got, err := out.MarshalJSON()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Fatalf("got %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedCapabilityRefutations(t *testing.T) {
+	for _, src := range []string{
+		`f: func(number) -> string
+         f: func(x: int) -> string: "ok"`,
+		`f: func(int) -> string
+         f: func(x: int) -> int: x`,
+		`f: (func(int) -> int) & (func(int) -> bool)`,
+		`f: func(int = 1) -> int
+         f: func(x: int) -> int: x`,
+		`f: func(a: int) -> int
+         f: func(b: int) -> int: b`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			if err := v.LookupPath(cue.MakePath(cue.Str("f"))).Err(); err == nil {
+				t.Fatal("concrete counterexample did not refute capability")
+			}
+		})
+	}
+	for _, src := range []string{
+		`f: func(number) -> number
+         f: func(number) -> int`,
+		`f: (func(int) -> string) & (func(string) -> int)`,
+		`f: (func(_|_) -> int) & (func(_|_) -> string)`,
+		`x: number
+         f: func(x) -> string
+         f: func(n: int) -> string: "ok"`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			if err := v.LookupPath(cue.MakePath(cue.Str("f"))).Err(); err != nil {
+				t.Fatalf("unrefuted capability was rejected: %v", err)
+			}
+		})
+	}
+}
+
+func TestQuantifiedCapabilityGuardRefinement(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`
+@experiment(quantified)
+f: func(x: int) -> int: x
+f: func(0) -> 0
+y: int
+out: f(y)
+`)
+	if err := v.LookupPath(cue.MakePath(cue.Str("f"))).Err(); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []int{0, 1, 2} {
+		r := v.FillPath(cue.MakePath(cue.Str("y")), n)
+		got, err := r.LookupPath(cue.MakePath(cue.Str("out"))).Int64()
+		if err != nil || got != int64(n) {
+			t.Fatalf("refining y to %d: got %d, %v", n, got, err)
+		}
+	}
+}

@@ -326,6 +326,9 @@ func ExtraFuncParam(typ, val *Function, valTypes []FuncType) (FuncParam, bool) {
 // to -1. Such a label binds no argument, matching the treatment of conflicting
 // contract labels on builtins in [bindBuiltinArgs].
 func funcParamLabels(fn *Function, types []FuncType) (map[Feature]int, Feature) {
+	if capabilityMode(fn, types) {
+		types = nil
+	}
 	byLabel := make(map[Feature]int)
 	ambiguous := InvalidLabel
 	add := func(label Feature, pos int) {
@@ -1014,10 +1017,10 @@ func BuiltinSubsumes(a, b *Builtin) bool {
 // conflicting partial applications, to be reported like any other
 // conflicting scalars.
 func mergeFuncValues(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
-	composing := !IsFuncType(a) && !IsFuncType(b)
-	if composing && (a.Fn.Quantified || b.Fn.Quantified) {
-		return mergeClosureIdentities(c, a, b)
+	if capabilityMode(a.Fn, a.Types) || capabilityMode(b.Fn, b.Types) {
+		return mergeCapabilities(c, a, b)
 	}
+	composing := !IsFuncType(a) && !IsFuncType(b)
 	if composing && a.Fn == b.Fn && a.Env.Equal(c, b.Env) && equalFuncArgs(a.args, b.args) {
 		// VALUE & VALUE of the same function: only the recorded types need
 		// to be combined. Two partial applications are the same only when
@@ -1268,7 +1271,7 @@ func equalFuncTypes(a, b []FuncType) bool {
 func equalFuncValues(c *OpContext, x, y *FuncValue) bool {
 	if x.Fn != nil && y.Fn != nil && (x.Fn.Quantified || y.Fn.Quantified) &&
 		!IsFuncType(x) && !IsFuncType(y) {
-		return closureIdentity(c, x, y) == identityEqual &&
+		return closureIdentity(c, x, y) == proofEstablished &&
 			slices.Equal(x.identities, y.identities) && equalFuncTypes(x.Types, y.Types)
 	}
 	if x.Fn == y.Fn && x.Env.Equal(c, y.Env) {

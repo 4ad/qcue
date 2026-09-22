@@ -1811,6 +1811,9 @@ func (x *FuncValue) hasDefault(i int) bool {
 // parameter is omittable: a call may leave it unbound, and it is admitted
 // beyond a closed signature like an optional one.
 func FuncParamHasDefault(fn *Function, types []FuncType, i int) bool {
+	if capabilityMode(fn, types) {
+		return fn.Params[i].Default != nil
+	}
 	if fn.Params[i].Default != nil {
 		return true
 	}
@@ -1832,6 +1835,9 @@ func FuncParamHasDefault(fn *Function, types []FuncType, i int) bool {
 // an optional one, so a parameter is optional only if every signature that
 // declares it marks it optional.
 func FuncParamArcType(fn *Function, types []FuncType, i int) ArcType {
+	if capabilityMode(fn, types) {
+		return fn.Params[i].ArcType
+	}
 	a := fn.Params[i].ArcType
 	for _, t := range types {
 		matches := matchFuncParamsToValue(t.Fn, fn, types)
@@ -1958,6 +1964,14 @@ func (n *nodeContext) scheduleFuncCall(ref *FuncCallRef, env *Environment, ci Cl
 				}
 			}
 		}
+	}
+	if capabilityMode(fn, ref.types) {
+		n.scheduleCapabilityResults(ref, env, ci)
+		n.scheduleConjunct(MakeConjunct(env, fn.Body, ci), ci)
+		if fn.Ret != nil {
+			n.scheduleConjunct(MakeConjunct(env.Up, fn.Ret, ci), ci)
+		}
+		return
 	}
 	// The function types the called value was unified with contribute their
 	// parameter constraints and result constraints as well. A type parameter

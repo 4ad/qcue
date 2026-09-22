@@ -16,22 +16,14 @@ package adt
 
 import "slices"
 
-type identityResult uint8
-
-const (
-	identityPending identityResult = iota
-	identityEqual
-	identityConflict
-)
-
 // closureIdentity compares operational descriptors, not the functions they
 // compute. Unknown captures retain an equality obligation: comparing two
 // upper approximations is not evidence that their witnesses are equal.
-func closureIdentity(c *OpContext, a, b *FuncValue) identityResult {
+func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 	if a.Fn != b.Fn {
-		return identityConflict
+		return proofRefuted
 	}
-	result := identityEqual
+	result := proofEstablished
 	compare := func(x Expr, xe *Environment, y Expr, ye *Environment) {
 		if x == y && xe == ye {
 			return
@@ -39,13 +31,13 @@ func closureIdentity(c *OpContext, a, b *FuncValue) identityResult {
 		xv, _ := c.Evaluate(xe, x)
 		yv, _ := c.Evaluate(ye, y)
 		if !concreteCapture(c, xv) || !concreteCapture(c, yv) {
-			if result != identityConflict {
-				result = identityPending
+			if result != proofRefuted {
+				result = proofUnknown
 			}
 			return
 		}
 		if !Equal(c, xv, yv, 0) {
-			result = identityConflict
+			result = proofRefuted
 		}
 	}
 	if a.Env != b.Env {
@@ -62,7 +54,7 @@ func closureIdentity(c *OpContext, a, b *FuncValue) identityResult {
 			y = b.args[i]
 		}
 		if (x.expr == nil) != (y.expr == nil) {
-			return identityConflict
+			return proofRefuted
 		}
 		if x.expr != nil {
 			compare(x.expr, x.env, y.expr, y.env)
@@ -131,16 +123,13 @@ func concreteCapture(c *OpContext, v Value) bool {
 
 func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
 	result := closureIdentity(c, a, b)
-	if result == identityConflict {
+	if result == proofRefuted {
 		return nil, c.NewErrf("conflicting function identities")
-	}
-	if err := checkFuncTypeSetsMeet(c, a.Types, b.Types); err != nil {
-		return nil, err
 	}
 	m := *a
 	m.Types = mergeFuncTypes(a.Types, b.Types)
 	m.identities = slices.Clone(a.identities)
-	if result == identityPending && !slices.Contains(m.identities, b) {
+	if result == proofUnknown && !slices.Contains(m.identities, b) {
 		m.identities = append(m.identities, b)
 	}
 	for _, p := range b.identities {
@@ -154,9 +143,9 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 func (x *FuncValue) checkIdentities(c *OpContext) *Bottom {
 	for _, peer := range x.identities {
 		switch closureIdentity(c, x, peer) {
-		case identityConflict:
+		case proofRefuted:
 			return c.NewErrf("conflicting function identities")
-		case identityPending:
+		case proofUnknown:
 			return &Bottom{Code: IncompleteError,
 				Err: c.Newf("incomplete equality of captured values or partial arguments")}
 		}
