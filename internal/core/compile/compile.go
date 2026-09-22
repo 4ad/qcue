@@ -141,6 +141,7 @@ type compiler struct {
 
 	typeParameters    map[*ast.TypeParam]*adt.TypeParameter
 	parametricAliases map[*ast.ParametricAlias]adt.Expr
+	typePosition      bool
 
 	num literal.NumInfo
 
@@ -257,7 +258,12 @@ func (c *compiler) lookupAlias(k int, id *ast.Ident) aliasEntry {
 		entry.srcExpr = nil // mark to allow detecting cycles
 		m[name] = entry
 
+		// An alias is shared by all of its uses. Decode an ordinary witness
+		// at the use site, independently of which use compiles it first.
+		typePosition := c.typePosition
+		c.typePosition = false
 		entry.expr = c.labeledExprAt(k, nil, entry.label, src)
+		c.typePosition = typePosition
 		entry.label = nil
 	}
 
@@ -1200,9 +1206,9 @@ func (c *compiler) funcParam(i int, p *ast.FuncParam) adt.FuncParam {
 	if p.Label != nil {
 		param.Label = c.label(p.Label)
 	}
-	param.Value = c.expr(p.Value)
+	param.Value = c.typeExpr(p.Value)
 	if p.Default != nil {
-		param.Default = c.expr(p.Default)
+		param.Default = c.valueExpr(p.Default)
 	}
 	if err := c.checkFuncParamMarks(i, p, &param); err != nil {
 		param.Value = err
@@ -1287,7 +1293,11 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 	case nil:
 		return nil
 	case *ast.Ident:
-		return c.resolve(n)
+		x := c.resolve(n)
+		if c.typePosition && ordinaryWitnessReference(x) {
+			return &adt.WitnessReference{X: x}
+		}
+		return x
 
 	case *ast.Quantifier:
 		return c.quantifier(n)
@@ -1296,7 +1306,7 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		s := &adt.PackageSeal{Src: n, Interface: c.expr(n.Interface), Body: c.expr(n.Body)}
 		for _, witness := range n.Witnesses {
 			s.Names = append(s.Names, witness.Ident.Name)
-			s.Witnesses = append(s.Witnesses, c.expr(witness.Expr))
+			s.Witnesses = append(s.Witnesses, c.typeExpr(witness.Expr))
 		}
 		return s
 
@@ -1352,9 +1362,9 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		}
 		// Parameter constraints and return values are compiled in the closure
 		// scope. Only the implementation body gets a function-parameter scope.
-		fn.Ret = c.expr(n.Ret)
+		fn.Ret = c.typeExpr(n.Ret)
 		c.pushScope(nil, 1, n)
-		fn.Body = c.expr(n.Body)
+		fn.Body = c.valueExpr(n.Body)
 		c.popScope()
 		if fn.Quantified && fn.Body != nil {
 			fn.Captures = c.functionCaptures(n, fn)
@@ -1394,24 +1404,32 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		return v
 
 	case *ast.SelectorExpr:
-		x := c.expr(n.X)
+		x := c.valueExpr(n.X)
 		// TODO: check if x is an ImportReference, and if so, check if it a
 		// standard library, look up the builtin, and check its version. The
 		// index of standard libraries is available in c.index, which is really
 		// an adt.Runtime under the hood.
-		return &adt.SelectorExpr{
+		r := &adt.SelectorExpr{
 			Src: n,
 			X:   x,
 			Sel: c.label(n.Sel),
 		}
+		if c.typePosition && ordinaryWitnessReference(r) {
+			return &adt.WitnessReference{X: r}
+		}
+		return r
 
 	case *ast.IndexExpr:
-		return &adt.IndexExpr{
+		r := &adt.IndexExpr{
 			Src:        n,
-			X:          c.expr(n.X),
-			Index:      c.expr(n.Index),
+			X:          c.valueExpr(n.X),
+			Index:      c.typeExpr(n.Index),
 			Quantified: c.experiments.Quantified,
 		}
+		if c.typePosition && ordinaryWitnessReference(r) {
+			return &adt.WitnessReference{X: r}
+		}
+		return r
 
 	case *ast.SliceExpr:
 		slice := &adt.SliceExpr{Src: n, X: c.expr(n.X)}

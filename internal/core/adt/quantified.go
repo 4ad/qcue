@@ -397,15 +397,16 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 			if v == nil {
 				continue
 			}
-			if p.ExplicitLevel {
-				level, known := universeOf(c, v, make(map[Expr]bool))
-				if !known {
-					return nil, &Bottom{Src: p.Src, Code: IncompleteError,
-						Err: c.Newf("unresolved universe level for %s", p.Src.Name.Name)}
-				}
-				if level > p.Level {
-					return nil, c.NewErrf("type argument for %s has universe level %d, exceeding Type(%d)", p.Src.Name.Name, level, p.Level)
-				}
+			if universeOccurs(c, p, v, make(map[Value]bool)) {
+				return nil, c.NewErrf("type argument for %s requires an infinite universe level", p.Src.Name.Name)
+			}
+			level, known := universeOf(c, v, make(map[Expr]bool))
+			if p.ExplicitLevel && level > p.Level {
+				return nil, c.NewErrf("type argument for %s has universe level %d, exceeding Type(%d)", p.Src.Name.Name, level, p.Level)
+			}
+			if !known {
+				return nil, &Bottom{Src: p.Src, Code: IncompleteError,
+					Err: c.Newf("unresolved universe level for %s", p.Src.Name.Name)}
 			}
 			if p.Bound == nil {
 				continue

@@ -168,6 +168,9 @@ func equalTerminal(ctx *OpContext, v, w Value, flags Flag) bool {
 		return ok && x.carrier == y.carrier
 	case *RigidType:
 		return x == w
+	case *WitnessType:
+		y, ok := w.(*WitnessType)
+		return ok && x.Ref == y.Ref && x.Env == y.Env
 
 	case *Num, *String, *Bool, *Bytes, *Null:
 		return BinOpBool(ctx, errOnDiffType, EqualOp, v, w)

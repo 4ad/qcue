@@ -38,9 +38,11 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 	case *RigidType:
 		return v.Param.Level, true
 	case *FuncValue:
+		known := true
 		for _, p := range typeParameters(v.Env) {
 			if p.ValueRange == nil {
 				level = max(level, p.Level+1)
+				known = known && p.ExplicitLevel
 			}
 		}
 		n, ok := typeExpressionLevel(c, v.Env, v.Fn, seen)
@@ -50,11 +52,12 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		}
 		for _, t := range v.Types {
 			n, ok := typeExpressionLevel(c, t.Env, t.Fn, seen)
+			level = max(level, n)
 			if !ok {
 				return level, false
 			}
-			level = max(level, n)
 		}
+		return level, known
 	case *Universal:
 		return typeExpressionLevel(c, v.Env, v.Template, seen)
 	case *Existential:
@@ -73,10 +76,10 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		for conj := range v.LeafConjuncts() {
 			if x, ok := conj.Elem().(Expr); ok {
 				n, ok := typeExpressionLevel(c, conj.Env, x, seen)
+				level = max(level, n)
 				if !ok {
 					return level, false
 				}
-				level = max(level, n)
 			}
 		}
 	case *Conjunction:
@@ -130,6 +133,7 @@ func typeExpressionLevel(c *OpContext, env *Environment, x Expr, seen map[Expr]b
 		for _, p := range x.Params {
 			if p.ValueRange == nil {
 				level = max(level, p.Level+1)
+				known = known && p.ExplicitLevel
 			}
 			add(p.Bound)
 		}
@@ -174,4 +178,51 @@ func typeExpressionLevel(c *OpContext, env *Environment, x Expr, seen map[Expr]b
 		return universeOf(c, v, seen)
 	}
 	return level, known
+}
+
+// A scheme lives strictly above the universe of each of its binders.
+// Instantiating one of those binders with that same scheme would require
+// n >= n+1. This occurs check also follows schemes nested in data values.
+func universeOccurs(c *OpContext, param *TypeParameter, value Value, seen map[Value]bool) bool {
+	if value == nil || seen[value] {
+		return false
+	}
+	seen[value] = true
+	switch v := Unwrap(value).(type) {
+	case *FuncValue:
+		for _, p := range typeParameters(v.Env) {
+			if p == param {
+				return true
+			}
+		}
+		for env := v.Env; env != nil; env = env.Up {
+			if env.types != nil {
+				for _, arg := range env.types.arguments {
+					if universeOccurs(c, param, arg, seen) {
+						return true
+					}
+				}
+			}
+		}
+	case *Vertex:
+		v.Finalize(c)
+		for _, a := range v.Arcs {
+			if universeOccurs(c, param, a, seen) {
+				return true
+			}
+		}
+	case *Conjunction:
+		for _, x := range v.Values {
+			if universeOccurs(c, param, x, seen) {
+				return true
+			}
+		}
+	case *Disjunction:
+		for _, x := range v.Values {
+			if universeOccurs(c, param, x, seen) {
+				return true
+			}
+		}
+	}
+	return false
 }

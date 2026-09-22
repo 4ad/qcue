@@ -15,9 +15,11 @@
 package cue_test
 
 import (
+	"fmt"
 	"testing"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
 )
@@ -1023,5 +1025,106 @@ func TestQuantifiedCovariantExistentials(t *testing.T) {
 				t.Fatalf("validation: %v; want success %v", err, tt.valid)
 			}
 		})
+	}
+}
+
+func TestQuantifiedWitnessCorrelation(t *testing.T) {
+	for _, tt := range []struct {
+		name, src string
+		good, bad int
+		want      string
+	}{
+		{"guard", `f: func(n: int) -> int: n
+f: func(witness) -> 0
+out: f(1)`, 0, 1, `1`},
+		{"selector result", `record: {value: witness}
+f: func() -> record.value: 1
+out: f()`, 1, 2, `1`},
+		{"alias result", `let alias = witness
+f: func() -> alias: 1
+out: f()`, 1, 2, `1`},
+		{"indexed result", `items: [witness]
+f: func() -> items[0]: 1
+out: f()`, 1, 2, `1`},
+		{"explicit type argument", `id(A): func(x: A) -> A: x
+out: id[witness](1)`, 1, 2, `1`},
+		{"result", `f: func() -> witness: 1
+out: f()`, 1, 2, `1`},
+		{"protocol", `f: func(x: witness) -> int: 0
+out: f(1)`, 1, 2, `0`},
+		{"type bound", `f(A: witness): func(x: A) -> A: x
+out: f(1)`, 1, 2, `1`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\nwitness: int\n" + tt.src)
+			out := v.LookupPath(cue.ParsePath("out"))
+			if !out.Exists() {
+				t.Fatal(v.Err())
+			}
+			if err := out.Validate(); err != nil {
+				t.Fatalf("unresolved witness was refuted: %v", err)
+			}
+			if err := out.Validate(cue.Concrete(true)); err == nil {
+				t.Fatal("witness upper bound was mistaken for its singleton")
+			}
+			good := v.FillPath(cue.ParsePath("witness"), tt.good).LookupPath(cue.ParsePath("out"))
+			if got, err := good.MarshalJSON(); err != nil || string(got) != tt.want {
+				t.Fatalf("good refinement: %s, %v; want %s", got, err, tt.want)
+			}
+			bad := v.FillPath(cue.ParsePath("witness"), tt.bad).LookupPath(cue.ParsePath("out"))
+			if err := bad.Validate(); err == nil {
+				t.Fatal("incompatible witness refinement was accepted")
+			}
+		})
+	}
+	v := cuecontext.New().CompileString(`@experiment(quantified)
+witness: int
+f: func(x: int) -> witness: x`)
+	if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.VerifyFunctions(true)); err == nil {
+		t.Fatal("a result singleton was certified from its upper approximation")
+	}
+}
+
+func TestQuantifiedUniverseOccursCheck(t *testing.T) {
+	for _, expr := range []string{`id[id]`, `id(id)`, `id[{f: id}]`} {
+		v := cuecontext.New().CompileString("@experiment(quantified)\nid(A): func(x: A) -> A: x\nout: " + expr)
+		out := v.LookupPath(cue.ParsePath("out"))
+		if !out.Exists() || out.Validate() == nil {
+			t.Fatalf("infinite universe level was accepted: %s (%v)", expr, v.Err())
+		}
+	}
+}
+
+func TestQuantifiedFileOrder(t *testing.T) {
+	cases := [][]string{
+		{`wrap(A): func(A) -> {value: A}`,
+			`wrap(A): func(A) -> {tag: "wrapped"}`,
+			`wrap(A): func(x: A) -> {value: A, tag: "wrapped"}: {value: x, tag: "wrapped"}
+out: wrap(1)`},
+		{`f: func(x: number) -> number: 1`, `f: func(number) -> int`, `out: f(1.5)`},
+	}
+	want := []string{`{"value":1,"tag":"wrapped"}`, `1`}
+	for i, files := range cases {
+		for _, order := range [][3]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}} {
+			t.Run(fmt.Sprint(i, order), func(t *testing.T) {
+				instance := build.NewContext().NewInstance(".", nil)
+				for _, n := range order {
+					if err := instance.AddFile(fmt.Sprintf("part%d.cue", n), "@experiment(quantified)\npackage test\n"+files[n]); err != nil {
+						t.Fatal(err)
+					}
+				}
+				v := cuecontext.New().BuildInstance(instance)
+				got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON()
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Decode to compare records independently of declaration order.
+				expected := cuecontext.New().CompileString(want[i])
+				actual := expected.Context().CompileString(string(got))
+				if expected.Subsume(actual, cue.Final()) != nil || actual.Subsume(expected, cue.Final()) != nil {
+					t.Fatalf("got %s; want %s", got, want[i])
+				}
+			})
+		}
 	}
 }

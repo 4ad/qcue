@@ -39,7 +39,14 @@ func (p *parser) quantifierAhead(block bool) bool {
 	if !p.quantifiedEnabled() || tok != token.LPAREN {
 		return false
 	}
+	tok = next()
+	if tok != token.IDENT && tok != token.RPAREN {
+		return false
+	}
 	depth := 1
+	if tok == token.RPAREN {
+		depth = 0
+	}
 	for depth > 0 {
 		switch next() {
 		case token.LPAREN:

@@ -85,6 +85,11 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		if b.Bound != nil {
 			return s.values(a, b.Bound)
 		}
+	case *adt.WitnessType:
+		if x, ok := a.(*adt.WitnessType); ok {
+			return x.Ref == b.Ref && x.Env == b.Env
+		}
+		return s.values(a, b.Upper)
 	}
 
 	switch x := a.(type) {
@@ -93,6 +98,8 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 	case *adt.RigidType:
 		// Only identity (handled above) proves inclusion in an arbitrary
 		// type. Its upper bound is never a substitute for that type.
+		return false
+	case *adt.WitnessType:
 		return false
 
 	case *adt.Bottom:

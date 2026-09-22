@@ -70,7 +70,7 @@ func (c *compiler) aliasApplication(src *ast.CallExpr, id *ast.Ident, alias *ast
 	}
 	application := &adt.AliasApplication{Src: src, Template: q, UpCount: up}
 	for _, a := range src.Args {
-		application.Args = append(application.Args, c.expr(a))
+		application.Args = append(application.Args, c.typeExpr(a))
 	}
 	return application
 }
@@ -117,12 +117,48 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 			param.Level = n
 			param.ExplicitLevel = true
 		}
-		param.Bound = c.expr(p.Bound)
+		param.Bound = c.typeExpr(p.Bound)
 		c.typeParameters[p] = param
 		q.Params = append(q.Params, param)
 	}
 	q.Body = c.expr(src.Body)
 	return q
+}
+
+func (c *compiler) typeExpr(x ast.Expr) adt.Expr {
+	saved := c.typePosition
+	c.typePosition = c.experiments.Quantified
+	defer func() { c.typePosition = saved }()
+	return c.expr(x)
+}
+
+func (c *compiler) valueExpr(x ast.Expr) adt.Expr {
+	saved := c.typePosition
+	c.typePosition = false
+	defer func() { c.typePosition = saved }()
+	return c.expr(x)
+}
+
+func ordinaryWitnessReference(x adt.Expr) bool {
+	switch x := x.(type) {
+	case *adt.FieldReference:
+		if x.Label.IsDef() {
+			return false
+		}
+		if x.Src != nil {
+			if scope, ok := x.Src.Scope.(*ast.OpenExpr); ok && x.Src.Node == scope.Type {
+				return false
+			}
+		}
+		return true
+	case *adt.SelectorExpr:
+		return !x.Sel.IsDef() && ordinaryWitnessReference(x.X)
+	case *adt.IndexExpr:
+		return ordinaryWitnessReference(x.X)
+	case *adt.LetReference:
+		return ordinaryWitnessReference(x.X)
+	}
+	return false
 }
 
 func finiteValueRange(x ast.Expr) bool {

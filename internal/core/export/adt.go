@@ -241,6 +241,8 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 
 	case *adt.TypeReference:
 		return ast.Clone(x.Src)
+	case *adt.WitnessReference:
+		return e.innerExpr(env, x.X)
 
 	case *adt.BinaryExpr:
 		if x.Op == adt.AndOp || x.Op == adt.OrOp {

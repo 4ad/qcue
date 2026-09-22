@@ -350,6 +350,12 @@ func (w *printer) compactNode(n adt.Node) {
 	case *adt.RigidType:
 		w.string("rigid ")
 		w.string(x.Param.Src.Name.Name)
+	case *adt.WitnessReference:
+		w.node(x.X)
+	case *adt.WitnessType:
+		w.string("singleton(")
+		w.node(x.Ref)
+		w.string(")")
 
 	case *adt.OpaqueValue:
 		w.string("opaque value")
