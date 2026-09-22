@@ -177,6 +177,7 @@ func (w *Visitor) node(n adt.Node) {
 	case *adt.Quantified:
 		for _, p := range x.Params {
 			w.node(p.Bound)
+			w.node(p.ValueRange)
 		}
 		w.node(x.Body)
 

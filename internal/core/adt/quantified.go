@@ -28,6 +28,9 @@ type TypeParameter struct {
 	Src   *ast.TypeParam
 	Bound Expr
 	Level int
+	// ValueRange is non-nil for the finite value-binder fragment. General
+	// dependent ranges and signatures remain outside this profile.
+	ValueRange Expr
 }
 
 // Quantified is a retained predicate template over one subject.
@@ -102,6 +105,11 @@ func (a *AliasApplication) evaluate(c *OpContext, state Flags) Value {
 }
 
 func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
+	for _, p := range q.Params {
+		if p.ValueRange != nil {
+			return q.evaluateFinite(c)
+		}
+	}
 	if q.Src.Exists {
 		return &Existential{Template: q, Env: c.Env(0)}
 	}
@@ -127,6 +135,71 @@ func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 	}
 	v, _ := c.Evaluate(env, q.Body)
 	return v
+}
+
+func (q *Quantified) evaluateFinite(c *OpContext) Value {
+	for _, p := range q.Params {
+		if p.ValueRange == nil {
+			// Mixed prefixes are retained rather than commuting type and
+			// value scopes to force a finite expansion.
+			if q.Src.Exists {
+				return &Existential{Template: q, Env: c.Env(0)}
+			}
+			return &Universal{Template: q, Env: c.Env(0)}
+		}
+	}
+	var expand func(*Environment, int) Value
+	expand = func(env *Environment, i int) Value {
+		if i == len(q.Params) {
+			v, _ := c.Evaluate(env, q.Body)
+			return v
+		}
+		p := q.Params[i]
+		saved := c.PushState(env, p.Src)
+		rangeValue, _ := c.Evaluate(env, p.ValueRange)
+		if b := c.PopState(saved); b != nil {
+			rangeValue = b
+		}
+		var candidates []Value
+		switch v := Unwrap(rangeValue).(type) {
+		case *Bottom:
+			if v.IsIncomplete() {
+				return v
+			}
+		case *Disjunction:
+			candidates = v.Values
+		case *Null, *Bool, *Num, *String, *Bytes:
+			candidates = []Value{v}
+		default:
+			return &Bottom{Code: IncompleteError, Err: c.Newf("finite binder range remains unresolved")}
+		}
+		if len(candidates) == 0 {
+			if !q.Src.Exists {
+				return &Top{}
+			}
+			return c.NewErrf("existential binder has an empty range")
+		}
+		values := make([]Value, 0, len(candidates))
+		for _, v := range candidates {
+			args := maps.Clone(env.types.arguments)
+			args[p] = v
+			frame := *env
+			frame.types = &typeScope{quantifier: q, arguments: args}
+			frame.cache = nil
+			value := expand(&frame, i+1)
+			if value == nil {
+				return nil
+			}
+			values = append(values, value)
+		}
+		if q.Src.Exists {
+			return &Disjunction{Values: values}
+		}
+		return &Conjunction{Values: values}
+	}
+	env := &Environment{Up: c.Env(0), Vertex: c.newInlineVertex(nil, &StructMarker{}),
+		types: &typeScope{quantifier: q, arguments: make(map[*TypeParameter]Value)}}
+	return expand(env, 0)
 }
 
 // Universals commute with conjunction and fixed record projections, but
@@ -357,6 +430,12 @@ func inferTypeArguments(c *OpContext, env *Environment, pattern Expr, value Valu
 	}
 	switch p := pattern.(type) {
 	case *TypeReference:
+		// A known scalar contributes its immutable singleton predicate.
+		// Carrying its activation vertex into later type instances would
+		// incorrectly retain that argument cell's local sharing topology.
+		if scalar := Unwrap(value); scalar != nil {
+			value = scalar
+		}
 		if prev, ok := args[p.Param]; ok {
 			if prev == nil {
 				args[p.Param] = value

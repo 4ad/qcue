@@ -1,0 +1,845 @@
+[
+  {
+    "id": 1,
+    "title": "Descriptions and completions}",
+    "source": "config: {\n    x: int\n    y: x + 1\n}\n",
+    "checks": {
+      "config": "incomplete"
+    }
+  },
+  {
+    "id": 2,
+    "title": "Independent instantiations of a description}{Existing CUE}",
+    "source": "#Cell: {value: int}\nleft:  #Cell & {value: 1}\nright: #Cell & {value: 2}\n",
+    "checks": {
+      "left": "json:{\"value\":1}",
+      "right": "json:{\"value\":2}"
+    }
+  },
+  {
+    "id": 3,
+    "title": "One subject at every instance}{\\Uone{}}",
+    "source": "empty(A): [...A]                 // []\nimpossible(A): A                 // _|_\nimpossibleRecord(n in 0 | 1): {\n    value: n                     // one field cannot be both 0 and 1\n}\n",
+    "checks": {
+      "empty": "json:[]",
+      "impossible": "conflict",
+      "impossibleRecord": "conflict"
+    }
+  },
+  {
+    "id": 4,
+    "title": "Refining a polymorphic record across declarations}{\\Uone{}}",
+    "source": "r(A): {wrap: func(A) -> {value: A}}\nr(B): {wrap: func(B) -> {tag: \"wrapped\"}}\n\n// Unified description, after alpha-renaming:\nr(T): {wrap: func(T) -> {value: T, tag: \"wrapped\"}}\n",
+    "checks": {
+      "r": "valid"
+    }
+  },
+  {
+    "id": 5,
+    "title": "Two bounds do not become one upper bound}{\\Uone{}}",
+    "source": "choose(A: int):    func(A, A) -> A\nchoose(A: string): func(A, A) -> A\n\n// The stronger declaration also covers mixed unions:\nstronger(A: int | string): func(A, A) -> A\n",
+    "checks": {
+      "choose": "valid"
+    }
+  },
+  {
+    "id": 6,
+    "title": "An ordinary field floats as a constant obligation}{\\Uone{}}",
+    "source": "r(A): {id: func(A) -> A}\nr:    {label: \"utilities\"}\n\n// Type universes are nonempty:\nr(A): {id: func(A) -> A, label: \"utilities\"}\n",
+    "checks": {
+      "r": "valid"
+    }
+  },
+  {
+    "id": 7,
+    "title": "Binder scope across a union}{\\Uone{}+\\Dep{}}",
+    "source": "a: forall (n in 0 | 1) (n | (1 - n))  // 0 | 1\nb: (forall (n in 0 | 1) n) |\n   (forall (n in 0 | 1) (1 - n))      // _|_\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 8,
+    "title": "A particular client and a universally capable producer}{\\Uone{}}",
+    "source": "job: {\n    x: number\n    f: func(x) -> string\n    result: f(x)\n}\njob: {x: int & >=0}\njob: {x: 7, f: func(n: int) -> string: \"\\(n)\"}\n",
+    "checks": {
+      "job.result": "json:\"7\""
+    }
+  },
+  {
+    "id": 9,
+    "title": "A correlation-preserving overloaded contract}{\\Uone{}}",
+    "source": "convert: (func(int) -> string) & (func(string) -> int)\n",
+    "checks": {
+      "convert": "valid"
+    }
+  },
+  {
+    "id": 10,
+    "title": "Capabilities and one-call constraints}{\\Uone{}}",
+    "source": "wide:   func(number) -> string\nwide:   func(x: int) -> string: \"ok\"  // incompatible coverage\n\nnarrow: func(int) -> string\nnarrow: func(x: number) -> string: \"ok\" // conforming implementation\n",
+    "checks": {
+      "wide": "conflict",
+      "narrow": "valid"
+    }
+  },
+  {
+    "id": 11,
+    "title": "A scheme and an ordinary arrow unify normally}{\\Uone{}}",
+    "source": "id(A): func(A) -> A\nid:    func(int) -> int       // redundant instance\n\nbad(A): func(A) -> A\nbad:    func(int) -> bool     // _|_: int and bool are disjoint\n",
+    "checks": {
+      "id": "valid",
+      "bad": "conflict"
+    }
+  },
+  {
+    "id": 12,
+    "title": "Quantifier expressions}",
+    "source": "forall (A, B) T\nexists A { ... }\nforall (A: number) func(A, A) -> [A, A]\nforall (n in int & >=0) T\n",
+    "checks": {},
+    "mode": "syntax",
+    "reason": "Surface grammar with metavariables rather than a closed program."
+  },
+  {
+    "id": 13,
+    "title": "Quantified field declarations}",
+    "source": "map(A, B): func(func(A) -> B, [...A]) -> [...B]\n",
+    "checks": {
+      "map": "valid"
+    }
+  },
+  {
+    "id": 14,
+    "title": "Listing 14",
+    "source": "map: forall (A, B) func(func(A) -> B, [...A]) -> [...B]\n",
+    "checks": {
+      "map": "valid"
+    }
+  },
+  {
+    "id": 15,
+    "title": "Listing 15",
+    "source": "r(A): {\n    id:   func(A) -> A\n    wrap: func(A) -> {value: A}\n}\n",
+    "checks": {
+      "r": "valid"
+    }
+  },
+  {
+    "id": 16,
+    "title": "Quantifier blocks}",
+    "source": "x: {\n    exists T: U\n    forall V: W\n    // The whole following declaration body is in this prefix.\n    value: T\n    transform: func(V) -> V\n}\n",
+    "checks": {
+      "x": "valid"
+    },
+    "setup": "U: _\nW: _\n"
+  },
+  {
+    "id": 17,
+    "title": "Listing 17",
+    "source": "x: exists (T: U) forall (V: W) {\n    value: T\n    transform: func(V) -> V\n}\n",
+    "checks": {
+      "x": "valid"
+    },
+    "setup": "U: _\nW: _\n"
+  },
+  {
+    "id": 18,
+    "title": "Listing 18",
+    "source": "x(V: W): {\n    exists T: U\n    value: T\n    transform: func(V) -> V\n}\n",
+    "checks": {
+      "x": "valid"
+    },
+    "setup": "U: _\nW: _\n"
+  },
+  {
+    "id": 19,
+    "title": "Function-local generics and parametric aliases}",
+    "source": "map: func<A, B>(func(A) -> B, [...A]) -> [...B]\n",
+    "checks": {
+      "map": "valid"
+    }
+  },
+  {
+    "id": 20,
+    "title": "Listing 20",
+    "source": "Box(A) = {value: A}\nPair(A, B) = [A, B]\n",
+    "checks": {
+      "probe": "json:{\"b\":{\"value\":3},\"p\":[3,\"x\"]}"
+    },
+    "extra": "probe: {b: Box(int) & {value: 3}, p: Pair(int, string) & [3, \"x\"]}"
+  },
+  {
+    "id": 21,
+    "title": "A conservative embedding}",
+    "source": "#Add: {a: int, b: int, out: a + b}\nsum: (#Add & {a: 1, b: 2}).out\n",
+    "checks": {
+      "sum": "json:3"
+    }
+  },
+  {
+    "id": 22,
+    "title": "Full symmetric, higher-rank CUE: \\Shigher{}}",
+    "source": "use: func(forall A func(A) -> A) -> [int, string]\n\n#Showable: exists A {\n    value: A\n    show:  func(A) -> string\n}\nshow: func(#Showable) -> string\n",
+    "checks": {
+      "use": "valid"
+    }
+  },
+  {
+    "id": 23,
+    "title": "Symmetric, rank-1 CUE: \\Sone{}}",
+    "source": "Counter: exists State {\n    zero: State\n    next: func(State) -> State\n    read: func(State) -> int\n}\n",
+    "checks": {
+      "Counter": "valid"
+    }
+  },
+  {
+    "id": 24,
+    "title": "Universal-only, rank-1 CUE: \\Uone{}}",
+    "source": "id(A): func(A) -> A\ncompose(A, B, C): func(func(B) -> C, func(A) -> B) ->\n    func(A) -> C\nmap(A, B): func(func(A) -> B, [...A]) -> [...B]\n",
+    "checks": {
+      "id": "valid"
+    }
+  },
+  {
+    "id": 25,
+    "title": "Identity at unrelated instances}{\\Uone{}}",
+    "source": "id(A): func(x: A) -> A: x\ninteger: id(7)                 // 7\ntext:    id(\"seven\")           // \"seven\"\nrecord:  id({port: 443})       // {port: 443}\nchosen:  id[int & >=0](7)      // a checked explicit instance\n",
+    "checks": {
+      "integer": "json:7",
+      "text": "json:\"seven\"",
+      "record": "json:{\"port\":443}",
+      "chosen": "json:7"
+    }
+  },
+  {
+    "id": 26,
+    "title": "Pairing preserves an inferred common refinement}{\\Uone{}}",
+    "source": "pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]\np: pair[int & >=1](2, 5)       // [2, 5]\nq: pair(1, 2.5)                // [1, 2.5]\n",
+    "checks": {
+      "p": "json:[2,5]",
+      "q": "json:[1,2.5]"
+    }
+  },
+  {
+    "id": 27,
+    "title": "Selecting a value preserves its subtype}{\\Uone{}}",
+    "source": "min(A: number): func(x: A, y: A) -> A: {\n    if x <= y {out: x}\n    if x > y  {out: y}\n}.out\n\nm: min[int & >=10](12, 20)     // 12\n",
+    "checks": {
+      "m": "json:12"
+    }
+  },
+  {
+    "id": 28,
+    "title": "Two type parameters preserve asymmetric information}{\\Uone{}}",
+    "source": "swap(A, B): func(p: [A, B]) -> [B, A]: [p[1], p[0]]\ns: swap([7, \"seven\"])         // [\"seven\", 7]\n",
+    "checks": {
+      "s": "json:[\"seven\",7]"
+    }
+  },
+  {
+    "id": 29,
+    "title": "Map with a single implementation}{\\Uone{}}",
+    "source": "map(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [\n    for x in xs {g(x)}\n]\ninc:  func(x: int) -> int: x + 1\ntext: func(x: int) -> string: \"\\(x)\"\n\nnumbers: map(inc, [1, 2, 3])    // [2, 3, 4]\nstrings: map(text, [1, 2, 3])   // [\"1\", \"2\", \"3\"]\n",
+    "checks": {
+      "numbers": "json:[2,3,4]",
+      "strings": "json:[\"1\",\"2\",\"3\"]"
+    }
+  },
+  {
+    "id": 30,
+    "title": "Filtering and partitioning preserve elements}{\\Uone{}}",
+    "source": "filter(A): func(p: func(A) -> bool, xs: [...A]) -> [...A]: [\n    for x in xs if p(x) {x}\n]\npartition(A): func(p: func(A) -> bool, xs: [...A]) -> {\n    yes: [...A]\n    no:  [...A]\n}: {\n    yes: [for x in xs if p(x) {x}]\n    no:  [for x in xs if !p(x) {x}]\n}\npositive: func(x: int) -> bool: x > 0\nkept: filter(positive, [-2, 0, 4]) // [4]\n",
+    "checks": {
+      "kept": "json:[4]",
+      "probe": "json:{\"yes\":[4],\"no\":[-2,0]}"
+    },
+    "extra": "probe: partition(positive, [-2, 0, 4])"
+  },
+  {
+    "id": 31,
+    "title": "Flattening a generic transformation}{\\Uone{}}",
+    "source": "flatMap(A, B): func(g: func(A) -> [...B], xs: [...A]) -> [...B]: [\n    for x in xs for y in g(x) {y}\n]\nduplicate(A): func(x: A) -> [A, A]: [x, x]\ntwice: flatMap(duplicate, [1, 2]) // [1, 1, 2, 2]\n",
+    "checks": {
+      "twice": "json:[1,1,2,2]"
+    }
+  },
+  {
+    "id": 32,
+    "title": "Mapping named record coordinates}{\\Uone{}}",
+    "source": "mapPoint(A, B): func(g: func(A) -> B, p: {x: A, y: A}) -> {\n    x: B\n    y: B\n}: {\n    x: g(p.x)\n    y: g(p.y)\n}\np: mapPoint(text, {x: 2, y: 3}) // {x: \"2\", y: \"3\"}\n",
+    "checks": {
+      "p": "json:{\"x\":\"2\",\"y\":\"3\"}"
+    },
+    "setup": "text: func(x: int) -> string: \"\\(x)\"\n"
+  },
+  {
+    "id": 33,
+    "title": "Composition is rank-1}{\\Uone{}}",
+    "source": "compose(A, B, C): func(g: func(B) -> C, f: func(A) -> B) ->\n    func(A) -> C:\n    func(x: A) -> C: g(f(x))\n\npipeline: compose(text, inc)\nanswer: pipeline(4)           // \"5\"\n",
+    "checks": {
+      "answer": "json:\"5\""
+    },
+    "setup": "text: func(x: int) -> string: \"\\(x)\"\ninc: func(x: int) -> int: x + 1\n"
+  },
+  {
+    "id": 34,
+    "title": "A value-dependent closure}{\\Uone{}}",
+    "source": "withPrefix: func(prefix: string) -> func(string) -> string:\n    func(s: string) -> string: prefix + s\n\nwarn: withPrefix(\"warning: \")\nmessage: warn(\"retry\")        // \"warning: retry\"\n",
+    "checks": {
+      "message": "json:\"warning: retry\""
+    }
+  },
+  {
+    "id": 35,
+    "title": "A polymorphic callback}{\\Shigher{}}",
+    "source": "useBoth: func(p: forall A func(A) -> A) -> [int, string]: [\n    p(7),\n    p(\"seven\"),\n]\nok: useBoth(id)              // [7, \"seven\"]\nonlyInt: func(x: int) -> int: x\nbad: useBoth(onlyInt)         // incompatible universal obligation\n",
+    "checks": {
+      "ok": "json:[7,\"seven\"]",
+      "bad": "conflict"
+    },
+    "setup": "id(A): func(x: A) -> A: x\n"
+  },
+  {
+    "id": 36,
+    "title": "A nested universal result}{\\Shigher{} syntax; prenex normalization may apply}",
+    "source": "constant(A): func(x: A) -> (forall B func(B) -> A):\n    func(_) -> A: x\n\nseven: constant(7)\na: seven(\"ignored\")          // 7\nb: seven(true)               // 7\n",
+    "checks": {
+      "a": "json:7",
+      "b": "json:7"
+    }
+  },
+  {
+    "id": 37,
+    "title": "A reusable polymorphic utility record}{\\Uone{}}",
+    "source": "utilities(A): {\n    id:   func(x: A) -> A: x\n    wrap: func(x: A) -> {value: A}: {value: x}\n}\nutilities: {name: \"core\"}\n\nwrapped: utilities.wrap(\"payload\") // {value: \"payload\"}\n",
+    "checks": {
+      "wrapped": "json:{\"value\":\"payload\"}"
+    }
+  },
+  {
+    "id": 38,
+    "title": "A cross-file behavioral strengthening}{\\Uone{}}",
+    "source": "// interface.cue\nwrap(A): func(A) -> {value: A}\n\n// metadata.cue\nwrap(A): func(A) -> {tag: \"wrapped\"}\n\n// implementation.cue\nwrap(A): func(x: A) -> {value: A, tag: \"wrapped\"}: {\n    value: x\n    tag: \"wrapped\"\n}\n",
+    "checks": {
+      "probe": "json:{\"value\":3,\"tag\":\"wrapped\"}"
+    },
+    "extra": "probe: wrap(3)"
+  },
+  {
+    "id": 39,
+    "title": "An intersection of domain-specific guarantees}{\\Uone{}}",
+    "source": "classify: func(x: int) -> (\"negative\" | \"nonnegative\"): {\n    if x < 0  {out: \"negative\"}\n    if x >= 0 {out: \"nonnegative\"}\n}.out\nclassify: (func(int & <0) -> \"negative\") &\n          (func(int & >=0) -> \"nonnegative\")\n\nc: classify(-3)              // \"negative\"\n",
+    "checks": {
+      "probe": "json:[\"negative\",\"nonnegative\"]"
+    },
+    "extra": "probe: [classify(-3), classify(2)]"
+  },
+  {
+    "id": 40,
+    "title": "Unresolved alternatives and defaults}{\\Uone{}}",
+    "source": "f: (func(x: int) -> int: x) |\n   (func(x: int) -> int: x + 1)\na: f(3)                     // incomplete operational choice\n\npreferred: *(func(x: int) -> int: x) |\n            (func(x: int) -> int: x + 1)\nb: preferred(3)             // 3, under legacy default selection\n",
+    "checks": {
+      "a": "incomplete",
+      "b": "json:3"
+    }
+  },
+  {
+    "id": 41,
+    "title": "Positional, named, and mixed calls}{\\Uone{}}",
+    "source": "sum: func(a: int, b: int) -> int: a + b\np: sum(2, 3)                // 5\nq: sum(a: 2, b: 3)          // 5\nr: sum(2, b: 3)             // 5\n",
+    "checks": {
+      "p": "json:5",
+      "q": "json:5",
+      "r": "json:5"
+    }
+  },
+  {
+    "id": 42,
+    "title": "Name-only required and optional parameters}{\\Uone{}}",
+    "source": "key: func(a!: int, note?: string) -> int: a\nx: key(a: 4)                // 4; note is absent\nz: key(a: 4, note: \"audit\") // 4\nbad: key(4)                 // invalid packet: a is name-only\n",
+    "checks": {
+      "x": "json:4",
+      "z": "json:4",
+      "bad": "conflict"
+    }
+  },
+  {
+    "id": 43,
+    "title": "Positional-only aliases and anonymous parameters}{\\Uone{}}",
+    "source": "scale: func(_~value: int, _: int) -> int: value * 2\nx: scale(5, 99)             // 10\nbad: scale(value: 5, 99)     // invalid label/order\n",
+    "checks": {
+      "x": "json:10"
+    },
+    "mode": "compile-error",
+    "error": "positional argument after labeled argument",
+    "valid_without": "bad:"
+  },
+  {
+    "id": 44,
+    "title": "Hidden labels and attributes}{\\Uone{}}",
+    "source": "package internal\nmeasure: func(_value: int @go(Int), unit!: string) -> int: _value\ninside: measure(_value: 7, unit: \"ms\")\n// Another package can use the positional slot, not the hidden label.\n",
+    "checks": {
+      "inside": "json:7"
+    }
+  },
+  {
+    "id": 45,
+    "title": "Errors distinguish presence from values}{\\Uone{}}",
+    "source": "a: sum(1, a: 1)            // duplicate binding, even with equal values\nb: sum(1, 2, 3)            // surplus positional argument\nc: sum(a: 1, b: 2, c: 3)    // unknown label\nd: sum(1)                  // required argument missing\ne: sum(_, 2)               // supplied but incomplete, not missing\n",
+    "checks": {
+      "a": "conflict",
+      "b": "conflict",
+      "c": "conflict",
+      "d": "conflict",
+      "e": "incomplete"
+    },
+    "setup": "sum: func(a: int, b: int) -> int: a + b\n"
+  },
+  {
+    "id": 46,
+    "title": "Omission defaults and caller preferences}{\\Uone{}}",
+    "source": "add: func(a: int, b: int = 10) -> int: a + b\nx: int | *5\nomitted:  add(1)            // 11\nsupplied: add(1, x)         // 6\nunknown:  add(1, _)         // incomplete; b was supplied\n",
+    "checks": {
+      "omitted": "json:11",
+      "supplied": "json:6",
+      "unknown": "incomplete"
+    }
+  },
+  {
+    "id": 47,
+    "title": "A defaulted name-only argument}{\\Uone{}}",
+    "source": "render: func(text: string, suffix!: string = \"!\") -> string:\n    text + suffix\nx: render(\"hello\")                 // \"hello!\"\ny: render(\"hello\", suffix: \"?\")   // \"hello?\"\n",
+    "checks": {
+      "x": "json:\"hello!\"",
+      "y": "json:\"hello?\""
+    }
+  },
+  {
+    "id": 48,
+    "title": "A configurable default is an explicit adapter}{\\Uone{}}",
+    "source": "raw: func(x: int) -> int: x\nconfigured: func(x: int = 2) -> int: raw(x)\nanswer: configured()        // 2\n",
+    "checks": {
+      "answer": "json:2"
+    }
+  },
+  {
+    "id": 49,
+    "title": "An open interface completed by an implementation}{\\Uone{}, implicit protocol row}",
+    "source": "T: func(a: int, ...) -> number\nf: T & (func(a: int, b: int) -> int: a + b)\nx: f(1, 2)                 // 3\ny: f(1)                    // missing b\n",
+    "checks": {
+      "x": "json:3",
+      "y": "conflict"
+    }
+  },
+  {
+    "id": 50,
+    "title": "Chained partial application}{\\Uone{}}",
+    "source": "add3: func(a: int, b: int, c: int) -> int: a + b + c\nf: add3(1, ...)\ng: f(2, ...)\nx: g(3)                    // 6\ny: add3(a: 1, ...)(2, 3)    // 6\n",
+    "checks": {
+      "x": "json:6",
+      "y": "json:6"
+    }
+  },
+  {
+    "id": 51,
+    "title": "A residual contract on a partial closure}{\\Uone{}}",
+    "source": "f: add3(1, ...)\nf: func(int, int) -> int\nx: f(2, 3)                 // 6\n",
+    "checks": {
+      "x": "json:6"
+    },
+    "setup": "add3: func(a: int, b: int, c: int) -> int: a + b + c\n"
+  },
+  {
+    "id": 52,
+    "title": "Self-unification after copying and embedding}{\\Uone{}}",
+    "source": "x: {f: func(y: int) -> int: y}\na: x.f & x.f\nb: x.f & {x}.f\nc: x.f & (x & {g: 1}).f\nr: [a(2), b(2), c(2)]       // [2, 2, 2]\n",
+    "checks": {
+      "r": "json:[2,2,2]"
+    }
+  },
+  {
+    "id": 53,
+    "title": "Equal source, unequal captures}{\\Uone{}}",
+    "source": "d: [for v in [1, 2] {func(y: int) -> int: y + v}]\ne: d[0] & d[1]             // _|_: captures differ\n",
+    "checks": {
+      "e": "conflict"
+    }
+  },
+  {
+    "id": 54,
+    "title": "Combining result descriptions explicitly}{\\Uone{}}",
+    "source": "left:  func(x: int) -> {a: int}: {a: x}\nright: func(x: int) -> {b: int}: {b: x}\nboth: func(x: int) -> {a: int, b: int}: left(x) & right(x)\nr: both(3)                  // {a: 3, b: 3}\n",
+    "checks": {
+      "r": "json:{\"a\":3,\"b\":3}"
+    }
+  },
+  {
+    "id": 55,
+    "title": "A predicate used as an ordinary constraint}{\\Uone{}}",
+    "source": "positive: func(x: int) -> bool: x > 0\n#Positive: {value: int, _valid: true & positive(value)}\nn: (#Positive & {value: 7}).value   // 7\nbad: #Positive & {value: -1}       // _|_\n",
+    "checks": {
+      "n": "json:7",
+      "bad": "conflict"
+    }
+  },
+  {
+    "id": 56,
+    "title": "Portable foreign contract}{\\Uone{} with checked effects}",
+    "source": "externF: extern func(int) -> int !bridge\n// A native-range failure is a bridge outcome.\n// A fractional input is outside the logical domain.\n",
+    "checks": {
+      "externF": "valid"
+    }
+  },
+  {
+    "id": 57,
+    "title": "Nested calls remain ordinary evaluation}{\\Uone{}}",
+    "source": "twice: func(n: int) -> int: n + n\nvalue: twice(twice(twice(2))) // 16\n",
+    "checks": {
+      "value": "json:16"
+    }
+  },
+  {
+    "id": 58,
+    "title": "A structurally recursive fold}{\\Uone{} with structural recursion}",
+    "source": "fold(A, B): func(step: func(B, A) -> B, seed: B, xs: [...A]) -> B: {\n    if len(xs) == 0 {out: seed}\n    if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}\n}.out\nplus: func(x: int, y: int) -> int: x + y\nsum: fold(plus, 0, [1, 2, 3]) // 6\n",
+    "checks": {
+      "sum": "json:6"
+    }
+  },
+  {
+    "id": 59,
+    "title": "A directly dependent result}{\\Uone{}+\\Dep{}}",
+    "source": "successor: func(x: int) -> (x + 1): x + 1\n\n// Equivalent pointwise specification:\nsuccessor(n in int): func(n) -> (n + 1)\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 60,
+    "title": "A dependent parameter constraint}{\\Uone{}+\\Dep{}}",
+    "source": "interval: func(lo: int, hi: int & >=lo) -> {\n    low: lo\n    high: hi\n}: {low: lo, high: hi}\n\nok: interval(3, 7)          // {low: 3, high: 7}\nbad: interval(7, 3)         // domain contradiction\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 61,
+    "title": "Indexed finite sequences}",
+    "source": "import \"list\"\n\nlet Nat = int & >=0\nVec(A, n in Nat) = [...A] &\n    list.MinItems(n) & list.MaxItems(n)\nFin(n in Nat) = int & >=0 & <n\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 62,
+    "title": "Length-preserving map}{\\Uone{}+\\Dep{}}",
+    "source": "map(A, B, n in Nat): func(\n    g: func(A) -> B,\n    xs: Vec(A, n),\n) -> Vec(B, n): [for x in xs {g(x)}]\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 63,
+    "title": "Safe indexing, including the zero-length case}{\\Uone{}+\\Dep{}}",
+    "source": "index(A, n in Nat): func(xs: Vec(A, n), i: Fin(n)) -> A: xs[i]\n\nx: index([\"a\", \"b\"], 1)    // \"b\"\nbad: index([], 0)           // 0 is outside Fin(0)\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 64,
+    "title": "Head with an explicit nonempty precondition}{\\Uone{}+\\Dep{}}",
+    "source": "head(A, n in int & >=1): func(xs: Vec(A, n)) -> A: xs[0]\nfirst: head([4, 5])         // 4\nbad: head([])               // no admissible instance\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 65,
+    "title": "Appending adds lengths}{\\Uone{}+\\Dep{}}",
+    "source": "append(A, n in Nat, m in Nat): func(\n    xs: Vec(A, n), ys: Vec(A, m),\n) -> Vec(A, n + m): [for x in xs {x}, for y in ys {y}]\n\nv: append([1, 2], [3])      // [1, 2, 3]\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 66,
+    "title": "Zip rejects unequal lengths}{\\Uone{}+\\Dep{}}",
+    "source": "zip(A, B, n in Nat): func(xs: Vec(A, n), ys: Vec(B, n)) ->\n    Vec([A, B], n): [for i, x in xs {[x, ys[i]]}]\n\nz: zip([1, 2], [\"a\", \"b\"]) // [[1, \"a\"], [2, \"b\"]]\nbad: zip([1], [\"a\", \"b\"])   // inconsistent length witness\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 67,
+    "title": "Split at a bounded position}{\\Uone{}+\\Dep{}}",
+    "source": "split(A, n in Nat, k in int & >=0 & <=n): func(\n    xs: Vec(A, n), cut: k,\n) -> {left: Vec(A, k), right: Vec(A, n - k)}: {\n    left: xs[:cut]\n    right: xs[cut:]\n}\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 68,
+    "title": "Replication reifies its count}{\\Uone{}+\\Dep{}}",
+    "source": "replicate(A, n in Nat): func(x: A, count: n) -> Vec(A, n): [\n    for i in list.Range(0, count, 1) {x}\n]\nr: replicate(\"x\", 3)      // [\"x\", \"x\", \"x\"]\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 69,
+    "title": "A dependent result with a hidden length}{\\Shigher{}+\\Dep{}}",
+    "source": "filterBounded(A, n in Nat): func(\n    p: func(A) -> bool, xs: Vec(A, n),\n) -> (exists (k in int & >=0 & <=n) Vec(A, k)):\n    [for x in xs if p(x) {x}]\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 70,
+    "title": "Matrix dimensions, including empty matrices}",
+    "source": "Matrix(A, r in Nat, c in Nat) = {\n    rows: r\n    cols: c\n    data: Vec(Vec(A, c), r)\n}\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 71,
+    "title": "Transpose with a precise shape}{\\Uone{}+\\Dep{}}",
+    "source": "transpose(A, r in Nat, c in Nat): func(m: Matrix(A, r, c)) ->\n    Matrix(A, c, r): {\n        rows: m.cols\n        cols: m.rows\n        data: [\n            for j in list.Range(0, m.cols, 1) {\n                [for row in m.data {row[j]}]\n            }\n        ]\n    }\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 72,
+    "title": "Dot product with matched dimensions}{\\Uone{}+\\Dep{}; finite fold primitive}",
+    "source": "addNumber: func(x: number, y: number) -> number: x + y\n\ndot(n in Nat): func(xs: Vec(number, n), ys: Vec(number, n)) ->\n    number: fold(addNumber, 0, [for i, x in xs {x * ys[i]}])\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 73,
+    "title": "Dimension-safe matrix multiplication}{\\Uone{}+\\Dep{}}",
+    "source": "matmul(r in Nat, k in Nat, c in Nat): func(\n    x: Matrix(number, r, k), y: Matrix(number, k, c),\n) -> Matrix(number, r, c): {\n    rows: x.rows\n    cols: y.cols\n    data: [\n        for row in x.data {\n            [for j in list.Range(0, y.cols, 1) {\n                dot(row, [for yrow in y.data {yrow[j]}])\n            }]\n        }\n    ]\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 74,
+    "title": "A request-indexed response}{\\Uone{}+\\Dep{} with a checked service}",
+    "source": "let Request = {kind: \"lookup\", key: string} |\n              {kind: \"size\", items: [..._]}\nReply(q in Request) = {\n    if q.kind == \"lookup\" {result: string}\n    if q.kind == \"size\"   {result: int & >=0}\n}\nrequest: extern func(q: Request) -> Reply(q) !service\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 75,
+    "title": "A relation between input and output records}{\\Uone{}+\\Dep{}}",
+    "source": "annotate(A): func(x: A, tag: string) -> {\n    value: x\n    label: tag\n}: {value: x, label: tag}\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 76,
+    "title": "Clamping to an argument-dependent interval}{\\Uone{}+\\Dep{}}",
+    "source": "clamp: func(lo: int, hi: int & >=lo, x: int) -> (\n    int & >=lo & <=hi\n): {\n    if x < lo {out: lo}\n    if x > hi {out: hi}\n    if x >= lo && x <= hi {out: x}\n}.out\n\nbounded: clamp(0, 10, 14) // 10\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 77,
+    "title": "A shared hidden representation}",
+    "source": "#Counter: exists State {\n    zero: State\n    next: func(State) -> State\n    read: func(State) -> (int & >=0)\n}\n",
+    "checks": {
+      "#Counter": "valid"
+    }
+  },
+  {
+    "id": 78,
+    "title": "Sealing and opening}",
+    "source": "seal Interface with (HiddenType = Representation) {\n    // implementation fields, checked with the private representation\n}\n\nopen moduleValue as (AbstractType, View) {\n    // AbstractType is rigid; View has the opened interface.\n}\n",
+    "checks": {},
+    "mode": "syntax",
+    "reason": "Surface grammar with metavariables rather than a closed program."
+  },
+  {
+    "id": 79,
+    "title": "An integer representation}{\\Sone{}+\\Abs{}}",
+    "source": "counterV1: seal #Counter with (State = int & >=0) {\n    zero: 0\n    next: func(x: int & >=0) -> (int & >=0): x + 1\n    read: func(x: int & >=0) -> (int & >=0): x\n}\n",
+    "checks": {
+      "probe": "json:1"
+    },
+    "setup": "#Counter: exists State {\n    zero: State\n    next: func(State) -> State\n    read: func(State) -> (int & >=0)\n}\n",
+    "extra": "probe: (open counterV1 as (S, C) {out: C.read(C.next(C.zero))}).out"
+  },
+  {
+    "id": 80,
+    "title": "A record representation}{\\Sone{}+\\Abs{}}",
+    "source": "let CounterRep = close({count: int & >=0})\ncounterV2: seal #Counter with (State = CounterRep) {\n    zero: {count: 0}\n    next: func(s: CounterRep) -> CounterRep:\n        {count: s.count + 1}\n    read: func(s: CounterRep) -> (int & >=0): s.count\n}\n",
+    "checks": {
+      "probe": "json:1"
+    },
+    "setup": "#Counter: exists State {\n    zero: State\n    next: func(State) -> State\n    read: func(State) -> (int & >=0)\n}\n",
+    "extra": "probe: (open counterV2 as (S, C) {out: C.read(C.next(C.zero))}).out"
+  },
+  {
+    "id": 81,
+    "title": "A client checked once}{\\Sone{}+\\Abs{} with a rank-1 utility}",
+    "source": "useCounter(S): func(c: {\n    zero: S\n    next: func(S) -> S\n    read: func(S) -> (int & >=0)\n}) -> (int & >=0): c.read(c.next(c.next(c.zero)))\n\nv1: (open counterV1 as (S, C) {out: useCounter[S](C)}).out\nv2: (open counterV2 as (S, C) {out: useCounter[S](C)}).out\n// Both observations are 2.\n",
+    "checks": {
+      "v1": "json:2",
+      "v2": "json:2"
+    },
+    "setup": "#Counter: exists State {\n    zero: State\n    next: func(State) -> State\n    read: func(State) -> (int & >=0)\n}\ncounterV1: seal #Counter with (State = int & >=0) {\n    zero: 0\n    next: func(x: int & >=0) -> (int & >=0): x + 1\n    read: func(x: int & >=0) -> (int & >=0): x\n}\nlet CounterRep = close({count: int & >=0})\ncounterV2: seal #Counter with (State = CounterRep) {\n    zero: {count: 0}\n    next: func(s: CounterRep) -> CounterRep:\n        {count: s.count + 1}\n    read: func(s: CounterRep) -> (int & >=0): s.count\n}\n"
+  },
+  {
+    "id": 82,
+    "title": "A module law strengthened by universals}{\\Sone{}+\\Dep{}+\\Abs{}}",
+    "source": "#CounterLawful: exists State {\n    zero: State\n    next: func(State) -> State\n    read: func(State) -> (int & >=0)\n    _zeroLaw: true & (read(zero) == 0)\n    forall (s in State) {\n        _stepLaw: true & (read(next(s)) == read(s) + 1)\n    }\n}\n",
+    "checks": {},
+    "exclude": "Dependent profile D (out of scope)."
+  },
+  {
+    "id": 83,
+    "title": "Heterogeneous values with their own operations}{\\Shigher{}+\\Abs{}}",
+    "source": "#Showable: exists A {\n    value: A\n    show: func(A) -> string\n}\np: seal #Showable with (A = int) {\n    value: 7\n    show: func(x: int) -> string: \"\\(x)\"\n}\nq: seal #Showable with (A = string) {\n    value: \"hello\"\n    show: func(x: string) -> string: x\n}\nitems: [p, q]\n",
+    "checks": {
+      "items": "valid"
+    }
+  },
+  {
+    "id": 84,
+    "title": "Eliminating a first-class package}{\\Shigher{}+\\Abs{}}",
+    "source": "describe: func(p: #Showable) -> string:\n    (open p as (A, P) {out: P.show(P.value)}).out\ntext: map(describe, items)     // [\"7\", \"hello\"]\n",
+    "checks": {
+      "text": "json:[\"7\",\"hello\"]"
+    },
+    "setup": "#Showable: exists A {\n    value: A\n    show: func(A) -> string\n}\np: seal #Showable with (A = int) {\n    value: 7\n    show: func(x: int) -> string: \"\\(x)\"\n}\nq: seal #Showable with (A = string) {\n    value: \"hello\"\n    show: func(x: string) -> string: x\n}\nitems: [p, q]\nmap(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [for x in xs {g(x)}]\n"
+  },
+  {
+    "id": 85,
+    "title": "Sharing two values under one witness}{\\Shigher{}+\\Abs{}}",
+    "source": "#ComparablePair: exists A {\n    left: A\n    right: A\n    equal: func(A, A) -> bool\n}\ncompare: func(p: #ComparablePair) -> bool:\n    (open p as (A, P) {out: P.equal(P.left, P.right)}).out\n",
+    "checks": {
+      "compare": "valid"
+    }
+  },
+  {
+    "id": 86,
+    "title": "An abstract codec interface}{\\Sone{}+\\Abs{}; checked effects}",
+    "source": "#CodecModule: exists Value {\n    encode: func(Value) -> bytes\n    decode: func(bytes) -> Value !decode\n}\n",
+    "checks": {
+      "#CodecModule": "valid"
+    }
+  },
+  {
+    "id": 87,
+    "title": "Mixed prefixes and generic modules}",
+    "source": "module(A): {\n    exists State\n    empty: State\n    push: func(A, State) -> State\n}\n",
+    "checks": {
+      "module": "valid"
+    }
+  },
+  {
+    "id": 88,
+    "title": "An empty arithmetic relation retained as hypotheses}{Base fragment}",
+    "source": "a: int & b * 5\nb: a - 1\n",
+    "checks": {
+      "a": "incomplete",
+      "b": "incomplete"
+    }
+  },
+  {
+    "id": 89,
+    "title": "A local bound contradiction}{Base fragment}",
+    "source": "x: <0\ny: x & >0\n",
+    "checks": {
+      "y": "conflict"
+    }
+  },
+  {
+    "id": 90,
+    "title": "A concrete result with a residual guard}{Base fragment}",
+    "source": "x: int\nr: 3 & (x + 1)\n",
+    "checks": {
+      "r": "incomplete"
+    }
+  },
+  {
+    "id": 91,
+    "title": "A broad approximation is not a contradiction}{\\Uone{}}",
+    "source": "f: func(x: number) -> number: 1\nf: func(number) -> int              // provable from the body\n\nunknown: func(number) -> number\nunknown: func(number) -> int        // a nonempty refinement\n",
+    "checks": {
+      "f": "valid",
+      "unknown": "valid"
+    }
+  },
+  {
+    "id": 92,
+    "title": "Concrete counterexamples to implementation contracts}{\\Uone{}}",
+    "source": "wrongResult: func(int) -> string\nwrongResult: func(x: int) -> int: x\n\nwrongDomain: func(number) -> string\nwrongDomain: func(x: int) -> string: \"ok\"\n",
+    "checks": {
+      "wrongResult": "conflict",
+      "wrongDomain": "conflict"
+    }
+  },
+  {
+    "id": 93,
+    "title": "Uniform proofs and finite refutations}{\\Uone{}}",
+    "source": "id(A): func(x: A) -> A: x        // one structural proof\nbad(A): func(x: A) -> A: 0      // refuted at A = 1, x = 1\n",
+    "checks": {
+      "id": "valid",
+      "bad": "conflict"
+    }
+  },
+  {
+    "id": 94,
+    "title": "A symbolic inconsistency exposed by one universal instance}{\\Uone{}}",
+    "source": "f(A): func(A) -> A\nr: f(3) & string\n",
+    "checks": {
+      "r": "conflict"
+    }
+  },
+  {
+    "id": 95,
+    "title": "A flexible witness must remain refinable}{\\Sone{}}",
+    "source": "x: exists (n in 1 | 2) {value: n}\nx: {value: 2}\n",
+    "checks": {
+      "x": "json:{\"value\":2}"
+    }
+  },
+  {
+    "id": 96,
+    "title": "A refinable argument restricts a call, not a universal domain}{\\Uone{}}",
+    "source": "x: number\nf: func(x) -> string\nf: func(n: int) -> string: \"ok\"\n\nx: int\n",
+    "checks": {
+      "f": "valid"
+    }
+  },
+  {
+    "id": 97,
+    "title": "Local execution and universal verification}{\\Uone{}}",
+    "source": "externalArithmetic: extern func(int) -> int !bridge\nf: func(x: int) -> int: externalArithmetic(x)\nr: f(0)\n",
+    "checks": {
+      "r": "incomplete"
+    }
+  },
+  {
+    "id": 98,
+    "title": "Incremental algorithm}",
+    "source": "refine(state, declarations, demands, resources):\n    elaborate_and_conjoin(state, declarations)\n    enqueue_new_dependencies(state, demands)\n    while an enabled task has an available resource ticket:\n        task = choose_task_deterministically(state)\n        result = local_kernel(task, state)\n        match result:\n            equivalent_rewrite(replacement, proof):\n                verify(proof); install_preserving_scopes(replacement)\n            consequence(fact, proof):\n                verify(proof); conjoin_and_record(fact, proof)\n            refutation(guard, proof):\n                verify(proof); exclude_guarded_case(guard, proof)\n            blocked(dependencies):\n                retain_and_watch(task, dependencies)\n        enqueue_tasks_whose_inputs_gained_information(state)\n    return state_with_all_residuals_and_certificates(state)\n",
+    "checks": {},
+    "exclude": "Implementation pseudocode, not CUE source."
+  },
+  {
+    "id": 99,
+    "title": "Supplying a label}{\\Uone{}}",
+    "source": "raw: func(_~n: int) -> int: n + 1\nnamed: func(x: int) -> int: raw(x)\na: named(x: 2)              // 3\n",
+    "checks": {
+      "a": "json:3"
+    }
+  },
+  {
+    "id": 100,
+    "title": "Restricting public calls across files}{\\Uone{}}",
+    "source": "raw: func(x: number) -> string: \"\\(x)\"\ncall: {arg: number, result: raw(arg)}\ncall: {arg: int, result: string}\n\nok:  (call & {arg: 7}).result   // \"7\"\nbad: (call & {arg: 1.5}).result // _|_\n",
+    "checks": {
+      "ok": "json:\"7\"",
+      "bad": "conflict"
+    }
+  },
+  {
+    "id": 101,
+    "title": "Keeping late contract failures explicit}{\\Uone{} with checked effects}",
+    "source": "checked: func(x: int) -> string !constraint:\n    checkedResult(string, legacyBody(x))\n",
+    "checks": {
+      "checked": "valid"
+    },
+    "setup": "checkedResult: extern func(_, _) -> _ !constraint\nlegacyBody: extern func(int) -> _ !constraint\n"
+  }
+]

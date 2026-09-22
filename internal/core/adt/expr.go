@@ -1292,14 +1292,12 @@ func (x *SliceExpr) evaluate(c *OpContext, state Flags) Value {
 				})
 				return nil
 			}
-			if v.IsDynamic {
-				// If the list is dynamic, there is no need to recompute the
-				// arcs.
-				a.Label = label
-				n.Arcs = append(n.Arcs, a)
-				continue
-			}
+			// A slice renumbers its own arcs. Dynamic lists can still be
+			// referenced by earlier activations and by sibling expressions;
+			// changing their arc labels would mutate those observations.
+			a.Finalize(c)
 			arc := *a
+			arc.state = nil
 			arc.Parent = n
 			arc.Label = label
 			n.Arcs = append(n.Arcs, &arc)
@@ -2161,7 +2159,7 @@ type funcCallResult struct {
 	types      []FuncType
 	args       []funcArg
 	identities []*FuncValue
-	result     *Vertex
+	result     Value
 }
 
 // matches reports whether a memoized result was produced by the given
@@ -2348,6 +2346,26 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		}
 		x = inst
 	}
+	recursive := false
+	if x.Fn.Quantified {
+		activation, b := c.enterFunction(callee.Fn, bindings)
+		if b != nil {
+			return b
+		}
+		recursive = activation.recursive
+		if recursive {
+			for i, arg := range bindings {
+				if arg.expr != nil {
+					v, _ := c.Evaluate(arg.env, arg.expr)
+					if value := recursiveArgument(c, v); value != nil {
+						bindings[i] = funcArg{expr: value}
+					}
+				}
+			}
+		}
+		c.activeFunctionCalls = append(c.activeFunctionCalls, activation)
+		defer func() { c.activeFunctionCalls = c.activeFunctionCalls[:len(c.activeFunctionCalls)-1] }()
+	}
 
 	// Phase 2: complete the call.
 	//
@@ -2366,6 +2384,11 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	// cycle. This mirrors `(f & {n: (f & {...}).out}).out`, where the two `f`
 	// references are distinct AST nodes.
 	anchor := c.funcAnchor(callee.Fn, callee.Env)
+	if recursive {
+		// The checked decrease supplies a fresh activation identity. Calls
+		// without this evidence continue to use the host cycle discipline.
+		anchor = c.newInlineVertex(nil, nil)
+	}
 	ref := c.funcCallRef(call, anchor, callee)
 
 	arcs := make([]*Vertex, 0, len(x.Fn.Params))
@@ -2433,6 +2456,9 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			// argument, so that its (lazy) evaluation never adopts the
 			// callee body's chain; see [CycleInfo.IsFuncArg].
 			ci := c.ci
+			if recursive && argEnv == nil {
+				ci.CycleInfo = CycleInfo{}
+			}
 			ci.IsFuncArg = true
 			arc.Conjuncts = ConjunctGroup{MakeConjunct(argEnv, arg, ci)}
 		}
@@ -2462,7 +2488,15 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		a.Parent = activation
 	}
 	bodyEnv := &Environment{Up: x.Env, Vertex: activation}
-	result := c.newInlineVertex(anchor, nil, MakeConjunct(bodyEnv, ref, c.ci))
+	bodyCI := c.ci
+	if recursive {
+		// This activation's finite descent discharges the call-cycle edge.
+		// Preserve closing and positions, but start its local reference
+		// cycle tracking afresh; ordinary cycles inside the body still run
+		// through the host detector.
+		bodyCI.CycleInfo = CycleInfo{IsFuncArg: true}
+	}
+	result := c.newInlineVertex(anchor, nil, MakeConjunct(bodyEnv, ref, bodyCI))
 	result.Finalize(c)
 	if b := result.Bottom(); b != nil && !b.IsIncomplete() {
 		return b
@@ -2489,16 +2523,26 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	// already returned above); a recursion cycle produces a (non-incomplete)
 	// bottom above and likewise leaves no entry, which is what keeps
 	// memoization from short-circuiting cycle detection.
+	var completed Value = result
+	if x.Fn.Quantified && result.Bottom() == nil &&
+		Validate(c, result, &ValidateConfig{Concrete: true}) == nil {
+		if value := recursiveArgument(c, result); value != nil {
+			// Ground evaluation has discharged the result's validation
+			// edges. Preserve its value, rather than re-expanding the call
+			// activation whenever its result is used by another expression.
+			completed = value
+		}
+	}
 	if result.Bottom() == nil {
 		if c.funcCallResults == nil {
 			c.funcCallResults = map[funcCallResultKey][]funcCallResult{}
 		}
 		c.funcCallResults[resultKey] = append(c.funcCallResults[resultKey],
 			funcCallResult{fn: callee.Fn, env: callee.Env, types: callee.Types, args: callee.args,
-				identities: callee.identities, result: result})
+				identities: callee.identities, result: completed})
 	}
 
-	return result
+	return completed
 }
 
 // funcAnchor returns the stable anchor vertex for the given function literal

@@ -38,14 +38,18 @@ func (c *compiler) functionCaptures(src *ast.Func, fn *adt.Function) []adt.Expr 
 			return false
 		}
 		if _, ok := n.(adt.Resolver); !ok {
-			return true
+			if r, ok := n.(*adt.TypeReference); !ok || r.Param.ValueRange == nil {
+				return true
+			}
 		}
 		id, ok := n.Source().(*ast.Ident)
 		if !ok || local[id.Scope] {
 			return true
 		}
-		if _, erased := id.Node.(*ast.TypeParam); erased {
-			return false
+		if p, ok := id.Node.(*ast.TypeParam); ok {
+			if c.typeParameters[p].ValueRange == nil {
+				return false
+			}
 		}
 		if _, imported := id.Node.(*ast.ImportSpec); imported {
 			return false

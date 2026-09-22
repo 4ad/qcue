@@ -163,6 +163,101 @@ func TestQuantifiedAbstractOverloads(t *testing.T) {
 	}
 }
 
+func TestQuantifiedStructuralRecursion(t *testing.T) {
+	for _, src := range []string{
+		`sum: func(xs: [...int]) -> int: {
+             if len(xs) == 0 {out: 0}
+             if len(xs) > 0 {out: xs[0] + sum(xs[1:])}
+         }.out
+         out: sum([1, 2, 3])`,
+		`sum: func(seed: int, xs: [...int]) -> int: {
+             if len(xs) == 0 {out: seed}
+             if len(xs) > 0 {out: sum(seed + xs[0], xs[1:])}
+         }.out
+         out: sum(0, [1, 2, 3])`,
+		`fold: func(step: func(int, int) -> int, seed: int, xs: [...int]) -> int: {
+             if len(xs) == 0 {out: seed}
+             if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}
+         }.out
+         plus: func(x: int, y: int) -> int: x + y
+         out: fold(plus, 0, [1, 2, 3])`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			got, err := v.LookupPath(cue.ParsePath("out")).Int64()
+			if err != nil || got != 6 {
+				t.Fatalf("got %d, %v (root: %v)", got, err, v.Err())
+			}
+		})
+	}
+}
+
+func TestQuantifiedRecursionRequiresDescent(t *testing.T) {
+	for _, src := range []string{
+		`loop: func(xs: [...int]) -> int: loop(xs)
+         out: loop([1])`,
+		`loop: func(xs: [...int]) -> int: loop([0, for x in xs {x}])
+         out: loop([1])`,
+		`loop: func(xs: [...int], ys: [...int]) -> int: loop(ys, xs)
+         out: loop([1, 2], [1])`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
+			out := v.LookupPath(cue.ParsePath("out"))
+			if !out.Exists() || out.Validate() == nil {
+				t.Fatalf("missing recursion rejection (root: %v)", v.Err())
+			}
+		})
+	}
+}
+
+func TestQuantifiedSlicePreservesSource(t *testing.T) {
+	v := cuecontext.New().CompileString(`
+@experiment(quantified)
+f: func(xs: [...int]) -> _: {
+    tail: xs[1:]
+    head: xs[0]
+    original: xs
+    last: xs[2:]
+}
+out: f([1, 2, 3])
+`)
+	got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON()
+	const want = `{"tail":[2,3],"head":1,"original":[1,2,3],"last":[3]}`
+	if err != nil || string(got) != want {
+		t.Fatalf("got %s, %v; want %s", got, err, want)
+	}
+}
+
+func TestQuantifiedFiniteWitnesses(t *testing.T) {
+	v := cuecontext.New().CompileString(`
+@experiment(quantified)
+x: exists (n in 1 | 2) {a: n, b: n}
+x: {a: 2}
+bad: exists (n in 1 | 2) {a: n, b: n}
+bad: {a: 1, b: 2}
+dependent: forall (n in 0 | 1) exists (m in 0 | 1) {ok: true & (n == m)}
+independent: exists (m in 0 | 1) forall (n in 0 | 1) {ok: true & (n == m)}
+empty: exists (n in _|_) {value: n}
+vacuous: forall (n in _|_) _|_
+`)
+	for _, path := range []string{"bad", "independent", "empty"} {
+		x := v.LookupPath(cue.ParsePath(path))
+		if !x.Exists() || x.Validate() == nil {
+			t.Errorf("%s: missing finite-witness conflict (root: %v)", path, v.Err())
+		}
+	}
+	for path, want := range map[string]string{"x": `{"a":2,"b":2}`, "dependent": `{"ok":true}`} {
+		got, err := v.LookupPath(cue.ParsePath(path)).MarshalJSON()
+		if err != nil || string(got) != want {
+			t.Errorf("%s: got %s, %v; want %s", path, got, err, want)
+		}
+	}
+	if err := v.LookupPath(cue.ParsePath("vacuous")).Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestQuantifiedInvalidInstances(t *testing.T) {
 	for _, src := range []string{
 		`id(A): func(x: A) -> A: x

@@ -92,6 +92,12 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 	for _, p := range src.Params {
 		param := &adt.TypeParameter{Src: p}
 		if p.Sort != nil {
+			if finiteValueRange(p.Sort) {
+				param.ValueRange = c.expr(p.Sort)
+				c.typeParameters[p] = param
+				q.Params = append(q.Params, param)
+				continue
+			}
 			call, ok := p.Sort.(*ast.CallExpr)
 			if !ok || len(call.Args) != 1 {
 				return c.errf(p, "value binders require the dependent profile D")
@@ -116,4 +122,18 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 	}
 	q.Body = c.expr(src.Body)
 	return q
+}
+
+func finiteValueRange(x ast.Expr) bool {
+	switch x := x.(type) {
+	case *ast.BasicLit, *ast.BottomLit:
+		return true
+	case *ast.ParenExpr:
+		return finiteValueRange(x.X)
+	case *ast.UnaryExpr:
+		return (x.Op == token.ADD || x.Op == token.SUB) && finiteValueRange(x.X)
+	case *ast.BinaryExpr:
+		return x.Op == token.OR && finiteValueRange(x.X) && finiteValueRange(x.Y)
+	}
+	return false
 }
