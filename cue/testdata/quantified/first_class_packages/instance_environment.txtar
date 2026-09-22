@@ -1,0 +1,29 @@
+An existential template retains its captured type arguments. Reapplying the
+same alias can narrow an ordinary field and must not erase a contradiction.
+Equal instances and valid wider predicates preserve the shared sealed value.
+
+-- in.cue --
+@test(validate, conflict, at="bad")
+@test(validate, concrete, at="same")
+@test(validate, concrete, at="wider")
+@test(json, [1, 1], at="out")
+@test(validate, conflict, at="optionalBad")
+@test(validate, conflict, at="patternBad")
+@test(validate, conflict, at="defaultBad")
+
+P(T) = exists A {value: A, tag: T}
+p: seal P(int) with (A = int) {value: 42, tag: 1}
+bad: p & P(string)
+same: p & P(int)
+wider: p & P(number)
+out: [
+    (open same as (A, P) {out: P.tag}).out,
+    (open wider as (A, P) {out: P.tag}).out,
+]
+
+optional: seal P({x?: int}) with (A = int) {value: 42, tag: {x: 1}}
+optionalBad: optional & P({x?: string})
+pattern: seal P({[string]: int}) with (A = int) {value: 42, tag: {x: 1}}
+patternBad: pattern & P({[string]: string})
+preferred: seal P(*1 | 2) with (A = int) {value: 42, tag: 2}
+defaultBad: preferred & P(*1 | 3)

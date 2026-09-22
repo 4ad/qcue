@@ -50,7 +50,18 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 	if v, ok := value.(*Vertex); ok {
 		v = v.DerefValue()
 		if p := v.sealed; p != nil && p.interfaceType.Template == e.Template {
-			return nil
+			if sameTypeEnvironment(c, p.interfaceType.Env, e.Env) {
+				return nil
+			}
+			// Reusing a template does not identify its captured predicates.
+			// Check this instance using the package's existing shared public
+			// witness, rather than forgetting the new environment or choosing
+			// an unrelated representation for each field.
+			args := make(map[*TypeParameter]Value, len(p.carriers))
+			for param, carrier := range p.carriers {
+				args[param] = &OpaqueType{carrier: carrier}
+			}
+			return e.validateWitness(c, quantifiedEnvironment(c, e, args), value)
 		}
 	}
 	if covariantData(e.Template.Body) {
@@ -81,26 +92,64 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 			}
 			env = instantiateEnvironment(env, map[*TypeParameter]Value{param: bound})
 		}
-		subject := value
-		if vertex, ok := value.(*Vertex); ok {
-			// Membership concerns the data witness, not another evaluation
-			// of this same existential validator. Other obligations remain
-			// on the original vertex and are validated independently.
-			subject = vertex.ToDataAll(c)
-		}
-		v := c.newInlineVertex(nil, nil, MakeRootConjunct(env, e.Template.Body), MakeRootConjunct(nil, subject))
-		v.Finalize(c)
-		if b := v.Bottom(); b != nil {
-			// The failing child belongs to this private membership check,
-			// not to the original value's graph. Report it at the validator
-			// boundary so recursive validation cannot skip the obligation.
-			copy := *b
-			copy.ChildError, copy.HasRecursive = false, false
-			return &copy
-		}
-		return Validate(c, v, &ValidateConfig{Concrete: true})
+		return e.validateWitness(c, env, value)
 	}
 	return e.unresolved(c)
+}
+
+// Type frames contain immutable predicate arguments and no runtime fields.
+// Outside them only shared value cells establish environment identity: equal
+// upper approximations of distinct witnesses are not equal assignments.
+func sameTypeEnvironment(c *OpContext, a, b *Environment) bool {
+	if a == b {
+		return true
+	}
+	if a == nil || b == nil || !sameTypeEnvironment(c, a.Up, b.Up) {
+		return false
+	}
+	if a.types == nil || b.types == nil {
+		return a.types == b.types && a.DerefVertex(c) == b.DerefVertex(c)
+	}
+	if a.types.quantifier != b.types.quantifier || len(a.types.arguments) != len(b.types.arguments) {
+		return false
+	}
+	for param, value := range a.types.arguments {
+		other, ok := b.types.arguments[param]
+		// Data equality omits patterns, optional fields and preferences.
+		// Only shared predicates or this exact scalar vocabulary justify
+		// the shortcut; structural arguments go through membership below.
+		if !ok || value != other && (!fixedCapabilityExpr(value) || !fixedCapabilityExpr(other) ||
+			!Equal(c, value, other, CheckStructural)) {
+			return false
+		}
+	}
+	return true
+}
+
+func (e *Existential) validateWitness(c *OpContext, env *Environment, value Value) *Bottom {
+	subject := value
+	if vertex, ok := value.(*Vertex); ok {
+		// Membership concerns the data witness, not another evaluation of
+		// this validator. Other obligations remain on the original vertex.
+		subject = vertex.ToDataAll(c)
+	}
+	v := c.newInlineVertex(nil, nil, MakeRootConjunct(env, e.Template.Body), MakeRootConjunct(nil, subject))
+	v.Finalize(c)
+	if b := v.Bottom(); b != nil {
+		// This child belongs to the private membership check. Report it at
+		// the validator boundary so recursive validation cannot skip it.
+		copy := *b
+		copy.ChildError, copy.HasRecursive = false, false
+		return &copy
+	}
+	cfg := &ValidateConfig{Concrete: true}
+	if !covariantData(e.Template.Body) {
+		// Conjoining an arrow is not evidence that the existing operation
+		// satisfies it. Keep the membership obligation pending until its
+		// conformance can be established independently.
+		cfg.CheckFunction = func(*OpContext, *FuncValue) *Bottom { return e.unresolved(c) }
+	}
+	return Validate(c, v, cfg)
 }
 
 func (e *Existential) unresolved(c *OpContext) *Bottom {
