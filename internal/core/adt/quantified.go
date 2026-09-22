@@ -484,21 +484,39 @@ func (f *FuncValue) inferInstance(c *OpContext, bindings []funcArg) (*FuncValue,
 			inferTypeArguments(c, f.Env, f.Fn.Params[i].Value, v, args)
 		}
 	}
-	for p, v := range args {
+	var unconstrained *TypeParameter
+	for _, p := range typeParameters(f.Env) {
+		v := args[p]
 		if v == nil {
-			if len(f.Fn.Params) == 0 && p.ValueRange == nil {
-				// A call without inputs admits every instance of its
-				// universal clause. The empty predicate is always an
-				// admissible subtype and gives the strongest covariant
-				// data result. It is a use-site type, not a program witness.
+			if p.ValueRange == nil {
+				// Empty containers and unused binders need not contribute
+				// an element witness. Try the empty predicate, then prove
+				// that this instance admits the supplied packet below.
+				// An unsupported inference shape must not turn this guess
+				// into a contradiction or discard a packet constraint.
 				args[p] = &Bottom{Code: EvalError, Err: c.Newf("empty type instance")}
+				unconstrained = p
 				continue
 			}
 			return nil, &Bottom{Src: p.Src, Code: IncompleteError,
 				Err: c.Newf("cannot infer type argument %s", p.Src.Name.Name)}
 		}
 	}
-	return f.instantiate(c, args)
+	inst, b := f.instantiate(c, args)
+	if b != nil || unconstrained == nil {
+		return inst, b
+	}
+	for i, binding := range bindings {
+		if binding.expr == nil {
+			continue
+		}
+		v, _ := c.Evaluate(binding.env, binding.expr)
+		if capabilityMember(c, inst.Env, inst.Fn.Params[i].Value, v) != proofEstablished {
+			return nil, &Bottom{Src: unconstrained.Src, Code: IncompleteError,
+				Err: c.Newf("cannot infer type argument %s", unconstrained.Src.Name.Name)}
+		}
+	}
+	return inst, nil
 }
 
 func inferTypeArguments(c *OpContext, env *Environment, pattern Expr, value Value, args map[*TypeParameter]Value) {

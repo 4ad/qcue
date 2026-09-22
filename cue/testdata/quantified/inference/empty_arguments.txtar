@@ -1,0 +1,18 @@
+Inference may select the empty predicate for an unconstrained type argument
+when that instance admits the supplied packet. Empty containers and unused
+binders do not require element witnesses. A failed speculative instance
+remains incomplete rather than refuting an unsupported inference shape.
+
+-- in.cue --
+@test(json, [[], 3, [], {items: []}, [1], "ordinary"], at="out")
+@test(validate, concrete, incomplete, at="unsupported")
+
+#id(A): func(xs: [...A]) -> [...A]: xs
+#unused(A): func(x: int) -> int: x
+#bounded(A: number): func(xs: [...A]) -> [...A]: xs
+#nested(A): func(x: {items: [...A]}) -> {items: [...A]}: x
+#pair(A): func(xs: [...A], y: A) -> [...A]: [y]
+#union(A): func(x: A | string) -> string: "ordinary"
+out: [#id([]), #unused(3), #bounded([]), #nested({items: []}),
+    #pair([], 1), #union("text")]
+unsupported: #union(1)
