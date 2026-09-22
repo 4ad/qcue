@@ -689,3 +689,175 @@ out: f(y)
 		}
 	}
 }
+
+func TestQuantifiedPartialCapabilities(t *testing.T) {
+	for _, tt := range []struct {
+		name, src, want string
+	}{
+		{"residual result", `
+add: func(x: int, y: int) -> int: x + y
+p: add(1, ...)
+p: func(int) -> 3
+out: p(2)`, `3`},
+		{"residual conflict", `
+add: func(x: int, y: int) -> int: x + y
+p: add(1, ...)
+p: func(int) -> 4
+out: p(2)`, ``},
+		{"guard skips bound prefix", `
+f: func(x: string, y: int) -> int: y
+p: f("prefix", ...)
+p: func(int) -> 3
+out: p(2)`, ``},
+		{"chained residual conflict", `
+f: func(x: string, y: int, z: int) -> int: y + z
+p: f("prefix", ...)
+p: func(int, int) -> 4
+q: p(1, ...)
+out: q(2)`, ``},
+		{"original contract retained", `
+f: func(x: int, y: int) -> int: x + y
+f: func(1, 2) -> 3
+p: f(1, ...)
+out: p(2)`, `3`},
+		{"residual generic clause", `
+f: func(x: string, y: int) -> int: y
+p: f("prefix", ...)
+p(A: int): func(A) -> A
+out: p(2)`, `2`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			out := v.LookupPath(cue.ParsePath("out"))
+			if tt.want == "" {
+				if err := out.Validate(); err == nil {
+					t.Fatal("missing residual contract conflict")
+				}
+				return
+			}
+			got, err := out.MarshalJSON()
+			if err != nil || string(got) != tt.want {
+				t.Fatalf("got %s, %v; want %s", got, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedCapabilitySubsumption(t *testing.T) {
+	for _, tt := range []struct {
+		a, b string
+		want bool
+	}{
+		{`func(int) -> number`, `func(number) -> int`, true},
+		{`func(number) -> int`, `func(int) -> number`, false},
+		{`func(int) -> number`, `func(int) -> string`, false},
+		{`func(x: int) -> number`, `func(y: number) -> int`, false},
+		{`func(x?: int) -> int`, `func(x!: number) -> int`, false},
+		{`func(x!: int) -> number`, `func(x?: number) -> int`, true},
+		{`func(x: int = 1) -> number`, `func(x: number) -> int`, false},
+		{`func(x: int) -> number`, `func(x: number = 0) -> int`, true},
+		{`func(int) -> number`, `func(number, y: int = 0) -> int`, true},
+		{`func(int) -> number`, `func(number, y: int) -> int`, false},
+		{`func(int) -> number`, `(func(string) -> bool) & (func(number) -> int)`, true},
+		{`(func(int) -> number) & (func(string) -> bool)`, `(func(number) -> int) & (func(string) -> bool)`, true},
+		{`(func(int) -> number) & (func(string) -> bool)`, `func(number) -> int`, false},
+	} {
+		t.Run(tt.a+" / "+tt.b, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\na: " + tt.a + "\nb: " + tt.b)
+			a, b := v.LookupPath(cue.ParsePath("a")), v.LookupPath(cue.ParsePath("b"))
+			if err := v.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if err := a.Subsume(b); (err == nil) != tt.want {
+				t.Fatalf("Subsume = %v; want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedOpaqueCallbacks(t *testing.T) {
+	v := cuecontext.New().CompileString(`
+@experiment(quantified)
+#I: exists A {
+    seed: A
+    read: func(A) -> int
+    apply: func(func(A) -> A, A) -> A
+    build: func(int) -> (func(A) -> A)
+}
+p: seal #I with (A = int) {
+    seed: 1
+    read: func(x: int) -> int: x
+    apply: func(f: func(int) -> int, x: int) -> int: f(x)
+    build: func(n: int) -> (func(int) -> int): func(x: int) -> int: x + n
+}
+out: (open p as (T, P) {
+    let identity = func(x: T) -> T: x
+    out: [P.read(P.apply(identity, P.seed)), P.read(P.build(3)(P.seed)), P.read(P.build(4)(P.seed))]
+}).out
+`)
+	got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON()
+	if err != nil || string(got) != `[1,4,5]` {
+		t.Fatalf("got %s, %v; want [1,4,5]", got, err)
+	}
+}
+
+func TestQuantifiedOpaqueClosureEscape(t *testing.T) {
+	for _, tt := range []struct{ body, call, want string }{
+		{`{f: func() -> _: C.zero}`, `f()`, ``},
+		{`{f: func() -> _: {value: C.zero}}`, `f()`, ``},
+		{`{f: func() -> _: func() -> _: C.zero}`, `f()()`, ``},
+		{`{f: [func() -> _: C.zero]}`, `f[0]()`, ``},
+		{`{f: func() -> int: C.read(C.next(C.zero))}`, `f()`, `1`},
+		{`{f: func() -> _: func() -> int: C.read(C.zero)}`, `f()()`, `0`},
+	} {
+		t.Run(tt.body, func(t *testing.T) {
+			v := cuecontext.New().CompileString(quantifiedCounters + "\nview: open counterV1 as (S, C) " + tt.body + "\nout: view." + tt.call)
+			out := v.LookupPath(cue.ParsePath("out"))
+			if tt.want == "" {
+				if err := out.Validate(); err == nil {
+					t.Fatal("abstract value escaped through a closure")
+				}
+			} else if got, err := out.MarshalJSON(); err != nil || string(got) != tt.want {
+				t.Fatalf("got %s, %v; want %s", got, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuantifiedPredicativeUniverses(t *testing.T) {
+	for _, tt := range []struct {
+		src string
+		bad bool
+	}{
+		{`f: forall (A in Type(0)) func(x: A) -> A: x
+out: f[int](3)`, false},
+		{`f: forall (A in Type(0)) func(x: A) -> A: x
+out: f[func(int) -> int]`, false},
+		{`f: forall (A in Type(0)) func(x: A) -> A: x
+out: f[forall B func(B) -> B]`, true},
+		{`f: forall (A in Type(1)) func(x: A) -> A: x
+out: f[forall (B in Type(0)) func(B) -> B]`, false},
+		{`f: forall (A in Type(1)) func(x: A) -> A: x
+out: f[forall (B in Type(1)) func(B) -> B]`, true},
+		{`f(A): func(x: A) -> A: x
+out: f[forall (B in Type(2)) func(B) -> B]`, false},
+		{`Box(A in Type(0)) = {value: A}
+out: Box(forall B func(B) -> B)`, true},
+		{`f: forall (A in Type(0)) func(x: A) -> A: x
+out: f[{call: forall B func(B) -> B}]`, true},
+		{`f: forall (A in Type(0)) func(x: A) -> A: x
+out: f[[...(forall B func(B) -> B)]]`, true},
+	} {
+		t.Run(tt.src, func(t *testing.T) {
+			v := cuecontext.New().CompileString("@experiment(quantified)\n" + tt.src)
+			out := v.LookupPath(cue.ParsePath("out"))
+			if !out.Exists() {
+				t.Fatalf("missing output: %v", v.Err())
+			}
+			err := out.Validate()
+			if (err != nil) != tt.bad {
+				t.Fatalf("validation = %v; want error %v", err, tt.bad)
+			}
+		})
+	}
+}

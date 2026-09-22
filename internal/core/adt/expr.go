@@ -1633,6 +1633,10 @@ type FuncValue struct {
 	// obligations constrain the same inhabitant; they are never additional
 	// implementations to execute and combine.
 	identities []*FuncValue
+
+	// scopes retain lexical non-escape obligations when a returned closure's
+	// result annotation is too weak to settle them at the opening boundary.
+	scopes []*sealedPackage
 }
 
 // A funcArg is an argument bound to a function parameter by a partial
@@ -2243,7 +2247,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	resultKey := funcCallResultKey{call: call, env: callEnv}
 	for i := range c.funcCallResults[resultKey] {
 		if r := &c.funcCallResults[resultKey][i]; r.matches(c, x) {
-			return r.result
+			return x.checkResultScopes(c, r.result)
 		}
 	}
 
@@ -2336,8 +2340,22 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		if reportUnusedArg() {
 			return nil
 		}
+		if x.Fn.Quantified {
+			for i, arg := range bindings {
+				if arg.expr == nil || x.Fn.Params[i].Value == nil {
+					continue
+				}
+				v := c.newInlineVertex(nil, nil,
+					MakeRootConjunct(arg.env, arg.expr),
+					MakeRootConjunct(x.Env, x.Fn.Params[i].Value))
+				v.Finalize(c)
+				if b := v.Bottom(); b != nil && !b.IsIncomplete() {
+					return b
+				}
+			}
+		}
 		return &FuncValue{Src: x.Src, Fn: x.Fn, Env: x.Env, Types: x.Types,
-			args: bindings, identities: x.identities}
+			args: bindings, identities: x.identities, scopes: x.scopes}
 	}
 	if len(typeParameters(x.Env)) != 0 {
 		inst, b := x.inferInstance(c, bindings)
@@ -2542,7 +2560,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 				identities: callee.identities, result: completed})
 	}
 
-	return completed
+	return x.checkResultScopes(c, completed)
 }
 
 // funcAnchor returns the stable anchor vertex for the given function literal

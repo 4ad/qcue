@@ -67,7 +67,7 @@ type sealedPackage struct {
 	privateEnv    *Environment
 	publicEnv     *Environment
 	carriers      map[*TypeParameter]*opaqueCarrier
-	operations    map[*Function]*FuncValue
+	operations    []opaqueAdapter
 }
 
 type opaqueCarrier struct {
@@ -140,8 +140,7 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 		return c.NewErrf("seal requires one witness for each representation type")
 	}
 	p := &sealedPackage{interfaceType: e,
-		carriers:   make(map[*TypeParameter]*opaqueCarrier),
-		operations: make(map[*Function]*FuncValue)}
+		carriers: make(map[*TypeParameter]*opaqueCarrier)}
 	private := make(map[*TypeParameter]Value)
 	public := make(map[*TypeParameter]Value)
 	for _, param := range q.Params {
@@ -266,18 +265,26 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 		if !ok {
 			return c.NewErrf("interface requires a function implementation")
 		}
-		if !outward {
-			return &Bottom{Code: IncompleteError, Err: c.Newf("callback transport remains unresolved")}
-		}
-		if public := p.operations[x]; public != nil {
-			return public
+		for _, a := range p.operations {
+			if a.schema == x && a.env == env && a.outward == outward &&
+				equalFuncTypes(a.target.Types, f.Types) && closureIdentity(c, a.target, f) == proofEstablished {
+				return a.value
+			}
 		}
 		fn := *x
 		fn.Captures = nil
-		fn.Body = &OpaqueCall{owner: p, private: f, signature: x, env: env}
-		public := &FuncValue{Src: x.Src, Fn: &fn, Env: env}
-		p.operations[x] = public
-		return public
+		fn.Body = &OpaqueCall{owner: p, private: f, signature: x, env: env, outward: outward}
+		fnEnv := env
+		if !outward {
+			args := make(map[*TypeParameter]Value, len(p.carriers))
+			for param, carrier := range p.carriers {
+				args[param] = carrier.representation
+			}
+			fnEnv = instantiateEnvironment(env, args)
+		}
+		adapter := &FuncValue{Src: x.Src, Fn: &fn, Env: fnEnv}
+		p.operations = append(p.operations, opaqueAdapter{x, env, f, outward, adapter})
+		return adapter
 	case *ListLit:
 		v, ok := value.(*Vertex)
 		if !ok || !v.IsList() {
@@ -385,11 +392,20 @@ func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, out
 
 // OpaqueCall is an authorized adapter. Traversals intentionally cannot visit
 // its private implementation or capture environment.
+type opaqueAdapter struct {
+	schema  *Function
+	env     *Environment
+	target  *FuncValue
+	outward bool
+	value   *FuncValue
+}
+
 type OpaqueCall struct {
 	owner     *sealedPackage
 	private   *FuncValue
 	signature *Function
 	env       *Environment
+	outward   bool
 }
 
 func (*OpaqueCall) Source() ast.Node { return nil }
@@ -416,7 +432,7 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 		if value == nil {
 			continue
 		}
-		v := s.owner.transport(c, s.env, p.Value, value, false)
+		v := s.owner.transport(c, s.env, p.Value, value, !s.outward)
 		if b, ok := v.(*Bottom); ok {
 			return b
 		}
@@ -431,7 +447,7 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 	if b, ok := Unwrap(v).(*Bottom); ok {
 		return b
 	}
-	return s.owner.transport(c, s.env, s.signature.Ret, v, true)
+	return s.owner.transport(c, s.env, s.signature.Ret, v, s.outward)
 }
 
 type PackageOpen struct {
@@ -481,7 +497,7 @@ func (o *PackageOpen) evaluate(c *OpContext, state Flags) Value {
 	if abstractEscapes(c, result, p, make(map[Value]bool)) {
 		return c.NewErrf("abstract type escapes its opening scope")
 	}
-	return result
+	return protectAbstractScope(c, result, p, make(map[Value]bool))
 }
 
 func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[Value]bool) bool {
@@ -503,7 +519,7 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 		}
 		v.Finalize(c)
 		for _, a := range v.Arcs {
-			if a.ArcType == ArcMember && abstractEscapes(c, a, owner, seen) {
+			if !a.Label.IsLet() && abstractEscapes(c, a, owner, seen) {
 				return true
 			}
 		}
@@ -537,4 +553,76 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 		}
 	}
 	return false
+}
+
+func (f *FuncValue) checkResultScopes(c *OpContext, value Value) Value {
+	for _, owner := range f.scopes {
+		if abstractEscapes(c, value, owner, make(map[Value]bool)) {
+			return c.NewErrf("abstract type escapes its opening scope through a returned function")
+		}
+		value = protectAbstractScope(c, value, owner, make(map[Value]bool))
+	}
+	return value
+}
+
+// Retain non-escape obligations on returned closures, including closures
+// nested in records and lists. The extra view is conjoined with the original
+// vertex, preserving its presence, pattern and validation constraints.
+// Neither the original value nor any shared closure is mutated.
+func protectAbstractScope(c *OpContext, value Value, owner *sealedPackage, seen map[Value]bool) Value {
+	if value == nil || seen[value] {
+		return value
+	}
+	seen[value] = true
+	defer delete(seen, value)
+	if f, ok := Unwrap(value).(*FuncValue); ok {
+		if slices.Contains(f.scopes, owner) {
+			return value
+		}
+		copy := *f
+		copy.scopes = append(slices.Clone(f.scopes), owner)
+		return &copy
+	}
+	v, ok := value.(*Vertex)
+	if !ok {
+		return value
+	}
+	v = v.DerefValue()
+	if v.sealed != nil || v.Kind()&(StructKind|ListKind) == 0 {
+		return value
+	}
+	var extra Expr
+	if v.IsList() {
+		list := &ListLit{}
+		changed := false
+		for a := range v.Elems() {
+			x := protectAbstractScope(c, a, owner, seen)
+			changed = changed || x != a
+			list.Elems = append(list.Elems, x)
+		}
+		if !changed {
+			return value
+		}
+		if !v.IsClosedList() {
+			list.Elems = append(list.Elems, &Ellipsis{Value: &Top{}})
+		}
+		extra = list
+	} else {
+		record := &StructLit{}
+		for _, a := range v.Arcs {
+			if a.ArcType != ArcMember || a.Label.IsLet() {
+				continue
+			}
+			if x := protectAbstractScope(c, a, owner, seen); x != a {
+				record.Decls = append(record.Decls, &Field{Label: a.Label, Value: x})
+			}
+		}
+		if len(record.Decls) == 0 {
+			return value
+		}
+		extra = record
+	}
+	result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, value), MakeRootConjunct(nil, extra))
+	result.Finalize(c)
+	return result
 }

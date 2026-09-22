@@ -86,6 +86,11 @@ import (
 type FuncType struct {
 	Fn  *Function
 	Env *Environment
+
+	// partial records the binding mask at the time a capability was
+	// attached. Its packet addresses the then-remaining parameters;
+	// capabilities attached before partial application keep the full packet.
+	partial *FuncValue
 }
 
 // IsFuncType reports whether v is a bodyless function literal, i.e. a

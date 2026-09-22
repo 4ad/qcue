@@ -25,9 +25,10 @@ import (
 // Bounds remain expressions in their telescope scope until an instance is
 // selected. Level is the predicative universe of admissible arguments.
 type TypeParameter struct {
-	Src   *ast.TypeParam
-	Bound Expr
-	Level int
+	Src           *ast.TypeParam
+	Bound         Expr
+	Level         int
+	ExplicitLevel bool
 	// ValueRange is non-nil for the finite value-binder fragment. General
 	// dependent ranges and signatures remain outside this profile.
 	ValueRange Expr
@@ -334,7 +335,20 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 		}
 		for _, p := range e.types.quantifier.Params {
 			v := args[p]
-			if v == nil || p.Bound == nil {
+			if v == nil {
+				continue
+			}
+			if p.ExplicitLevel {
+				level, known := universeOf(c, v, make(map[Expr]bool))
+				if !known {
+					return nil, &Bottom{Src: p.Src, Code: IncompleteError,
+						Err: c.Newf("unresolved universe level for %s", p.Src.Name.Name)}
+				}
+				if level > p.Level {
+					return nil, c.NewErrf("type argument for %s has universe level %d, exceeding Type(%d)", p.Src.Name.Name, level, p.Level)
+				}
+			}
+			if p.Bound == nil {
 				continue
 			}
 			bound, _ := c.Evaluate(e, p.Bound)

@@ -38,7 +38,13 @@ func mergeCapabilities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
 		a, b = b, a
 	}
 	m := *a
-	m.Types = mergeFuncTypes(a.Types, append([]FuncType{{Fn: b.Fn, Env: b.Env}}, b.Types...))
+	incoming := append([]FuncType{{Fn: b.Fn, Env: b.Env}}, b.Types...)
+	if a.IsPartial() {
+		for i := range incoming {
+			incoming[i].partial = a
+		}
+	}
+	m.Types = mergeFuncTypes(a.Types, incoming)
 	clauses := append([]FuncType{{Fn: m.Fn, Env: m.Env}}, m.Types...)
 	for i, t := range clauses {
 		if t.Fn.Body != nil {
@@ -301,7 +307,7 @@ func (n *nodeContext) scheduleCapabilityResults(ref *FuncCallRef, env *Environme
 		}
 		if len(typeParameters(t.Env)) != 0 {
 			bindings := make([]funcArg, len(t.Fn.Params))
-			matches := matchFuncParams(t.Fn, ref.fn, false)
+			matches := capabilityMatches(t, ref.fn)
 			for i, j := range matches {
 				if j < 0 {
 					continue
@@ -351,7 +357,7 @@ func capabilityApplies(c *OpContext, t FuncType, fn *Function, types []FuncType,
 	for _, a := range act.Arcs {
 		arcs[a.Label] = a
 	}
-	matches := matchFuncParams(t.Fn, fn, false)
+	matches := capabilityMatches(t, fn)
 	result := proofEstablished
 	for i, p := range t.Fn.Params {
 		j := matches[i]
@@ -382,6 +388,9 @@ func capabilityApplies(c *OpContext, t FuncType, fn *Function, types []FuncType,
 	}
 	if !t.Fn.Open {
 		for j, p := range fn.Params {
+			if t.partial != nil && j < len(t.partial.args) && t.partial.args[j].expr != nil {
+				continue
+			}
 			if slices.Contains(matches, j) {
 				continue
 			}
@@ -395,6 +404,44 @@ func capabilityApplies(c *OpContext, t FuncType, fn *Function, types []FuncType,
 		}
 	}
 	return result
+}
+
+// capabilityMatches translates a residual packet back to the implementation
+// activation. The mask is fixed when the clause is attached, so later partial
+// applications preserve obligations over arguments they have since bound.
+func capabilityMatches(t FuncType, fn *Function) []int {
+	if t.partial == nil {
+		return matchFuncParams(t.Fn, fn, false)
+	}
+	residual, slots := t.partial.residualSignature()
+	matches := matchFuncParams(t.Fn, residual, false)
+	for i, j := range matches {
+		if j >= 0 {
+			matches[i] = slots[j]
+		}
+	}
+	return matches
+}
+
+func (f *FuncValue) residualSignature() (*Function, []int) {
+	fn := *f.Fn
+	fn.Params = nil
+	var slots []int
+	for i, p := range f.Fn.Params {
+		if i < len(f.args) && f.args[i].expr != nil {
+			continue
+		}
+		fn.Params = append(fn.Params, p)
+		slots = append(slots, i)
+	}
+	return &fn, slots
+}
+
+// ResidualSignature returns the implementation's remaining call protocol.
+// It does not alter the origin, captures, or attached capability clauses.
+func (f *FuncValue) ResidualSignature() *Function {
+	fn, _ := f.residualSignature()
+	return fn
 }
 
 func capabilityPacket(c *OpContext, packet *CallExpr) string {

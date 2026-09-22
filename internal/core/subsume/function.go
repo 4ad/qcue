@@ -53,6 +53,9 @@ import (
 // funcValues reports whether the function value or type a subsumes the
 // function value or type b.
 func (s *subsumer) funcValues(a, b *adt.FuncValue) bool {
+	if a.Fn.Quantified || b.Fn.Quantified {
+		return s.capabilityValues(a, b)
+	}
 	if adt.IsFuncType(a) {
 		// Partial application removes already bound parameters from the
 		// callable surface. Until partial values expose a specialized

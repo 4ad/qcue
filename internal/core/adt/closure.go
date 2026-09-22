@@ -128,6 +128,12 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 	}
 	m := *a
 	m.Types = mergeFuncTypes(a.Types, b.Types)
+	m.scopes = slices.Clone(a.scopes)
+	for _, p := range b.scopes {
+		if !slices.Contains(m.scopes, p) {
+			m.scopes = append(m.scopes, p)
+		}
+	}
 	m.identities = slices.Clone(a.identities)
 	if result == proofUnknown && !slices.Contains(m.identities, b) {
 		m.identities = append(m.identities, b)

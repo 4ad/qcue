@@ -115,6 +115,7 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 				return c.errf(p, "invalid universe level")
 			}
 			param.Level = n
+			param.ExplicitLevel = true
 		}
 		param.Bound = c.expr(p.Bound)
 		c.typeParameters[p] = param
