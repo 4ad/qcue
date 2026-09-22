@@ -179,6 +179,14 @@ func (v *validator) validate(x *Vertex) {
 		}
 	}
 
+	if f, ok := x.BaseValue.(*FuncValue); ok && len(f.identities) > 0 {
+		if b := f.checkIdentities(v.ctx); b != nil {
+			if !b.IsIncomplete() || v.ReportIncomplete || v.checkConcrete() {
+				v.add(b)
+			}
+		}
+	}
+
 	for _, a := range x.Arcs {
 		if a.ArcType == ArcRequired && v.Final && v.inDefinition == 0 {
 			v.ctx.PushArcAndLabel(a)

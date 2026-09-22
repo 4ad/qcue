@@ -1015,6 +1015,9 @@ func BuiltinSubsumes(a, b *Builtin) bool {
 // conflicting scalars.
 func mergeFuncValues(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
 	composing := !IsFuncType(a) && !IsFuncType(b)
+	if composing && (a.Fn.Quantified || b.Fn.Quantified) {
+		return mergeClosureIdentities(c, a, b)
+	}
 	if composing && a.Fn == b.Fn && a.Env.Equal(c, b.Env) && equalFuncArgs(a.args, b.args) {
 		// VALUE & VALUE of the same function: only the recorded types need
 		// to be combined. Two partial applications are the same only when
@@ -1263,6 +1266,11 @@ func equalFuncTypes(a, b []FuncType) bool {
 // bound the same arguments and consist of the same functions and types,
 // regardless of the order in which these were unified.
 func equalFuncValues(c *OpContext, x, y *FuncValue) bool {
+	if x.Fn != nil && y.Fn != nil && (x.Fn.Quantified || y.Fn.Quantified) &&
+		!IsFuncType(x) && !IsFuncType(y) {
+		return closureIdentity(c, x, y) == identityEqual &&
+			slices.Equal(x.identities, y.identities) && equalFuncTypes(x.Types, y.Types)
+	}
 	if x.Fn == y.Fn && x.Env.Equal(c, y.Env) {
 		return equalFuncTypes(x.Types, y.Types) && equalFuncArgs(x.args, y.args)
 	}

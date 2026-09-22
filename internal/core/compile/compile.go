@@ -1271,13 +1271,16 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		return c.resolve(n)
 
 	case *ast.Func:
-		if !c.experiments.Functions {
+		if !c.experiments.Functions && !c.experiments.Quantified {
 			return c.errf(n, "function syntax requires @experiment(functions)")
 		}
 		if n.Ellipsis != token.NoPos && n.Body != nil {
 			return c.errf(n, "open function signature cannot have a body")
 		}
-		fn := &adt.Function{Src: n, Open: n.Ellipsis != token.NoPos}
+		fn := &adt.Function{
+			Src: n, Open: n.Ellipsis != token.NoPos,
+			Quantified: c.experiments.Quantified,
+		}
 		seenCallableName := false
 		params := n.Parameters()
 		seenParamName := map[adt.Feature]ast.Node{}
@@ -1316,6 +1319,9 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		c.pushScope(nil, 1, n)
 		fn.Body = c.expr(n.Body)
 		c.popScope()
+		if fn.Quantified && fn.Body != nil {
+			fn.Captures = c.functionCaptures(n, fn)
+		}
 		return fn
 
 	case *ast.StructLit:

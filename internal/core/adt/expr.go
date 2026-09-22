@@ -1550,6 +1550,13 @@ type Function struct {
 	// "..." and may be extended by unification with other signatures. A
 	// function with an implementation body is always closed.
 	Open bool
+
+	// Quantified selects the capability and intensional closure semantics
+	// of the quantified experiment. Captures contains only free runtime
+	// references, compiled relative to the closure's environment. Ambient
+	// fields that the function never uses do not contribute to its identity.
+	Quantified bool
+	Captures   []Expr
 }
 
 // FuncParam represents a compiled function parameter.
@@ -1594,6 +1601,12 @@ type FuncValue struct {
 	// the environment it was bound in, which may differ from the environment
 	// of a later completing call.
 	args []funcArg
+
+	// identities retains equality obligations between copies of one closure
+	// origin whose captures or partial bindings are not yet concrete. These
+	// obligations constrain the same inhabitant; they are never additional
+	// implementations to execute and combine.
+	identities []*FuncValue
 }
 
 // A funcArg is an argument bound to a function parameter by a partial
@@ -2095,11 +2108,12 @@ type funcCallResultKey struct {
 // literal, its closure environment, its recorded type constraints, and the
 // arguments bound by partial application.
 type funcCallResult struct {
-	fn     *Function
-	env    *Environment
-	types  []FuncType
-	args   []funcArg
-	result *Vertex
+	fn         *Function
+	env        *Environment
+	types      []FuncType
+	args       []funcArg
+	identities []*FuncValue
+	result     *Vertex
 }
 
 // matches reports whether a memoized result was produced by the given
@@ -2108,7 +2122,8 @@ func (r *funcCallResult) matches(c *OpContext, x *FuncValue) bool {
 	return r.fn == x.Fn &&
 		(r.env == x.Env || r.env.Equal(c, x.Env)) &&
 		equalFuncTypes(r.types, x.Types) &&
-		equalFuncArgs(r.args, x.args)
+		equalFuncArgs(r.args, x.args) &&
+		slices.Equal(r.identities, x.identities)
 }
 
 // A FuncCallRef is a stable reference to a function's anchor vertex, carrying
@@ -2154,6 +2169,9 @@ func unresolvedDisjunction(v Value) *Disjunction {
 }
 
 func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
+	if b := x.checkIdentities(c); b != nil {
+		return b
+	}
 	if x.Fn == nil || x.Fn.Body == nil {
 		c.AddErrf("cannot call function without implementation")
 		return nil
@@ -2268,7 +2286,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		if reportUnusedArg() {
 			return nil
 		}
-		return &FuncValue{Src: x.Src, Fn: x.Fn, Env: x.Env, Types: x.Types, args: bindings}
+		return &FuncValue{Src: x.Src, Fn: x.Fn, Env: x.Env, Types: x.Types,
+			args: bindings, identities: x.identities}
 	}
 
 	// Phase 2: complete the call.
@@ -2416,7 +2435,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			c.funcCallResults = map[funcCallResultKey][]funcCallResult{}
 		}
 		c.funcCallResults[resultKey] = append(c.funcCallResults[resultKey],
-			funcCallResult{fn: x.Fn, env: x.Env, types: x.Types, args: x.args, result: result})
+			funcCallResult{fn: x.Fn, env: x.Env, types: x.Types, args: x.args,
+				identities: x.identities, result: result})
 	}
 
 	return result
