@@ -82,6 +82,10 @@ type parser struct {
 	// nestLevel tracks and limits the expression nesting depth during
 	// parsing. See [maxNestLevel].
 	nestLevel int
+
+	// angleParamLevel marks the expression level where > closes a
+	// function-local generic parameter list, rather than a comparison.
+	angleParamLevel int
 }
 
 func (p *parser) init(filename string, src []byte, opts []Option) {
@@ -656,6 +660,42 @@ func (p *parser) parseOperand() (expr ast.Expr) {
 		if p.quantifierAhead() {
 			return p.parseQuantifier()
 		}
+		if p.quantifiedEnabled() && p.lit == "extern" {
+			s := p.scanner
+			_, next, _ := s.Scan()
+			if p.peekToken.scanned {
+				next = p.peekToken.tok
+			}
+			if next == token.FUNC {
+				extern := p.pos
+				p.next()
+				x := p.parseFunc()
+				fn := x
+				if q, ok := x.(*ast.Quantifier); ok {
+					fn = q.Body
+				}
+				if f, ok := fn.(*ast.Func); ok {
+					f.Extern = extern
+					if f.Body != nil {
+						p.errf(f.Body.Pos(), "extern function cannot have a body")
+					}
+				}
+				return x
+			}
+		}
+		if p.quantifiedEnabled() && (p.lit == "seal" || p.lit == "open") {
+			s := p.scanner
+			_, next, _ := s.Scan()
+			if p.peekToken.scanned {
+				next = p.peekToken.tok
+			}
+			if next == token.IDENT || next == token.LPAREN {
+				if p.lit == "seal" {
+					return p.parseSeal()
+				}
+				return p.parseOpen()
+			}
+		}
 		ident := p.parseIdent()
 		// Check for optional reference marker (?)
 		// Don't consume ? if it's followed by : (that's a field constraint, not optional reference)
@@ -762,8 +802,16 @@ func (p *parser) parseIndexOrSlice(x ast.Expr) (expr ast.Expr) {
 			index[nColons] = p.parseRHS()
 		}
 	}
+	var instances []ast.Expr
 	if nColons == 0 && p.tok == token.COMMA {
 		p.next()
+		for p.quantifiedEnabled() && p.tok != token.RBRACK && p.tok != token.EOF {
+			instances = append(instances, p.parseRHS())
+			if p.tok != token.COMMA {
+				break
+			}
+			p.next()
+		}
 	}
 	p.exprLev--
 	rbrack := p.expect(token.RBRACK)
@@ -783,6 +831,11 @@ func (p *parser) parseIndexOrSlice(x ast.Expr) (expr ast.Expr) {
 		Lbrack: lbrack,
 		Index:  index[0],
 		Rbrack: rbrack,
+	}
+	// Type instantiation is ordered substitution. Several supplied types
+	// select successive binders, so f[A, B] and f[A][B] share an AST.
+	for _, instance := range instances {
+		result = &ast.IndexExpr{X: result, Lbrack: lbrack, Index: instance, Rbrack: rbrack}
 	}
 	return p.wrapOptional(result, p.tok)
 }
@@ -1232,13 +1285,22 @@ func (p *parser) parseStruct() (expr ast.Expr) {
 		defer un(trace(p, "StructLit"))
 	}
 
+	prefix, first := p.parseBlockPrefix()
 	elts := p.parseStructBody()
+	if first != nil {
+		elts = append([]ast.Decl{first}, elts...)
+	}
 	rbrace := p.expectClosing(token.RBRACE, "struct literal")
-	return &ast.StructLit{
+	expr = &ast.StructLit{
 		Lbrace: lbrace,
 		Elts:   elts,
 		Rbrace: rbrace,
 	}
+	for i := len(prefix) - 1; i >= 0; i-- {
+		prefix[i].Body = expr
+		expr = prefix[i]
+	}
+	return expr
 }
 
 func (p *parser) parseStructBody() []ast.Decl {
@@ -1548,18 +1610,33 @@ func (p *parser) parseFunc() (expr ast.Expr) {
 		}
 	}
 
+	var generic *ast.Quantifier
+	if p.quantifiedEnabled() && p.tok == token.LSS {
+		generic = &ast.Quantifier{Quantifier: fun}
+		generic.Lparen = p.expect(token.LSS)
+		saved := p.angleParamLevel
+		p.angleParamLevel = p.exprLev + 1
+		generic.Params = p.parseTypeParams(token.GTR)
+		p.angleParamLevel = saved
+		generic.Rparen = p.expectClosing(token.GTR, "function type parameters")
+	}
 	lparen := p.expect(token.LPAREN)
 	params, ellipsis := p.parseFuncParams()
 	rparen := p.expectClosing(token.RPAREN, "function parameter list")
 
 	var arrow token.Pos
 	var ret ast.Expr
+	var effect *ast.Ident
 	var colon token.Pos
 	var body ast.Expr
 	if p.tok == token.RARROW {
 		arrow = p.pos
 		p.next()
 		ret = p.parseExpr()
+		if p.quantifiedEnabled() && p.tok == token.NOT {
+			p.next()
+			effect = p.parseIdent()
+		}
 		if p.tok == token.COLON {
 			colon = p.pos
 			p.next()
@@ -1579,7 +1656,7 @@ func (p *parser) parseFunc() (expr ast.Expr) {
 		p.errf(ellipsis, "open function signature cannot have a body")
 	}
 
-	return &ast.Func{
+	f := &ast.Func{
 		Func:     fun,
 		Lparen:   lparen,
 		Params:   params,
@@ -1587,10 +1664,16 @@ func (p *parser) parseFunc() (expr ast.Expr) {
 		Rparen:   rparen,
 		Arrow:    arrow,
 		Ret:      ret,
+		Effect:   effect,
 		Colon:    colon,
 		Body:     body,
 		Args:     funcParamArgs(params),
 	}
+	if generic != nil {
+		generic.Body = f
+		return generic
+	}
+	return f
 }
 
 func funcParamArgs(params []*ast.FuncParam) []ast.Expr {
@@ -2073,6 +2156,8 @@ func (p *parser) checkExpr(x ast.Expr) ast.Expr {
 	case *ast.Interpolation:
 	case *ast.Func:
 	case *ast.Quantifier:
+	case *ast.SealExpr:
+	case *ast.OpenExpr:
 	case *ast.StructLit:
 	case *ast.ListLit:
 	case *ast.ParenExpr:
@@ -2242,6 +2327,9 @@ func (p *parser) parseBinaryExpr(prec1 int) ast.Expr {
 
 func (p *parser) parseBinaryExprTail(prec1 int, x ast.Expr) ast.Expr {
 	for {
+		if p.angleParamLevel == p.exprLev+1 && p.tok == token.GTR {
+			return x
+		}
 		op, prec := p.tok, p.tok.Precedence()
 		if prec < prec1 {
 			return x

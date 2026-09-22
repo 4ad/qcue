@@ -552,6 +552,14 @@ func (f *formatter) decl(decl ast.Decl) {
 		}
 		f.print(newsection, nooverride)
 
+	case *ast.ParametricAlias:
+		f.expr(n.Name)
+		f.print(token.LPAREN)
+		f.typeParams(n.Params, 1)
+		f.print(token.RPAREN, blank, token.BIND, blank)
+		f.expr(n.Body)
+		f.print(declcomma)
+
 	case *ast.LetClause:
 		if !decl.Pos().HasRelPos() || decl.Pos().RelPos() >= token.Newline {
 			f.print(formfeed)
@@ -807,6 +815,31 @@ func (f *formatter) exprRaw(expr ast.Expr, prec1, depth int) {
 		}
 		f.after(nil)
 
+	case *ast.SealExpr:
+		f.print("seal", blank)
+		f.expr0(x.Interface, depth)
+		f.print(blank, "with", blank, token.LPAREN)
+		for i, w := range x.Witnesses {
+			if i > 0 {
+				f.print(token.COMMA, blank)
+			}
+			f.expr0(w.Ident, depth)
+			f.print(blank, token.BIND, blank)
+			f.expr0(w.Expr, depth)
+		}
+		f.print(token.RPAREN, blank)
+		f.expr0(x.Body, depth)
+
+	case *ast.OpenExpr:
+		f.print("open", blank)
+		f.expr0(x.Value, depth)
+		f.print(blank, "as", blank, token.LPAREN)
+		f.expr0(x.Type, depth)
+		f.print(token.COMMA, blank)
+		f.expr0(x.View, depth)
+		f.print(token.RPAREN, blank)
+		f.expr0(x.Body, depth)
+
 	case *ast.Quantifier:
 		parens := prec1 > token.LowestPrec
 		if parens {
@@ -817,22 +850,7 @@ func (f *formatter) exprRaw(expr ast.Expr, prec1, depth int) {
 			word = "exists"
 		}
 		f.print(word, blank, token.LPAREN)
-		for i, p := range x.Params {
-			if i > 0 {
-				f.print(token.COMMA, blank)
-			}
-			f.before(p)
-			f.expr0(p.Name, depth)
-			if p.Sort != nil {
-				f.print(blank, token.IN, blank)
-				f.expr0(p.Sort, depth)
-			}
-			if p.Bound != nil {
-				f.print(token.COLON, blank)
-				f.expr0(p.Bound, depth)
-			}
-			f.after(p)
-		}
+		f.typeParams(x.Params, depth)
 		f.print(token.RPAREN, blank)
 		f.expr0(x.Body, depth)
 		if parens {
@@ -848,6 +866,9 @@ func (f *formatter) exprRaw(expr ast.Expr, prec1, depth int) {
 		parens := prec1 > token.LowestPrec && (x.Ret != nil || x.Body != nil)
 		if parens {
 			f.print(token.LPAREN, nooverride)
+		}
+		if x.Extern.IsValid() {
+			f.print(x.Extern, "extern", blank)
 		}
 		f.print(x.Func, token.FUNC)
 		f.print(x.Lparen, token.LPAREN)
@@ -910,6 +931,10 @@ func (f *formatter) exprRaw(expr ast.Expr, prec1, depth int) {
 		if x.Ret != nil {
 			f.print(blank, x.Arrow, token.RARROW, blank)
 			f.expr(x.Ret)
+		}
+		if x.Effect != nil {
+			f.print(blank, token.NOT)
+			f.expr(x.Effect)
 		}
 		if x.Body != nil {
 			f.print(x.Colon, token.COLON, blank)
@@ -1345,4 +1370,23 @@ func (f *formatter) selectorExpr(x *ast.SelectorExpr, depth int) bool {
 func isTop(e ast.Expr) bool {
 	ident, ok := e.(*ast.Ident)
 	return ok && ident.Name == "_"
+}
+
+func (f *formatter) typeParams(params []*ast.TypeParam, depth int) {
+	for i, p := range params {
+		if i > 0 {
+			f.print(token.COMMA, blank)
+		}
+		f.before(p)
+		f.expr0(p.Name, depth)
+		if p.Sort != nil {
+			f.print(blank, token.IN, blank)
+			f.expr0(p.Sort, depth)
+		}
+		if p.Bound != nil {
+			f.print(token.COLON, blank)
+			f.expr0(p.Bound, depth)
+		}
+		f.after(p)
+	}
 }

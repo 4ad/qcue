@@ -594,6 +594,20 @@ func DebugStr(x interface{}) (out string) {
 		out += DebugStr(v.Path)
 		return out
 
+	case *ast.ParametricAlias:
+		q := DebugStr(&ast.Quantifier{Params: v.Params, Body: ast.NewIdent("")})
+		return v.Name.Name + strings.TrimPrefix(q, "forall ") + "= " + DebugStr(v.Body)
+
+	case *ast.SealExpr:
+		var ws []string
+		for _, w := range v.Witnesses {
+			ws = append(ws, DebugStr(w))
+		}
+		return "seal " + DebugStr(v.Interface) + " with (" + strings.Join(ws, ", ") + ") " + DebugStr(v.Body)
+
+	case *ast.OpenExpr:
+		return "open " + DebugStr(v.Value) + " as (" + v.Type.Name + ", " + v.View.Name + ") " + DebugStr(v.Body)
+
 	case *ast.Quantifier:
 		word := "forall"
 		if v.Exists {
@@ -621,8 +635,14 @@ func DebugStr(x interface{}) (out string) {
 			params += "..."
 		}
 		out := fmt.Sprintf("func(%v)", params)
+		if v.Extern.IsValid() {
+			out = "extern " + out
+		}
 		if v.Ret != nil {
 			out += fmt.Sprintf(" -> %v", DebugStr(v.Ret))
+		}
+		if v.Effect != nil {
+			out += " !" + v.Effect.Name
 		}
 		if v.Body != nil {
 			out += fmt.Sprintf(": %v", DebugStr(v.Body))

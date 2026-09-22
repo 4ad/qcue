@@ -212,6 +212,8 @@ func newScope(f *ast.File, outer *scope, node ast.Node, decls []ast.Decl) *scope
 				}
 				s.insert(name, v, x, nil)
 			}
+		case *ast.ParametricAlias:
+			s.insert(x.Name.Name, x, x, nil)
 		case *ast.LetClause:
 			name, isIdent, _ := ast.LabelName(x.Ident)
 			if isIdent {
@@ -270,6 +272,30 @@ func newFuncScope(f *ast.File, outer *scope, fn *ast.Func) *scope {
 	return s
 }
 
+func (s *scope) resolveTypeParams(params []*ast.TypeParam) {
+	for _, p := range params {
+		if p.Sort != nil {
+			ast.Walk(p.Sort, s.Before, nil)
+		}
+		if p.Bound != nil {
+			ast.Walk(p.Bound, s.Before, nil)
+		}
+		if p.Name.Name == "_" {
+			s.errFn(p.Pos(), "quantifier parameter must have a name")
+		} else if s.index[p.Name.Name].node != nil {
+			s.errFn(p.Pos(), "quantifier parameter %q redeclared", p.Name.Name)
+		} else {
+			// A lexical binder may shadow either a field or an alias.
+			// The field/alias redeclaration rule applies within record
+			// scopes, not across this newly introduced binder scope.
+			if s.nameFn != nil {
+				s.nameFn(p.Name.Name)
+			}
+			s.index[p.Name.Name] = entry{node: p, link: p}
+		}
+	}
+}
+
 func (s *scope) isLet(n, link ast.Node) bool {
 	if _, ok := s.node.(*ast.Field); ok {
 		return true
@@ -278,7 +304,7 @@ func (s *scope) isLet(n, link ast.Node) bool {
 		return true
 	}
 	switch n.(type) {
-	case *ast.LetClause, *ast.TryClause, *ast.Alias, *ast.Field:
+	case *ast.LetClause, *ast.ParametricAlias, *ast.TryClause, *ast.Alias, *ast.Field:
 		return true
 	}
 	return false
@@ -294,7 +320,7 @@ func (s *scope) mustBeUnique(n, link ast.Node) bool {
 	switch n.(type) {
 	// TODO: add *ast.ImportSpec when some implementations are moved over to
 	// Sanitize.
-	case *ast.ImportSpec, *ast.LetClause, *ast.TryClause, *ast.Alias, *ast.Field:
+	case *ast.ImportSpec, *ast.LetClause, *ast.ParametricAlias, *ast.TryClause, *ast.Alias, *ast.Field:
 		return true
 	}
 	return false
@@ -424,30 +450,42 @@ func (s *scope) Before(n ast.Node) bool {
 		}
 		return false
 
+	case *ast.ParametricAlias:
+		s = newScope(s.file, s, x, nil)
+		defer s.freeScope()
+		s.resolveTypeParams(x.Params)
+		ast.Walk(x.Body, s.Before, nil)
+		return false
+
+	case *ast.SealExpr:
+		ast.Walk(x.Interface, s.Before, nil)
+		for _, w := range x.Witnesses {
+			ast.Walk(w.Expr, s.Before, nil)
+		}
+		ast.Walk(x.Body, s.Before, nil)
+		return false
+
+	case *ast.OpenExpr:
+		ast.Walk(x.Value, s.Before, nil)
+		s = newScope(s.file, s, x, nil)
+		defer s.freeScope()
+		for _, id := range []*ast.Ident{x.Type, x.View} {
+			if id.Name == "_" || s.index[id.Name].node != nil {
+				s.errFn(id.Pos(), "opening requires distinct type and view names")
+				continue
+			}
+			if s.nameFn != nil {
+				s.nameFn(id.Name)
+			}
+			s.index[id.Name] = entry{node: id, link: id}
+		}
+		ast.Walk(x.Body, s.Before, nil)
+		return false
+
 	case *ast.Quantifier:
 		s = newScope(s.file, s, x, nil)
 		defer s.freeScope()
-		for _, p := range x.Params {
-			if p.Sort != nil {
-				ast.Walk(p.Sort, s.Before, nil)
-			}
-			if p.Bound != nil {
-				ast.Walk(p.Bound, s.Before, nil)
-			}
-			if p.Name.Name == "_" {
-				s.errFn(p.Pos(), "quantifier parameter must have a name")
-			} else if s.index[p.Name.Name].node != nil {
-				s.errFn(p.Pos(), "quantifier parameter %q redeclared", p.Name.Name)
-			} else {
-				// A lexical binder may shadow either a field or an alias.
-				// The field/alias redeclaration rule applies within record
-				// scopes, not across this newly introduced binder scope.
-				if s.nameFn != nil {
-					s.nameFn(p.Name.Name)
-				}
-				s.index[p.Name.Name] = entry{node: p, link: p}
-			}
-		}
+		s.resolveTypeParams(x.Params)
 		ast.Walk(x.Body, s.Before, nil)
 		return false
 

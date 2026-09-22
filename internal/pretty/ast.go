@@ -1073,21 +1073,21 @@ func (c *converter) exprCore(x ast.Expr) doc {
 		if x.Exists {
 			word = "exists"
 		}
-		parts := []doc{stringLit(word + " (")}
-		for i, p := range x.Params {
+		return cats(stringLit(word+" "), c.typeParams(x.Params), spaceLit, c.expr(x.Body))
+
+	case *ast.SealExpr:
+		parts := []doc{stringLit("seal "), c.expr(x.Interface), stringLit(" with (")}
+		for i, w := range x.Witnesses {
 			if i > 0 {
 				parts = append(parts, stringLit(", "))
 			}
-			parts = append(parts, c.expr(p.Name))
-			if p.Sort != nil {
-				parts = append(parts, stringLit(" in "), c.expr(p.Sort))
-			}
-			if p.Bound != nil {
-				parts = append(parts, stringLit(": "), c.expr(p.Bound))
-			}
+			parts = append(parts, c.expr(w.Ident), equalsSpaceLit, c.expr(w.Expr))
 		}
-		parts = append(parts, stringLit(") "), c.expr(x.Body))
-		return cats(parts...)
+		return cats(append(parts, stringLit(") "), c.expr(x.Body))...)
+
+	case *ast.OpenExpr:
+		return cats(stringLit("open "), c.expr(x.Value), stringLit(" as ("),
+			c.expr(x.Type), stringLit(", "), c.expr(x.View), stringLit(") "), c.expr(x.Body))
 
 	case *ast.Alias:
 		// In expression position (including inside pattern labels
@@ -2986,8 +2986,14 @@ func (c *converter) funcExpr(x *ast.Func) doc {
 }
 
 func (c *converter) funcResult(d doc, x *ast.Func) doc {
+	if x.Extern.IsValid() {
+		d = cats(stringLit("extern "), d)
+	}
 	if x.Ret != nil {
 		d = cats(d, stringLit(" -> "), c.expr(x.Ret))
+	}
+	if x.Effect != nil {
+		d = cats(d, stringLit(" !"), c.expr(x.Effect))
 	}
 	if x.Body != nil {
 		d = cats(d, colonLit, spaceLit, c.expr(x.Body))
@@ -3264,6 +3270,9 @@ func (c *converter) decl(d ast.Decl) doc {
 	switch x := d.(type) {
 	case *ast.Field:
 		return c.field(x)
+
+	case *ast.ParametricAlias:
+		return cats(c.expr(x.Name), c.typeParams(x.Params), equalsSpaceLit, c.expr(x.Body))
 
 	case *ast.Alias:
 		return cats(stringLit(x.Ident.Name), equalsSpaceLit, c.expr(x.Expr))
@@ -4913,4 +4922,22 @@ func (s *stack[T]) pop() T {
 func nodeType[T ast.Node](n ast.Node) bool {
 	_, ok := n.(T)
 	return ok
+}
+
+func (c *converter) typeParams(params []*ast.TypeParam) doc {
+	parts := []doc{lParenLit}
+	for i, p := range params {
+		if i > 0 {
+			parts = append(parts, stringLit(", "))
+		}
+		item := c.expr(p.Name)
+		if p.Sort != nil {
+			item = cats(item, stringLit(" in "), c.expr(p.Sort))
+		}
+		if p.Bound != nil {
+			item = cats(item, stringLit(": "), c.expr(p.Bound))
+		}
+		parts = append(parts, c.withComments(p, item))
+	}
+	return cats(append(parts, rParenLit)...)
 }

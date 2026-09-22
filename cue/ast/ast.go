@@ -651,6 +651,7 @@ func (p *FuncParam) End() token.Pos {
 //
 // This is an experimental type and the contents will change without notice.
 type Func struct {
+	Extern   token.Pos    // position of "extern", for a foreign implementation
 	Func     token.Pos    // position of "func"
 	Lparen   token.Pos    // position of "("
 	Params   []*FuncParam // list of parameters; or nil
@@ -658,6 +659,7 @@ type Func struct {
 	Rparen   token.Pos    // position of ")"
 	Arrow    token.Pos    // position of "->"
 	Ret      Expr         // return type; nil means _
+	Effect   *Ident       // admitted checked failure tag, or nil for a pure arrow
 	Colon    token.Pos    // position of ":" before Body
 	Body     Expr         // implementation body; or nil
 
@@ -1008,9 +1010,14 @@ func (x *BasicLit) Pos() token.Pos       { return x.ValuePos }
 func (x *BasicLit) pos() *token.Pos      { return &x.ValuePos }
 func (x *Interpolation) Pos() token.Pos  { return x.Elts[0].Pos() }
 func (x *Interpolation) pos() *token.Pos { return x.Elts[0].pos() }
-func (x *Func) Pos() token.Pos           { return x.Func }
-func (x *Func) pos() *token.Pos          { return &x.Func }
-func (x *StructLit) Pos() token.Pos      { return getPos(x) }
+func (x *Func) Pos() token.Pos           { return *x.pos() }
+func (x *Func) pos() *token.Pos {
+	if x.Extern.IsValid() {
+		return &x.Extern
+	}
+	return &x.Func
+}
+func (x *StructLit) Pos() token.Pos { return getPos(x) }
 func (x *StructLit) pos() *token.Pos {
 	if x.Lbrace == token.NoPos && len(x.Elts) > 0 {
 		return x.Elts[0].pos()
@@ -1061,6 +1068,9 @@ func (x *Interpolation) End() token.Pos { return x.Elts[len(x.Elts)-1].End() }
 func (x *Func) End() token.Pos {
 	if x.Body != nil {
 		return x.Body.End()
+	}
+	if x.Effect != nil {
+		return x.Effect.End()
 	}
 	if x.Ret != nil {
 		return x.Ret.End()

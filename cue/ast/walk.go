@@ -92,6 +92,22 @@ func Walk(node Node, before func(Node) bool, after func(Node)) {
 		walkList(n.Params, before, after)
 		Walk(n.Body, before, after)
 
+	case *ParametricAlias:
+		Walk(n.Name, before, after)
+		walkList(n.Params, before, after)
+		Walk(n.Body, before, after)
+
+	case *SealExpr:
+		Walk(n.Interface, before, after)
+		walkList(n.Witnesses, before, after)
+		Walk(n.Body, before, after)
+
+	case *OpenExpr:
+		Walk(n.Value, before, after)
+		Walk(n.Type, before, after)
+		Walk(n.View, before, after)
+		Walk(n.Body, before, after)
+
 	case *Func:
 		// Walk the nodes actually present in the AST rather than the
 		// synthesized view of [Func.Parameters], whose discriminator
@@ -102,6 +118,7 @@ func Walk(node Node, before func(Node) bool, after func(Node)) {
 			walkList(n.Args, before, after)
 		}
 		walkIfNotNil(n.Ret, before, after)
+		walkIfNotNil(n.Effect, before, after)
 		walkIfNotNil(n.Body, before, after)
 
 	case *StructLit:

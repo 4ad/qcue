@@ -433,6 +433,22 @@ func applyCursor(v applyVisitor, c Cursor) {
 		applyList(v, c, n.Params)
 		apply(v, c, &n.Body)
 
+	case *ast.ParametricAlias:
+		apply(v, c, &n.Name)
+		applyList(v, c, n.Params)
+		apply(v, c, &n.Body)
+
+	case *ast.SealExpr:
+		apply(v, c, &n.Interface)
+		applyList(v, c, n.Witnesses)
+		apply(v, c, &n.Body)
+
+	case *ast.OpenExpr:
+		apply(v, c, &n.Value)
+		apply(v, c, &n.Type)
+		apply(v, c, &n.View)
+		apply(v, c, &n.Body)
+
 	case *ast.Func:
 		// Rewrite the nodes actually present in the AST rather than the
 		// synthesized view of [ast.Func.Parameters], whose discriminator
@@ -443,6 +459,7 @@ func applyCursor(v applyVisitor, c Cursor) {
 			applyList(v, c, n.Args)
 		}
 		applyIfNotNil(v, c, &n.Ret)
+		applyIfNotNil(v, c, &n.Effect)
 		applyIfNotNil(v, c, &n.Body)
 
 	case *ast.ParenExpr:

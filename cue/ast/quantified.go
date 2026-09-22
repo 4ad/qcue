@@ -61,3 +61,60 @@ type Quantifier struct {
 func (q *Quantifier) Pos() token.Pos  { return q.Quantifier }
 func (q *Quantifier) pos() *token.Pos { return &q.Quantifier }
 func (q *Quantifier) End() token.Pos  { return q.Body.End() }
+
+// A ParametricAlias abbreviates a description by capture-avoiding
+// substitution. Unlike a quantified field, it does not constrain a subject.
+type ParametricAlias struct {
+	Name   *Ident
+	Lparen token.Pos
+	Params []*TypeParam
+	Rparen token.Pos
+	Equal  token.Pos
+	Body   Expr
+
+	comments
+	decl
+}
+
+func (a *ParametricAlias) Pos() token.Pos  { return a.Name.Pos() }
+func (a *ParametricAlias) pos() *token.Pos { return a.Name.pos() }
+func (a *ParametricAlias) End() token.Pos  { return a.Body.End() }
+
+// A SealExpr constructs an opaque view of an existential interface using
+// explicit private witnesses. Copying a seal preserves its identity.
+type SealExpr struct {
+	Seal      token.Pos
+	Interface Expr
+	With      token.Pos
+	Lparen    token.Pos
+	Witnesses []*Alias
+	Rparen    token.Pos
+	Body      Expr
+
+	comments
+	expr
+}
+
+func (s *SealExpr) Pos() token.Pos  { return s.Seal }
+func (s *SealExpr) pos() *token.Pos { return &s.Seal }
+func (s *SealExpr) End() token.Pos  { return s.Body.End() }
+
+// An OpenExpr opens one existential witness in a rigid lexical scope.
+// Type names the shared representation type; View names the opened subject.
+type OpenExpr struct {
+	Open   token.Pos
+	Value  Expr
+	As     token.Pos
+	Lparen token.Pos
+	Type   *Ident
+	View   *Ident
+	Rparen token.Pos
+	Body   Expr
+
+	comments
+	expr
+}
+
+func (o *OpenExpr) Pos() token.Pos  { return o.Open }
+func (o *OpenExpr) pos() *token.Pos { return &o.Open }
+func (o *OpenExpr) End() token.Pos  { return o.Body.End() }

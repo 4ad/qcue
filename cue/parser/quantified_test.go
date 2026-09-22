@@ -24,6 +24,16 @@ import (
 
 func TestQuantifiedSyntax(t *testing.T) {
 	cases := []struct{ src, want string }{
+		{`bridge: extern func(int) -> int !bridge`, `bridge: extern func(int) -> int !bridge`},
+		{`codec: exists A {decode: func(bytes) -> A !decode}`, `codec: exists (A) {decode: func(bytes) -> A !decode}`},
+		{`x: f[int, string](1)`, `x: f[int][string](1)`},
+		{`Box(A) = {value: A}`, `Box(A) = {value: A}`},
+		{`map: func<A, B>(func(A) -> B, [...A]) -> [...B]`, `map: forall (A, B) func(func(A) -> B, [...A]) -> [...B]`},
+		{`f: func<A: number>(A) -> A`, `f: forall (A: number) func(A) -> A`},
+		{"module(A): {\nexists State\nempty: State\npush: func(A, State) -> State\n}", `module: forall (A) exists (State) {empty: State, push: func(A, State) -> State}`},
+		{"x: {\nexists T: U\nforall V: W\nvalue: T\ntransform: func(V) -> V\n}", `x: exists (T: U) forall (V: W) {value: T, transform: func(V) -> V}`},
+		{`p: seal #Showable with (A = int) {value: 7, show: func(x: int) -> string: "x"}`, `p: seal #Showable with (A=int) {value: 7, show: func(x: int) -> string: "x"}`},
+		{`v: (open p as (A, P) {out: P.show(P.value)}).out`, `v: (open p as (A, P) {out: P.show(P.value)}).out`},
 		{`id(A): func(x: A) -> A: x`, `id: forall (A) func(x: A) -> A: x`},
 		{`pair(A: number): func(A, A) -> [A, A]`, `pair: forall (A: number) func(A, A) -> [A, A]`},
 		{`r: forall (A, B: A) {a: A, b: B}`, `r: forall (A, B: A) {a: A, b: B}`},

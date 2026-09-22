@@ -33,6 +33,14 @@ func TestQuantifiedRoundTrip(t *testing.T) {
 		t.Run(fmt.Sprint(v2), func(t *testing.T) {
 			cueexperiment.Flags.FormatV2 = v2
 			for _, src := range []string{
+				`bridge: extern func(int) -> int !bridge`,
+				`codec: exists A {decode: func(bytes) -> A !decode}`,
+				`x: f[int, string](1)`,
+				`Box(A, B: A) = {left: A, right: B}`,
+				`f: func<A: number, B>(A) -> B`,
+				"module(A): {\nexists State\nempty: State\npush: func(A, State) -> State\n}",
+				`p: seal #Counter with (State = int & >=0) {zero: 0}`,
+				`r: (open p as (A, P) {out: P.read(P.zero)}).out`,
 				`id(A): func(x: A) -> A: x`,
 				`use: func(p: forall A func(A) -> A) -> [int, string]`,
 				`p: exists (A: number, B: A) {value: B}`,

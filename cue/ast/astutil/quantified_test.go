@@ -87,3 +87,36 @@ func TestQuantifiedDuplicateBinders(t *testing.T) {
 		}
 	}
 }
+
+func TestAliasAndOpenScopes(t *testing.T) {
+	f, err := parser.ParseFile("test.cue", `
+@experiment(quantified)
+let A = int
+Box(A, B: A) = {a: A, b: B}
+p: seal #Package with (A = A) {value: 1}
+x: open p as (A, P) {a: A, p: P}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias := f.Decls[2].(*ast.ParametricAlias)
+	if alias.Params[1].Bound.(*ast.Ident).Node != alias.Params[0] {
+		t.Fatal("alias bound lost its binder")
+	}
+	seal := f.Decls[3].(*ast.Field).Value.(*ast.SealExpr)
+	if seal.Witnesses[0].Expr.(*ast.Ident).Node != f.Decls[1] {
+		t.Fatal("private witness must resolve in declaration environment")
+	}
+	opened := f.Decls[4].(*ast.Field).Value.(*ast.OpenExpr)
+	body := opened.Body.(*ast.StructLit)
+	if id := body.Elts[0].(*ast.Field).Value.(*ast.Ident); id.Node != opened.Type || id.Scope != opened {
+		t.Fatal("opened type not bound in opening scope")
+	}
+	if body.Elts[1].(*ast.Field).Value.(*ast.Ident).Node != opened.View {
+		t.Fatal("opened view not shared")
+	}
+	clone := ast.Clone(opened)
+	if clone.Body.(*ast.StructLit).Elts[0].(*ast.Field).Value.(*ast.Ident).Node != clone.Type {
+		t.Fatal("copy did not preserve opening scope")
+	}
+}
