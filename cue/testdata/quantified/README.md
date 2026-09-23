@@ -1,6 +1,6 @@
 # Quantified CUE tests
 
-Start here for the **S_H** and **A** implementation. Language examples and
+Start here for the supported **S_H** and **A** fragments. Language examples and
 expectations live in txtar archives, grouped by topic. The ordinary CUE evaluator
 runner discovers this directory automatically; no Go table needs updating when
 adding a semantic case.
@@ -135,6 +135,29 @@ The following regressions cover the additional semantic audit findings:
 | Residual quantifier export retains lexical substitutions | [quantifier_export](api/quantifier_export.txtar) |
 | Subtype binders admit unary bodies | [bound_unary_body](finite_witnesses/bound_unary_body.txtar), plus parser and formatter fixtures |
 
+The implementation audit also has a regression for each reproduced defect:
+
+| Finding | Regression |
+| --- | --- |
+| 1. Existential membership preserves shape, presence, and closedness | [membership_shape](covariant_existentials/membership_shape.txtar), [API refinement](api/membership_refinement.txtar) |
+| 2. Sealing retains every interface conjunct, independent of order | [interface_conjunctions](seal_generativity/interface_conjunctions.txtar) |
+| 3. Builtin contracts require independent universal proofs | [builtin_contracts](certification/builtin_contracts.txtar) |
+| 4. Builtin capability guards preserve calls, labels, and defaults | [builtin_contracts](certification/builtin_contracts.txtar) |
+| 5. Opaque representations retain private function proof obligations | [opaque_representations](certification/opaque_representations.txtar) |
+| 6. Composite witnesses denote exact eventual singletons | [composite_singletons](certification/composite_singletons.txtar), [API refinement](api/membership_refinement.txtar) |
+| 7. Capture identity is independent of attached contracts | [captured_contracts](closure_identity/captured_contracts.txtar) |
+| 8. Distinct closures at one code origin can form a finite call chain | [finite_chain](closure_identity/finite_chain.txtar), [generative recursion](recursion_requires_descent/generative_chain.txtar) |
+| 9. Evaluated source export preserves attached builtin contracts | [builtin_export](api/builtin_export.txtar) |
+| 10. All export modes preserve opaque boundaries | [opaque_export](api/opaque_export.txtar), [exporter fixtures](../../../internal/core/export/testdata/quantified/) |
+| 11. Explicit type selection uses retained universal clauses | [attached_clauses](instantiation/attached_clauses.txtar), [selected_export](api/selected_export.txtar) |
+
+Further regressions cover [ordinary open-record transport](opaque_composite_transport/open_records.txtar),
+[erased type-parameter formation](api/erasure.txtar), and
+[source export of callable capture graphs](api/closure_export.txtar).
+The [profile boundaries](certification/profile_boundaries.txtar) fixture records
+the remaining unsupported package eliminations and effect/foreign proofs;
+these limitations must not become successful certification.
+
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Syntax-only cases and malformed syntax belong in the parser
 corpus. No test compares fixtures with the proposal document.
@@ -159,6 +182,10 @@ go test ./cmd/cue/cmd -run TestScript/quantified
 
 # Complete repository regression suite.
 go test ./...
+
+# Independent finite semantic models and deterministic reports.
+python3 checks/check_model.py
+python3 checks/check_residual.py
 ```
 
 A narrower `-run` can select a topic or example name, for example

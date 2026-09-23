@@ -3129,12 +3129,10 @@ func (builtin *Builtin) callPerDisjunct(c *OpContext, callCtx BuiltinCallContext
 	}
 }
 
-// applyParamTypes applies every attached function type's parameter
-// constraints to args, which are indexed by raw builtin position.
-// Positionally bindable parameters map by ordinal; a name-only parameter may
-// map through the contract label supplied by another attached signature.
-// Like native function constraints, these expressions are
-// evaluated in the environment in which their signature was declared.
+// applyParamTypes applies intrinsic and legacy parameter constraints to raw
+// builtin argument slots. Quantified client contracts instead guard result
+// obligations and do not refine the supplied arguments. Parameter expressions
+// are evaluated in the environment where their signature was declared.
 func (builtin *Builtin) applyParamTypes(c *OpContext, args []Value) ([]Value, *Bottom) {
 	for _, t := range builtin.Types {
 		if builtin.guardedType(t) {
@@ -3243,17 +3241,17 @@ type Builtin struct {
 	Package Feature
 	Name    string
 
-	// Types holds the function types (bodyless signatures) this builtin has
-	// been unified with; their parameter constraints and result constraints
-	// are additionally enforced on every ordinary full call (see
-	// [Builtin.rawCall]). The legacy validator-constructor path remains
-	// separate. A
-	// Builtin carrying Types is a clone of a package-level builtin, which
+	// Types holds the signatures this builtin has been unified with.
+	// Intrinsic and legacy signatures constrain each full call. Quantified
+	// client signatures impose guarded result obligations while preserving
+	// the original call protocol. The validator-constructor path is separate.
+	// A builtin carrying Types is a clone of a package-level builtin, which
 	// remains identified through orig.
 	Types []FuncType
 
-	// declared records the signatures supplied by the builtin's own package.
-	// User contracts cannot add labels or defaults to this fixed protocol.
+	// declared records the signatures supplied by the builtin's own package
+	// on the canonical value returned by self. User contracts cannot add
+	// labels or defaults to this fixed protocol.
 	declared []FuncType
 
 	// orig points to the package-level builtin from which a tightened clone
@@ -3346,10 +3344,10 @@ func (x *Builtin) checkArgs(c *OpContext, p token.Pos, numArgs int) bool {
 }
 
 // completeArgs appends the arguments for the parameters a call omits. The
-// CUE signatures of a builtin are the source of truth for its defaults: an
-// omitted argument takes the default that a signature unified with the
-// builtin declares for the parameter, or else the builtin's own default,
-// which such a signature must agree with.
+// CUE declarations of a builtin are the source of truth for its defaults.
+// In capability mode only intrinsic signatures contribute defaults; legacy
+// mode also considers attached signatures. The raw parameter default is the
+// fallback when no signature declares one.
 func (x *Builtin) completeArgs(c *OpContext, p token.Pos, args []Value, flags Flags) ([]Value, bool) {
 	n := len(args)
 	if n > len(x.Params) {
