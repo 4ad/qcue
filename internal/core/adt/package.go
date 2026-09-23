@@ -194,11 +194,12 @@ type sealKey struct {
 }
 
 type sealedPackage struct {
-	interfaceType *Existential
-	privateEnv    *Environment
-	publicEnv     *Environment
-	carriers      map[*TypeParameter]*opaqueCarrier
-	operations    []opaqueAdapter
+	interfaceType  *Existential
+	implementation *Vertex
+	privateEnv     *Environment
+	publicEnv      *Environment
+	carriers       map[*TypeParameter]*opaqueCarrier
+	operations     []opaqueAdapter
 }
 
 type opaqueCarrier struct {
@@ -318,6 +319,9 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	if b := Validate(c, implementation, &ValidateConfig{Concrete: true}); b != nil {
 		return b
 	}
+	// Transport hides representations, not their membership obligations.
+	// Retain the private graph for the public concrete-validation demand.
+	p.implementation = implementation
 	view := p.transport(c, p.publicEnv, q.Body, implementation, true)
 	if v, ok := view.(*Vertex); ok {
 		v.sealed = p

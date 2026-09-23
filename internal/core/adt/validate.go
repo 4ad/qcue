@@ -89,7 +89,19 @@ type validator struct {
 	// TODO: we could also keep track of the number of references to a
 	// shared vertex. This would allow us to report more than a single error
 	// per shared vertex.
-	visited map[*Vertex]bool
+	visited  map[*Vertex]bool
+	packages map[*sealedPackage]bool
+}
+
+func (v *validator) validatePackage(p *sealedPackage) {
+	if p == nil || !v.checkConcrete() || v.packages[p] {
+		return
+	}
+	if v.packages == nil {
+		v.packages = make(map[*sealedPackage]bool)
+	}
+	v.packages[p] = true
+	v.validate(p.implementation)
 }
 
 func (v *validator) addPositions(err *ValueError) {
@@ -192,7 +204,14 @@ func (v *validator) validate(x *Vertex) {
 			}
 		}
 	}
+	v.validatePackage(x.sealed)
+	if opaque, ok := x.BaseValue.(*OpaqueValue); ok {
+		v.validatePackage(opaque.carrier.owner)
+	}
 	if f, ok := x.BaseValue.(*FuncValue); ok && capabilityMode(f.Fn, f.Types) && v.checkConcrete() {
+		if boundary, ok := f.Fn.Body.(*OpaqueCall); ok {
+			v.validatePackage(boundary.owner)
+		}
 		if !concreteCapture(v.ctx, f) {
 			v.add(&Bottom{Src: f.Source(), Code: IncompleteError,
 				Err: v.ctx.Newf("function implementation or captured values remain unresolved")})
