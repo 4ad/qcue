@@ -1,0 +1,24 @@
+{
+  "model": "four values, sixteen predicates, 625 partial functions",
+  "status": "passed",
+  "assertions": 124523,
+  "families": {
+    "Frobenius": 4096,
+    "abstract equality": 384,
+    "abstract predicates": 18432,
+    "adjunctions": 8192,
+    "application counterexample": 1,
+    "application inclusion": 1296,
+    "application refinement": 4096,
+    "arrows": 8192,
+    "bounded universals": 16,
+    "empty range": 1,
+    "inhabited floating": 4096,
+    "mixed scope": 2,
+    "operation simulation": 60000,
+    "projection counterexample": 1,
+    "quantifier monotonicity": 13122,
+    "universal identity": 4,
+    "variance": 2592
+  }
+}

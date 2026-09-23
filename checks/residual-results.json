@@ -1,0 +1,16 @@
+{
+  "model": "two four-valued witnesses, six retained relational clauses",
+  "status": "passed",
+  "assertions": 133688,
+  "families": {
+    "bounded propagation": 49152,
+    "existential correlation": 3,
+    "grounded cycles": 64,
+    "guard retention": 3,
+    "persistent refutation": 5342,
+    "quantified counterexamples": 625,
+    "refinement": 49152,
+    "sample incompleteness": 124,
+    "sound refutation": 29223
+  }
+}
