@@ -47,6 +47,9 @@ func (e *exporter) bareValue(v adt.Value) ast.Expr {
 // value with a reference in graph mode.
 
 func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
+	if n.IsOpaquePackage() {
+		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
+	}
 	// Guard against infinite recursion when a vertex cycles back to itself
 	// through BuiltinValidator arguments or other value-level cycles.
 	for i := range e.stack {
@@ -515,6 +518,9 @@ func (e *exporter) quantifierSrc(q *adt.Quantified, env *adt.Environment) ast.Ex
 func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	if t.Fn == nil {
 		return e.funcSrc(nil)
+	}
+	if _, ok := t.Fn.Body.(*adt.OpaqueCall); ok {
+		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
 	}
 	if !t.Fn.Quantified {
 		return e.funcSrc(t.Fn.Src)

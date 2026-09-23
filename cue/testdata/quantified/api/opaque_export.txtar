@@ -1,0 +1,14 @@
+#skip
+#inlinetest:exclude Run by cue/quantified_test.go to exercise Go API export.
+
+-- operation.cue --
+#I: exists A {f: func(int) -> int}
+p: seal #I with (A = int) {f: func(x: int) -> int: x}
+out: p
+-- selected_operation.cue --
+#I: exists A {f: func(int) -> int}
+p: seal #I with (A = int) {f: func(x: int) -> int: x}
+out: (open p as (A, P) {f: P.f}).f
+-- data.cue --
+#I: exists A {tag: 1}
+out: seal #I with (A = int) {tag: 1}

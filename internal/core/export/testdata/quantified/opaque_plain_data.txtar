@@ -1,7 +1,7 @@
 #incomplete
 
 -- in.cue --
-#I:  exists (A) {value: A}
-out: seal #I with (A = int) {value: 123456789}
+#I: exists A {tag: 1}
+out: seal #I with (A = int) {tag: 1}
 -- out/export --
 opaque boundaries cannot be unfolded for export

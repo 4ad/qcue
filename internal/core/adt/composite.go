@@ -301,6 +301,10 @@ type Vertex struct {
 	Structs []StructInfo
 }
 
+// IsOpaquePackage reports a retained sealing boundary, including its opened
+// lexical view. Exporters must preserve that boundary or report incompleteness.
+func (v *Vertex) IsOpaquePackage() bool { return v.DerefValue().sealed != nil }
+
 func deref(v *Vertex) *Vertex {
 	v = v.DerefValue()
 	n := v.state

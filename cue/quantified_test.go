@@ -311,6 +311,31 @@ func TestQuantifiedBuiltinExport(t *testing.T) {
 	}
 }
 
+func TestQuantifiedOpaqueExport(t *testing.T) {
+	for _, name := range []string{"operation", "selected_operation", "data"} {
+		t.Run(name, func(t *testing.T) {
+			root := cuecontext.New().CompileString(quantifiedAPIText(t, "opaque_export", name+".cue"))
+			v := root.LookupPath(cue.ParsePath("out"))
+			if err := v.Validate(cue.Concrete(true)); err != nil {
+				t.Fatal(err)
+			}
+			for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
+				if _, ok := v.Syntax(opts...).(*ast.BadExpr); !ok {
+					t.Fatal("opaque export lost the package or operation identity")
+				}
+			}
+			r, x := value.ToInternal(v)
+			if _, err := export.Value(r, "", x); err == nil {
+				t.Fatal("value export dropped the opaque boundary")
+			}
+			r, x = value.ToInternal(root)
+			if _, err := export.Expr(r, "", x); err == nil {
+				t.Fatal("expression export dropped the opaque boundary")
+			}
+		})
+	}
+}
+
 func TestQuantifiedClosureExport(t *testing.T) {
 	for _, name := range []string{"captures", "factory", "literals", "records", "predicates", "generic", "nested_generic", "bounds", "hygiene"} {
 		for _, mode := range []string{"source", "final", "expression", "value"} {
