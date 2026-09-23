@@ -566,7 +566,7 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 			out.Decls = append(out.Decls, &Field{Label: field.Label, Value: result})
 		}
 		for _, a := range v.Arcs {
-			if a.ArcType == ArcMember && a.Label.IsRegular() && scope.LookupRaw(a.Label) == nil {
+			if a.ArcType == ArcMember && !a.Label.IsLet() && scope.LookupRaw(a.Label) == nil {
 				out.Decls = append(out.Decls, &Field{Label: a.Label, Value: a})
 			}
 		}
@@ -736,7 +736,16 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 			Value: p.transportResolved(c, field, a, outward)})
 	}
 	for _, a := range v.Arcs {
-		if a.ArcType != ArcMember || !a.Label.IsRegular() || typ.LookupRaw(a.Label) != nil {
+		if a.ArcType != ArcMember || a.Label.IsLet() || typ.LookupRaw(a.Label) != nil {
+			continue
+		}
+		// Hidden and definition labels are observable data in an ordinary
+		// record. Preserve their original package-qualified identity. Only
+		// the module projection may discard undeclared private fields.
+		if !a.Label.IsRegular() {
+			if !project {
+				out.Decls = append(out.Decls, &Field{Label: a.Label, Value: a})
+			}
 			continue
 		}
 		field := c.newInlineVertex(nil, nil)

@@ -1,0 +1,36 @@
+// Identity transport preserves hidden and definition labels, including in
+// nested records, lists and callbacks. Root module projection stays private.
+
+-- in.cue --
+@test(json, [7, 7, 7, 7, 7, 7, 7, 7], at="out")
+@test(validate, concrete, at="p")
+@test(validate, concrete, incomplete, at="privateHidden")
+@test(validate, concrete, incomplete, at="privateDefinition")
+
+#Record: {}
+#M: exists A {
+	id:       func({}) -> {}
+	resolved: func(#Record) -> #Record
+	nested:   func({inner: {}}) -> {inner: {}}
+	list:     func([{}]) -> [{}]
+	callback: func(func({}) -> {}) -> func({}) -> {}
+}
+p: seal #M with (A = int) {
+	_secret: 99
+	#Secret: 99
+	id:       func(x: {}) -> {}: x
+	resolved: func(x: #Record) -> #Record: x
+	nested:   func(x: {inner: {}}) -> {inner: {}}: x
+	list:     func(x: [{}]) -> [{}]: x
+	callback: func(f: func({}) -> {}) -> func({}) -> {}: f
+}
+data: {_secret: 7, #Secret: 7}
+out: (open p as (A, P) {
+	let f = P.callback(func(x: {}) -> {}: x)
+	r: [P.id(data)._secret, P.id(data).#Secret,
+		P.resolved(data)._secret, P.resolved(data).#Secret,
+		P.nested({inner: data}).inner._secret,
+		P.list([data])[0]._secret, f(data)._secret, f(data).#Secret]
+}).r
+privateHidden: (open p as (A, P) {r: P._secret}).r
+privateDefinition: (open p as (A, P) {r: P.#Secret}).r
