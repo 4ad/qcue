@@ -1,0 +1,21 @@
+// A failed inferred candidate cannot exclude a universal capability. An
+// applicable clause still constrains the result; unsupported inference must
+// remain incomplete. A separately proved impossible bound may exclude it.
+
+-- in.cue --
+@test(validate, conflict, at="callbackGuard")
+@test(validate, conflict, at="dependentGuard")
+@test(validate, conflict, at="builtinGuard")
+@test(validate, concrete, incomplete, at="unknownGuard")
+@test(json, 0, at="excluded")
+
+cb: func(x: number) -> int: 1
+callbackGuard: ((func(cb: _) -> int: {v: 0}.v) &
+	(forall (A: int) func(func(A) -> int) -> 1))(cb)
+dependentGuard: ((func(x: _) -> int: {v: 0}.v) &
+	(forall (A: int, B: A) func(B) -> 1))(2)
+builtinGuard: (len & (forall (A: int) func([...func(A) -> int]) -> 0))([cb, cb])
+unknownGuard: ((func(x: _) -> int: {v: 0}.v) &
+	(forall (A: int) func(A | string) -> 1))(2)
+excluded: ((func(x: _) -> int: {v: 0}.v) &
+	(forall (A: int) func(A) -> 1))("outside")

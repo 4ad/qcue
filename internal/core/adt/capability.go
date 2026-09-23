@@ -389,8 +389,9 @@ func (n *nodeContext) scheduleCapabilityResults(ref *FuncCallRef, env *Environme
 			f := &FuncValue{Fn: t.Fn, Env: t.Env}
 			inst, b := f.inferInstance(n.ctx, bindings)
 			if b != nil {
-				// A refuted bound excludes this instance of this guarded
-				// clause. It does not reject a packet admitted elsewhere.
+				// Inference reports a hard error only when a necessary
+				// condition excludes every instance. A failed candidate
+				// remains incomplete and cannot discard this clause.
 				if b.IsIncomplete() {
 					n.addBottom(b)
 				}

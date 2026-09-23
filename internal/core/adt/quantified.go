@@ -669,172 +669,6 @@ func typeArgumentFits(c *OpContext, bound, arg Value) proofResult {
 	return proofUnknown
 }
 
-func (f *FuncValue) inferInstance(c *OpContext, bindings []funcArg) (*FuncValue, *Bottom) {
-	args := make(map[*TypeParameter]Value)
-	for _, p := range typeParameters(f.Env) {
-		args[p] = nil
-	}
-	// Data arguments constrain the input variables before callback schemes
-	// are instantiated. A second pass handles result variables of callbacks.
-	for pass := range 2 {
-		for i, binding := range bindings {
-			if binding.expr == nil {
-				continue
-			}
-			v, _ := c.Evaluate(binding.env, binding.expr)
-			if vertex, ok := v.(*Vertex); ok {
-				vertex.Finalize(c)
-			}
-			_, callback := Unwrap(v).(*FuncValue)
-			if callback != (pass == 1) {
-				continue
-			}
-			inferTypeArguments(c, f.Env, f.Fn.Params[i].Value, v, args)
-		}
-	}
-	var unconstrained *TypeParameter
-	for _, p := range typeParameters(f.Env) {
-		v := args[p]
-		if v == nil {
-			if p.ValueRange == nil {
-				// Empty containers and unused binders need not contribute
-				// an element witness. Try the empty predicate, then prove
-				// that this instance admits the supplied packet below.
-				// An unsupported inference shape must not turn this guess
-				// into a contradiction or discard a packet constraint.
-				args[p] = &Bottom{Code: EvalError, Err: c.Newf("empty type instance")}
-				unconstrained = p
-				continue
-			}
-			return nil, &Bottom{Src: p.Src, Code: IncompleteError,
-				Err: c.Newf("cannot infer type argument %s", p.Src.Name.Name)}
-		}
-	}
-	inst, b := f.instantiate(c, args)
-	if b != nil || unconstrained == nil {
-		return inst, b
-	}
-	for i, binding := range bindings {
-		if binding.expr == nil {
-			continue
-		}
-		v, _ := c.Evaluate(binding.env, binding.expr)
-		if capabilityMember(c, inst.Env, inst.Fn.Params[i].Value, v) != proofEstablished {
-			return nil, &Bottom{Src: unconstrained.Src, Code: IncompleteError,
-				Err: c.Newf("cannot infer type argument %s", unconstrained.Src.Name.Name)}
-		}
-	}
-	return inst, nil
-}
-
-func inferTypeArguments(c *OpContext, env *Environment, pattern Expr, value Value, args map[*TypeParameter]Value) {
-	if value == nil {
-		return
-	}
-	switch p := pattern.(type) {
-	case *TypeReference:
-		// A known scalar contributes its immutable singleton predicate.
-		// Carrying its activation vertex into later type instances would
-		// incorrectly retain that argument cell's local sharing topology.
-		if scalar := Unwrap(value); scalar != nil {
-			value = scalar
-		}
-		if v, ok := value.(*Vertex); ok && concreteCapture(c, v) {
-			// A supplied data witness contributes its value predicate. Its
-			// activation's old annotation scopes are not part of that type.
-			value = v.ToDataAll(c)
-		}
-		if prev, ok := args[p.Param]; ok {
-			if prev == nil {
-				args[p.Param] = value
-			} else if !Equal(c, prev, value, 0) {
-				args[p.Param] = &Disjunction{Values: []Value{prev, value}}
-			}
-		}
-	case *ListLit:
-		v, ok := value.(*Vertex)
-		if !ok || !v.IsList() {
-			return
-		}
-		v.Finalize(c)
-		elems := slices.Collect(v.Elems())
-		for i, e := range p.Elems {
-			if rest, ok := e.(*Ellipsis); ok {
-				for _, item := range elems[min(i, len(elems)):] {
-					inferTypeArguments(c, env, rest.Value, item, args)
-				}
-				break
-			}
-			if i < len(elems) {
-				if e, ok := e.(Expr); ok {
-					inferTypeArguments(c, env, e, elems[i], args)
-				}
-			}
-		}
-	case *StructLit:
-		v, ok := value.(*Vertex)
-		if !ok {
-			return
-		}
-		v.Finalize(c)
-		for _, d := range p.Decls {
-			if field, ok := d.(*Field); ok {
-				for _, arc := range v.Arcs {
-					if arc.Label == field.Label {
-						inferTypeArguments(c, env, field.Value, arc, args)
-					}
-				}
-			}
-		}
-	case *Function:
-		f, ok := Unwrap(value).(*FuncValue)
-		if !ok {
-			return
-		}
-		// Instantiate a polymorphic callback from the expected input types,
-		// before reading its result predicate. This is elimination of that
-		// callback's scheme, not generalization of a monomorphic callback.
-		if params := typeParameters(f.Env); len(params) != 0 {
-			callbackArgs := make(map[*TypeParameter]Value, len(params))
-			for _, param := range params {
-				callbackArgs[param] = nil
-			}
-			expectedEnv := instantiateEnvironment(env, args)
-			for i, param := range p.Params {
-				if i >= len(f.Fn.Params) {
-					break
-				}
-				v, _ := c.Evaluate(expectedEnv, param.Value)
-				if b, ok := Unwrap(v).(*Bottom); !ok || !b.IsIncomplete() {
-					inferTypeArguments(c, f.Env, f.Fn.Params[i].Value, v, callbackArgs)
-				}
-			}
-			if inst, b := f.instantiate(c, callbackArgs); b == nil {
-				f = inst
-			}
-		}
-		known := maps.Clone(args)
-		for i, param := range p.Params {
-			if i >= len(f.Fn.Params) {
-				break
-			}
-			v, _ := c.Evaluate(f.Env, f.Fn.Params[i].Value)
-			inferTypeArguments(c, env, param.Value, v, args)
-		}
-		// Input bounds are upper bounds on an instance already learned from
-		// data. They must not widen that instance and discard refinements.
-		for param, v := range known {
-			if v != nil {
-				args[param] = v
-			}
-		}
-		if f.Fn.Ret != nil {
-			v, _ := c.Evaluate(f.Env, f.Fn.Ret)
-			inferTypeArguments(c, env, p.Ret, v, args)
-		}
-	}
-}
-
 // fixedTypeExpression extends the ground counterexample vocabulary only
 // with lexical type parameters. Ordinary references can still be refined,
 // and evaluating them speculatively could refute just one possible witness.
@@ -984,19 +818,14 @@ func refuteGenericCapability(c *OpContext, impl *FuncValue, t FuncType) (err *Bo
 			return true
 		}
 		view := impl
-		if params := typeParameters(impl.Env); len(params) != 0 {
-			args := make(map[*TypeParameter]Value, len(params))
-			for _, p := range params {
-				args[p] = nil
-			}
-			matches := matchFuncParams(target.Fn, impl.Fn, false)
-			for i, j := range matches {
-				if j >= 0 && target.Fn.Params[i].Value != nil {
-					v, _ := c.Evaluate(target.Env, target.Fn.Params[i].Value)
-					inferTypeArguments(c, impl.Env, impl.Fn.Params[j].Value, v, args)
+		if len(typeParameters(impl.Env)) != 0 {
+			bindings := make([]funcArg, len(impl.Fn.Params))
+			for i, j := range matchFuncParams(target.Fn, impl.Fn, false) {
+				if j >= 0 {
+					bindings[j] = funcArg{expr: target.Fn.Params[i].Value, env: target.Env}
 				}
 			}
-			inst, b := impl.instantiate(c, args)
+			inst, b := impl.inferInstance(c, bindings)
 			if b != nil {
 				return true
 			}

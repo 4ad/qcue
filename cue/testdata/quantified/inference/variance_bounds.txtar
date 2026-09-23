@@ -1,0 +1,26 @@
+// Callback inputs constrain type variables from above. Declared bounds and
+// other callbacks narrow those upper constraints; they do not contradict a
+// prematurely committed assignment. Bounds propagate through the telescope.
+
+-- in.cue --
+@test(json, [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, 5, 6, 7, 8], at="out")
+@test(validate, conflict, at="impossible")
+
+f(A: int): func(cb: func(A) -> int) -> int: 0
+cb: func(x: number) -> int: 1
+dependent(A: int, B: A): func(x: B) -> B: x
+chain(A: int, B: A, C: B): func(x: C) -> C: x
+both(A: int): func(f: func(A) -> int, g: func(A) -> int) -> int: 3
+narrow: func(x: int) -> int: 1
+data(A: int): func(f: func(A) -> int, x: A) -> A: x
+unbounded(A): func(f: func(A) -> int, g: func(A) -> int) -> int: 3
+id(T): func(x: T) -> T: x
+boxed(A, B): func(p: {f: func(A) -> B, x: A}) -> B: p.f(p.x)
+recordBound(A: int, B: {x: A}): func(x: B) -> int: x.x
+nested(A: int): func(f: func({x: [A]}) -> int) -> int: 8
+nestedCallback: func(x: {x: [number]}) -> int: 1
+out: [f[int](cb), f(cb), dependent[int][int](1), dependent(1),
+	chain[int][int][int](2), chain(2), both(cb, narrow), both(narrow, cb),
+	data(cb, 4), data[4](cb, 4), unbounded(cb, narrow), unbounded(narrow, cb),
+	boxed({f: id, x: 5}), boxed({x: 6, f: id}), recordBound({x: 7}), nested(nestedCallback)]
+impossible: dependent("wrong")
