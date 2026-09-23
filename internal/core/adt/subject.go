@@ -14,27 +14,55 @@
 
 package adt
 
+import "slices"
+
 // subjectScheme records one lexical introduction on a composite subject.
 // origin identifies the introduction independently of its selected instances.
 type subjectScheme struct {
 	origin *Environment
 	env    *Environment
+	// An excluded clause remains an obligation on the shared subject, but
+	// no longer participates in subsequent selections of this view.
+	excluded bool
 }
 
 func instantiateSubject(c *OpContext, subject *Vertex, argument Expr) (*Vertex, bool) {
 	subject = subject.DerefValue()
+	args := make(map[*TypeParameter]Value)
+	selected := make(map[*Environment]bool)
+	var err *Bottom
+	var arg Value
+	found := false
 	for _, s := range subject.schemes {
 		params := typeParameters(s.env)
-		if len(params) == 0 {
+		if s.excluded || len(params) == 0 {
 			continue
 		}
-		arg, _ := c.Evaluate(c.Env(0), argument)
-		args := map[*TypeParameter]Value{params[0]: arg}
-		if _, b := (&FuncValue{Env: s.env}).instantiate(c, args); b != nil {
-			c.AddBottom(b)
-			return emptyNode, true
+		if !found {
+			arg, _ = c.Evaluate(c.Env(0), argument)
+			found = true
 		}
-		return instantiateSubjectView(c, subject, args, make(map[*Vertex]*Vertex)), true
+		binding := map[*TypeParameter]Value{params[0]: arg}
+		if _, b := (&FuncValue{Env: s.env}).instantiate(c, binding); b != nil {
+			if err == nil || b.IsIncomplete() {
+				err = b
+			}
+			continue
+		}
+		args[params[0]] = arg
+		selected[s.origin] = true
+	}
+	if len(selected) != 0 {
+		view := instantiateSubjectView(c, subject, args, make(map[*Vertex]*Vertex))
+		for i := range view.schemes {
+			s := &view.schemes[i]
+			s.excluded = s.excluded || !selected[s.origin]
+		}
+		return view, true
+	}
+	if found {
+		c.AddBottom(err)
+		return emptyNode, true
 	}
 	return nil, false
 }
@@ -51,10 +79,16 @@ func instantiateSubjectView(c *OpContext, subject *Vertex, args map[*TypeParamet
 	if f, ok := Unwrap(subject).(*FuncValue); ok {
 		copy := *f
 		copy.Env = instantiateEnvironment(f.Env, args)
-		if copy.Env == f.Env {
+		copy.Types = slices.Clone(f.Types)
+		changed := copy.Env != f.Env
+		for i, t := range copy.Types {
+			copy.Types[i].Env = instantiateEnvironment(t.Env, args)
+			changed = changed || copy.Types[i].Env != t.Env
+		}
+		if !changed {
 			return subject
 		}
-		copy.Types = mergeFuncTypes(copy.Types, []FuncType{{Fn: f.Fn, Env: f.Env}})
+		copy.Types = mergeFuncTypes(copy.Types, f.selectionAndOriginalClauses())
 		v := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, &copy))
 		v.Finalize(c)
 		return v
@@ -65,7 +99,8 @@ func instantiateSubjectView(c *OpContext, subject *Vertex, args map[*TypeParamet
 	view := c.newInlineVertex(nil, nil)
 	seen[subject] = view
 	for _, s := range subject.schemes {
-		view.schemes = append(view.schemes, subjectScheme{s.origin, instantiateEnvironment(s.env, args)})
+		s.env = instantiateEnvironment(s.env, args)
+		view.schemes = append(view.schemes, s)
 	}
 	var overlay Expr
 	if subject.IsList() {

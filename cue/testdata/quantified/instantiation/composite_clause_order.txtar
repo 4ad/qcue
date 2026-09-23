@@ -1,0 +1,20 @@
+// Selection tries every retained introduction and instantiates all clauses
+// which admit the argument. Later selections consume only selected scopes.
+
+-- in.cue --
+@test(json, ["s", "s", 2, 2], at="out")
+@test(json, ["t", "t"], at="second")
+@test(validate, conflict, at="bad")
+
+a: forall (A: int) {f: func(x: A) -> A: x}
+a: forall (B: string) {g: func(x: B) -> B: x}
+b: forall (B: string) {g: func(x: B) -> B: x}
+b: forall (A: int) {f: func(x: A) -> A: x}
+out: [a[string].g("s"), b[string].g("s"), a[int].f(2), b[int].f(2)]
+bad: a[bool]
+
+c: forall (A: int, C: int) {f: func(x: C) -> C: x}
+c: forall (B: string, D: string) {g: func(x: D) -> D: x}
+d: forall (B: string, D: string) {g: func(x: D) -> D: x}
+d: forall (A: int, C: int) {f: func(x: C) -> C: x}
+second: [c[string][string].g("t"), d[string][string].g("t")]
