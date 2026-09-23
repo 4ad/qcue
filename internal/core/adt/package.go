@@ -70,7 +70,7 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 		// admissible types. Keep the template for explicit sealing: its
 		// logical simplification does not erase an abstraction boundary.
 		for _, param := range e.Template.Params {
-			if !covariantData(param.Bound) {
+			if param.ValueRange != nil || !covariantData(param.Bound) {
 				return e.unresolved(c)
 			}
 		}

@@ -74,6 +74,7 @@ func (*TypeReference) elemNode()          {}
 type typeScope struct {
 	quantifier *Quantified
 	arguments  map[*TypeParameter]Value
+	finite     *finiteExpansionBudget
 }
 
 // AliasApplication substitutes predicates into an abbreviation. It creates
@@ -205,19 +206,61 @@ func universalDataMinimum(c *OpContext, x Expr, params map[*TypeParameter]bool) 
 	return x
 }
 
+// Limit work, rather than the size of the result alone: many different
+// assignments can yield the same value. Exhaustion retains the entire scoped
+// predicate, never a partially enumerated conjunction or disjunction.
+const finiteExpansionLimit = 1024
+
+type finiteExpansionBudget struct {
+	remaining int
+	exhausted bool
+}
+
+func (q *Quantified) finiteResidual(env *Environment) Value {
+	if q.Src.Exists {
+		return &Existential{Template: q, Env: env}
+	}
+	return &Universal{Template: q, Env: env}
+}
+
 func (q *Quantified) evaluateFinite(c *OpContext) Value {
+	outer := c.Env(0)
 	for _, p := range q.Params {
 		if p.ValueRange == nil {
 			// Mixed prefixes are retained rather than commuting type and
 			// value scopes to force a finite expansion.
-			if q.Src.Exists {
-				return &Existential{Template: q, Env: c.Env(0)}
-			}
-			return &Universal{Template: q, Env: c.Env(0)}
+			return q.finiteResidual(outer)
 		}
+	}
+	budget := c.finiteExpansion
+	for env := outer; budget == nil && env != nil; env = env.Up {
+		if env.types != nil {
+			budget = env.types.finite
+		}
+	}
+	if budget == nil {
+		budget = &finiteExpansionBudget{remaining: finiteExpansionLimit}
+	}
+	saved := c.finiteExpansion
+	c.finiteExpansion = budget
+	defer func() { c.finiteExpansion = saved }()
+	// A literal body is independent of every binder. Check each fixed range
+	// for emptiness, but one assignment suffices for each nonempty range.
+	independent := false
+	switch q.Body.(type) {
+	case *Top, *Bottom, *BasicType, *Null, *Bool, *Num, *String, *Bytes:
+		independent = true
+	}
+	for _, p := range q.Params {
+		independent = independent && fixedCapabilityExpr(p.ValueRange)
 	}
 	var expand func(*Environment, int) Value
 	expand = func(env *Environment, i int) Value {
+		if budget.remaining == 0 || budget.exhausted {
+			budget.exhausted = true
+			return nil
+		}
+		budget.remaining--
 		if i == len(q.Params) {
 			v, _ := c.Evaluate(env, q.Body)
 			return v
@@ -247,15 +290,18 @@ func (q *Quantified) evaluateFinite(c *OpContext) Value {
 			}
 			return c.NewErrf("existential binder has an empty range")
 		}
+		if independent {
+			candidates = candidates[:1]
+		}
 		values := make([]Value, 0, len(candidates))
 		for _, v := range candidates {
 			args := maps.Clone(env.types.arguments)
 			args[p] = v
 			frame := *env
-			frame.types = &typeScope{quantifier: q, arguments: args}
+			frame.types = &typeScope{quantifier: q, arguments: args, finite: budget}
 			frame.cache = nil
 			value := expand(&frame, i+1)
-			if value == nil {
+			if value == nil || budget.exhausted {
 				return nil
 			}
 			values = append(values, value)
@@ -265,9 +311,13 @@ func (q *Quantified) evaluateFinite(c *OpContext) Value {
 		}
 		return &Conjunction{Values: values}
 	}
-	env := &Environment{Up: c.Env(0), Vertex: c.newInlineVertex(nil, &StructMarker{}),
-		types: &typeScope{quantifier: q, arguments: make(map[*TypeParameter]Value)}}
-	return expand(env, 0)
+	env := &Environment{Up: outer, Vertex: c.newInlineVertex(nil, &StructMarker{}),
+		types: &typeScope{quantifier: q, arguments: make(map[*TypeParameter]Value), finite: budget}}
+	value := expand(env, 0)
+	if budget.exhausted {
+		return q.finiteResidual(outer)
+	}
+	return value
 }
 
 // Universals commute with conjunction and fixed record projections, but
