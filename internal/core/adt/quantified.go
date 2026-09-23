@@ -72,9 +72,10 @@ func (*TypeReference) elemNode()          {}
 // typeScope holds one introduction of a quantified template. Argument maps
 // are immutable after construction; uses instantiate independent copies.
 type typeScope struct {
-	quantifier *Quantified
-	arguments  map[*TypeParameter]Value
-	finite     *finiteExpansionBudget
+	quantifier    *Quantified
+	arguments     map[*TypeParameter]Value
+	finite        *finiteExpansionBudget
+	erasedIndices map[*IndexExpr]bool
 }
 
 // AliasApplication substitutes predicates into an abbreviation. It creates
@@ -84,6 +85,9 @@ type AliasApplication struct {
 	Template *Quantified
 	UpCount  int32
 	Args     []Expr
+	// ErasedIndices guards runtime indexing only for this substitution.
+	// The underlying template remains shared with fixed-argument uses.
+	ErasedIndices map[*IndexExpr]bool
 }
 
 func (a *AliasApplication) Source() ast.Node { return a.Src }
@@ -104,6 +108,20 @@ func (a *AliasApplication) evaluate(c *OpContext, state Flags) Value {
 	scope := c.newInlineVertex(nil, &StructMarker{})
 	env := &Environment{Up: c.Env(a.UpCount), Vertex: scope,
 		types: &typeScope{quantifier: a.Template}}
+	for e := c.Env(0); e != nil; e = e.Up {
+		if e.types != nil && len(e.types.erasedIndices) != 0 {
+			if env.types.erasedIndices == nil {
+				env.types.erasedIndices = make(map[*IndexExpr]bool)
+			}
+			maps.Copy(env.types.erasedIndices, e.types.erasedIndices)
+		}
+	}
+	if len(a.ErasedIndices) != 0 {
+		if env.types.erasedIndices == nil {
+			env.types.erasedIndices = make(map[*IndexExpr]bool)
+		}
+		maps.Copy(env.types.erasedIndices, a.ErasedIndices)
+	}
 	f := &FuncValue{Env: env}
 	inst, b := f.instantiate(c, args)
 	if b != nil {
@@ -111,6 +129,15 @@ func (a *AliasApplication) evaluate(c *OpContext, state Flags) Value {
 	}
 	v, _ := c.Evaluate(inst.Env, a.Template.Body)
 	return v
+}
+
+func (c *OpContext) erasedAliasIndex(index *IndexExpr) bool {
+	for e := c.Env(0); e != nil; e = e.Up {
+		if e.types != nil && e.types.erasedIndices[index] {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *Quantified) evaluate(c *OpContext, state Flags) Value {

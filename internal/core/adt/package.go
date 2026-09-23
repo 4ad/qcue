@@ -15,6 +15,7 @@
 package adt
 
 import (
+	"maps"
 	"slices"
 
 	"cuelang.org/go/cue/ast"
@@ -169,6 +170,9 @@ func sameTypeEnvironment(c *OpContext, a, b *Environment) bool {
 		return a.types == b.types && a.DerefVertex(c) == b.DerefVertex(c)
 	}
 	if a.types.quantifier != b.types.quantifier || len(a.types.arguments) != len(b.types.arguments) {
+		return false
+	}
+	if !maps.Equal(a.types.erasedIndices, b.types.erasedIndices) {
 		return false
 	}
 	for param, value := range a.types.arguments {

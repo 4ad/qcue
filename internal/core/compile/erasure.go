@@ -22,6 +22,7 @@ import (
 type erasureScope struct {
 	up   *erasureScope
 	args map[*adt.TypeParameter]adt.Expr
+	root *adt.AliasApplication
 }
 
 type erasureVisit struct {
@@ -30,7 +31,10 @@ type erasureVisit struct {
 }
 
 func (s *erasureScope) bind(x *adt.AliasApplication) *erasureScope {
-	next := &erasureScope{up: s, args: make(map[*adt.TypeParameter]adt.Expr)}
+	next := &erasureScope{up: s, args: make(map[*adt.TypeParameter]adt.Expr), root: x}
+	if s != nil {
+		next.root = s.root
+	}
 	for i, arg := range x.Args {
 		next.args[x.Template.Params[i]] = arg
 	}
@@ -93,7 +97,17 @@ func (c *compiler) checkFunctionErasure(fn *adt.Function) {
 			if x.Quantified && hasErasedParameter(x.Index, current) {
 				// Indexing is overloaded. Preserve type application and reject
 				// fallback to ordinary data indexing when the subject resolves.
-				x.ErasedIndex = true
+				if current == nil {
+					x.ErasedIndex = true
+				} else {
+					// Templates are shared by all applications. An erased
+					// substitution must not poison a fixed-argument use.
+					app := current.root
+					if app.ErasedIndices == nil {
+						app.ErasedIndices = make(map[*adt.IndexExpr]bool)
+					}
+					app.ErasedIndices[x] = true
+				}
 				w.Elem(x.X)
 				return false
 			}

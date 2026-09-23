@@ -1204,7 +1204,7 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 			}
 		}
 	}
-	if x.ErasedIndex {
+	if x.ErasedIndex || ctx.erasedAliasIndex(x) {
 		ctx.AddBottom(ctx.NewErrf("erased type parameter cannot be used as a runtime index"))
 		return emptyNode
 	}

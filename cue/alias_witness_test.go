@@ -143,3 +143,38 @@ func TestParametricAliasWitness(t *testing.T) {
 		}
 	}
 }
+
+func TestQuantifiedAliasErasureSelectionContexts(t *testing.T) {
+	for _, tt := range []struct{ name, decl, use string }{
+		{"direct", "At(A) = xs[A]", "At"},
+		{"nested", "At(A) = xs[A]\nWrap(B) = At(B)", "Wrap"},
+		{"scoped", "At(A) = xs[A]\nWrap(B) = {out: At(B)}.out", "Wrap"},
+	} {
+		for _, fixedFirst := range []bool{false, true} {
+			t.Run(tt.name, func(t *testing.T) {
+				generic := "f(T): func() -> int: " + tt.use + "(T)\n"
+				fixed := "g: func() -> int: " + tt.use + "(0)\n"
+				functions := generic + fixed
+				if fixedFirst {
+					functions = fixed + generic
+				}
+				v := cuecontext.New().CompileString("xs: [10, 20]\n" + tt.decl + "\n" + functions + "out: g()\nbad: f[0]()")
+				if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 10 {
+					t.Fatalf("fixed alias application inherited another use's erasure check: %d, %v", got, err)
+				}
+				if err := v.LookupPath(cue.ParsePath("bad")).Err(); err == nil || !strings.Contains(err.Error(), "runtime index") {
+					t.Fatalf("erased argument used as runtime index: %v", err)
+				}
+			})
+		}
+	}
+	v := cuecontext.New().CompileString(`
+id(A): func(x: A) -> A: x
+Select(B) = id[B]
+f(T): func(x: T) -> T: Select(T)(x)
+out: f[int](3)
+`)
+	if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 3 {
+		t.Fatalf("erased alias argument prevented type selection: %d, %v", got, err)
+	}
+}
