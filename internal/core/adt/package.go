@@ -258,6 +258,7 @@ type sealKey struct {
 type sealedPackage struct {
 	interfaceType  *Existential
 	implementation *Vertex
+	publicSchema   *Vertex
 	privateEnv     *Environment
 	publicEnv      *Environment
 	carriers       map[*TypeParameter]*opaqueCarrier
@@ -395,6 +396,7 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	if b := schema.Bottom(); b != nil {
 		return b
 	}
+	p.publicSchema = schema
 	view := p.transportResolvedMode(c, schema, implementation, true, true)
 	if v, ok := view.(*Vertex); ok {
 		v.sealed = p
@@ -512,7 +514,7 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 			return &OpaqueValue{carrier: carrier, private: value}
 		}
 	}
-	if packageValue := p.transportPackage(c, value); packageValue != nil {
+	if packageValue := p.transportPackage(c, env, schema, value); packageValue != nil {
 		return packageValue
 	}
 	switch x := schema.(type) {
@@ -679,7 +681,7 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 		}
 		return &OpaqueValue{carrier: carrier, private: value}
 	}
-	if packageValue := p.transportPackage(c, value); packageValue != nil {
+	if packageValue := p.transportPackage(c, nil, schema, value); packageValue != nil {
 		return packageValue
 	}
 	if f, ok := Unwrap(schema).(*FuncValue); ok {
@@ -759,7 +761,7 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 // An independent boundary transports by identity, retaining its witness,
 // generativity, and implementation obligations. Borrowed abstract fields
 // need a stronger transport rule and must remain incomplete.
-func (p *sealedPackage) transportPackage(c *OpContext, value Value) Value {
+func (p *sealedPackage) transportPackage(c *OpContext, env *Environment, schema Expr, value Value) Value {
 	v, ok := value.(*Vertex)
 	if !ok {
 		return nil
@@ -770,10 +772,17 @@ func (p *sealedPackage) transportPackage(c *OpContext, value Value) Value {
 		return nil
 	}
 	if v.sealed != p {
-		for _, a := range v.Arcs {
-			if abstractEscapes(c, a, p, make(map[Value]bool)) {
-				return &Bottom{Code: IncompleteError, Err: c.Newf("dependent package transport remains unresolved")}
-			}
+		// The private package can be independent while its public schema
+		// borrows this boundary's carrier. Identity transport would then
+		// expose the private instantiation of that public dependency.
+		var typ Value
+		complete := true
+		if schema != nil {
+			typ, complete = c.Evaluate(env, schema)
+		}
+		if !complete || abstractEscapes(c, typ, p, make(map[Value]bool)) ||
+			abstractEscapes(c, v, p, make(map[Value]bool)) {
+			return &Bottom{Code: IncompleteError, Err: c.Newf("dependent package transport remains unresolved")}
 		}
 	}
 	return value
@@ -974,10 +983,17 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 		return v.carrier.owner == owner
 	case *Vertex:
 		v = v.DerefValue()
-		if v.sealed != nil {
+		if v.sealed == owner {
 			// A closed package binds its own witness. The opened structural
 			// view still mentions the local rigid type and cannot escape.
-			return v.sealed == owner && v.sealedOpened
+			return v.sealedOpened
+		}
+		if v.sealed != nil && v.sealed.publicSchema != nil &&
+			abstractEscapes(c, v.sealed.publicSchema, owner, seen) {
+			// Another seal binds only its own witness, not free abstract
+			// dependencies in its public interface. Never inspect its
+			// private implementation or representation witnesses here.
+			return true
 		}
 		v.Finalize(c)
 		for _, a := range v.Arcs {
@@ -985,9 +1001,21 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 				return true
 			}
 		}
+		if pcs := v.PatternConstraints; pcs != nil {
+			for _, pc := range pcs.Pairs {
+				if abstractEscapes(c, pc.Pattern, owner, seen) ||
+					abstractEscapes(c, pc.Constraint, owner, seen) {
+					return true
+				}
+			}
+		}
 		if value := Unwrap(v); value != v {
 			return abstractEscapes(c, value, owner, seen)
 		}
+	case *Existential:
+		return abstractReferencesEscape(c, v.Template, v.Env, owner, seen)
+	case *Universal:
+		return abstractReferencesEscape(c, v.Template, v.Env, owner, seen)
 	case *Conjunction:
 		for _, term := range v.Values {
 			if abstractEscapes(c, term, owner, seen) {
@@ -1012,6 +1040,16 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 		if v.Fn.Ret != nil {
 			x, _ := c.Evaluate(v.Env, v.Fn.Ret)
 			return abstractEscapes(c, x, owner, seen)
+		}
+	}
+	return false
+}
+
+func abstractReferencesEscape(c *OpContext, q *Quantified, env *Environment, owner *sealedPackage, seen map[Value]bool) bool {
+	for _, ref := range q.References {
+		value, _ := c.Evaluate(env, ref)
+		if abstractEscapes(c, value, owner, seen) {
+			return true
 		}
 	}
 	return false

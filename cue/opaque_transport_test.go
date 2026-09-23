@@ -15,11 +15,12 @@
 package cue_test
 
 import (
+	"strings"
+	"testing"
+
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
-	"strings"
-	"testing"
 )
 
 func TestQuantifiedNestedPackageTransport(t *testing.T) {
@@ -42,5 +43,69 @@ listed: (open q as (A, Q) {result: Q.list[0]}).result
 				t.Fatalf("%s lost its package boundary: %s", path, src)
 			}
 		}
+	}
+}
+
+func TestQuantifiedDependentPackageTransport(t *testing.T) {
+	for _, body := range []string{"{#T: T}", "{value?: T}", "{[string]: T}"} {
+		t.Run(body, func(t *testing.T) {
+			v := cuecontext.New().CompileString(`
+Inner(T) = exists B ` + body + `
+#Outer: exists A {inner: Inner(A)}
+private: seal Inner(int) with (B = bool) {}
+p: seal #Outer with (A = int) {inner: private}
+q: (open p as (A, P) {result: P.inner}).result
+`)
+			if err := v.LookupPath(cue.ParsePath("p")).Validate(cue.Concrete(true)); err == nil ||
+				!strings.Contains(err.Error(), "dependent package transport remains unresolved") {
+				t.Fatalf("dependent public interface must remain incomplete: %v", err)
+			}
+		})
+	}
+	v := cuecontext.New().CompileString(`
+Inner(T) = exists B {#T: T}
+#Outer: exists A {inner: Inner(A)}
+private: seal Inner(int) with (B = bool) {}
+p: seal #Outer with (A = int) {inner: private}
+q: (open p as (A, P) {result: P.inner}).result
+exposed: (open q as (B, Q) {result: Q.#T}).result
+out: exposed & 1
+`)
+	if got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON(); err == nil {
+		t.Fatalf("nested package exposed the outer representation: %s", got)
+	}
+}
+
+func TestQuantifiedPackageFreeAbstractDependencies(t *testing.T) {
+	for _, body := range []string{
+		`forall B (func(A) -> B | func(B) -> A)`,
+		`seal (exists B {#T: A}) with (B = bool) {}`,
+		`seal ((exists B {}) & {#T: A}) with (B = bool) {}`,
+		`seal ((exists B {}) & {[string]: A}) with (B = bool) {}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			v := cuecontext.New().CompileString(`
+#M: exists A {value: A}
+p: seal #M with (A = int) {value: 1}
+out: (open p as (A, P) {result: ` + body + `}).result
+`)
+			if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil ||
+				!strings.Contains(err.Error(), "abstract type escapes its opening scope") {
+				t.Fatalf("free abstract dependency escaped: %v", err)
+			}
+		})
+	}
+
+	// An inner seal may bind the outer representation as its private
+	// witness when its public interface is independent of that witness.
+	v := cuecontext.New().CompileString(`
+#M: exists A {value: A}
+p: seal #M with (A = int) {value: 1}
+out: (open p as (A, P) {
+	result: seal (exists B {value: B}) with (B = A) {value: P.value}
+}).result
+`)
+	if err := v.LookupPath(cue.ParsePath("out")).Validate(cue.Concrete(true)); err != nil {
+		t.Fatal(err)
 	}
 }
