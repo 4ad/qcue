@@ -70,6 +70,12 @@ func (s *subsumer) capabilitySignature(target, source adt.FuncType) bool {
 	if !ok {
 		return false
 	}
+	if source.Fn.Open {
+		// The source's existential row may contain further required slots.
+		// Its known prefix alone does not establish coverage of a packet
+		// or a closed target protocol.
+		return false
+	}
 
 	a, b := target.Fn, source.Fn
 	if b.Src != nil && b.Src.Effect != nil {
