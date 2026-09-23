@@ -7,8 +7,8 @@ version v0.18.0 and later. Build with `go install ./cmd/qcue`; the resulting
 Run `qcue version` for the supported language version and extension profiles.
 
 See [the implementation guide](doc/quantified-cue-implementation.md) and
-[the quantified test index](cue/testdata/quantified/README.md), including all
-paper examples and topic-organized txtar fixtures.
+[the quantified test index](cue/testdata/quantified/README.md) for examples and
+topic-organized txtar fixtures.
 
 <!--
  Copyright 2018 The CUE Authors

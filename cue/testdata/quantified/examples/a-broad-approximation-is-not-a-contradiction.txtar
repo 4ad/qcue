@@ -1,0 +1,9 @@
+-- in.cue --
+@test(validate, at="f")
+@test(validate, at="unknown")
+
+f: func(x: number) -> number: 1
+f: func(number) -> int              // provable from the body
+
+unknown: func(number) -> number
+unknown: func(number) -> int        // a nonempty refinement

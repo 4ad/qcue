@@ -1,0 +1,5 @@
+-- in.cue --
+@test(validate, conflict, at="r")
+
+f(A): func(A) -> A
+r: f(3) & string

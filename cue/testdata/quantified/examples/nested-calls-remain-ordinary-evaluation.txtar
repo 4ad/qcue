@@ -1,0 +1,5 @@
+-- in.cue --
+@test(json, 16, at="value")
+
+twice: func(n: int) -> int: n + n
+value: twice(twice(twice(2))) // 16

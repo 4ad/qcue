@@ -1,0 +1,8 @@
+#error
+
+-- in.cue --
+scale: func(_~value: int, _: int) -> int: value * 2
+x: scale(5, 99)             // 10
+bad: scale(value: 5, 99)     // invalid label/order
+-- error.txt --
+positional argument after labeled argument

@@ -1,0 +1,9 @@
+-- in.cue --
+@test(validate, conflict, at="wrongDomain")
+@test(validate, conflict, at="wrongResult")
+
+wrongResult: func(int) -> string
+wrongResult: func(x: int) -> int: x
+
+wrongDomain: func(number) -> string
+wrongDomain: func(x: int) -> string: "ok"

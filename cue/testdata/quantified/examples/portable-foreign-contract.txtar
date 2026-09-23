@@ -1,0 +1,6 @@
+-- in.cue --
+@test(validate, at="externF")
+
+externF: extern func(int) -> int !bridge
+// A native-range failure is a bridge outcome.
+// A fractional input is outside the logical domain.

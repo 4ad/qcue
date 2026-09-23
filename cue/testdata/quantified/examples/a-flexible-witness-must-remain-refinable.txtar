@@ -1,0 +1,5 @@
+-- in.cue --
+@test(json, {"value":2}, at="x")
+
+x: exists (n in 1 | 2) {value: n}
+x: {value: 2}

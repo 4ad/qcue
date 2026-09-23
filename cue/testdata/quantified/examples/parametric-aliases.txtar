@@ -1,0 +1,7 @@
+-- in.cue --
+@test(json, {"b":{"value":3},"p":[3,"x"]}, at="probe")
+
+Box(A) = {value: A}
+Pair(A, B) = [A, B]
+
+probe: {b: Box(int) & {value: 3}, p: Pair(int, string) & [3, "x"]}

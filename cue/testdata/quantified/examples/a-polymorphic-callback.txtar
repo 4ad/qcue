@@ -1,0 +1,12 @@
+-- in.cue --
+@test(validate, conflict, at="bad")
+@test(json, [7,"seven"], at="ok")
+
+id(A): func(x: A) -> A: x
+useBoth: func(p: forall A func(A) -> A) -> [int, string]: [
+    p(7),
+    p("seven"),
+]
+ok: useBoth(id)              // [7, "seven"]
+onlyInt: func(x: int) -> int: x
+bad: useBoth(onlyInt)         // incompatible universal obligation

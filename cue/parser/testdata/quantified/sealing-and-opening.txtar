@@ -1,0 +1,8 @@
+-- in.cue --
+seal Interface with (HiddenType = Representation) {
+    // implementation fields, checked with the private representation
+}
+
+open moduleValue as (AbstractType, View) {
+    // AbstractType is rigid; View has the opened interface.
+}

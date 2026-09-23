@@ -1,0 +1,6 @@
+-- in.cue --
+@test(validate, concrete, incomplete, at="a")
+@test(validate, concrete, incomplete, at="b")
+
+a: int & b * 5
+b: a - 1

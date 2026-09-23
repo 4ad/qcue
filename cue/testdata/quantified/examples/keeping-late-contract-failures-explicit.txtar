@@ -1,0 +1,7 @@
+-- in.cue --
+@test(validate, at="checked")
+
+checkedResult: extern func(_, _) -> _ !constraint
+legacyBody: extern func(int) -> _ !constraint
+checked: func(x: int) -> string !constraint:
+    checkedResult(string, legacyBody(x))

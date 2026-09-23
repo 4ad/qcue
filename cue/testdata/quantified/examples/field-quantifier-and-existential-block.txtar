@@ -1,0 +1,10 @@
+-- in.cue --
+@test(validate, at="x")
+
+U: _
+W: _
+x(V: W): {
+    exists T: U
+    value: T
+    transform: func(V) -> V
+}

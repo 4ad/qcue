@@ -1,0 +1,5 @@
+-- in.cue --
+@test(json, 10, at="x")
+
+scale: func(_~value: int, _: int) -> int: value * 2
+x: scale(5, 99)             // 10

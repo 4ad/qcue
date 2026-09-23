@@ -5,10 +5,9 @@ expectations live in txtar archives, grouped by topic. The ordinary CUE evaluato
 runner discovers this directory automatically; no Go table needs updating when
 adding a semantic case.
 
-- [Paper corpus](paper/README.md): an index of all **101** listings, with exact
-  paper text, executable context, and explicit expectations. All 78 executable
-  S_H/A examples run, including expected errors and incomplete specifications.
-  The two syntax templates are parsed; D and pseudocode exclusions are labeled.
+- [Examples](examples/): standalone programs with explicit expectations,
+  including expected errors and incomplete specifications. Examples initially
+  copied from the proposal evolve independently of its text and numbering.
 - [API fixtures](api/): programs for refinement with `Unify` and `FillPath`,
   declaration ordering, source export, and closure completeness. Their Go
   assertions remain in [quantified_test.go](../../quantified_test.go) because
@@ -132,18 +131,18 @@ The following regressions cover the additional semantic audit findings:
 | Subtype binders admit unary bodies | [bound_unary_body](finite_witnesses/bound_unary_body.txtar), plus parser and formatter fixtures |
 
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
-load them directly. Paper exclusions state their reason, and the paper index
-test checks that every listing still matches the proposal exactly.
+load them directly. Syntax-only cases and malformed syntax belong in the parser
+corpus. No test compares fixtures with the proposal document.
 
 ## Running the tests
 
 From the repository root:
 
 ```sh
-# Semantic fixtures, including the executable paper examples.
+# Semantic fixtures, including the standalone examples.
 go test ./internal/core/adt -run TestEvalV3/quantified
 
-# Paper integrity and Go API operations.
+# Go API operations.
 go test ./cue -run TestQuantified
 
 # Syntax, both formatters, AST identities, and export errors.
@@ -158,7 +157,8 @@ go test ./...
 ```
 
 A narrower `-run` can select a topic or paper number, for example
-`TestEvalV3/quantified/paper/035`. New semantic archives need explicit assertions.
+`TestEvalV3/quantified/examples/a-polymorphic-callback`.
+New semantic archives need explicit assertions.
 When deliberately changing a golden expectation, use the repository's
 `CUE_UPDATE=1` (fill missing output) or `CUE_UPDATE=force` (replace output), then
 review the diff. JSON, validation, and subsumption assertions are authored

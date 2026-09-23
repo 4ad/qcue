@@ -1,0 +1,8 @@
+-- in.cue --
+@test(validate, at="f")
+
+x: number
+f: func(x) -> string
+f: func(n: int) -> string: "ok"
+
+x: int

@@ -1,0 +1,5 @@
+-- in.cue --
+forall (A, B) T
+exists A { ... }
+forall (A: number) func(A, A) -> [A, A]
+forall (n in int & >=0) T

@@ -1,0 +1,8 @@
+-- in.cue --
+@test(json, "hello!", at="x")
+@test(json, "hello?", at="y")
+
+render: func(text: string, suffix!: string = "!") -> string:
+    text + suffix
+x: render("hello")                 // "hello!"
+y: render("hello", suffix: "?")   // "hello?"

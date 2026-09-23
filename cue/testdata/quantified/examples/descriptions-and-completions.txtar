@@ -1,0 +1,7 @@
+-- in.cue --
+@test(validate, concrete, incomplete, at="config")
+
+config: {
+    x: int
+    y: x + 1
+}

@@ -1,0 +1,6 @@
+-- in.cue --
+@test(json, 3, at="a")
+
+raw: func(_~n: int) -> int: n + 1
+named: func(x: int) -> int: raw(x)
+a: named(x: 2)              // 3

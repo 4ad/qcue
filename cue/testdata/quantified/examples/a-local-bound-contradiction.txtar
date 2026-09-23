@@ -1,0 +1,5 @@
+-- in.cue --
+@test(validate, conflict, at="y")
+
+x: <0
+y: x & >0

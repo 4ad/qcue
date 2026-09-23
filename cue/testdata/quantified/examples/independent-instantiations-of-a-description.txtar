@@ -1,0 +1,7 @@
+-- in.cue --
+@test(json, {"value":1}, at="left")
+@test(json, {"value":2}, at="right")
+
+#Cell: {value: int}
+left:  #Cell & {value: 1}
+right: #Cell & {value: 2}

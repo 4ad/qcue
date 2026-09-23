@@ -1,0 +1,4 @@
+-- in.cue --
+@test(validate, at="convert")
+
+convert: (func(int) -> string) & (func(string) -> int)

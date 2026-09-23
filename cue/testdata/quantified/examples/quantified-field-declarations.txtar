@@ -1,0 +1,4 @@
+-- in.cue --
+@test(validate, at="map")
+
+map(A, B): func(func(A) -> B, [...A]) -> [...B]

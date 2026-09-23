@@ -1,0 +1,10 @@
+-- in.cue --
+@test(validate, at="use")
+
+use: func(forall A func(A) -> A) -> [int, string]
+
+#Showable: exists A {
+    value: A
+    show:  func(A) -> string
+}
+show: func(#Showable) -> string

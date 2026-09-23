@@ -1,0 +1,5 @@
+-- in.cue --
+@test(validate, conflict, at="e")
+
+d: [for v in [1, 2] {func(y: int) -> int: y + v}]
+e: d[0] & d[1]             // _|_: captures differ

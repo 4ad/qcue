@@ -1,0 +1,6 @@
+-- in.cue --
+@test(json, 2, at="answer")
+
+raw: func(x: int) -> int: x
+configured: func(x: int = 2) -> int: raw(x)
+answer: configured()        // 2

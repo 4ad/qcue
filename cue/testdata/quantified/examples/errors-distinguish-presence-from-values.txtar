@@ -1,0 +1,13 @@
+-- in.cue --
+@test(validate, conflict, at="a")
+@test(validate, conflict, at="b")
+@test(validate, conflict, at="c")
+@test(validate, conflict, at="d")
+@test(validate, concrete, incomplete, at="e")
+
+sum: func(a: int, b: int) -> int: a + b
+a: sum(1, a: 1)            // duplicate binding, even with equal values
+b: sum(1, 2, 3)            // surplus positional argument
+c: sum(a: 1, b: 2, c: 3)    // unknown label
+d: sum(1)                  // required argument missing
+e: sum(_, 2)               // supplied but incomplete, not missing

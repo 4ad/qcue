@@ -1,0 +1,12 @@
+-- in.cue --
+@test(validate, at="x")
+
+U: _
+W: _
+x: {
+    exists T: U
+    forall V: W
+    // The whole following declaration body is in this prefix.
+    value: T
+    transform: func(V) -> V
+}

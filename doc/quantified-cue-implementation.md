@@ -215,18 +215,17 @@ incompleteness rather than being replaced with a weaker description.
 - [The quantified test index](../cue/testdata/quantified/README.md) links every
   layer's txtar fixtures and explains their assertions. Semantic cases run in
   the ordinary evaluator corpus under `cue/testdata/quantified/`.
-- [The paper corpus](../cue/testdata/quantified/paper/README.md) contains all
-  **101** exact listings: **78 executable examples**, two parsed surface-syntax
-  templates, 20 explicitly excluded D examples, and one pseudocode listing.
-  `cue/quantified_paper_test.go` checks the corpus against the paper. Intentional
-  errors and specification-only examples assert their errors or residual status.
+- [The examples](../cue/testdata/quantified/examples/) are standalone regression
+  tests, initially copied from the proposal and maintained independently.
+  Intentional errors and specification-only examples assert their errors or
+  residual status. Syntax-only cases live in the parser corpus.
 - Additional txtar fixtures cover refinement, universes, opacity, identity,
   file ordering, certification, and export. Small Go harnesses retain checks
   requiring Go API operations or AST identity; their input programs are txtar
   sections too. Parser, formatter, AST, exporter, and CLI corpora all have
   `quantified` in their paths or filenames.
 
-Run the semantic corpus and the paper/API checks with:
+Run the semantic corpus and the API checks with:
 
 ```sh
 go test ./internal/core/adt -run TestEvalV3/quantified

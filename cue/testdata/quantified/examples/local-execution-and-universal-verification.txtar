@@ -1,0 +1,6 @@
+-- in.cue --
+@test(validate, concrete, incomplete, at="r")
+
+externalArithmetic: extern func(int) -> int !bridge
+f: func(x: int) -> int: externalArithmetic(x)
+r: f(0)

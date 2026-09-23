@@ -1,0 +1,8 @@
+-- in.cue --
+@test(validate, at="#Counter")
+
+#Counter: exists State {
+    zero: State
+    next: func(State) -> State
+    read: func(State) -> (int & >=0)
+}
