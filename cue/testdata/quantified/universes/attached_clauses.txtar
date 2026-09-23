@@ -1,0 +1,18 @@
+// Formation depends on every retained telescope, not only implementation
+// parameters or the occurrences of binders in its parameter/result types.
+
+-- in.cue --
+@test(validate, conflict, at="self")
+@test(validate, conflict, at="tooSmall")
+@test(validate, at="largeEnough")
+
+f: func(x: _) -> _: x
+f: forall (A in Type(0)) func(A) -> A
+self: f[f](f)
+
+g: func(x: _) -> _: x
+g: forall (A in Type(1)) func(A) -> A
+Box(A in Type(1)) = {value: A}
+Large(A in Type(2)) = {value: A}
+tooSmall: Box(g)
+largeEnough: Large(g)

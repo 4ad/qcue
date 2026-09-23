@@ -58,19 +58,10 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		return v.carrier.level, true
 	case *FuncValue:
 		known := true
-		for _, p := range typeParameters(v.Env) {
-			if p.ValueRange == nil {
-				level = max(level, p.Level+1)
-				known = known && p.ExplicitLevel
-			}
-		}
-		n, ok := typeExpressionLevel(c, v.Env, v.Fn, seen)
-		level = max(level, n)
-		if !ok {
-			return level, false
-		}
-		for _, t := range v.Types {
-			n, ok := typeExpressionLevel(c, t.Env, t.Fn, seen)
+		for _, t := range v.selectionAndOriginalClauses() {
+			n, ok := environmentUniverse(c, t.Env, seen)
+			level, known = max(level, n), known && ok
+			n, ok = typeExpressionLevel(c, t.Env, t.Fn, seen)
 			level = max(level, n)
 			if !ok {
 				return level, false
@@ -85,6 +76,13 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		v.Finalize(c)
 		if x := Unwrap(v); x != v {
 			return universeOf(c, x, seen)
+		}
+		for _, s := range v.schemes {
+			n, ok := environmentUniverse(c, s.env, seen)
+			level = max(level, n)
+			if !ok {
+				return level, false
+			}
 		}
 		for _, a := range v.Arcs {
 			if !a.Label.IsLet() && !add(a) {
@@ -120,6 +118,30 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		return 0, !v.IsIncomplete()
 	}
 	return level, true
+}
+
+// A retained clause carries a telescope as well as a predicate expression.
+// Every formation check must include both, even when the expression does not
+// mention its binders. Selected arguments also contribute their own levels.
+func environmentUniverse(c *OpContext, env *Environment, seen map[Expr]bool) (int, bool) {
+	level, known := 0, true
+	for _, p := range typeParameters(env) {
+		if p.ValueRange == nil {
+			level = max(level, p.Level+1)
+			known = known && p.ExplicitLevel
+		}
+	}
+	for e := env; e != nil; e = e.Up {
+		if e.types != nil {
+			for _, arg := range e.types.arguments {
+				if arg != nil {
+					n, ok := universeOf(c, arg, seen)
+					level, known = max(level, n), known && ok
+				}
+			}
+		}
+	}
+	return level, known
 }
 
 func typeExpressionLevel(c *OpContext, env *Environment, x Expr, seen map[Expr]bool) (int, bool) {
@@ -212,22 +234,22 @@ func universeOccurs(c *OpContext, param *TypeParameter, value Value, seen map[Va
 	seen[value] = true
 	switch v := Unwrap(value).(type) {
 	case *FuncValue:
-		for _, p := range typeParameters(v.Env) {
-			if p == param {
+		for _, t := range v.selectionAndOriginalClauses() {
+			if environmentOccurs(c, param, t.Env, seen) {
 				return true
 			}
 		}
-		for env := v.Env; env != nil; env = env.Up {
-			if env.types != nil {
-				for _, arg := range env.types.arguments {
-					if universeOccurs(c, param, arg, seen) {
-						return true
-					}
-				}
-			}
-		}
+	case *Universal:
+		return environmentOccurs(c, param, v.Env, seen)
+	case *Existential:
+		return environmentOccurs(c, param, v.Env, seen)
 	case *Vertex:
 		v.Finalize(c)
+		for _, s := range v.schemes {
+			if environmentOccurs(c, param, s.env, seen) {
+				return true
+			}
+		}
 		for _, a := range v.Arcs {
 			if universeOccurs(c, param, a, seen) {
 				return true
@@ -243,6 +265,24 @@ func universeOccurs(c *OpContext, param *TypeParameter, value Value, seen map[Va
 		for _, x := range v.Values {
 			if universeOccurs(c, param, x, seen) {
 				return true
+			}
+		}
+	}
+	return false
+}
+
+func environmentOccurs(c *OpContext, param *TypeParameter, env *Environment, seen map[Value]bool) bool {
+	for _, p := range typeParameters(env) {
+		if p == param {
+			return true
+		}
+	}
+	for e := env; e != nil; e = e.Up {
+		if e.types != nil {
+			for _, arg := range e.types.arguments {
+				if universeOccurs(c, param, arg, seen) {
+					return true
+				}
 			}
 		}
 	}

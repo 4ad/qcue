@@ -462,6 +462,13 @@ func (f *FuncValue) selectionClauses() []FuncType {
 	if f.selection != nil {
 		return f.selection.clauses
 	}
+	return f.selectionAndOriginalClauses()
+}
+
+// A selected view retains the original clauses as obligations. Checks on the
+// whole descriptor (such as universe formation) must not use only the selected
+// telescope that the next type application consumes.
+func (f *FuncValue) selectionAndOriginalClauses() []FuncType {
 	return append([]FuncType{{Fn: f.Fn, Env: f.Env}}, f.Types...)
 }
 
