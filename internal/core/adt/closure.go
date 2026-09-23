@@ -42,6 +42,7 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 	}
 	c.checkingClosures[key] = true
 	defer delete(c.checkingClosures, key)
+	a, b = transportIdentity(c, a), transportIdentity(c, b)
 	result := proofEstablished
 	if a.Fn != b.Fn {
 		x, xok := a.Fn.Body.(*OpaqueCall)
@@ -93,6 +94,53 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 		}
 	}
 	return result
+}
+
+// Opposite transports through the same interface are the identity on a
+// callable descriptor. Normalize only the identity observation: retaining
+// the actual adapters preserves their attached contracts and runtime checks.
+func transportIdentity(c *OpContext, f *FuncValue) *FuncValue {
+	for !f.IsPartial() {
+		outer, ok := f.Fn.Body.(*OpaqueCall)
+		if !ok || outer.private.IsPartial() {
+			break
+		}
+		inner, ok := outer.private.Fn.Body.(*OpaqueCall)
+		if !ok || outer.owner != inner.owner || outer.outward == inner.outward ||
+			!sameTransportSignature(c, outer.signature, outer.env, inner.signature, inner.env) {
+			break
+		}
+		f = inner.private
+	}
+	return f
+}
+
+func sameTransportSignature(c *OpContext, a *Function, ae *Environment, b *Function, be *Environment) bool {
+	if a == b && ae == be {
+		return true
+	}
+	if a.Open != b.Open || len(a.Params) != len(b.Params) ||
+		len(typeParameters(ae)) != 0 || len(typeParameters(be)) != 0 {
+		return false
+	}
+	same := func(x Expr, xe *Environment, y Expr, ye *Environment) bool {
+		if x == nil || y == nil {
+			return x == y
+		}
+		xv, xok := c.Evaluate(xe, x)
+		yv, yok := c.Evaluate(ye, y)
+		return xok && yok && xv != nil && yv != nil &&
+			(Equal(c, xv, yv, CheckStructural) ||
+				(c.provesInclusion(xv, yv) && c.provesInclusion(yv, xv)))
+	}
+	for i, x := range a.Params {
+		y := b.Params[i]
+		if x.Label != y.Label || x.Positional != y.Positional || x.ArcType != y.ArcType ||
+			(x.Default == nil) != (y.Default == nil) || !same(x.Value, ae, y.Value, be) {
+			return false
+		}
+	}
+	return same(a.Ret, ae, b.Ret, be)
 }
 
 func concreteCapture(c *OpContext, v Value) bool {

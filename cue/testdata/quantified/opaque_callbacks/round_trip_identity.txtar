@@ -1,0 +1,36 @@
+-- in.cue --
+@test(json, [2, 3, 4, 5], at="out")
+@test(validate, conflict, at="different")
+@test(validate, conflict, at="differentSeal")
+#M: exists (A) {
+	seed:       A
+	op:         func(A) -> A
+	read:       func(A) -> int
+	id:         func(func(int) -> int) -> (func(int) -> int)
+	abstractId: func(func(A) -> A) -> (func(A) -> A)
+}
+p: seal #M with (A = int) {
+	seed:       5
+	op:         func(x: int) -> int: x
+	read:       func(x: int) -> int: x
+	id:         func(f: func(int) -> int) -> (func(int) -> int): f
+	abstractId: func(f: func(int) -> int) -> (func(int) -> int): f
+}
+q: seal #M with (A = int) {
+	seed:       5
+	op:         func(x: int) -> int: x
+	read:       func(x: int) -> int: x
+	id:         func(f: func(int) -> int) -> (func(int) -> int): f
+	abstractId: func(f: func(int) -> int) -> (func(int) -> int): f
+}
+f: func(x: int) -> int: x
+g: func(x: int) -> int: x
+out: (open p as (A, P) {
+	let left = P.id(f) & f
+	let right = f & P.id(f)
+	let twice = P.id(P.id(f)) & f
+	let same = P.abstractId(P.op) & P.op
+	result: [left(2), right(3), twice(4), P.read(same(P.seed))]
+}).result
+different:     (open p as (A, P) {result: P.id(f) & g}).result
+differentSeal: (open p as (A, P) {result: open q as (B, Q) {result: P.op & Q.op}}).result.result

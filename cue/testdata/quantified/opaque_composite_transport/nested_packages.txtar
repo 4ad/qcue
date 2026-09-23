@@ -1,0 +1,32 @@
+-- in.cue --
+@test(validate, concrete, at="q")
+@test(validate, conflict, at="different")
+@test(validate, conflict, at="listedDifferent")
+@test(json, [1, 1, 1], at="out")
+
+#Inner: exists (B) {tag: 1}
+#Outer: exists (A) {
+	inner: #Inner
+	list:  [...#Inner]
+	pass:  func(#Inner) -> #Inner
+}
+p:     seal #Inner with (B = int) {tag: 1}
+other: seal #Inner with (B = int) {tag: 1}
+q: seal #Outer with (A = int) {
+	inner: p
+	list:  [p]
+	pass:  func(x: #Inner) -> #Inner: x
+}
+copy:            (open q as (A, Q) {result: Q.inner}).result
+listed:          (open q as (A, Q) {result: Q.list[0]}).result
+returned:        (open q as (A, Q) {result: Q.pass(p)}).result
+same:            copy & p
+sameList:        listed & p
+sameReturn:      returned & p
+different:       copy & other
+listedDifferent: listed & other
+out: [
+	(open same as (B, P) {result: P.tag}).result,
+	(open sameList as (B, P) {result: P.tag}).result,
+	(open sameReturn as (B, P) {result: P.tag}).result,
+]

@@ -447,6 +447,9 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 			return &OpaqueValue{carrier: carrier, private: value}
 		}
 	}
+	if packageValue := p.transportPackage(c, value); packageValue != nil {
+		return packageValue
+	}
 	switch x := schema.(type) {
 	case *StructLit:
 		for _, d := range x.Decls {
@@ -607,6 +610,9 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 		}
 		return &OpaqueValue{carrier: carrier, private: value}
 	}
+	if packageValue := p.transportPackage(c, value); packageValue != nil {
+		return packageValue
+	}
 	if f, ok := Unwrap(schema).(*FuncValue); ok {
 		return p.transport(c, f.Env, f.Fn, value, outward)
 	}
@@ -672,6 +678,30 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 	result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, out))
 	result.Finalize(c)
 	return result
+}
+
+// A nested package is an existential value, not a record to reconstruct.
+// An independent boundary transports by identity, retaining its witness,
+// generativity, and implementation obligations. Borrowed abstract fields
+// need a stronger transport rule and must remain incomplete.
+func (p *sealedPackage) transportPackage(c *OpContext, value Value) Value {
+	v, ok := value.(*Vertex)
+	if !ok {
+		return nil
+	}
+	v.Finalize(c)
+	v = v.DerefValue()
+	if v.sealed == nil || (v.sealed == p && v.sealedOpened) {
+		return nil
+	}
+	if v.sealed != p {
+		for _, a := range v.Arcs {
+			if abstractEscapes(c, a, p, make(map[Value]bool)) {
+				return &Bottom{Code: IncompleteError, Err: c.Newf("dependent package transport remains unresolved")}
+			}
+		}
+	}
+	return value
 }
 
 // OpaqueCall is an authorized adapter. Traversals intentionally cannot visit

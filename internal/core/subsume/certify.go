@@ -236,7 +236,13 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	}
 	s := &subsumer{ctx: p.ctx}
 	source := adt.FuncType{Fn: f.Fn, Env: f.Env}
-	if partial := target.Partial(); partial != nil {
+	partial := target.Partial()
+	if partial == nil && f.IsPartial() && target.Fn != f.Fn {
+		// A new contract, including a boundary's callback interface,
+		// describes the residual packet of the supplied closure.
+		partial = f
+	}
+	if partial != nil {
 		source.Fn = partial.ResidualSignature()
 	}
 	if target.Fn == f.Fn {
@@ -279,7 +285,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	}
 	matches := adt.MatchFuncValueParams(target.Fn, &adt.FuncValue{Fn: source.Fn})
 	values := make(map[adt.Feature]adt.Value)
-	if partial := target.Partial(); partial != nil {
+	if partial != nil {
 		for i, arg := range f.Fn.Params {
 			env, expr := partial.BoundArgument(i)
 			if expr == nil {

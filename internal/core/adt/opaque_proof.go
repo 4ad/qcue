@@ -112,6 +112,11 @@ func (p *sealedPackage) totalTransport(c *OpContext, env *Environment, schema Ex
 	if v, ok := value.(*Vertex); ok {
 		v.Finalize(c)
 		value = v.DerefValue()
+		if _, ok := Unwrap(value).(*Existential); ok &&
+			(len(v.Arcs) != 0 || v.PatternConstraints != nil) {
+			// Refinements of an existential may borrow the outer carrier.
+			return false
+		}
 	}
 	value = Unwrap(value)
 	if active[value] {
@@ -124,6 +129,10 @@ func (p *sealedPackage) totalTransport(c *OpContext, env *Environment, schema Ex
 		return true
 	case *OpaqueType:
 		return v.carrier.owner == p
+	case *Existential:
+		// A closed interface with no free predicate dependencies cannot
+		// mention this boundary's carrier. Its packages pass unchanged.
+		return len(v.Template.References) == 0
 	case *Conjunction:
 		if abstractEscapes(c, v, p, make(map[Value]bool)) {
 			return false

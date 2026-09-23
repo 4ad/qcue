@@ -1,0 +1,22 @@
+-- in.cue --
+@test(json, [2, 3, 4], at="out")
+@test(validate, conflict, at="differentCapture")
+#M: exists (A) {
+	record: func({f: func(int) -> int}) -> {f: func(int) -> int}
+	list:   func([func(int) -> int]) -> [func(int) -> int]
+}
+p: seal #M with (A = int) {
+	record: func(x: {f: func(int) -> int}) -> {f: func(int) -> int}: x
+	list:   func(x: [func(int) -> int]) -> [func(int) -> int]: x
+}
+make:    func(n: int) -> (func(int) -> int): func(x: int) -> int: n + x
+f:       make(1)
+partial: (func(x: int, y: int) -> int: x + y)(1, ...)
+out: (open p as (A, P) {
+	result: [
+		(P.record({f: make(1)}).f & f)(1),
+		(P.list([f])[0] & f)(2),
+		(P.list([partial])[0] & partial)(3),
+	]
+}).result
+differentCapture: (open p as (A, P) {result: P.list([f])[0] & make(2)}).result
