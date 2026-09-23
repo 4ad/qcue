@@ -404,6 +404,10 @@ func (e *exporter) builtin(x *adt.Builtin) ast.Expr {
 // Printing a separate body for each clause would create distinct closures on
 // reimport; printing only the selected body would lose universal obligations.
 func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
+	if subject, argument, extra := f.TypeSelection(); subject != nil {
+		x := &ast.IndexExpr{X: &ast.ParenExpr{X: e.quantifiedFuncValue(subject)}, Index: e.value(argument)}
+		return e.withFuncTypes(x, extra)
+	}
 	head := adt.FuncType{Fn: f.Fn, Env: f.Env}
 	origin := head
 	var types []adt.FuncType

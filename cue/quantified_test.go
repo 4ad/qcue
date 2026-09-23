@@ -192,6 +192,8 @@ func TestQuantifiedSelectedExport(t *testing.T) {
 		{"invalid", false, "f(3)", "0"},
 		{"partial", true, `f(3, "s")`, `[3,"s"]`},
 		{"complete", true, `f(3, "s")`, `[3,"s"]`},
+		{"attached", true, "f(3)", "3"},
+		{"attached_partial", true, `f[string](3, "s")`, `[3,"s"]`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			v := cuecontext.New().CompileString(quantifiedAPIText(t, "selected_export", tt.name+".cue"))
@@ -213,6 +215,24 @@ func TestQuantifiedSelectedExport(t *testing.T) {
 				t.Fatalf("export %s: got %s, %v; want %s", text, out, err, tt.want)
 			}
 		})
+	}
+}
+
+func TestQuantifiedAttachedSelectionDepth(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(quantifiedAPIText(t, "selected_export", "attached_partial.cue"))
+	for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
+		text, err := format.Node(v.LookupPath(cue.ParsePath("selected")).Syntax(opts...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rebuilt := ctx.CompileString("f: " + string(text) + "\ngood: f[string](3, \"s\")\nbad: f[string][bool]")
+		if got, err := rebuilt.LookupPath(cue.ParsePath("good")).MarshalJSON(); err != nil || string(got) != `[3,"s"]` {
+			t.Fatalf("export %s: result %s, %v", text, got, err)
+		}
+		if rebuilt.LookupPath(cue.ParsePath("bad")).Validate() == nil {
+			t.Fatalf("export reintroduced a consumed binder: %s", text)
+		}
 	}
 }
 

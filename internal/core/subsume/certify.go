@@ -168,6 +168,18 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 		// equality is checked independently by the closure identity rules.
 		source.Env = target.Env
 	}
+	if len(adt.FunctionTypeParameters(source)) == 0 {
+		// Prove a universally constrained monomorphic implementation under
+		// fresh rigid inputs. This checks its body; it does not generalize
+		// a monomorphic callback from an annotation alone.
+		for _, param := range adt.FunctionTypeParameters(target) {
+			bound := p.schema(target.Env, param.Bound)
+			if bound == nil {
+				return false
+			}
+			target = adt.BindFunctionTypes(target, []adt.Value{&adt.RigidType{Param: param, Bound: bound}})
+		}
+	}
 	target, source, ok := s.capabilityScopes(target, source)
 	if !ok {
 		return false

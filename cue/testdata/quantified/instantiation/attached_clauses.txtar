@@ -1,0 +1,32 @@
+-- in.cue --
+@test(json, [3, 3, "x", [1, "y"], "z"], at="out")
+@test(validate, concrete, at="id")
+@test(validate, concrete, at="selected")
+@test(validate, concrete, at="pair")
+@test(validate, conflict, at="invalid")
+@test(validate, conflict, at="abstractConflict")
+@test(validate, conflict, at="tooMany")
+@test(validate, concrete, incomplete, at="badSelected")
+@test(json, "reversed", at="reversedOut")
+
+id(A): func(A) -> A
+id: func(x: _) -> _: x
+selected: id[int]
+pair(A, B): func(A, B) -> [A, B]
+pair: func(x: _, y: _) -> [_, _]: [x, y]
+bounded(A: int): func(A) -> A
+bounded(B: string): func(B) -> B
+bounded: func(x: _) -> _: x
+out: [id(3), selected(3), id[string]("x"), pair[int][string](1, "y"), bounded[string]("z")]
+invalid: bounded[bool]
+tooMany: pair[int][string][bool]
+abstract(A: int): func(A) -> A
+abstract(B: string): func(B) -> B
+abstractConflict: abstract[string]("x") & int
+reversed(B: string): func(B) -> B
+reversed(A: int): func(A) -> A
+reversed: func(x: _) -> _: x
+reversedOut: reversed[string]("reversed")
+bad(A): func(A) -> A
+bad: func(x: _) -> _: ({value: 0}).value
+badSelected: bad[int]

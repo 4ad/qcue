@@ -1165,19 +1165,13 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 			index = x.Index
 		}
 		if v := ctx.unifyNode(x.X, state); v != nil {
-			if f, ok := Unwrap(v).(*FuncValue); ok && len(typeParameters(f.Env)) != 0 {
+			if f, ok := Unwrap(v).(*FuncValue); ok && f.hasTypeSelection() {
 				arg, _ := ctx.Evaluate(ctx.Env(0), index)
-				inst, b := f.instantiate(ctx, map[*TypeParameter]Value{
-					typeParameters(f.Env)[0]: arg,
-				})
+				inst, b := f.selectType(ctx, arg)
 				if b != nil {
 					ctx.AddBottom(b)
 					return emptyNode
 				}
-				// Selection changes the call view, not the subject's
-				// obligations. Keep the original universal clause for
-				// certification and subsequent conjunctions.
-				inst.Types = mergeFuncTypes(inst.Types, []FuncType{{Fn: f.Fn, Env: f.Env}})
 				v := ctx.newInlineVertex(nil, nil, MakeRootConjunct(ctx.Env(0), inst))
 				v.Finalize(ctx)
 				return v
@@ -1641,6 +1635,11 @@ type FuncValue struct {
 	Fn    *Function
 	Env   *Environment
 	Types []FuncType
+
+	// selection tracks the remaining telescopes independently of retained
+	// universal proof obligations. Otherwise a second index could select
+	// the first binder of an original clause all over again.
+	selection *functionSelection
 
 	// args holds arguments bound by partial application, indexed by parameter;
 	// a nil expr marks an unbound parameter. When any entry is set this is a
@@ -2377,7 +2376,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			}
 		}
 		return &FuncValue{Src: x.Src, Fn: x.Fn, Env: x.Env, Types: x.Types,
-			args: bindings, identities: x.identities, scopes: x.scopes}
+			args: bindings, identities: x.identities, scopes: x.scopes, selection: x.selection}
 	}
 	if len(typeParameters(x.Env)) != 0 {
 		inst, b := x.inferInstance(c, bindings)

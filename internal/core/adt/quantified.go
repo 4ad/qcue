@@ -438,6 +438,78 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 	return &copy, nil
 }
 
+type functionSelection struct {
+	subject  *FuncValue
+	argument Value
+	clauses  []FuncType
+	types    []FuncType // obligations already entailed by this selection
+}
+
+// TypeSelection exposes the retained elimination for faithful source export.
+func (f *FuncValue) TypeSelection() (subject *FuncValue, argument Value, extra []FuncType) {
+	if s := f.selection; s != nil {
+		for _, t := range f.Types {
+			if !slices.Contains(s.types, t) {
+				extra = append(extra, t)
+			}
+		}
+		return s.subject, s.argument, extra
+	}
+	return nil, nil, nil
+}
+
+func (f *FuncValue) selectionClauses() []FuncType {
+	if f.selection != nil {
+		return f.selection.clauses
+	}
+	return append([]FuncType{{Fn: f.Fn, Env: f.Env}}, f.Types...)
+}
+
+func (f *FuncValue) hasTypeSelection() bool {
+	for _, t := range f.selectionClauses() {
+		if len(typeParameters(t.Env)) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *FuncValue) selectType(c *OpContext, argument Value) (*FuncValue, *Bottom) {
+	copy := *f
+	selected := &functionSelection{subject: f, argument: argument}
+	var err *Bottom
+	for _, t := range f.selectionClauses() {
+		params := typeParameters(t.Env)
+		if len(params) == 0 {
+			continue
+		}
+		inst, b := (&FuncValue{Fn: t.Fn, Env: t.Env}).instantiate(c,
+			map[*TypeParameter]Value{params[0]: argument})
+		if b != nil {
+			// Other retained clauses may admit the argument. An unknown
+			// bound takes precedence if none establishes an instance.
+			if err == nil || b.IsIncomplete() {
+				err = b
+			}
+			continue
+		}
+		view := t
+		view.Env = inst.Env
+		selected.clauses = append(selected.clauses, view)
+		if t.Fn == f.Fn && t.Env == f.Env {
+			copy.Env = inst.Env
+		}
+	}
+	if len(selected.clauses) == 0 {
+		return nil, err
+	}
+	copy.selection = selected
+	copy.Types = mergeFuncTypes(f.Types, []FuncType{{Fn: f.Fn, Env: f.Env}})
+	copy.Types = mergeFuncTypes(copy.Types, selected.clauses)
+	selected.types = copy.Types
+	return &copy, nil
+}
+
 // typeArgumentFits is a sufficient inclusion check, with concrete witnesses
 // for refutation. Compatibility of two incomplete predicates proves neither
 // inclusion nor its negation.

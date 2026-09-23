@@ -1299,6 +1299,10 @@ func equalFuncTypes(a, b []FuncType) bool {
 // bound the same arguments and consist of the same functions and types,
 // regardless of the order in which these were unified.
 func equalFuncValues(c *OpContext, x, y *FuncValue) bool {
+	if (x.selection != nil || y.selection != nil) &&
+		!equalFuncTypes(x.selectionClauses(), y.selectionClauses()) {
+		return false
+	}
 	if x.Fn != nil && y.Fn != nil && (x.Fn.Quantified || y.Fn.Quantified) &&
 		!IsFuncType(x) && !IsFuncType(y) {
 		return closureIdentity(c, x, y) == proofEstablished &&
