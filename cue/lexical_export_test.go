@@ -96,6 +96,7 @@ func TestQuantifiedUnresolvedWitnessExport(t *testing.T) {
 	for _, source := range []string{
 		"x: int\nlet Y = x & int\nf: func(y: Y) -> int: 0",
 		"x: int\nf: func(x) -> 1",
+		"x: int\nAlias(A) = x & A\nf: func(y: Alias(int)) -> int: 0",
 	} {
 		for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
 			ctx := cuecontext.New()

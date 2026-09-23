@@ -140,7 +140,7 @@ type compiler struct {
 	fileScope map[adt.Feature]bool
 
 	typeParameters    map[*ast.TypeParam]*adt.TypeParameter
-	parametricAliases map[*ast.ParametricAlias]adt.Expr
+	parametricAliases map[aliasContext]adt.Expr
 	typePosition      bool
 	functionLiterals  map[*ast.Func]functionLiteral
 	letLabels         map[*ast.LetClause]adt.Feature

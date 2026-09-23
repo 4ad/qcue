@@ -52,7 +52,7 @@ func TestQuantifiedDataMeet(t *testing.T) {
 }
 
 func TestQuantifiedErasure(t *testing.T) {
-	for _, name := range []string{"result", "argument", "default", "alias", "nested", "builtin", "type_alias"} {
+	for _, name := range []string{"result", "argument", "default", "alias", "nested", "builtin", "type_alias", "alias_free", "alias_free_nested", "alias_substitutions"} {
 		t.Run(name, func(t *testing.T) {
 			v := cuecontext.New().CompileString(quantifiedAPIText(t, "erasure", name+".cue"))
 			if err := v.Err(); err == nil || !strings.Contains(err.Error(), "erased type parameter") {

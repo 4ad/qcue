@@ -23,23 +23,32 @@ import (
 	"cuelang.org/go/internal/core/adt"
 )
 
+// Alias bodies have the same two interpretations as ordinary abbreviations:
+// a value expression and a predicate that retains singleton dependencies.
+// Both interpretations share lexical binders and function code origins.
+type aliasContext struct {
+	src       *ast.ParametricAlias
+	predicate bool
+}
+
 func (c *compiler) aliasTemplate(src *ast.ParametricAlias, level int) adt.Expr {
 	if c.parametricAliases == nil {
-		c.parametricAliases = make(map[*ast.ParametricAlias]adt.Expr)
+		c.parametricAliases = make(map[aliasContext]adt.Expr)
 	}
-	if x, ok := c.parametricAliases[src]; ok {
+	key := aliasContext{src, c.typePosition}
+	if x, ok := c.parametricAliases[key]; ok {
 		if x == nil {
 			return c.errf(src, "cyclic parametric alias %s", src.Name.Name)
 		}
 		return x
 	}
-	c.parametricAliases[src] = nil
+	c.parametricAliases[key] = nil
 	saved := c.stack
 	c.stack = slices.Clone(c.stack[:level+1])
 	q := &ast.Quantifier{Quantifier: src.Pos(), Params: src.Params, Body: src.Body}
 	x := c.quantifiedTemplate(q, src)
 	c.stack = saved
-	c.parametricAliases[src] = x
+	c.parametricAliases[key] = x
 	return x
 }
 

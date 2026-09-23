@@ -19,21 +19,52 @@ import (
 	"cuelang.org/go/internal/core/walk"
 )
 
+type erasureScope struct {
+	up   *erasureScope
+	args map[*adt.TypeParameter]adt.Expr
+}
+
+type erasureVisit struct {
+	n adt.Node
+	s *erasureScope
+}
+
+func (s *erasureScope) bind(x *adt.AliasApplication) *erasureScope {
+	next := &erasureScope{up: s, args: make(map[*adt.TypeParameter]adt.Expr)}
+	for i, arg := range x.Args {
+		next.args[x.Template.Params[i]] = arg
+	}
+	return next
+}
+
 // Type parameters may occur in checked signatures, type selection, and seal
 // witnesses. They cannot supply runtime results, arguments, or defaults. In
 // particular, a bound of int does not turn an erased type into an integer
 // argument. Finite value binders are different: closure conversion captures
 // their selected values as part of the runtime descriptor.
 func (c *compiler) checkFunctionErasure(fn *adt.Function) {
-	seen := make(map[adt.Node]bool)
+	// Each alias argument is interpreted in its caller's substitution scope.
+	// A template can be visited with several substitutions in the same body.
+	var current *erasureScope
+	seen := make(map[erasureVisit]bool)
 	var w walk.Visitor
 	w.Before = func(n adt.Node) bool {
-		if n == nil || seen[n] {
+		key := erasureVisit{n, current}
+		if n == nil || seen[key] {
 			return false
 		}
-		seen[n] = true
+		seen[key] = true
 		switch x := n.(type) {
 		case *adt.TypeReference:
+			for s := current; s != nil; s = s.up {
+				if arg, ok := s.args[x.Param]; ok {
+					saved := current
+					current = s.up
+					w.Elem(arg)
+					current = saved
+					return false
+				}
+			}
 			if x.Param.ValueRange == nil {
 				c.errf(x.Src, "erased type parameter %s cannot be used as a runtime value", x.Param.Src.Name.Name)
 			}
@@ -50,18 +81,16 @@ func (c *compiler) checkFunctionErasure(fn *adt.Function) {
 			// uses in the template, rather than treating the substitutions
 			// themselves as runtime call arguments. Nested lambdas have
 			// already checked their bodies independently.
-			for _, arg := range x.Args {
-				if hasErasedParameter(arg) {
-					w.Elem(x.Template.Body)
-					break
-				}
-			}
+			saved := current
+			current = current.bind(x)
+			w.Elem(x.Template.Body)
+			current = saved
 			return false
 		case *adt.LetReference:
 			w.Elem(x.X)
 			return false
 		case *adt.IndexExpr:
-			if x.Quantified && hasErasedParameter(x.Index) {
+			if x.Quantified && hasErasedParameter(x.Index, current) {
 				// Indexing is overloaded. Preserve type application and reject
 				// fallback to ordinary data indexing when the subject resolves.
 				x.ErasedIndex = true
@@ -80,18 +109,34 @@ func (c *compiler) checkFunctionErasure(fn *adt.Function) {
 	w.Elem(fn.Body)
 }
 
-func hasErasedParameter(expr adt.Expr) bool {
-	seen := make(map[adt.Node]bool)
+func hasErasedParameter(expr adt.Expr, current *erasureScope) bool {
+	seen := make(map[erasureVisit]bool)
 	found := false
 	var w walk.Visitor
 	w.Before = func(n adt.Node) bool {
-		if n == nil || seen[n] || found {
+		key := erasureVisit{n, current}
+		if n == nil || seen[key] || found {
 			return false
 		}
-		seen[n] = true
+		seen[key] = true
 		switch x := n.(type) {
 		case *adt.TypeReference:
+			for s := current; s != nil; s = s.up {
+				if arg, ok := s.args[x.Param]; ok {
+					saved := current
+					current = s.up
+					w.Elem(arg)
+					current = saved
+					return false
+				}
+			}
 			found = x.Param.ValueRange == nil
+		case *adt.AliasApplication:
+			saved := current
+			current = current.bind(x)
+			w.Elem(x.Template.Body)
+			current = saved
+			return false
 		case *adt.LetReference:
 			w.Elem(x.X)
 		}

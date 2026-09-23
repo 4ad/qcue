@@ -78,6 +78,8 @@ func TestQuantifiedAliasCodeOrigin(t *testing.T) {
 		"let F = forall (A) func(x: A) -> A: x\nf: func(cb: F) -> int: cb(1)\nout: f(F)",
 		"let R = {f: func(x: int) -> int: x}\nf: func(cb: R) -> int: cb.f(1)\nout: f(R)",
 		"let R = forall (A) {f: func(x: A) -> A: x}\nf: func(cb: R) -> int: cb.f(1)\nout: f(R)",
+		"F(A) = func(x: A) -> A: x\nf: func(cb: F(int)) -> int: cb(1)\nout: f(F(int))",
+		"R(A) = {f: func(x: A) -> A: x}\nf: func(cb: R(int)) -> int: cb.f(1)\nout: f(R(int))",
 	} {
 		v := cuecontext.New().CompileString(source)
 		if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 1 {
@@ -94,5 +96,50 @@ out: [xs[0].out, xs[1].out]
 `)
 	if got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON(); err != nil || string(got) != `[1,2]` {
 		t.Fatalf("iteration captures: %s, %v", got, err)
+	}
+}
+
+func TestParametricAliasWitness(t *testing.T) {
+	for _, alias := range []string{
+		`Alias(A) = x & A`,
+		`Inner(B) = x & B; Alias(A) = Inner(A)`,
+		`Alias(A) = {a: x & A}`,
+	} {
+		for _, aliasFirst := range []bool{false, true} {
+			for _, runtimeFirst := range []bool{false, true} {
+				t.Run(alias, func(t *testing.T) {
+					argument := "2"
+					if strings.Contains(alias, "{a:") {
+						argument = "{a: 2}"
+					}
+					use := "f: func(y: Alias(int)) -> string: \"ok\"\nout: f(" + argument + ")\n"
+					if runtimeFirst {
+						use = "runtime: Alias(int)\n" + use
+					} else {
+						use += "runtime: Alias(int)\n"
+					}
+					decl := strings.ReplaceAll(alias, ";", "\n") + "\n"
+					if aliasFirst {
+						use = decl + use
+					} else {
+						use += decl
+					}
+					v := cuecontext.New().CompileString("x: int\n" + use)
+					out := v.LookupPath(cue.ParsePath("out"))
+					if err := out.Validate(); err != nil {
+						t.Fatalf("pending witness: %v", err)
+					}
+					if _, err := out.MarshalJSON(); err == nil {
+						t.Fatal("unresolved alias witness was erased")
+					}
+					for _, n := range []int{1, 2} {
+						r := v.FillPath(cue.ParsePath("x"), n).LookupPath(cue.ParsePath("out"))
+						if _, err := r.MarshalJSON(); (err == nil) != (n == 2) {
+							t.Fatalf("witness %d: %v", n, err)
+						}
+					}
+				})
+			}
+		}
 	}
 }
