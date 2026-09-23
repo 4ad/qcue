@@ -1,0 +1,31 @@
+#skip
+#inlinetest:exclude Run by cue/quantified_test.go to check formation errors.
+
+-- result.cue --
+f(A: int): func() -> int: A
+-- argument.cue --
+id: func(x: int) -> int: x
+f(A: int): func() -> int: id(A)
+-- default.cue --
+f(A: int): func(x: int = A) -> int: x
+-- alias.cue --
+f(A: int): func() -> _: {let hidden = A, value: hidden}
+-- nested.cue --
+f(A: int): func() -> func() -> int: func() -> int: A
+-- builtin.cue --
+f(A: string): func() -> int: len(A)
+-- type_alias.cue --
+Box(A) = {value: A}
+f(A: int): func() -> _: Box(A)
+-- selection.cue --
+id(A): func(x: A) -> A: x
+f(A): func(x: A) -> A: id[A](x)
+out: [f[1](1), f[2](2)]
+-- fixed_alias.cue --
+Box(A) = {value: A}
+f: func() -> {value: 1}: Box(1)
+out: f().value
+-- runtime_index.cue --
+xs: [10, 20]
+f(A: int): func() -> int: xs[A]
+out: f[0]()

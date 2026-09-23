@@ -1141,12 +1141,13 @@ func (x *SelectorExpr) resolve(c *OpContext, state Flags) *Vertex {
 //	a[index]
 //	a[index]? (optional - returns OptionalUndefined if index doesn't exist)
 type IndexExpr struct {
-	Src        *ast.IndexExpr
-	X          Expr
-	Index      Expr
-	TypeIndex  Expr // singleton decoding applies only to type application
-	Optional   bool // true if index has ? suffix (e.g., foo[0]?)
-	Quantified bool // permits explicit type application
+	Src         *ast.IndexExpr
+	X           Expr
+	Index       Expr
+	TypeIndex   Expr // singleton decoding applies only to type application
+	Optional    bool // true if index has ? suffix (e.g., foo[0]?)
+	Quantified  bool // permits explicit type application
+	ErasedIndex bool // an erased type dependency permits only type selection
 }
 
 func (x *IndexExpr) Source() ast.Node {
@@ -1187,6 +1188,10 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 				return emptyNode
 			}
 		}
+	}
+	if x.ErasedIndex {
+		ctx.AddBottom(ctx.NewErrf("erased type parameter cannot be used as a runtime index"))
+		return emptyNode
 	}
 	// TODO: support byte index.
 	n := ctx.node(x, x.X, true, Flags{

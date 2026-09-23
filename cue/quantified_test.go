@@ -51,6 +51,30 @@ func TestQuantifiedDataMeet(t *testing.T) {
 	}
 }
 
+func TestQuantifiedErasure(t *testing.T) {
+	for _, name := range []string{"result", "argument", "default", "alias", "nested", "builtin", "type_alias"} {
+		t.Run(name, func(t *testing.T) {
+			v := cuecontext.New().CompileString(quantifiedAPIText(t, "erasure", name+".cue"))
+			if err := v.Err(); err == nil || !strings.Contains(err.Error(), "erased type parameter") {
+				t.Fatalf("runtime type inspection was admitted: %v", err)
+			}
+		})
+	}
+	ctx := cuecontext.New()
+	v := ctx.CompileString(quantifiedAPIText(t, "erasure", "selection.cue"))
+	if got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON(); err != nil || string(got) != "[1,2]" {
+		t.Fatalf("erased selection: %s, %v", got, err)
+	}
+	v = ctx.CompileString(quantifiedAPIText(t, "erasure", "fixed_alias.cue"))
+	if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 1 {
+		t.Fatalf("fixed alias construction: %d, %v", got, err)
+	}
+	v = ctx.CompileString(quantifiedAPIText(t, "erasure", "runtime_index.cue"))
+	if err := v.LookupPath(cue.ParsePath("out")).Err(); err == nil || !strings.Contains(err.Error(), "runtime index") {
+		t.Fatalf("erased type used for data indexing: %v", err)
+	}
+}
+
 func TestQuantifiedMembershipRefinement(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(quantifiedAPIText(t, "membership_refinement", "existential.cue"))

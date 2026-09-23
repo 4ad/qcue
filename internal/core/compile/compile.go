@@ -1367,6 +1367,7 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		fn.Body = c.valueExpr(n.Body)
 		c.popScope()
 		if fn.Quantified && fn.Body != nil {
+			c.checkFunctionErasure(fn)
 			fn.Captures = c.functionCaptures(n, fn)
 			fn.References = c.freeReferences(n, fn, false)
 		}
