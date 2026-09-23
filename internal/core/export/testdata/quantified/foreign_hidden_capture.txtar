@@ -1,0 +1,16 @@
+#incomplete
+
+-- in.cue --
+@experiment(quantified)
+import "example.com/qcue/lib"
+out: lib.f
+-- cue.mod/module.cue --
+module: "example.com/qcue"
+language: version: "v0.18.0"
+-- lib/lib.cue --
+@experiment(quantified)
+package lib
+r: {_secret: 7}
+f: func() -> int: r._secret
+-- out/export --
+captured value r cannot be exported independently

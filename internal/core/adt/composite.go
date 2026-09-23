@@ -170,6 +170,9 @@ type Vertex struct {
 	// schemes retain universal introductions on a composite subject. Type
 	// selection changes its view, while the original value graph is shared.
 	schemes []subjectScheme
+	// A selected view retains its elimination for source export. Replaying
+	// the implementation overlay would allocate a second code origin.
+	subjectSelection *compositeSelection
 
 	// Parent links to a parent Vertex. This parent should only be used to
 	// access the parent's Label field to find the relative location within a
@@ -304,6 +307,10 @@ type Vertex struct {
 // IsOpaquePackage reports a retained sealing boundary, including its opened
 // lexical view. Exporters must preserve that boundary or report incompleteness.
 func (v *Vertex) IsOpaquePackage() bool { return v.DerefValue().sealed != nil }
+
+// HasSubjectSchemes reports type introductions that remain observable by
+// selecting a composite value. Serializing only its fields loses them.
+func (v *Vertex) HasSubjectSchemes() bool { return len(v.DerefValue().schemes) != 0 }
 
 func deref(v *Vertex) *Vertex {
 	v = v.DerefValue()

@@ -1,0 +1,7 @@
+-- in.cue --
+@test(json, [1, "s"], at="out")
+r: {
+	let Q = forall (A, B) {f: func(x: A, y: B) -> [A, B]: [x, y]}
+	Q[int]
+}
+out: r[string].f(1, "s")

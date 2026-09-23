@@ -125,12 +125,7 @@ func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 	if !covariantData(q.Body) && !distributableUniversal(q.Body) {
 		return &Universal{Template: q, Env: c.Env(0)}
 	}
-	scope := c.newInlineVertex(nil, nil)
-	scope.BaseValue = &StructMarker{}
-	env := &Environment{
-		Up: c.Env(0), Vertex: scope,
-		types: &typeScope{quantifier: q},
-	}
+	env := q.lexicalScope(c)
 	// Universals commute with fixed record projections. Reduce covariant
 	// data fields even when a sibling field is a generic function. Never
 	// substitute bottom through an arrow's negative domain.
@@ -141,9 +136,39 @@ func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 	body := universalDataMinimum(c, q.Body, params)
 	v, _ := c.Evaluate(env, body)
 	if vertex, ok := v.(*Vertex); ok && vertex.Kind()&(StructKind|ListKind) != 0 {
-		vertex.schemes = append(vertex.schemes, subjectScheme{origin: env, env: env})
+		if !slices.ContainsFunc(vertex.schemes, func(s subjectScheme) bool { return s.origin == env }) {
+			vertex.schemes = append(vertex.schemes, subjectScheme{origin: env, env: env})
+		}
 	}
 	return v
+}
+
+// Re-evaluation of one lexical introduction must not create another
+// telescope on the same subject. Runtime witness cells identify its scope;
+// equal approximations from separate activations do not establish identity.
+func (q *Quantified) lexicalScope(c *OpContext) *Environment {
+	outer := c.Env(0)
+	key := quantifiedScopeKey{q: q}
+	if outer != nil {
+		key.vertex = outer.DerefVertex(c)
+	}
+	for _, env := range c.quantifiedScopes[key] {
+		if sameTypeEnvironment(c, env.Up, outer) {
+			return env
+		}
+	}
+	env := &Environment{Up: outer, Vertex: c.newInlineVertex(nil, &StructMarker{}),
+		types: &typeScope{quantifier: q}}
+	if c.quantifiedScopes == nil {
+		c.quantifiedScopes = make(map[quantifiedScopeKey][]*Environment)
+	}
+	c.quantifiedScopes[key] = append(c.quantifiedScopes[key], env)
+	return env
+}
+
+type quantifiedScopeKey struct {
+	q      *Quantified
+	vertex *Vertex
 }
 
 func universalDataMinimum(c *OpContext, x Expr, params map[*TypeParameter]bool) Expr {

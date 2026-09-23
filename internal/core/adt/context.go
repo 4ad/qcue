@@ -151,7 +151,8 @@ type OpContext struct {
 
 	// Shared only by one finite expansion and work it invokes. Retained
 	// lexical frames also carry it for bodies whose evaluation is deferred.
-	finiteExpansion *finiteExpansionBudget
+	finiteExpansion  *finiteExpansionBudget
+	quantifiedScopes map[quantifiedScopeKey][]*Environment
 
 	cuedebug.Config
 	Version internal.EvaluatorVersion // Copied from Runtime

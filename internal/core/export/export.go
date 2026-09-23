@@ -365,12 +365,14 @@ type exporter struct {
 	experimentsErr error
 	postfixAliases bool
 	// fieldAlias is used to track original alias names of regular fields.
-	fieldAlias      map[*ast.Field]fieldAndScope
-	letAlias        map[*ast.LetClause]*ast.LetClause
-	references      map[*adt.Vertex]*referenceInfo
-	functionOrigins map[*adt.Function]*functionOrigin
-	originDecls     []ast.Decl
-	originNames     map[string]ast.Node
+	fieldAlias        map[*ast.Field]fieldAndScope
+	letAlias          map[*ast.LetClause]*ast.LetClause
+	references        map[*adt.Vertex]*referenceInfo
+	functionOrigins   map[*adt.Function]*functionOrigin
+	quantifierOrigins map[quantifierOriginKey]*ast.LetClause
+	quantifierCode    map[*adt.Function]quantifierOriginKey
+	originDecls       []ast.Decl
+	originNames       map[string]ast.Node
 
 	pivotter *pivotter
 }
@@ -466,7 +468,6 @@ func (e *exporter) initPivot(n *adt.Vertex) {
 // that require conversion to a File, Sanitization, and self containment.
 func (e *exporter) finalize(n *adt.Vertex, v ast.Expr) (f *ast.File, err errors.Error) {
 	f = e.toFile(n, v)
-	f.Decls = append(f.Decls, e.originDecls...)
 
 	// The file is built rather than parsed, so nothing in it records which
 	// language version it is written for. Say so, both for the passes below
@@ -478,6 +479,9 @@ func (e *exporter) finalize(n *adt.Vertex, v ast.Expr) (f *ast.File, err errors.
 	f.SetExperiments(e.experiments)
 
 	e.completePivot(f)
+	// Exporting external dependencies may discover further code origins.
+	// Append the complete set before resolving their generated identifiers.
+	f.Decls = append(f.Decls, e.originDecls...)
 
 	if err := astutil.Sanitize(f); err != nil {
 		err := errors.Promote(err, "export")

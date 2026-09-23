@@ -145,6 +145,9 @@ func (e *exporter) originApplication(o *functionOrigin, value func(adt.Expr, boo
 }
 
 func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter) *functionOrigin {
+	if _, ok := e.quantifierCode[fn]; ok {
+		e.quantifiedExportError("shared composite code cannot be exported in separate lexical origins")
+	}
 	if o := e.functionOrigins[fn]; o != nil {
 		return o
 	}
@@ -235,6 +238,19 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 				nested = append(nested, nestedFunction{x.Src, f, x.Params})
 				return false
 			}
+			// Keep composite introductions intact inside this code origin.
+			// Lifting their individual methods would give those methods a
+			// different telescope from the surrounding record or list.
+			for _, f := range quantifierFunctions(x) {
+				if _, ok := e.quantifierCode[f]; ok || e.functionOrigins[f] != nil {
+					e.quantifiedExportError("shared composite code cannot be exported in separate lexical origins")
+				}
+				if e.quantifierCode == nil {
+					e.quantifierCode = make(map[*adt.Function]quantifierOriginKey)
+				}
+				e.quantifierCode[f] = quantifierOriginKey{q: x}
+			}
+			return false
 		case *adt.Function:
 			if x != fn && x.Body != nil {
 				nested = append(nested, nestedFunction{src: x.Src, fn: x})

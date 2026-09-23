@@ -28,6 +28,7 @@ import (
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/core/walk"
 )
 
 func (e *exporter) bareValue(v adt.Value) ast.Expr {
@@ -49,6 +50,15 @@ func (e *exporter) bareValue(v adt.Value) ast.Expr {
 func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 	if n.IsOpaquePackage() {
 		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
+	}
+	if subject, argument := n.SubjectSelection(); subject != nil {
+		return e.subjectSelectionExpr(subject, argument)
+	}
+	if n.HasSubjectSchemes() {
+		if n.IsData() {
+			return e.quantifiedExportError("composite type introductions have no faithful data projection")
+		}
+		return e.predicateValue(n)
 	}
 	// Guard against infinite recursion when a vertex cycles back to itself
 	// through BuiltinValidator arguments or other value-level cycles.
@@ -149,6 +159,10 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 	}
 
 	return result
+}
+
+func (e *exporter) subjectSelectionExpr(subject *adt.Vertex, argument adt.Value) ast.Expr {
+	return &ast.IndexExpr{X: &ast.ParenExpr{X: e.predicateValue(subject)}, Index: e.predicateValue(argument)}
 }
 
 func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
@@ -486,8 +500,54 @@ func (e *exporter) quantifierSrc(q *adt.Quantified, env *adt.Environment) ast.Ex
 			}
 		}
 	}
+	// The implementation literals inside one composite introduction must
+	// occur only once in exported source. Copies and selected views refer
+	// to that shared introduction. A mixed graph with separately exported
+	// implementations needs lexical projection support; fail explicitly
+	// rather than silently allocating different code identities.
+	key := quantifierOriginKey{q, env}
+	if decl := e.quantifierOrigins[key]; decl != nil {
+		id := ast.NewIdent(decl.Ident.Name)
+		id.Node = decl
+		return id
+	}
+	functions := quantifierFunctions(q)
+	for _, f := range functions {
+		if _, ok := e.quantifierCode[f]; ok || e.functionOrigins[f] != nil {
+			return e.quantifiedExportError("shared composite code cannot be exported in separate lexical origins")
+		}
+	}
+	var origin *ast.LetClause
+	if len(functions) != 0 {
+		ast.Walk(q.Src, func(n ast.Node) bool {
+			if id, ok := n.(*ast.Ident); ok {
+				label := adt.MakeIdentLabel(e.ctx, id.Name, "")
+				if _, exists := e.usedFeature[label]; !exists {
+					e.usedFeature[label] = nil
+				}
+			}
+			return true
+		}, nil)
+		if e.quantifierOrigins == nil {
+			e.quantifierOrigins = make(map[quantifierOriginKey]*ast.LetClause)
+		}
+		if e.quantifierCode == nil {
+			e.quantifierCode = make(map[*adt.Function]quantifierOriginKey)
+		}
+		origin = &ast.LetClause{Ident: ast.NewIdent(e.uniqueAlias("CUEQuantified"))}
+		e.quantifierOrigins[key] = origin
+		for _, f := range functions {
+			e.quantifierCode[f] = key
+		}
+	}
 	args := adt.FunctionTypeArguments(adt.FuncType{Env: env})
 	refs := make(map[ast.Node]adt.Value)
+	runtimeRefs := make(map[ast.Node]bool)
+	for _, fn := range functions {
+		for _, ref := range fn.Captures {
+			runtimeRefs[referenceKey(ref)] = true
+		}
+	}
 	for _, ref := range q.References {
 		id, ok := ref.Source().(*ast.Ident)
 		if !ok || id.Node == nil {
@@ -497,12 +557,21 @@ func (e *exporter) quantifierSrc(q *adt.Quantified, env *adt.Environment) ast.Ex
 		if !complete || value == nil {
 			return e.quantifiedExportError("quantifier dependency %s is unresolved", id.Name)
 		}
+		if runtimeRefs[id.Node] && !e.exportableCapture(value, make(map[adt.Value]bool)) {
+			return e.quantifiedExportError("quantifier capture %s cannot be exported independently", id.Name)
+		}
 		refs[id.Node] = value
 	}
-	src := astutil.Apply(ast.Clone(q.Src), func(c astutil.Cursor) bool {
+	names := make(map[ast.Node]string)
+	src := e.withLexicalAliases(ast.Clone(q.Src), nil, names)
+	src = astutil.Apply(src, func(c astutil.Cursor) bool {
 		id, ok := c.Node().(*ast.Ident)
 		if !ok {
 			return true
+		}
+		if name := names[id.Node]; name != "" {
+			c.Replace(ast.NewIdent(name))
+			return false
 		}
 		value := refs[id.Node]
 		if p, ok := id.Node.(*ast.TypeParam); ok && args[p] != nil {
@@ -511,17 +580,55 @@ func (e *exporter) quantifierSrc(q *adt.Quantified, env *adt.Environment) ast.Ex
 		if value != nil {
 			// Parentheses keep an inserted arrow or quantifier from taking
 			// ownership of operators in the surrounding template.
-			c.Replace(&ast.ParenExpr{X: e.predicateValue(value)})
+			var replacement ast.Expr
+			if runtimeRefs[id.Node] {
+				replacement = e.runtimeCaptureValue(value)
+			} else {
+				replacement = e.predicateValue(value)
+			}
+			c.Replace(&ast.ParenExpr{X: replacement})
 			return false
 		}
 		return true
 	}, nil).(ast.Expr)
-	return e.funcExprSrc(src, "quantified")
+	src = e.funcExprSrc(src, "quantified")
+	if origin != nil {
+		origin.Expr = src
+		e.originDecls = append(e.originDecls, origin)
+		id := ast.NewIdent(origin.Ident.Name)
+		id.Node = origin
+		return id
+	}
+	return src
+}
+
+type quantifierOriginKey struct {
+	q   *adt.Quantified
+	env *adt.Environment
+}
+
+func quantifierFunctions(q *adt.Quantified) (functions []*adt.Function) {
+	seen := make(map[adt.Node]bool)
+	w := walk.Visitor{Before: func(n adt.Node) bool {
+		if n == nil || seen[n] {
+			return false
+		}
+		seen[n] = true
+		if f, ok := n.(*adt.Function); ok && f.Body != nil {
+			functions = append(functions, f)
+		}
+		return true
+	}}
+	w.Elem(q.Body)
+	return functions
 }
 
 func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	if t.Fn == nil {
 		return e.funcSrc(nil)
+	}
+	if _, ok := e.quantifierCode[t.Fn]; ok {
+		return e.quantifiedExportError("shared composite code cannot be exported in separate lexical origins")
 	}
 	if _, ok := t.Fn.Body.(*adt.OpaqueCall); ok {
 		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")

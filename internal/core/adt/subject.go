@@ -26,6 +26,20 @@ type subjectScheme struct {
 	excluded bool
 }
 
+type compositeSelection struct {
+	subject  *Vertex
+	argument Value
+}
+
+// SubjectSelection exposes an exact retained type elimination. Additional
+// refinements remain conjuncts on its containing vertex.
+func (v *Vertex) SubjectSelection() (*Vertex, Value) {
+	if s := v.DerefValue().subjectSelection; s != nil {
+		return s.subject, s.argument
+	}
+	return nil, nil
+}
+
 func instantiateSubject(c *OpContext, subject *Vertex, argument Expr) (*Vertex, bool) {
 	subject = subject.DerefValue()
 	args := make(map[*TypeParameter]Value)
@@ -58,6 +72,7 @@ func instantiateSubject(c *OpContext, subject *Vertex, argument Expr) (*Vertex, 
 			s := &view.schemes[i]
 			s.excluded = s.excluded || !selected[s.origin]
 		}
+		view.subjectSelection = &compositeSelection{subject, arg}
 		return view, true
 	}
 	if found {

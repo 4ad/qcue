@@ -74,6 +74,9 @@ func (e *exporter) expr(env *adt.Environment, v adt.Elem) (result ast.Expr) {
 		return nil
 
 	case *adt.Vertex:
+		if subject, argument := x.SubjectSelection(); subject != nil {
+			return e.subjectSelectionExpr(subject, argument)
+		}
 		if x.IsData() {
 			// Treat as literal value.
 			return e.value(x)
@@ -417,6 +420,10 @@ func (e *conjuncts) addExpr(env *adt.Environment, src *adt.Vertex, x adt.Elem, i
 			e.addValueConjunct(src, env, x)
 
 		case *adt.Vertex:
+			if subject, argument := v.SubjectSelection(); subject != nil {
+				e.conjuncts = append(e.conjuncts, e.subjectSelectionExpr(subject, argument))
+				return
+			}
 			if b := v.Bottom(); b != nil {
 				if !b.IsIncomplete() || e.cfg.Final {
 					e.addExpr(env, v, b, false)
