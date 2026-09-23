@@ -1,5 +1,3 @@
-Quantified syntax must round trip under both formatter versions.
-
 -- syntax01.input --
 bridge: extern func(int) -> int !bridge
 

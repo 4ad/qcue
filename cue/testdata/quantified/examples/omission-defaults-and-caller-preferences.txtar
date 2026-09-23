@@ -3,8 +3,8 @@
 @test(json, 6, at="supplied")
 @test(validate, concrete, incomplete, at="unknown")
 
-add: func(a: int, b: int = 10) -> int: a + b
-x: int | *5
-omitted:  add(1)            // 11
-supplied: add(1, x)         // 6
-unknown:  add(1, _)         // incomplete; b was supplied
+add:      func(a: int, b: int = 10) -> int: a + b
+x:        int | *5
+omitted:  add(1)    // 11
+supplied: add(1, x) // 6
+unknown:  add(1, _) // incomplete; b was supplied

@@ -1,14 +1,13 @@
-Quantified CUE: InvalidInstances/pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]          out: pair[string]("a", "b")
-
 -- in.cue --
 @test(validate, conflict)
 
-pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]
-         out: pair[string]("a", "b")
+pair:
+	forall (A: number) func(x: A, y: A) -> [A, A]: [x, y]
+out: pair[string]("a", "b")
 -- out/errors.txt --
 [eval] out: type argument string does not satisfy bound of A:
-    ./in.cue:4:15
-    ./in.cue:4:20
+    ./in.cue:5:6
+    ./in.cue:5:11
 -- out/eval/stats --
 Leaks:  0
 Freed:  3

@@ -1,4 +1,4 @@
-Explicit opt-out rejects quantified syntax.
+// Explicit opt-out rejects quantified syntax.
 
 #error
 

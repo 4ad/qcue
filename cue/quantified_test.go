@@ -64,9 +64,7 @@ func TestQuantifiedAbstractCall(t *testing.T) {
 	}
 }
 
-// The paper's self-unification examples exercise descriptor identity across
-// copied environments, not just references to the same evaluator pointer.
-
+// Self-unification exercises descriptor identity across copied environments.
 func TestQuantifiedCaptureRefinement(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(quantifiedAPIText(t, "capture_refinement", "case01.cue"))

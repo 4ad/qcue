@@ -1,69 +1,47 @@
-Quantified CUE public API: TestQuantifiedExport
-
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
 
 -- case01.cue --
-id(A): func(x: A) -> A: x
-
+id: forall (A) func(x: A) -> A: x
 -- case02.cue --
 f(3)
-
 -- case03.cue --
 3
-
 -- case04.cue --
-id(A): func(x: A) -> A: x
+id:          forall (A) func(x: A) -> A: x
 specialized: id[int]
-
 -- case05.cue --
 f(3)
-
 -- case06.cue --
 3
-
 -- case07.cue --
-id(A: int): func(x: A) -> A: x
-
+id: forall (A: int) func(x: A) -> A: x
 -- case08.cue --
 f(3)
-
 -- case09.cue --
 3
-
 -- case10.cue --
-constant(A): func(x: A) -> (forall B func(B) -> A): func<B>(y: B) -> A: x
-
+constant: forall (A) func(x: A) -> (forall (B) func(B) -> A): forall (B) func(y: B) -> A: x
 -- case11.cue --
 f(3)("x")
-
 -- case12.cue --
 3
-
 -- case13.cue --
-make(A): func(x: A) -> (func(int) -> A): func(y: int) -> A: x
-f: make(3)
-
+make: forall (A) func(x: A) -> (func(int) -> A): func(y: int) -> A: x
+f:    make(3)
 -- case14.cue --
 f(0)
-
 -- case15.cue --
 3
-
 -- case16.cue --
 prefix: "> "
-f: func(x: string) -> string: prefix + x
-
+f:      func(x: string) -> string: prefix + x
 -- case17.cue --
 f("text")
-
 -- case18.cue --
 "> text"
-
 -- case19.cue --
-f: forall A func(A) -> A
-
+f: forall (A) func(A) -> A
 -- case20.cue --
 f(3) & string
-
 -- case21.cue --

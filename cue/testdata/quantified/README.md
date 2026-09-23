@@ -73,6 +73,11 @@ The retained package path `cmd/cue/cmd` is the CLI library. Its executable is
 
 ## Reading and adding assertions
 
+Most archives need no introductory description. When a note explains a
+non-obvious expectation, write it as a `//` comment before the first section.
+Keep runner directives on their own `#` lines, and format executable CUE inputs
+with the CUE formatter.
+
 Each evaluator archive has an `in.cue` section. File-level assertions use `at=`
 to select the value without changing the program's lexical scopes:
 
@@ -156,7 +161,7 @@ go test ./cmd/cue/cmd -run TestScript/quantified
 go test ./...
 ```
 
-A narrower `-run` can select a topic or paper number, for example
+A narrower `-run` can select a topic or example name, for example
 `TestEvalV3/quantified/examples/a-polymorphic-callback`.
 New semantic archives need explicit assertions.
 When deliberately changing a golden expectation, use the repository's

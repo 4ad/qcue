@@ -1,12 +1,9 @@
-Quantified CUE public API: TestQuantifiedCapabilityGuardRefinement
-
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
 
 -- case01.cue --
-
 @experiment(quantified)
-f: func(x: int) -> int: x
-f: func(0) -> 0
-y: int
+f:   func(x: int) -> int: x
+f:   func(0) -> 0
+y:   int
 out: f(y)

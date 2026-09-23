@@ -1,5 +1,3 @@
-Quantified syntax and its desugared AST.
-
 -- in.cue --
 Box(A) = {value: A}
 -- debug.txt --

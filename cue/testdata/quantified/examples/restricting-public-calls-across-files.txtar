@@ -2,7 +2,7 @@
 @test(validate, conflict, at="bad")
 @test(json, "7", at="ok")
 
-raw: func(x: number) -> string: "\(x)"
+raw:  func(x: number) -> string: "\(x)"
 call: {arg: number, result: raw(arg)}
 call: {arg: int, result: string}
 

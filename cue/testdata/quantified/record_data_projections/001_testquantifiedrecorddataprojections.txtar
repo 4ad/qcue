@@ -1,11 +1,11 @@
-Quantified CUE: RecordDataProjections
-
 -- in.cue --
 @test(validate, conflict, at="bad")
 @test(validate, conflict, at="nested")
 @test(json, [[],1,"one"], at="out")
 
-bad(A): {value: A, id: func(A) -> A}
-good(A): {empty: [...A], absent?: A, id: func(x: A) -> A: x}
-out: [good.empty, good.id(1), good.id("one")]
-nested: forall A forall B {value: A | B}
+bad:
+	forall (A) {value: A, id: func(A) -> A}
+good:
+	forall (A) {empty: [...A], absent?: A, id: func(x: A) -> A: x}
+out:    [good.empty, good.id(1), good.id("one")]
+nested: forall (A) forall (B) {value: A | B}

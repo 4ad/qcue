@@ -1,8 +1,6 @@
-Quantified CUE: Instantiation/nested result
-
 -- in.cue --
 @test(json, [3,"hi"], at="out")
 
-constant(A): func(x: A) -> (forall B func(B) -> A):
-    func<B>(y: B) -> A: x
+constant:
+	forall (A) func(x: A) -> (forall (B) func(B) -> A): forall (B) func(y: B) -> A: x
 out: [constant(3)("x"), constant("hi")(false)]

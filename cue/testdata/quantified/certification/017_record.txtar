@@ -1,7 +1,6 @@
-Quantified CUE: Certification/record
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, at="f")
 
-f(A): func(x: A) -> {value: A}: {value: x}
+f:
+	forall (A) func(x: A) -> {value: A}: {value: x}

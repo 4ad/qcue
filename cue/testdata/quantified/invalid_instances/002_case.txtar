@@ -1,11 +1,8 @@
-Quantified CUE: InvalidInstances/id(A in int): func(x: int) -> int: x          out: id(1)
-
 #inlinetest:exclude Formation errors use golden compiler diagnostics.
 
 -- in.cue --
-
-id(A in int): func(x: int) -> int: x
-         out: id(1)
+id:  forall (A in int) func(x: int) -> int: x
+out: id(1)
 -- out/evalalpha --
 id: value binders require the dependent profile D:
-    ./in.cue:2:4
+    ./in.cue:1:14

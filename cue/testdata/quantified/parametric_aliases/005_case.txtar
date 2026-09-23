@@ -1,10 +1,9 @@
-Quantified CUE: ParametricAliases/Box(A) = {value: A} wrap(A): func(x: A) -> Box(A): {value: x} out: wrap("x")
-
 -- in.cue --
 @test(json, {"value":"x"}, at="out")
 
 Box(A) = {value: A}
-wrap(A): func(x: A) -> Box(A): {value: x}
+wrap:
+	forall (A) func(x: A) -> Box(A): {value: x}
 out: wrap("x")
 -- out/eval/stats --
 Leaks:  0

@@ -1,7 +1,6 @@
-Quantified CUE: Certification/list length
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, at="f")
 
-f(A): func(xs: [...A]) -> int: len(xs)
+f:
+	forall (A) func(xs: [...A]) -> int: len(xs)

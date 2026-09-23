@@ -1,10 +1,9 @@
-Quantified CUE: Instantiation/higher rank callback
-
 -- in.cue --
 @test(json, [7,"seven"], at="out")
 
-id(A): func(x: A) -> A: x
-useBoth: func(p: forall A func(A) -> A) -> [int, string]: [
-    p(7), p("seven"),
+id:
+	forall (A) func(x: A) -> A: x
+useBoth: func(p: forall (A) func(A) -> A) -> [int, string]: [
+	p(7), p("seven"),
 ]
 out: useBoth(id)

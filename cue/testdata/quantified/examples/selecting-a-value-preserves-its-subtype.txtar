@@ -1,9 +1,10 @@
 -- in.cue --
 @test(json, 12, at="m")
 
-min(A: number): func(x: A, y: A) -> A: {
-    if x <= y {out: x}
-    if x > y  {out: y}
-}.out
+min:
+	forall (A: number) func(x: A, y: A) -> A: {
+		if x <= y {out: x}
+		if x > y {out: y}
+	}.out
 
-m: min[int & >=10](12, 20)     // 12
+m: min[int & >=10](12, 20) // 12

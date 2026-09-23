@@ -1,10 +1,10 @@
-Known code and captures do not discharge an implementation's contract.
-Concrete observation of one call is compatible with an unresolved definition.
+// Known code and captures do not discharge an implementation's contract.
+// Concrete observation of one call is compatible with an unresolved definition.
 
 -- in.cue --
 @test(validate)
 @test(validate, concrete, incomplete)
 @test(validate, concrete, incomplete, at="positive")
 @test(json, 0, at="observation")
-positive: func(x: int & >0) -> (int & >=0): x - 1
+positive:    func(x: int & >0) -> (int & >=0): x - 1
 observation: positive(1)

@@ -1,7 +1,6 @@
-Quantified CUE: Instantiation/shadowing
-
 -- in.cue --
 @test(json, ["x",3], at="out")
 
-f(A): func(x: A) -> _: {g: func<A>(y: A) -> A: y, x: x}
+f:
+	forall (A) func(x: A) -> _: {g: forall (A) func(y: A) -> A: y, x: x}
 out: [f(3).g("x"), f("x").g(3)]

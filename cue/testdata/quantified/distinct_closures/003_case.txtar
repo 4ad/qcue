@@ -1,7 +1,5 @@
-Quantified CUE: DistinctClosures/f: func(a: int, b: int) -> int: a + b          out: f(1, ...) & f(2, ...)
-
 -- in.cue --
 @test(validate, conflict, at="out")
 
-f: func(a: int, b: int) -> int: a + b
-         out: f(1, ...) & f(2, ...)
+f:   func(a: int, b: int) -> int: a + b
+out: f(1, ...) & f(2, ...)

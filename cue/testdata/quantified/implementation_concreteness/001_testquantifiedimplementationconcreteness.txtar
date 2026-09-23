@@ -1,8 +1,8 @@
-Quantified CUE: ImplementationConcreteness
-
 -- in.cue --
 @test(validate, concrete, incomplete, at="unknown")
 @test(validate, concrete, at="known")
 
-unknown(A): func(A) -> A
-known(A): func(x: A) -> A: x
+unknown:
+	forall (A) func(A) -> A
+known:
+	forall (A) func(x: A) -> A: x

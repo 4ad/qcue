@@ -1,7 +1,7 @@
-The supported universal fragment proves arrows with rigid type variables,
-fixed records, covariant data, and finite binders. General Boolean predicates
-remain exact residual obligations. A uniformly inhabitable branch does not
-silently discard the surrounding universal or certify an arbitrary subject.
+// The supported universal fragment proves arrows with rigid type variables,
+// fixed records, covariant data, and finite binders. General Boolean predicates
+// remain exact residual obligations. A uniformly inhabitable branch does not
+// silently discard the surrounding universal or certify an arbitrary subject.
 
 -- in.cue --
 @test(validate, concrete, at="identity")
@@ -12,12 +12,15 @@ silently discard the surrounding universal or certify an arbitrary subject.
 @test(validate, concrete, incomplete, at="generalBad")
 @test(json, [3, "value", [], 2], at="out")
 
-identity(A): func(x: A) -> A: x
-record(A): {id: func(x: A) -> A: x}
-empty(A): [...A]
-finite: forall (n in 1 | 2) >=n
-finite: 2
-#General: forall A ((func(A) -> A) | (func() -> int))
-general: #General & (func() -> int: 0)
+identity:
+	forall (A) func(x: A) -> A: x
+record:
+	forall (A) {id: func(x: A) -> A: x}
+empty:
+	forall (A) [...A]
+finite:     forall (n in 1 | 2) >=n
+finite:     2
+#General:   forall (A) ((func(A) -> A) | (func() -> int))
+general:    #General & (func() -> int: 0)
 generalBad: #General & (func() -> string: "wrong")
-out: [identity(3), record[string].id("value"), empty, finite]
+out:        [identity(3), record[string].id("value"), empty, finite]

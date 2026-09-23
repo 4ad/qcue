@@ -1,5 +1,5 @@
-A subtype-bound quantifier can have a unary body. Parenthesized ordinary
-calls disambiguate labeled contextual-keyword arguments from binders.
+// A subtype-bound quantifier can have a unary body. Parenthesized ordinary
+// calls disambiguate labeled contextual-keyword arguments from binders.
 
 -- in.cue --
 x: forall (A: number) >=0

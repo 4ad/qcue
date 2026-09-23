@@ -1,11 +1,9 @@
-Quantified CUE: StructuralRecursion/fold: func(step: func(int, int) -> int, seed: int, xs: [...int]) -> int: {              if len(xs) == 0 {out: seed}              if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}          }.out          plus: func(x: int, y: int) -> int: x + y          out: fold(plus, 0, [1, 2, 3])
-
 -- in.cue --
 @test(json, 6, at="out")
 
 fold: func(step: func(int, int) -> int, seed: int, xs: [...int]) -> int: {
-             if len(xs) == 0 {out: seed}
-             if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}
-         }.out
-         plus: func(x: int, y: int) -> int: x + y
-         out: fold(plus, 0, [1, 2, 3])
+	if len(xs) == 0 {out: seed}
+	if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}
+}.out
+plus: func(x: int, y: int) -> int: x + y
+out:  fold(plus, 0, [1, 2, 3])

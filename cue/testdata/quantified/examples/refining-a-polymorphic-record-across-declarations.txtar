@@ -1,8 +1,11 @@
 -- in.cue --
 @test(validate, at="r")
 
-r(A): {wrap: func(A) -> {value: A}}
-r(B): {wrap: func(B) -> {tag: "wrapped"}}
+r:
+	forall (A) {wrap: func(A) -> {value: A}}
+r:
+	forall (B) {wrap: func(B) -> {tag: "wrapped"}}
 
 // Unified description, after alpha-renaming:
-r(T): {wrap: func(T) -> {value: T, tag: "wrapped"}}
+r:
+	forall (T) {wrap: func(T) -> {value: T, tag: "wrapped"}}

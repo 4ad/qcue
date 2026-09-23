@@ -1,7 +1,5 @@
-Quantified CUE: CapabilityRefutations/f: func(number) -> number          f: func(number) -> int
-
 -- in.cue --
 @test(validate, at="f")
 
 f: func(number) -> number
-         f: func(number) -> int
+f: func(number) -> int

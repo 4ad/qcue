@@ -2,4 +2,4 @@
 @test(json, 3, at="sum")
 
 #Add: {a: int, b: int, out: a + b}
-sum: (#Add & {a: 1, b: 2}).out
+sum:  (#Add & {a: 1, b: 2}).out

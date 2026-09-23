@@ -1,4 +1,4 @@
-A quantifier may not bind the same name twice.
+// A quantifier may not bind the same name twice.
 
 #error
 

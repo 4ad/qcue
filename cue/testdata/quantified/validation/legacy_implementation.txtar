@@ -1,5 +1,5 @@
-A quantified contract on a legacy closure also requires conformance.
-The implementation's original experiment setting cannot bypass validation.
+// A quantified contract on a legacy closure also requires conformance.
+// The implementation's original experiment setting cannot bypass validation.
 
 -- legacy.cue --
 @experiment(functions,quantified=false)

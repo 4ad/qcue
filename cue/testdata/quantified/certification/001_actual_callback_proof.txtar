@@ -1,9 +1,7 @@
-Quantified CUE: Certification/actual callback proof
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, incomplete, at="f")
 
-g: func(x: int) -> int: "wrong"
+g:     func(x: int) -> int: "wrong"
 apply: func(h: func(int) -> int, x: int) -> int: h(x)
-f: func(x: int) -> int: apply(g, x)
+f:     func(x: int) -> int: apply(g, x)

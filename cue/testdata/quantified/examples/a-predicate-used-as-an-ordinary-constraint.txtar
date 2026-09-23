@@ -2,7 +2,7 @@
 @test(validate, conflict, at="bad")
 @test(json, 7, at="n")
 
-positive: func(x: int) -> bool: x > 0
+positive:  func(x: int) -> bool: x > 0
 #Positive: {value: int, _valid: true & positive(value)}
-n: (#Positive & {value: 7}).value   // 7
-bad: #Positive & {value: -1}       // _|_
+n:         (#Positive & {value: 7}).value // 7
+bad:       #Positive & {value: -1}        // _|_

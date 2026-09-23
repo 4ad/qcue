@@ -2,12 +2,12 @@
 @test(json, ["negative","nonnegative"], at="probe")
 
 classify: func(x: int) -> ("negative" | "nonnegative"): {
-    if x < 0  {out: "negative"}
-    if x >= 0 {out: "nonnegative"}
+	if x < 0 {out: "negative"}
+	if x >= 0 {out: "nonnegative"}
 }.out
 classify: (func(int & <0) -> "negative") &
-          (func(int & >=0) -> "nonnegative")
+	(func(int & >=0) -> "nonnegative")
 
-c: classify(-3)              // "negative"
+c: classify(-3) // "negative"
 
 probe: [classify(-3), classify(2)]

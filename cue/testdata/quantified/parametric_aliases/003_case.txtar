@@ -1,14 +1,12 @@
-Quantified CUE: ParametricAliases/Box(A) = {value: A}          out: Box(int) & {value: "wrong"}
-
 -- in.cue --
 @test(validate, conflict)
 
 Box(A) = {value: A}
-         out: Box(int) & {value: "wrong"}
+out: Box(int) & {value: "wrong"}
 -- out/errors.txt --
 [eval] out.value: conflicting values "wrong" and int (mismatched types string and int):
-    ./in.cue:4:19
-    ./in.cue:4:34
+    ./in.cue:4:10
+    ./in.cue:4:25
 -- out/eval/stats --
 Leaks:  0
 Freed:  5

@@ -1,7 +1,7 @@
-Opaque operation certification proves the private implementation and its
-interface contract, then uses total boundary transport. Carrier identity
-supports public inclusion without exposing a private representation.
-Invalid private operations and ambiguous result transports remain unproved.
+// Opaque operation certification proves the private implementation and its
+// interface contract, then uses total boundary transport. Carrier identity
+// supports public inclusion without exposing a private representation.
+// Invalid private operations and ambiguous result transports remain unproved.
 
 -- in.cue --
 @test(validate, concrete, at="simple")
@@ -12,62 +12,62 @@ Invalid private operations and ambiguous result transports remain unproved.
 @test(validate, concrete, incomplete, at="ambiguous")
 @test(json, [42, 43, 20], at="out")
 
-#Simple: exists A {v: A, read: func(A) -> int}
+#Simple: exists (A) {v: A, read: func(A) -> int}
 simple: seal #Simple with (A = int) {
-    v: 42
-    read: func(x: int) -> int: x
+	v:    42
+	read: func(x: int) -> int: x
 }
-#Composite: exists A {
-    v: A
-    wrap: func(A) -> {items: [A]}
-    read: func({items: [A]}) -> int
+#Composite: exists (A) {
+	v:    A
+	wrap: func(A) -> {items: [A]}
+	read: func({items: [A]}) -> int
 }
 composite: seal #Composite with (A = int) {
-    v: 43
-    wrap: func(x: int) -> {items: [int]}: {items: [x]}
-    read: func(x: {items: [int]}) -> int: x.items[0]
+	v:    43
+	wrap: func(x: int) -> {items: [int]}: {items: [x]}
+	read: func(x: {items: [int]}) -> int: x.items[0]
 }
-#Defaults: exists A {f: func(x: int = 10) -> int}
+#Defaults: exists (A) {f: func(x: int = 10) -> int}
 defaulted: seal #Defaults with (A = int) {
-    f: func(x: int = 20) -> int: x
+	f: func(x: int = 20) -> int: x
 }
 client: open simple as (A, P) {f: func() -> int: P.read(P.v)}
 #wrong: func() -> string: "wrong"
 bad: seal #Simple with (A = int) {
-    v: 42
-    read: func(x: int) -> int: #wrong()
+	v:    42
+	read: func(x: int) -> int: #wrong()
 }
-#Ambiguous: exists A {f: func() -> A | string}
+#Ambiguous: exists (A) {f: func() -> A | string}
 ambiguous: seal #Ambiguous with (A = string) {
-    f: func() -> string: "private"
+	f: func() -> string: "private"
 }
 out: [client.f(),
-    (open composite as (A, P) {out: P.read(P.wrap(P.v))}).out,
-    (open defaulted as (A, P) {out: P.f()}).out]
+	(open composite as (A, P) {out: P.read(P.wrap(P.v))}).out,
+	(open defaulted as (A, P) {out: P.f()}).out]
 
 @test(validate, concrete, at="unions")
 @test(validate, concrete, at="callbacks")
 @test(validate, concrete, incomplete, at="badInterface")
 @test(json, [44, 45], at="more")
-#Unions: exists A {
-    make: func() -> A | string
-    read: func(x: A | string) -> int
+#Unions: exists (A) {
+	make: func() -> A | string
+	read: func(x: A | string) -> int
 }
 unions: seal #Unions with (A = int) {
-    make: func() -> int: 44
-    read: func(x: int | string) -> int: 44
+	make: func() -> int: 44
+	read: func(x: int | string) -> int: 44
 }
-#Callbacks: exists A {
-    value: A
-    apply: func(f: func(A) -> int, x: A) -> int
+#Callbacks: exists (A) {
+	value: A
+	apply: func(f: func(A) -> int, x: A) -> int
 }
 callbacks: seal #Callbacks with (A = int) {
-    value: 0
-    apply: func(f: func(int) -> int, x: int) -> int: f(x)
+	value: 0
+	apply: func(f: func(int) -> int, x: int) -> int: f(x)
 }
 badInterface: seal #Simple with (A = int) {
-    v: 42
-    read: func(x: int) -> string: #wrong()
+	v:    42
+	read: func(x: int) -> string: #wrong()
 }
 more: [(open unions as (A, P) {out: P.read(P.make())}).out,
-    (open callbacks as (A, P) {out: P.apply(func(x: A) -> int: 45, P.value)}).out]
+	(open callbacks as (A, P) {out: P.apply(func(x: A) -> int: 45, P.value)}).out]

@@ -1,14 +1,11 @@
-Quantified binder resolution, shadowing, and AST clone identity.
-
 -- quantifier_scopes.cue --
 @experiment(quantified)
 let A = int
 q: forall (A: A, B: A) {
-    outer: A
-    inner: exists A {a: A, b: B}
+	outer: A
+	inner: exists (A) {a: A, b: B}
 }
 outside: A
-
 -- alias_open_scopes.cue --
 @experiment(quantified)
 let A = int

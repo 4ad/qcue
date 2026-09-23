@@ -1,5 +1,3 @@
-Quantified syntax and its desugared AST.
-
 -- in.cue --
 codec: exists A {decode: func(bytes) -> A !decode}
 -- debug.txt --

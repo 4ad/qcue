@@ -1,4 +1,4 @@
 -- in.cue --
 @test(validate, at="map")
 
-map: func<A, B>(func(A) -> B, [...A]) -> [...B]
+map: forall (A, B) func(func(A) -> B, [...A]) -> [...B]

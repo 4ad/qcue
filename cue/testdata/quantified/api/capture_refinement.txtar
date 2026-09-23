@@ -1,20 +1,16 @@
-Quantified CUE public API: TestQuantifiedCaptureRefinement
-
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
 
 -- case01.cue --
-
 @experiment(quantified)
 let S = {n: int, f: func(x: int = n) -> int: 1}
-a: S
-b: S
-f: a.f & b.f
+a:   S
+b:   S
+f:   a.f & b.f
 out: f(0)
-
-
 -- case02.cue --
-a: n: 2, b: n: 2
-
+a: n: 2
+b: n: 2
 -- case03.cue --
-a: n: 2, b: n: 3
+a: n: 2
+b: n: 3

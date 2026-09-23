@@ -1,26 +1,28 @@
-Opaque adapters forward the supplied call packet and preserve omission.
-Interface defaults never replace implementation defaults, including when
-the latter lie outside the contract's domain for explicitly supplied values.
-Omitted slots do not shift later named arguments or optional parameters.
+// Opaque adapters forward the supplied call packet and preserve omission.
+// Interface defaults never replace implementation defaults, including when
+// the latter lie outside the contract's domain for explicitly supplied values.
+// Omitted slots do not shift later named arguments or optional parameters.
 
 -- in.cue --
 @test(json, [20, 3, 27, -1, 4, 8], at="out")
 
-#P: exists A {
-    plain: func(x: int = 10) -> int
-    mixed: func(x: int = 10, y: int = 5) -> int
-    narrow: func(x: int & >=0 = 10) -> int
-    optional: func(x: int, note?: string) -> int
-    named: func(x!: int = 10) -> int
+#P: exists (A) {
+	plain:    func(x: int = 10) -> int
+	mixed:    func(x: int = 10, y: int = 5) -> int
+	narrow:   func(x: int & >=0 = 10) -> int
+	optional: func(x: int, note?: string) -> int
+	named:    func(x!: int = 10) -> int
 }
 p: seal #P with (A = int) {
-    plain: func(x: int = 20) -> int: x
-    mixed: func(x: int = 20, y: int = 30) -> int: x + y
-    narrow: func(x: int = -1) -> int: x
-    optional: func(x: int, note?: string) -> int: x
-    named: func(x!: int = 8) -> int: x
+	plain:    func(x: int = 20) -> int: x
+	mixed:    func(x: int = 20, y: int = 30) -> int: x + y
+	narrow:   func(x: int = -1) -> int: x
+	optional: func(x: int, note?: string) -> int: x
+	named:    func(x!: int = 8) -> int: x
 }
-out: (open p as (A, P) {out: [
-    P.plain(), P.plain(3), P.mixed(y: 7), P.narrow(),
-    P.optional(4), P.named(),
-]}).out
+out: (open p as (A, P) {
+	out: [
+		P.plain(), P.plain(3), P.mixed(y: 7), P.narrow(),
+		P.optional(4), P.named(),
+	]
+}).out

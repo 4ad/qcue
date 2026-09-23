@@ -1,8 +1,11 @@
 -- in.cue --
 @test(validate, at="choose")
 
-choose(A: int):    func(A, A) -> A
-choose(A: string): func(A, A) -> A
+choose:
+	forall (A: int) func(A, A) -> A
+choose:
+	forall (A: string) func(A, A) -> A
 
 // The stronger declaration also covers mixed unions:
-stronger(A: int | string): func(A, A) -> A
+stronger:
+	forall (A: int | string) func(A, A) -> A

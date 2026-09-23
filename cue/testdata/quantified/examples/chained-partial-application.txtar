@@ -3,7 +3,7 @@
 @test(json, 6, at="y")
 
 add3: func(a: int, b: int, c: int) -> int: a + b + c
-f: add3(1, ...)
-g: f(2, ...)
-x: g(3)                    // 6
-y: add3(a: 1, ...)(2, 3)    // 6
+f:    add3(1, ...)
+g:    f(2, ...)
+x:    g(3)                  // 6
+y:    add3(a: 1, ...)(2, 3) // 6

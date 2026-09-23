@@ -1,36 +1,28 @@
-Opening obligations survive Go API refinement after initial evaluation.
+// Opening obligations survive Go API refinement after initial evaluation.
 
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go to exercise Unify.
 
 -- base.cue --
-#P: exists A {value: A}
-p: seal #P with (A = int) {value: 42}
-
+#P: exists (A) {value: A}
+p:  seal #P with (A = int) {value: 42}
 -- optional.cue --
 r: open p as (A, P) {get?: func(): P.value}
-
 -- optional-refine.cue --
-r: {get: _}
+r:   {get: _}
 out: r.get()
-
 -- union.cue --
 r: open p as (A, P) {get: (func(): P.value) | 0}
-
 -- union-refine.cue --
-r: {get: func() -> _}
+r:   {get: func() -> _}
 out: r.get()
-
 -- pattern.cue --
 r: open p as (A, P) {[string]: func(): P.value}
-
 -- pattern-refine.cue --
-r: {get: _}
+r:   {get: _}
 out: r.get()
-
 -- list.cue --
 r: open p as (A, P) {get: [...(func(): P.value)]}
-
 -- list-refine.cue --
-r: {get: [_]}
+r:   {get: [_]}
 out: r.get[0]()

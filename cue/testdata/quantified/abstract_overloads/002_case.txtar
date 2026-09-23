@@ -1,7 +1,5 @@
-Quantified CUE: AbstractOverloads/f: (func(int) -> string) & (func(string) -> int)          out: f("x") & bool
-
 -- in.cue --
 @test(validate, conflict, at="out")
 
-f: (func(int) -> string) & (func(string) -> int)
-         out: f("x") & bool
+f:   (func(int) -> string) & (func(string) -> int)
+out: f("x") & bool

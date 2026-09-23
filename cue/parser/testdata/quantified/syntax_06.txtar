@@ -1,5 +1,3 @@
-Quantified syntax and its desugared AST.
-
 -- in.cue --
 f: func<A: number>(A) -> A
 -- debug.txt --

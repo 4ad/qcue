@@ -4,5 +4,5 @@
 
 T: func(a: int, ...) -> number
 f: T & (func(a: int, b: int) -> int: a + b)
-x: f(1, 2)                 // 3
-y: f(1)                    // missing b
+x: f(1, 2) // 3
+y: f(1)    // missing b

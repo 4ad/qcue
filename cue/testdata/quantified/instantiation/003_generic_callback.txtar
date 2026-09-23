@@ -1,10 +1,10 @@
-Quantified CUE: Instantiation/generic callback
-
 -- in.cue --
 @test(json, [1,1,2,2], at="out")
 
-flatMap(A, B): func(g: func(A) -> [...B], xs: [...A]) -> [...B]: [
-    for x in xs for y in g(x) {y}
-]
-duplicate(A): func(x: A) -> [A, A]: [x, x]
+flatMap:
+	forall (A, B) func(g: func(A) -> [...B], xs: [...A]) -> [...B]: [
+		for x in xs for y in g(x) {y}
+	]
+duplicate:
+	forall (A) func(x: A) -> [A, A]: [x, x]
 out: flatMap(duplicate, [1, 2])

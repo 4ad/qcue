@@ -1,7 +1,6 @@
-Quantified CUE: Certification/filter
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, at="f")
 
-f(A): func(g: func(A) -> bool, xs: [...A]) -> [...A]: [for x in xs if g(x) {x}]
+f:
+	forall (A) func(g: func(A) -> bool, xs: [...A]) -> [...A]: [for x in xs if g(x) {x}]

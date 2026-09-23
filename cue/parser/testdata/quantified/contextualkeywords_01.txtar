@@ -1,5 +1,3 @@
-Quantified ContextualKeywords.
-
 -- in.cue --
 forall: func(x: int) -> int: x
 exists: forall

@@ -1,7 +1,5 @@
-Quantified CUE: PredicativeUniverses/Box(A in Type(0)) = {value: A} out: Box(forall B func(B) -> B)
-
 -- in.cue --
 @test(validate, conflict, at="out")
 
 Box(A in Type(0)) = {value: A}
-out: Box(forall B func(B) -> B)
+out: Box(forall (B) func(B) -> B)

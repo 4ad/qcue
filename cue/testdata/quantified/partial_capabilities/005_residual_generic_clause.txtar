@@ -1,9 +1,8 @@
-Quantified CUE: PartialCapabilities/residual generic clause
-
 -- in.cue --
 @test(json, 2, at="out")
 
 f: func(x: string, y: int) -> int: y
 p: f("prefix", ...)
-p(A: int): func(A) -> A
+p:
+	forall (A: int) func(A) -> A
 out: p(2)

@@ -1,5 +1,3 @@
-Quantified CUE: CapabilitySubsumption/func(x: int) -> number / func(y: number) -> int
-
 -- in.cue --
 @test(validate)
 @test(subsume, a, b, fail)

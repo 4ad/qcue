@@ -1,5 +1,3 @@
-Quantified CUE: ParametricAliases/let N = int & >=0 Box(A: N) = {value: A} out: {let N = string,  unused: N, value: Box(3)}.value
-
 -- in.cue --
 @test(json, {"value":3}, at="out")
 

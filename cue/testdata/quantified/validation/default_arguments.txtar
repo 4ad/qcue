@@ -1,5 +1,5 @@
-The body proof covers both supplied arguments and the implementation's
-own default. A target annotation cannot supply a missing default proof.
+// The body proof covers both supplied arguments and the implementation's
+// own default. A target annotation cannot supply a missing default proof.
 
 -- in.cue --
 @test(validate, concrete, at="identity")
@@ -8,11 +8,11 @@ own default. A target annotation cannot supply a missing default proof.
 @test(validate, concrete, at="strengthened")
 @test(validate, concrete, incomplete, at="unknown")
 @test(json, [1, 2, 3, 1], at="observation")
-identity: func(x: int = 1) -> int: x
-named: func(x!: int = 2) -> int: x
-n: 3
-captured: func(x: int = n) -> int: x
-strengthened: identity & func(x: int = 9) -> int
-pending: int
-unknown: func(x: int = pending) -> int: x
-observation: [identity(), named(), captured(), strengthened()]
+identity:     func(x: int = 1) -> int: x
+named:        func(x!: int = 2) -> int: x
+n:            3
+captured:     func(x: int = n) -> int: x
+strengthened: identity & (func(x: int = 9) -> int)
+pending:      int
+unknown:      func(x: int = pending) -> int: x
+observation:  [identity(), named(), captured(), strengthened()]

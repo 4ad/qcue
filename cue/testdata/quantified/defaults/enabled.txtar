@@ -1,12 +1,12 @@
-Quantifiers and functions work without an experiment attribute at the current
-language version. Ordinary indexes retain their value semantics.
+// Quantifiers and functions work without an experiment attribute at the current
+// language version. Ordinary indexes retain their value semantics.
 
 -- in.cue --
-id(A): func(x: A) -> A: x
-out: [id(3), id[string]("hello")] @test(eq, [3, "hello"])
-key: "x"
-record: {x: 7}
-selected: record[key] @test(eq, 7)
-index: 0
-items: [8, 9]
-indexed: items[index] @test(eq, 8)
+id:       forall (A) func(x: A) -> A: x
+out:      [id(3), id[string]("hello")] @test(eq, [3, "hello"])
+key:      "x"
+record:   {x: 7}
+selected: record[key]                  @test(eq, 7)
+index:    0
+items:    [8, 9]
+indexed:  items[index]                 @test(eq, 8)

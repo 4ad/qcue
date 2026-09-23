@@ -1,5 +1,3 @@
-Quantified CUE: CapabilitySubsumption/(func(int) -> number) & (func(string) -> bool) / (func(number) -> int) & (func(string) -> bool)
-
 -- in.cue --
 @test(validate)
 @test(subsume, a, b)

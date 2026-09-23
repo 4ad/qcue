@@ -1,30 +1,30 @@
-Residual templates retain substitutions and lexical dependencies.
+// Residual templates retain substitutions and lexical dependencies.
 
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go.
 
 -- existential.cue --
-Q(A) = exists B {value: A}
+Q(A) = exists (B) {value: A}
 r: Q(int)
 -- existential-want.cue --
-exists B {value: (int)}
+exists (B) {value: (int)}
 -- universal.cue --
-Q(A) = forall B ((func(B) -> B) | (func() -> A))
+Q(A) = forall (B) ((func(B) -> B) | (func() -> A))
 r: Q(int)
 -- universal-want.cue --
-forall B ((func(B) -> B) | (func() -> (int)))
+forall (B) ((func(B) -> B) | (func() -> (int)))
 -- capture.cue --
-limit: 5
+limit:  5
 #Bound: int & >=limit
-Q(A) = exists B {value: A, bound: #Bound, captured: limit}
+Q(A) = exists (B) {value: A, bound: #Bound, captured: limit}
 r: Q(string)
 -- capture-want.cue --
-exists B {value: (string), bound: (int & >=5), captured: (5)}
+exists (B) {value: (string), bound: (int & >=5), captured: (5)}
 -- shadow.cue --
-Q(A) = exists B {value: A, nested: exists A {value: A}}
+Q(A) = exists (B) {value: A, nested: exists (A) {value: A}}
 r: Q(int)
 -- shadow-want.cue --
-exists B {value: (int), nested: exists A {value: A}}
+exists (B) {value: (int), nested: exists (A) {value: A}}
 -- bound.cue --
 Q(A) = exists (B: A) {value: B}
 r: Q(int)

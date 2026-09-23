@@ -4,6 +4,6 @@
 @test(json, 4, at="z")
 
 key: func(a!: int, note?: string) -> int: a
-x: key(a: 4)                // 4; note is absent
-z: key(a: 4, note: "audit") // 4
-bad: key(4)                 // invalid packet: a is name-only
+x:   key(a: 4)                // 4; note is absent
+z:   key(a: 4, note: "audit") // 4
+bad: key(4)                   // invalid packet: a is name-only

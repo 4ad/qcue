@@ -1,7 +1,6 @@
-Quantified CUE: Certification/swap
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, at="f")
 
-f(A, B): func(x: [A, B]) -> [B, A]: [x[1], x[0]]
+f:
+	forall (A, B) func(x: [A, B]) -> [B, A]: [x[1], x[0]]

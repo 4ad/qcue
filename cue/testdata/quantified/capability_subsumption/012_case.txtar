@@ -1,8 +1,6 @@
-Quantified CUE: CapabilitySubsumption/func(int) -> int / forall A func(A) -> A
-
 -- in.cue --
 @test(validate)
 @test(subsume, a, b)
 
 a: func(int) -> int
-b: forall A func(A) -> A
+b: forall (A) func(A) -> A

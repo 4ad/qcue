@@ -1,13 +1,11 @@
-Quantified CUE: OpaqueCompositeTransport/Box(A) = {value?: A}{}
-
 -- in.cue --
 @test(json, 1, at="out")
 
 Box(A) = {value?: A}
-#I: exists A {seed: A, box: Box(A), read: func(A) -> int}
+#I: exists (A) {seed: A, box: Box(A), read: func(A) -> int}
 p: seal #I with (A = int) {
-seed: 1
-box: {}
-read: func(x: int) -> int: x
+	seed: 1
+	box:  {}
+	read: func(x: int) -> int: x
 }
 out: (open p as (T, P) {out: P.read(P.seed)}).out

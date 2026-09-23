@@ -1,6 +1,6 @@
-An explicit range makes a parenthesized binder unambiguous even when its
-body starts with a unary operator. Ordinary contextual-keyword calls keep
-their binary operators.
+// An explicit range makes a parenthesized binder unambiguous even when its
+// body starts with a unary operator. Ordinary contextual-keyword calls keep
+// their binary operators.
 
 -- in.cue --
 x: forall (n in 1 | 2) >=n

@@ -1,24 +1,22 @@
-Quantified CUE: FirstClassPackages
-
 -- in.cue --
 @test(json, ["7","hello"], at="out")
 
-#Showable: exists A {
-    value: A
-    show: func(A) -> string
+#Showable: exists (A) {
+	value: A
+	show:  func(A) -> string
 }
 p: seal #Showable with (A = int) {
-    value: 7
-    show: func(x: int) -> string: "\(x)"
+	value: 7
+	show:  func(x: int) -> string: "\(x)"
 }
 q: seal #Showable with (A = string) {
-    value: "hello"
-    show: func(x: string) -> string: x
+	value: "hello"
+	show:  func(x: string) -> string: x
 }
-items: [p, q]
-describe: func(p: #Showable) -> string:
-    (open p as (A, P) {out: P.show(P.value)}).out
-map(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [
-    for x in xs {g(x)}
-]
+items:    [p, q]
+describe: func(p: #Showable) -> string: (open p as (A, P) {out: P.show(P.value)}).out
+map:
+	forall (A, B) func(g: func(A) -> B, xs: [...A]) -> [...B]: [
+		for x in xs {g(x)}
+	]
 out: map(describe, items)

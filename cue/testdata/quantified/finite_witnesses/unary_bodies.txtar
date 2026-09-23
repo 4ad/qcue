@@ -1,14 +1,14 @@
-Range binders recognize unary bodies without extra parentheses, while
-ordinary calls of a function named forall retain their binary operators.
+// Range binders recognize unary bodies without extra parentheses, while
+// ordinary calls of a function named forall retain their binary operators.
 
 -- in.cue --
 @test(json, [2, -1, false, 3], at="out")
-a: forall (n in 1 | 2) >=n
-a: 2
-b: exists (n in 1 | 2) -n
-b: -1
-c: exists (v in true | false) !v
-c: false
+a:      forall (n in 1 | 2) >=n
+a:      2
+b:      exists (n in 1 | 2) -n
+b:      -1
+c:      exists (v in true | false) !v
+c:      false
 forall: func(x: int) -> int: x
-x: 2
-out: [a, b, c, forall(x) + 1]
+x:      2
+out:    [a, b, c, forall(x) + 1]

@@ -1,6 +1,5 @@
-Quantified CUE: UniversalRefutations/bad(A: number): func(x: A) -> A: x + 1
-
 -- in.cue --
 @test(validate, conflict, at="bad")
 
-bad(A: number): func(x: A) -> A: x + 1
+bad:
+	forall (A: number) func(x: A) -> A: x + 1

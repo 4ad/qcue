@@ -1,5 +1,5 @@
-Result inclusion must preserve required fields. Neither a top-valued
-required field nor a closed candidate makes the presence obligation vacuous.
+// Result inclusion must preserve required fields. Neither a top-valued
+// required field nor a closed candidate makes the presence obligation vacuous.
 
 -- in.cue --
 @test(validate, concrete, incomplete, at="closedMissing")
@@ -13,16 +13,16 @@ required field nor a closed candidate makes the presence obligation vacuous.
 @test(subsume, requiredType, closedType, fail)
 @test(subsume, requiredTopType, emptyType, fail)
 
-#Empty: {}
-closedMissing: func() -> {a!: int}: #Empty
-topMissing: func() -> {a!: _}: {}
+#Empty:          {}
+closedMissing:   func() -> {a!: int}: #Empty
+topMissing:      func() -> {a!: _}: {}
 optionalMissing: func(x: {a?: _}) -> {a!: _}: x
-present: func() -> {a!: int}: {a: 1}
-optional: func() -> {a?: int}: #Empty
-badClosed: closedMissing()
-badTop: topMissing()
-good: present()
-requiredType: func() -> {a!: int}
-closedType: func() -> #Empty
+present:         func() -> {a!: int}: {a: 1}
+optional:        func() -> {a?: int}: #Empty
+badClosed:       closedMissing()
+badTop:          topMissing()
+good:            present()
+requiredType:    func() -> {a!: int}
+closedType:      func() -> #Empty
 requiredTopType: func() -> {a!: _}
-emptyType: func() -> {}
+emptyType:       func() -> {}

@@ -2,9 +2,9 @@
 @test(json, "7", at="job.result")
 
 job: {
-    x: number
-    f: func(x) -> string
-    result: f(x)
+	x:      number
+	f:      func(x) -> string
+	result: f(x)
 }
 job: {x: int & >=0}
 job: {x: 7, f: func(n: int) -> string: "\(n)"}

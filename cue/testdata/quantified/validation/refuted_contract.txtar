@@ -1,5 +1,5 @@
-An established contradiction remains an error with or without a
-concreteness demand; it must not be downgraded to an incomplete proof.
+// An established contradiction remains an error with or without a
+// concreteness demand; it must not be downgraded to an incomplete proof.
 
 -- in.cue --
 @test(validate, conflict, at="f")

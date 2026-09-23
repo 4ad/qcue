@@ -1,5 +1,3 @@
-Quantified CUE: CovariantExistentials/exists (A: int, B: A) {left: A, right: B} / {left: 1, right: "x"}
-
 -- in.cue --
 @test(validate, concrete, conflict, at="out")
 

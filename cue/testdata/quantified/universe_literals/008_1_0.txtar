@@ -1,9 +1,7 @@
-Quantified CUE: UniverseLiterals/1 0
-
 -- in.cue --
 @test(json, 3, at="out")
 
-f: forall (A in Type(1_0)) func(x: A) -> A: x
+f:   forall (A in Type(1_0)) func(x: A) -> A: x
 out: f[int](3)
 -- out/eval/stats --
 Leaks:  0

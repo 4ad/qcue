@@ -1,5 +1,3 @@
-Quantified CUE: Certification/text
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, at="f")

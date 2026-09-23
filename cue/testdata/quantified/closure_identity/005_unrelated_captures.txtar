@@ -1,5 +1,3 @@
-Quantified CUE: ClosureIdentity/unrelated captures
-
 -- in.cue --
 @test(json, 2, at="r")
 

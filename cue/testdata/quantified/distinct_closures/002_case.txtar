@@ -1,7 +1,5 @@
-Quantified CUE: DistinctClosures/d: [for v in [1, 2] {func(y: int) -> int: y + v}]          out: d[0] & d[1]
-
 -- in.cue --
 @test(validate, conflict, at="out")
 
-d: [for v in [1, 2] {func(y: int) -> int: y + v}]
-         out: d[0] & d[1]
+d:   [for v in [1, 2] {func(y: int) -> int: y + v}]
+out: d[0] & d[1]

@@ -1,7 +1,7 @@
-Unions transport their matching source branches across the opaque boundary.
-An abstract representation never becomes public data through a union arm.
-Disjoint ordinary alternatives and incoming opaque values remain usable.
-Overlapping alternatives with different transports remain incomplete.
+// Unions transport their matching source branches across the opaque boundary.
+// An abstract representation never becomes public data through a union arm.
+// Disjoint ordinary alternatives and incoming opaque values remain usable.
+// Overlapping alternatives with different transports remain incomplete.
 
 -- in.cue --
 @test(validate, conflict, at="recordLeak")
@@ -10,70 +10,70 @@ Overlapping alternatives with different transports remain incomplete.
 @test(validate, concrete, incomplete, at="ambiguous")
 @test(json, [42, "ordinary", 42, 43, 44], at="out")
 
-#P: exists A {
-    v: A | string
-    read: func(x: A | string) -> int
-    make: (func() -> A) | string
-    nested: {v: A} | string
-    items: [...A] | string
+#P: exists (A) {
+	v:      A | string
+	read:   func(x: A | string) -> int
+	make:   (func() -> A) | string
+	nested: {v: A} | string
+	items:  [...A] | string
 }
 p: seal #P with (A = {secret: int}) {
-    v: {secret: 42}
-    read: func(x: {secret: int} | string) -> int: 42
-    make: func() -> {secret: int}: {secret: 42}
-    nested: {v: {secret: 43}}
-    items: [{secret: 44}]
+	v:      {secret: 42}
+	read:   func(x: {secret: int} | string) -> int: 42
+	make:   func() -> {secret: int}: {secret: 42}
+	nested: {v: {secret: 43}}
+	items:  [{secret: 44}]
 }
-recordLeak: (open p as (A, P) {out: P.v.secret}).out
+recordLeak:    (open p as (A, P) {out: P.v.secret}).out
 operationLeak: (open p as (A, P) {out: P.make().secret}).out
-#Scalar: exists A {v: A | string}
-scalar: seal #Scalar with (A = int) {v: 42}
-scalarLeak: (open scalar as (A, P) {out: P.v + 1}).out
-ordinary: seal #Scalar with (A = int) {v: "ordinary"}
-ambiguous: seal #Scalar with (A = string) {v: "private"}
+#Scalar:       exists (A) {v: A | string}
+scalar:        seal #Scalar with (A = int) {v: 42}
+scalarLeak:    (open scalar as (A, P) {out: P.v + 1}).out
+ordinary:      seal #Scalar with (A = int) {v: "ordinary"}
+ambiguous:     seal #Scalar with (A = string) {v: "private"}
 
-#Nested: exists A {
-    nested: {v: A} | string
-    items: [...A] | string
-    read: func(x: A) -> int
+#Nested: exists (A) {
+	nested: {v: A} | string
+	items:  [...A] | string
+	read:   func(x: A) -> int
 }
 nested: seal #Nested with (A = int) {
-    nested: {v: 43}
-    items: [44]
-    read: func(x: int) -> int: x
+	nested: {v: 43}
+	items:  [44]
+	read:   func(x: int) -> int: x
 }
 out: [
-    (open p as (A, P) {out: P.read(P.v)}).out,
-    (open ordinary as (A, P) {out: P.v}).out,
-    (open p as (A, P) {out: P.read(P.make())}).out,
-    (open nested as (A, P) {out: P.read(P.nested.v)}).out,
-    (open nested as (A, P) {out: P.read(P.items[0])}).out,
+	(open p as (A, P) {out: P.read(P.v)}).out,
+	(open ordinary as (A, P) {out: P.v}).out,
+	(open p as (A, P) {out: P.read(P.make())}).out,
+	(open nested as (A, P) {out: P.read(P.nested.v)}).out,
+	(open nested as (A, P) {out: P.read(P.items[0])}).out,
 ]
 
 @test(validate, conflict, at="crossCarrier")
 @test(json, [9, 10], at="patternOut")
 @test(validate, conflict, at="patternLeak")
 other: seal #P with (A = {secret: int}) {
-    v: {secret: 42}
-    read: func(x: {secret: int} | string) -> int: 42
-    make: func() -> {secret: int}: {secret: 42}
-    nested: {v: {secret: 43}}
-    items: [{secret: 44}]
+	v:      {secret: 42}
+	read:   func(x: {secret: int} | string) -> int: 42
+	make:   func() -> {secret: int}: {secret: 42}
+	nested: {v: {secret: 43}}
+	items:  [{secret: 44}]
 }
 crossCarrier: open p as (A, P) {
-    out: (open other as (B, Q) {out: P.read(Q.v)}).out
+	out: (open other as (B, Q) {out: P.read(Q.v)}).out
 }
-#Pattern: exists A {
-    values: {[string]: A} | string
-    optional: {v?: A} | string
-    read: func(x: A) -> int
+#Pattern: exists (A) {
+	values:   {[string]: A} | string
+	optional: {v?: A} | string
+	read:     func(x: A) -> int
 }
 pattern: seal #Pattern with (A = int) {
-    values: {x: 9}
-    optional: {v: 10}
-    read: func(x: int) -> int: x
+	values:   {x: 9}
+	optional: {v: 10}
+	read:     func(x: int) -> int: x
 }
 patternOut: (open pattern as (A, P) {
-    out: [P.read(P.values.x), P.read(P.optional.v)]
+	out: [P.read(P.values.x), P.read(P.optional.v)]
 }).out
 patternLeak: (open pattern as (A, P) {out: P.values.x + 1}).out

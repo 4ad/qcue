@@ -1,7 +1,5 @@
-Quantified CUE: CapabilityRefutations/f: func(number) -> string          f: func(x: int) -> string: "ok"
-
 -- in.cue --
 @test(validate, conflict, at="f")
 
 f: func(number) -> string
-         f: func(x: int) -> string: "ok"
+f: func(x: int) -> string: "ok"

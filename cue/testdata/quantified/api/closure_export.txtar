@@ -1,81 +1,83 @@
-Source round trips preserve the graph of code origins and captured values.
+// Source round trips preserve the graph of code origins and captured values.
 
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go.
 
 -- captures.cue --
 mk: func(x: int) -> func(int) -> int: func(y: int) -> int: x + y
-r: {a: mk(1), b: mk(1), c: mk(2)}
+r:  {a: mk(1), b: mk(1), c: mk(2)}
 -- captures-check.cue --
 good: (r.a & r.b)(2)
-bad: r.a & r.c
+bad:  r.a & r.c
 -- captures-want.json --
 3
 -- factory.cue --
 mk: func(x: int) -> func(int) -> int: func(y: int) -> int: x + y
-r: {factory: mk, a: mk(1), b: mk(2)}
+r:  {factory: mk, a: mk(1), b: mk(2)}
 -- factory-check.cue --
 good: (r.factory(1) & r.a)(2)
-bad: r.factory(1) & r.b
+bad:  r.factory(1) & r.b
 -- factory-want.json --
 3
 -- literals.cue --
 r: {
-    a: func(x: int) -> int: x
-    b: func(x: int) -> int: x
+	a: func(x: int) -> int: x
+	b: func(x: int) -> int: x
 }
 -- literals-check.cue --
 good: (r.a & r.a)(3)
-bad: r.a & r.b
+bad:  r.a & r.b
 -- literals-want.json --
 3
 -- records.cue --
 mk: func(x: {n: int}) -> func(int) -> int: func(y: int) -> int: x.n + y
-r: {xs: [mk({n: 1}), mk({n: 1}), mk({n: 2})]}
+r:  {xs: [mk({n: 1}), mk({n: 1}), mk({n: 2})]}
 -- records-check.cue --
 good: (r.xs[0] & r.xs[1])(2)
-bad: r.xs[0] & r.xs[2]
+bad:  r.xs[0] & r.xs[2]
 -- records-want.json --
 3
 -- predicates.cue --
-mk(A): func(x: int) -> func(A) -> int: func(y: A) -> int: x
-r: {factory: mk, a: mk[int](1), b: mk[number](1), c: mk[number](2)}
+mk: forall (A) func(x: int) -> func(A) -> int: func(y: A) -> int: x
+r:  {factory: mk, a: mk[int](1), b: mk[number](1), c: mk[number](2)}
 -- predicates-check.cue --
 good: (r.factory[int](1) & r.a & r.b)(2)
-bad: r.a & r.c
+bad:  r.a & r.c
 -- predicates-want.json --
 1
 -- generic.cue --
-id(A): func(x: A) -> A: x
-other(A): func(x: A) -> A: x
+id: forall (A) func(x: A) -> A: x
+other:
+	forall (A) func(x: A) -> A: x
 r: {all: id, a: id[int], b: id[number], different: other}
 -- generic-check.cue --
 good: (r.all & r.a & r.b)(3)
-bad: (r.all[int] & r.different[int])(1)
+bad:  (r.all[int] & r.different[int])(1)
 -- generic-want.json --
 3
 -- nested_generic.cue --
-mk(A): func(x: A) -> (forall B func(B) -> A): func<B>(y: B) -> A: x
-r: {factory: mk, a: mk(1), b: mk(1), c: mk(2)}
+mk: forall (A) func(x: A) -> (forall (B) func(B) -> A): forall (B) func(y: B) -> A: x
+r:  {factory: mk, a: mk(1), b: mk(1), c: mk(2)}
 -- nested_generic-check.cue --
 good: (r.factory(1) & r.a & r.b)("x")
-bad: r.a & r.c
+bad:  r.a & r.c
 -- nested_generic-want.json --
 1
 -- bounds.cue --
 #Bound: int & >=0
-mk(A: #Bound): func(x: A) -> func(int) -> A: func(y: int) -> A: x
+mk:
+	forall (A: #Bound) func(x: A) -> func(int) -> A: func(y: int) -> A: x
 r: {factory: mk, a: mk(1), b: mk(1), c: mk(2)}
 -- bounds-check.cue --
 good: (r.factory(1) & r.a & r.b)(3)
-bad: r.a & r.c
+bad:  r.a & r.c
 -- bounds-want.json --
 1
 -- hygiene.cue --
 mk: func(CUECapture: int) -> func(int) -> int: func(CUECode: int) -> int: CUECapture + CUECode
-r: {CUECode: 9, CUECapture: 9, CUEType: 9, a: mk(1), b: mk(1), c: mk(2)}
+r:  {CUECode: 9, CUECapture: 9, CUEType: 9, a: mk(1), b: mk(1), c: mk(2)}
 -- hygiene-check.cue --
 good: (r.a & r.b)(2)
-bad: r.a & r.c
+bad:  r.a & r.c
 -- hygiene-want.json --
 3

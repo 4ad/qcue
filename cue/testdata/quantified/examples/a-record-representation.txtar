@@ -1,17 +1,16 @@
 -- in.cue --
 @test(json, 1, at="probe")
 
-#Counter: exists State {
-    zero: State
-    next: func(State) -> State
-    read: func(State) -> (int & >=0)
+#Counter: exists (State) {
+	zero: State
+	next: func(State) -> State
+	read: func(State) -> (int & >=0)
 }
 let CounterRep = close({count: int & >=0})
 counterV2: seal #Counter with (State = CounterRep) {
-    zero: {count: 0}
-    next: func(s: CounterRep) -> CounterRep:
-        {count: s.count + 1}
-    read: func(s: CounterRep) -> (int & >=0): s.count
+	zero: {count: 0}
+	next: func(s: CounterRep) -> CounterRep: {count: s.count + 1}
+	read: func(s: CounterRep) -> (int & >=0): s.count
 }
 
 probe: (open counterV2 as (S, C) {out: C.read(C.next(C.zero))}).out

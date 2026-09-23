@@ -1,7 +1,6 @@
-Quantified CUE: Certification/map
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, at="f")
 
-f(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [for x in xs {g(x)}]
+f:
+	forall (A, B) func(g: func(A) -> B, xs: [...A]) -> [...B]: [for x in xs {g(x)}]

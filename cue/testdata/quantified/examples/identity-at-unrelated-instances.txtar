@@ -4,8 +4,9 @@
 @test(json, {"port":443}, at="record")
 @test(json, "seven", at="text")
 
-id(A): func(x: A) -> A: x
-integer: id(7)                 // 7
-text:    id("seven")           // "seven"
-record:  id({port: 443})       // {port: 443}
-chosen:  id[int & >=0](7)      // a checked explicit instance
+id:
+	forall (A) func(x: A) -> A: x
+integer: id(7)            // 7
+text:    id("seven")      // "seven"
+record:  id({port: 443})  // {port: 443}
+chosen:  id[int & >=0](7) // a checked explicit instance

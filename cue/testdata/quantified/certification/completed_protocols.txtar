@@ -1,6 +1,6 @@
-An open protocol's row is supplied by the actual implementation, including
-its required labels, parameter domains, and omission policy. It does not
-promise arbitrary extra arguments or make a required slot optional.
+// An open protocol's row is supplied by the actual implementation, including
+// its required labels, parameter domains, and omission policy. It does not
+// promise arbitrary extra arguments or make a required slot optional.
 
 -- in.cue --
 @test(validate, concrete, at="sum")
@@ -14,15 +14,16 @@ promise arbitrary extra arguments or make a required slot optional.
 @test(validate, concrete, incomplete, at="badPrefix")
 @test(json, [3, 5, 9, "value"], at="out")
 
-#Open: func(a: int, ...) -> int
-sum: #Open & (func(a: int, b: int) -> int: a + b)
-named: #Open & (func(a: int, b!: int) -> int: a + b)
+#Open:     func(a: int, ...) -> int
+sum:       #Open & (func(a: int, b: int) -> int: a + b)
+named:     #Open & (func(a: int, b!: int) -> int: a + b)
 defaulted: #Open & (func(a: int, b: int = 8) -> int: a + b)
-generic(A): (func(a: A, ...) -> A) & (func(a: A, b: int) -> A: a)
-missing: sum(1)
-extra: sum(1, 2, 3)
+generic:
+	forall (A) (func(a: A, ...) -> A) & (func(a: A, b: int) -> A: a)
+missing:    sum(1)
+extra:      sum(1, 2, 3)
 unresolved: #Open
-#wrong: func() -> string: "wrong"
-badResult: #Open & (func(a: int, b: int) -> int: #wrong())
-badPrefix: #Open & (func(a: int & >=0, b: int) -> int: a + b)
-out: [sum(1, 2), named(2, b: 3), defaulted(1), generic("value", 0)]
+#wrong:     func() -> string: "wrong"
+badResult:  #Open & (func(a: int, b: int) -> int: #wrong())
+badPrefix:  #Open & (func(a: int & >=0, b: int) -> int: a + b)
+out:        [sum(1, 2), named(2, b: 3), defaulted(1), generic("value", 0)]

@@ -1,7 +1,7 @@
-Certification of captured records and lists must prove every contained
-callback, including callbacks passed to a function with a checked interface.
-Their annotations alone are not evidence, and cycles through composites do
-not discharge a proof. Correct captured callbacks remain certifiable.
+// Certification of captured records and lists must prove every contained
+// callback, including callbacks passed to a function with a checked interface.
+// Their annotations alone are not evidence, and cycles through composites do
+// not discharge a proof. Correct captured callbacks remain certifiable.
 
 -- in.cue --
 @test(validate, concrete, incomplete, at="returnRecord")
@@ -13,19 +13,19 @@ not discharge a proof. Correct captured callbacks remain certifiable.
 @test(validate, concrete, at="callGood")
 @test(json, 1, at="out")
 
-#badBox: {g: func(x: int) -> int: "wrong"}
-#badList: [#badBox.g]
+#badBox:      {g: func(x: int) -> int: "wrong"}
+#badList:     [#badBox.g]
 returnRecord: func() -> {g: func(int) -> int}: #badBox
-returnList: func() -> [...func(int) -> int]: #badList
-apply: func(h: {g: func(int) -> int}) -> int: h.g(0)
-callBad: func() -> int: apply(#badBox)
+returnList:   func() -> [...func(int) -> int]: #badList
+apply:        func(h: {g: func(int) -> int}) -> int: h.g(0)
+callBad:      func() -> int: apply(#badBox)
 
 #cycle: {g: func(x: int) -> int: cyclic()}
 cyclic: func() -> int: apply(#cycle)
 
-#goodBox: {g: func(x: int) -> int: x + 1}
-#goodList: [#goodBox.g]
+#goodBox:   {g: func(x: int) -> int: x + 1}
+#goodList:  [#goodBox.g]
 goodRecord: func() -> {g: func(int) -> int}: #goodBox
-goodList: func() -> [...func(int) -> int]: #goodList
-callGood: func() -> int: apply(#goodBox)
-out: callGood()
+goodList:   func() -> [...func(int) -> int]: #goodList
+callGood:   func() -> int: apply(#goodBox)
+out:        callGood()

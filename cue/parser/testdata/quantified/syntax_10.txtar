@@ -1,5 +1,3 @@
-Quantified syntax and its desugared AST.
-
 -- in.cue --
 v: (open p as (A, P) {out: P.show(P.value)}).out
 -- debug.txt --

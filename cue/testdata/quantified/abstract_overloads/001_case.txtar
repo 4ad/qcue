@@ -1,8 +1,8 @@
-Quantified CUE: AbstractOverloads/f(A: int): func(A, A) -> A          f(A: string): func(A, A) -> A          out: f("x", "y") & int
-
 -- in.cue --
 @test(validate, conflict, at="out")
 
-f(A: int): func(A, A) -> A
-         f(A: string): func(A, A) -> A
-         out: f("x", "y") & int
+f:
+	forall (A: int) func(A, A) -> A
+f:
+	forall (A: string) func(A, A) -> A
+out: f("x", "y") & int

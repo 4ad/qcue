@@ -1,69 +1,51 @@
-Quantified CUE public API: TestQuantifiedWitnessCorrelation
-
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
 
 -- case01.cue --
-f: func(n: int) -> int: n
-f: func(witness) -> 0
+f:   func(n: int) -> int: n
+f:   func(witness) -> 0
 out: f(1)
-
 -- case02.cue --
 1
-
 -- case03.cue --
 record: {value: witness}
-f: func() -> record.value: 1
-out: f()
-
+f:      func() -> record.value: 1
+out:    f()
 -- case04.cue --
 1
-
 -- case05.cue --
 let alias = witness
-f: func() -> alias: 1
+f:   func() -> alias: 1
 out: f()
-
 -- case06.cue --
 1
-
 -- case07.cue --
 items: [witness]
-f: func() -> items[0]: 1
-out: f()
-
+f:     func() -> items[0]: 1
+out:   f()
 -- case08.cue --
 1
-
 -- case09.cue --
-id(A): func(x: A) -> A: x
+id:  forall (A) func(x: A) -> A: x
 out: id[witness](1)
-
 -- case10.cue --
 1
-
 -- case11.cue --
-f: func() -> witness: 1
+f:   func() -> witness: 1
 out: f()
-
 -- case12.cue --
 1
-
 -- case13.cue --
-f: func(x: witness) -> int: 0
+f:   func(x: witness) -> int: 0
 out: f(1)
-
 -- case14.cue --
 0
-
 -- case15.cue --
-f(A: witness): func(x: A) -> A: x
+f:   forall (A: witness) func(x: A) -> A: x
 out: f(1)
-
 -- case16.cue --
 1
-
 -- case17.cue --
 @experiment(quantified)
 witness: int
-f: func(x: int) -> witness: x
+f:       func(x: int) -> witness: x

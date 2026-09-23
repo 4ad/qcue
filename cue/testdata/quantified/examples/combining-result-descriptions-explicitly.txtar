@@ -3,5 +3,5 @@
 
 left:  func(x: int) -> {a: int}: {a: x}
 right: func(x: int) -> {b: int}: {b: x}
-both: func(x: int) -> {a: int, b: int}: left(x) & right(x)
-r: both(3)                  // {a: 3, b: 3}
+both:  func(x: int) -> {a: int, b: int}: left(x) & right(x)
+r:     both(3) // {a: 3, b: 3}

@@ -1,5 +1,3 @@
-Quantified CUE: ClosureIdentity/capture copying
-
 -- in.cue --
 @test(json, 5, at="r")
 

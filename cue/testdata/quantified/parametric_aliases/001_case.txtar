@@ -1,5 +1,3 @@
-Quantified CUE: ParametricAliases/Box(A) = {value: A} Nested(B) = Box(Box(B)) out: Nested(string) & {value: value: "x"}
-
 -- in.cue --
 @test(json, {"value":{"value":"x"}}, at="out")
 

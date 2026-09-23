@@ -1,9 +1,7 @@
-Quantified export: opaque package.
-
 #incomplete
 
 -- in.cue --
-#I: exists A {value: A}
+#I:  exists (A) {value: A}
 out: seal #I with (A = int) {value: 123456789}
 -- out/export --
 opaque values require an interface codec for export

@@ -4,6 +4,6 @@
 @test(json, 5, at="r")
 
 sum: func(a: int, b: int) -> int: a + b
-p: sum(2, 3)                // 5
-q: sum(a: 2, b: 3)          // 5
-r: sum(2, b: 3)             // 5
+p:   sum(2, 3)       // 5
+q:   sum(a: 2, b: 3) // 5
+r:   sum(2, b: 3)    // 5

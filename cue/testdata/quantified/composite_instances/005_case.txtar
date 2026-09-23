@@ -1,7 +1,6 @@
-Quantified CUE: CompositeInstances/module(A, B): {pair: func(x: A, y: B) -> [A, B]: [x, y]} out: module[int, string].pair(3, "x")
-
 -- in.cue --
 @test(json, [3,"x"], at="out")
 
-module(A, B): {pair: func(x: A, y: B) -> [A, B]: [x, y]}
-out: module[int, string].pair(3, "x")
+module:
+	forall (A, B) {pair: func(x: A, y: B) -> [A, B]: [x, y]}
+out: module[int][string].pair(3, "x")

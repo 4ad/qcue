@@ -1,6 +1,6 @@
-Opening scopes survive optional-field materialization and selection of a
-closure from a union. Ordinary data results, absent fields, and preference
-selection remain valid.
+// Opening scopes survive optional-field materialization and selection of a
+// closure from a union. Ordinary data results, absent fields, and preference
+// selection remain valid.
 
 -- in.cue --
 @test(validate, conflict, at="optionalOut")
@@ -13,30 +13,30 @@ selection remain valid.
 @test(json, 0, at="ordinaryOut")
 @test(json, "word", at="labelOut")
 
-#P: exists A {value: A}
-p: seal #P with (A = int) {value: 42}
-optional: open p as (A, P) {get?: func(): P.value}
-optional: {get: _}
+#P:          exists (A) {value: A}
+p:           seal #P with (A = int) {value: 42}
+optional:    open p as (A, P) {get?: func(): P.value}
+optional:    {get: _}
 optionalOut: optional.get()
 
-#union: open p as (A, P) {get: (func(): P.value) | 0}
+#union:   open p as (A, P) {get: (func(): P.value) | 0}
 selected: #union.get & (func() -> _)
 unionOut: selected()
 
-#preferred: open p as (A, P) {get: *(func(): P.value) | 0}
+#preferred:   open p as (A, P) {get: *(func(): P.value) | 0}
 preferredOut: #preferred.get()
-absent: open p as (A, P) {get?: func(): P.value}
-data: open p as (A, P) {get?: func() -> int: 7}
-data: {get: _}
-dataOut: data.get()
-ordinaryOut: #union.get & 0
+absent:       open p as (A, P) {get?: func(): P.value}
+data:         open p as (A, P) {get?: func() -> int: 7}
+data:         {get: _}
+dataOut:      data.get()
+ordinaryOut:  #union.get & 0
 
-patterns: open p as (A, P) {[string]: func(): P.value}
-patterns: {get: _}
+patterns:   open p as (A, P) {[string]: func(): P.value}
+patterns:   {get: _}
 patternOut: patterns.get()
-lists: open p as (A, P) {get: [...(func(): P.value)]}
-lists: {get: [_]}
-listOut: lists.get[0]()
-labels: open p as (A, P) {[string]~(L,_): func() -> string: L}
-labels: {word: _}
-labelOut: labels.word()
+lists:      open p as (A, P) {get: [...(func(): P.value)]}
+lists:      {get: [_]}
+listOut:    lists.get[0]()
+labels:     open p as (A, P) {[string]~(L,_): func() -> string: L}
+labels:     {word: _}
+labelOut:   labels.word()

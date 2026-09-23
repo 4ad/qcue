@@ -1,6 +1,4 @@
-Quantified CUE: CovariantExistentials/exists A {left: A, right: A} / {left: 1, right: "x"}
-
 -- in.cue --
 @test(validate, concrete, at="out")
 
-out: (exists A {left: A, right: A}) & ({left: 1, right: "x"})
+out: (exists (A) {left: A, right: A}) & ({left: 1, right: "x"})

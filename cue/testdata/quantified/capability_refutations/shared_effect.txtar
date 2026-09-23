@@ -1,6 +1,6 @@
-Intersecting effectful arrows retains their common admitted failure outcome.
-An unspecified implementation is still incomplete; a pure obligation or
-disjoint effect tags can rule out the shared outcome and establish conflict.
+// Intersecting effectful arrows retains their common admitted failure outcome.
+// An unspecified implementation is still incomplete; a pure obligation or
+// disjoint effect tags can rule out the shared outcome and establish conflict.
 
 -- in.cue --
 @test(validate, at="shared")
@@ -12,7 +12,8 @@ disjoint effect tags can rule out the shared outcome and establish conflict.
 @test(validate, conflict, at="refined")
 
 shared: (func(int) -> int !bridge) & (func(int) -> string !bridge)
-generic(A): (func(A) -> int !bridge) & (func(A) -> string !bridge)
-pure: (func(int) -> int) & (func(int) -> string !bridge)
+generic:
+	forall (A) (func(A) -> int !bridge) & (func(A) -> string !bridge)
+pure:      (func(int) -> int) & (func(int) -> string !bridge)
 different: (func(int) -> int !bridge) & (func(int) -> string !decode)
-refined: shared & (func(int) -> int)
+refined:   shared & (func(int) -> int)

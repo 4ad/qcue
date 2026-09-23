@@ -1,7 +1,6 @@
-Quantified CUE: CompositeInstances/module(A): {nested: {id: func(x: A) -> A: x}, empty: [...A]} out: [module[int].nested.id(3), module[string].nested.id("x"), module[int].empty]
-
 -- in.cue --
 @test(json, [3,"x",[]], at="out")
 
-module(A): {nested: {id: func(x: A) -> A: x}, empty: [...A]}
+module:
+	forall (A) {nested: {id: func(x: A) -> A: x}, empty: [...A]}
 out: [module[int].nested.id(3), module[string].nested.id("x"), module[int].empty]

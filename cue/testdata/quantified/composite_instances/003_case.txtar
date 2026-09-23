@@ -1,7 +1,6 @@
-Quantified CUE: CompositeInstances/module(A): {id: func(x: A) -> A: x} out: module[int].id(3)
-
 -- in.cue --
 @test(json, 3, at="out")
 
-module(A): {id: func(x: A) -> A: x}
+module:
+	forall (A) {id: func(x: A) -> A: x}
 out: module[int].id(3)

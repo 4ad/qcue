@@ -1,8 +1,10 @@
 -- in.cue --
 @test(json, [1,1,2,2], at="twice")
 
-flatMap(A, B): func(g: func(A) -> [...B], xs: [...A]) -> [...B]: [
-    for x in xs for y in g(x) {y}
-]
-duplicate(A): func(x: A) -> [A, A]: [x, x]
+flatMap:
+	forall (A, B) func(g: func(A) -> [...B], xs: [...A]) -> [...B]: [
+		for x in xs for y in g(x) {y}
+	]
+duplicate:
+	forall (A) func(x: A) -> [A, A]: [x, x]
 twice: flatMap(duplicate, [1, 2]) // [1, 1, 2, 2]

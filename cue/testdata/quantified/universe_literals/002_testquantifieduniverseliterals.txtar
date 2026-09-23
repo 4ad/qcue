@@ -1,10 +1,7 @@
-Quantified CUE: UniverseLiterals
-
 #inlinetest:exclude Formation errors use golden compiler diagnostics.
 
 -- in.cue --
-
 f: forall (A in Type(1.5)) func(A) -> A
 -- out/evalalpha --
 f: universe level must be a nonnegative integer literal:
-    ./in.cue:2:12
+    ./in.cue:1:12

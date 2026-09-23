@@ -1,5 +1,3 @@
-Quantified CUE: Certification/unsupported arithmetic
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, incomplete, at="f")

@@ -2,6 +2,6 @@
 @test(json, 6, at="x")
 
 add3: func(a: int, b: int, c: int) -> int: a + b + c
-f: add3(1, ...)
-f: func(int, int) -> int
-x: f(2, 3)                 // 6
+f:    add3(1, ...)
+f:    func(int, int) -> int
+x:    f(2, 3) // 6

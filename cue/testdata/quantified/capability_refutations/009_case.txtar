@@ -1,8 +1,6 @@
-Quantified CUE: CapabilityRefutations/x: number          f: func(x) -> string          f: func(n: int) -> string: "ok"
-
 -- in.cue --
 @test(validate, at="f")
 
 x: number
-         f: func(x) -> string
-         f: func(n: int) -> string: "ok"
+f: func(x) -> string
+f: func(n: int) -> string: "ok"

@@ -1,8 +1,6 @@
-Quantified CUE: Capabilities/contravariant coverage
-
 -- in.cue --
 @test(json, ["ok","ok"], at="out")
 
 narrow: func(int) -> string
 narrow: func(x: number) -> string: "ok"
-out: [narrow(1), narrow(1.5)]
+out:    [narrow(1), narrow(1.5)]

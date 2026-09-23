@@ -1,7 +1,5 @@
-Quantified CUE: Instantiation/explicit arguments
-
 -- in.cue --
 @test(json, [3,"hello"], at="out")
 
-id: func<A>(x: A) -> A: x
+id:  forall (A) func(x: A) -> A: x
 out: [id[int](3), id[string]("hello")]

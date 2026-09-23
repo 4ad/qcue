@@ -1,16 +1,13 @@
-Quantified CUE public API: TestQuantifiedAbstractCall
-
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go to exercise Go API operations.
 
 -- case01.cue --
-
 @experiment(quantified)
-f(A): func(A) -> A
-r: f(3)
+f:
+	forall (A) func(A) -> A
+r:   f(3)
 bad: f(3) & string
-
-
 -- case02.cue --
 @experiment(quantified)
-f(A): func(x: A) -> A: x
+f:
+	forall (A) func(x: A) -> A: x

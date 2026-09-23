@@ -1,6 +1,6 @@
-Partial applications retain their original implementation obligations and
-certify attached residual contracts using the original bound slots.
-Bound callbacks require proof even without an additional residual contract.
+// Partial applications retain their original implementation obligations and
+// certify attached residual contracts using the original bound slots.
+// Bound callbacks require proof even without an additional residual contract.
 
 -- in.cue --
 @test(validate, concrete, at="simple")
@@ -13,17 +13,17 @@ Bound callbacks require proof even without an additional residual contract.
 @test(validate, concrete, incomplete, at="badResidual")
 @test(json, [3, 6, 6, 6, 9], at="out")
 
-simple: (func(x: int, y: int) -> int: x + y)(1, ...)
-#add: func(x: int, y: int, z: int) -> int: x + y + z
-residual: #add(1, ...) & func(y: int, z: int) -> int
-chained: residual(2, ...) & func(z: int) -> int
-named: #add(z: 3, ...) & func(x: int, y: int) -> int
-defaulted: (func(x: int, y: int = 8) -> int: x + y)(1, ...)
-#bad: func(x: int, y: int) -> int: "wrong"
-bad: #bad(1, ...)
-#apply: func(h: {f: func(int) -> int}, x: int) -> int: h.f(x)
-#wrong: func() -> string: "wrong"
-#invalid: {f: func(x: int) -> int: #wrong()}
+simple:      (func(x: int, y: int) -> int: x + y)(1, ...)
+#add:        func(x: int, y: int, z: int) -> int: x + y + z
+residual:    #add(1, ...) & (func(y: int, z: int) -> int)
+chained:     residual(2, ...) & (func(z: int) -> int)
+named:       #add(z: 3, ...) & (func(x: int, y: int) -> int)
+defaulted:   (func(x: int, y: int = 8) -> int: x + y)(1, ...)
+#bad:        func(x: int, y: int) -> int: "wrong"
+bad:         #bad(1, ...)
+#apply:      func(h: {f: func(int) -> int}, x: int) -> int: h.f(x)
+#wrong:      func() -> string: "wrong"
+#invalid:    {f: func(x: int) -> int: #wrong()}
 badCallback: #apply(#invalid, ...)
-badResidual: #add(1, ...) & func(y: int, z: int) -> string
-out: [simple(2), residual(2, 3), chained(3), named(1, 2), defaulted()]
+badResidual: #add(1, ...) & (func(y: int, z: int) -> string)
+out:         [simple(2), residual(2, 3), chained(3), named(1, 2), defaulted()]

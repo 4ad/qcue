@@ -1,5 +1,5 @@
-An open callback's known prefix cannot certify a call before the remaining
-protocol row is known. A supplied implementation may require more arguments.
+// An open callback's known prefix cannot certify a call before the remaining
+// protocol row is known. A supplied implementation may require more arguments.
 
 -- in.cue --
 @test(validate, concrete, incomplete, at="use")
@@ -10,12 +10,12 @@ protocol row is known. A supplied implementation may require more arguments.
 @test(json, 3, at="good")
 @test(subsume, closedType, openType, fail)
 
-use: func(f: func(a: int, ...) -> int) -> int: f(1)
-two: func(a: int, b: int) -> int: a + b
+use:      func(f: func(a: int, ...) -> int) -> int: f(1)
+two:      func(a: int, b: int) -> int: a + b
 accepted: (func(a: int, ...) -> int) & two
-bad: use(two)
+bad:      use(two)
 
-closed: func(f: func(a: int, b: int) -> int) -> int: f(1, 2)
-good: closed(two)
+closed:     func(f: func(a: int, b: int) -> int) -> int: f(1, 2)
+good:       closed(two)
 closedType: func(a: int) -> int
-openType: func(a: int, ...) -> int
+openType:   func(a: int, ...) -> int

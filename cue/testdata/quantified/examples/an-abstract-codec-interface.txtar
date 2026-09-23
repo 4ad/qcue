@@ -1,7 +1,7 @@
 -- in.cue --
 @test(validate, at="#CodecModule")
 
-#CodecModule: exists Value {
-    encode: func(Value) -> bytes
-    decode: func(bytes) -> Value !decode
+#CodecModule: exists (Value) {
+	encode: func(Value) -> bytes
+	decode: func(bytes) -> Value !decode
 }

@@ -1,8 +1,10 @@
 -- in.cue --
 @test(validate, at="r")
 
-r(A): {id: func(A) -> A}
-r:    {label: "utilities"}
+r:
+	forall (A) {id: func(A) -> A}
+r: {label: "utilities"}
 
 // Type universes are nonempty:
-r(A): {id: func(A) -> A, label: "utilities"}
+r:
+	forall (A) {id: func(A) -> A, label: "utilities"}

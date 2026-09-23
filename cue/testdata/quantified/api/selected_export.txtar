@@ -1,21 +1,18 @@
-Selected function export preserves one implementation and all universal
-obligations, as well as the selected call view and partial type selection.
+// Selected function export preserves one implementation and all universal
+// obligations, as well as the selected call view and partial type selection.
 
 #skip
 #inlinetest:exclude Run by cue/quantified_test.go for source round trips.
 
 -- valid.cue --
-id(A): func(x: A) -> A: x
+id:       forall (A) func(x: A) -> A: x
 selected: id[int]
-
 -- invalid.cue --
-bad(A): func(x: A) -> A: ({value: 0}).value
+bad:      forall (A) func(x: A) -> A: ({value: 0}).value
 selected: bad[int]
-
 -- partial.cue --
-pair(A, B): func(x: A, y: B) -> [A, B]: [x, y]
+pair:     forall (A, B) func(x: A, y: B) -> [A, B]: [x, y]
 selected: pair[int]
-
 -- complete.cue --
-pair(A, B): func(x: A, y: B) -> [A, B]: [x, y]
+pair:     forall (A, B) func(x: A, y: B) -> [A, B]: [x, y]
 selected: pair[int][string]

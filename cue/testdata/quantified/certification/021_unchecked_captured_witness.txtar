@@ -1,5 +1,3 @@
-Quantified CUE: Certification/unchecked captured witness
-
 -- in.cue --
 @test(validate, at="f")
 @test(validate, concrete, incomplete, at="f")

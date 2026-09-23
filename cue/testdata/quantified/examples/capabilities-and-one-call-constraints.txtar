@@ -2,8 +2,8 @@
 @test(validate, at="narrow")
 @test(validate, conflict, at="wide")
 
-wide:   func(number) -> string
-wide:   func(x: int) -> string: "ok"  // incompatible coverage
+wide: func(number) -> string
+wide: func(x: int) -> string: "ok" // incompatible coverage
 
 narrow: func(int) -> string
 narrow: func(x: number) -> string: "ok" // conforming implementation
