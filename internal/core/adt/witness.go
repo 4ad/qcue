@@ -66,10 +66,10 @@ func (x *WitnessType) validate(c *OpContext, value Value) *Bottom {
 		return &Bottom{Src: x.Source(), Code: IncompleteError,
 			Err: c.Newf("singleton witness in function signature remains unresolved")}
 	}
-	if !concreteCapture(c, value) {
+	switch runtimeValueIdentity(c, witness, value) {
+	case proofUnknown:
 		return &Bottom{Src: x.Source(), Code: IncompleteError, Err: c.Newf("singleton membership remains unresolved")}
-	}
-	if Equal(c, witness, value, 0) {
+	case proofEstablished:
 		return nil
 	}
 	return c.NewErrf("value conflicts with the singleton witness in its signature")

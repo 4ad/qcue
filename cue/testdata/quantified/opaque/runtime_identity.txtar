@@ -1,0 +1,32 @@
+// Abstract equality and meet observe runtime identity and keep every
+// representation's contracts, even when those contracts are redundant.
+
+-- in.cue --
+@test(json, [true, true, true, false], at="out")
+@test(validate, concrete, at="p")
+@test(validate, concrete, incomplete, at="invalid")
+
+#M: exists A {
+	left: A
+	right: A
+	other: A
+	same: func(A, A) -> bool
+}
+base: func(x: int) -> int: {v: x}.v
+otherImpl: func(x: int) -> int: {v: x}.v
+p: seal #M with (A = {f: func(int) -> int}) {
+	left: {f: base}
+	right: {f: base & (func(int) -> int)}
+	other: {f: otherImpl}
+	same: func(x: {f: func(int) -> int}, y: {f: func(int) -> int}) -> bool: true
+}
+out: (open p as (A, P) {
+	r: [P.same(P.left & P.right, P.left), P.left == P.right,
+		P.left != P.other, P.left == P.other]
+}).r
+invalid: seal #M with (A = {f: func(int) -> int}) {
+	left: {f: base}
+	right: {f: base & (func(int) -> 1)}
+	other: {f: otherImpl}
+	same: func(x: {f: func(int) -> int}, y: {f: func(int) -> int}) -> bool: true
+}

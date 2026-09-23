@@ -63,13 +63,12 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 		}
 		xv, _ := c.Evaluate(xe, x)
 		yv, _ := c.Evaluate(ye, y)
-		if !concreteCapture(c, xv) || !concreteCapture(c, yv) {
+		switch runtimeValueIdentity(c, xv, yv) {
+		case proofUnknown:
 			if result != proofRefuted {
 				result = proofUnknown
 			}
-			return
-		}
-		if !Equal(c, xv, yv, runtimeIdentity) {
+		case proofRefuted:
 			result = proofRefuted
 		}
 	}

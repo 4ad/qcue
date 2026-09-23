@@ -1,0 +1,26 @@
+// Singleton membership observes runtime descriptors through records, lists,
+// and builtins, without treating attached contracts as new implementations.
+
+-- in.cue --
+@test(json, [1, 2, 3, 4], at="out")
+@test(validate, conflict, at="distinct")
+@test(validate, concrete, incomplete, at="retained")
+@test(validate, conflict, at="shape")
+
+base: func(x: int) -> int: {v: x}.v
+a: {f: base}
+b: {f: base & (func(int) -> int)}
+accept: func(x: a) -> int: 1
+la: [{f: base}]
+lb: [{f: base & (func(int) -> int)}]
+acceptList: func(x: la) -> int: 2
+ba: {f: len}
+bb: {f: len & (func(string) -> int)}
+acceptBuiltin: func(x: ba) -> int: 3
+plain: {v: 1}
+acceptPlain: func(x: plain) -> int: 4
+out: [accept(b), acceptList(lb), acceptBuiltin(bb), acceptPlain({v: 1})]
+other: func(x: int) -> int: {v: x}.v
+distinct: accept({f: other})
+retained: b & {f: func(int) -> 1}
+shape: acceptPlain(1)

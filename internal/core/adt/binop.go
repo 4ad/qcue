@@ -75,7 +75,11 @@ func BinOp(c *OpContext, node Node, op Op, left, right Value) Value {
 		return err
 	}
 	if _, ok := Unwrap(left).(*OpaqueValue); ok && (op == EqualOp || op == NotEqualOp) {
-		equal := Equal(c, Unwrap(left), Unwrap(right), 0)
+		result := runtimeValueIdentity(c, left, right)
+		if result == proofUnknown {
+			return &Bottom{Code: IncompleteError, Err: c.Newf("abstract value equality remains unresolved")}
+		}
+		equal := result == proofEstablished
 		return c.NewBool(op == EqualOp && equal || op == NotEqualOp && !equal)
 	}
 

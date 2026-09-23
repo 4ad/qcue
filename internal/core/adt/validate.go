@@ -215,6 +215,15 @@ func (v *validator) validate(x *Vertex) {
 	}
 	if opaque, ok := x.BaseValue.(*OpaqueValue); ok {
 		v.validatePackage(opaque.carrier.owner)
+		// An opaque meet retains obligations from both representation
+		// graphs. They may include contracts acquired after the seal was
+		// created, so checking the original package alone is insufficient.
+		private, ok := opaque.private.(*Vertex)
+		if !ok {
+			private = v.ctx.newInlineVertex(nil, nil, MakeRootConjunct(nil, opaque.private))
+			private.Finalize(v.ctx)
+		}
+		v.validate(private)
 	}
 	if f, ok := x.BaseValue.(*FuncValue); ok && capabilityMode(f.Fn, f.Types) && v.checkConcrete() {
 		if boundary, ok := f.Fn.Body.(*OpaqueCall); ok {

@@ -924,6 +924,25 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 		n.updateCyclicStatus(id)
 
 		if y := n.scalar; y != nil {
+			if a, ok := x.(*OpaqueValue); ok {
+				if b, ok := y.(*OpaqueValue); ok {
+					switch runtimeValueIdentity(ctx, a, b) {
+					case proofRefuted:
+						n.reportConflict(x, y, x.Kind(), y.Kind(), n.scalarID, id.posInfo)
+					case proofUnknown:
+						n.addBottom(&Bottom{Code: IncompleteError,
+							Err: ctx.Newf("abstract value equality remains unresolved")})
+					case proofEstablished:
+						// Equality observes the runtime inhabitant. Keep both
+						// representation graphs and their contract obligations.
+						private := ctx.newInlineVertex(nil, nil,
+							MakeRootConjunct(nil, a.private), MakeRootConjunct(nil, b.private))
+						private.Finalize(ctx)
+						n.scalar = &OpaqueValue{carrier: a.carrier, private: private}
+					}
+					break
+				}
+			}
 			p1 := n.scalarID.Priority
 			p2 := id.Priority
 			if p1 != 0 && p2 != 0 {
