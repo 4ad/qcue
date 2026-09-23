@@ -83,8 +83,8 @@ signature denotes its eventual singleton. For example, `x: int` and
 value of `x`. The current approximation `int` cannot discharge that obligation.
 For records and lists, the singleton includes the entire eventual data shape;
 it is not an open structural predicate that admits additional fields.
-Let abbreviations decode their constituent references in the context of each
-use. Predicate and runtime uses have separate evaluation caches, while lexical
+Ordinary and parametric aliases decode their constituent references in the
+context of each use. Predicate and runtime uses have separate caches, while lexical
 binder identities and function code origins remain shared. Unresolved singleton
 constraints inside unused record arguments also keep a call incomplete.
 
@@ -92,8 +92,11 @@ Erased type parameters may appear in signatures, type selections, and seal
 witnesses. They cannot supply runtime return values, arguments, defaults, or
 ordinary data indexes. A bound such as `A: int` does not make `A` an integer
 argument. The compiler rejects these runtime uses, including indirect uses
-through local aliases. Finite literal value binders retain their selected values
-as runtime captures and are distinct from erased type binders.
+through local aliases. The check follows free dependencies and nested argument
+substitutions. Index guards belong to each alias use: checking an erased argument
+does not invalidate a separate fixed integer index through the same template.
+Finite literal value binders retain their selected values as runtime captures
+and are distinct from erased type binders.
 
 ## Functions, refinement, and checking
 
@@ -103,6 +106,9 @@ and extra-argument policy. Applicable clauses constrain its actual call result.
 An unresolved applicability guard remains an obligation.
 For callable domains, including callbacks inside records or lists, applicability
 requires independent conformance evidence from the original argument.
+Completing a call also checks the actual packet's callable membership
+obligations before returning or caching its result. Ignoring a callback, or
+calling it on one successful input, cannot discharge its universal contract.
 
 Builtins obey the same rule. Their package declarations define their original
 protocol; adding a client contract cannot install a default or rename a slot.
@@ -158,6 +164,16 @@ call, does not discharge its declared contract.
 Calls within certified bodies use the remaining protocol of a partial closure.
 Primitive proof rules check the actual labels, arity, and omission policy before
 using a known total result rule.
+Numeric translation by a constant preserves supported bounds. Constructed
+records carry their exact field set during proof. Package clients can be checked
+by opening the admitted interface under a fresh abstract carrier, using its
+operation contracts as hypotheses, and checking that the carrier cannot escape.
+
+Certification shares one bounded proof context through nested evaluator calls.
+Completed proofs are reusable only when their inherited hypotheses are still
+available; a proof in progress is never evidence for itself. The work budget
+bounds repeated proof expansion as well as depth. Exhaustion reports
+incompleteness and leaves the original obligations available for another check.
 
 Unproved arithmetic implications, recursive termination proofs, optional
 presence branches, arbitrary quantified Boolean inclusion, and general
@@ -213,6 +229,18 @@ arguments and results retain their extra data fields, including inside nested
 records and lists; adapters transport the abstract occurrences within them.
 Omission passes through an adapter, so the private implementation chooses its
 own default rather than receiving the interface's default as an argument.
+Independent nested packages pass through by identity, preserving their seals
+and private validation obligations. A nested public interface that depends on
+the outer carrier requires a stronger transport rule and remains incomplete.
+The dependency check includes definitions, optional fields, patterns, and free
+references of residual quantifiers. Another seal binds its own witness only;
+free outer abstract dependencies cannot escape behind it. Repackaging an outer
+representation as a private witness behind an independent interface is allowed.
+
+Transporting a callback inward and back outward through the same interface
+preserves its observable closure identity. The adapters remain in place for
+execution and validation; identity comparison recognizes inverse transports
+without removing their contracts or identifying independent operation handles.
 
 Concrete validation certifies opaque operations by proving the private
 implementation and its interface contract, then checking that transport is
@@ -253,6 +281,9 @@ JSON. Source export preserves supported generic functions and concrete captures.
 Shared function literals are emitted once, with separate arguments for erased
 predicates and runtime captures, so recompilation preserves closure identity.
 Finite concrete capture graphs may contain other implemented functions.
+Runtime captures retain hidden fields observable by the code, including fields
+inside records and lists. A hidden label from another package that cannot be
+rebound faithfully makes independent export incomplete.
 Residual quantifiers retain selected arguments, outer predicates, and local
 binder scopes. These rules apply to both ordinary and final source export;
 unsupported captures, independent partial closures, and opaque operations report
@@ -268,6 +299,14 @@ remain constraints on future calls. Both implementations and bodyless contracts
 carry their lexical dependencies. Parametric and ordinary aliases retain their
 declarations and bounds, with renamed bindings to avoid destination capture.
 Unknown runtime witnesses make independent export incomplete.
+
+Evaluated source export also retains quantified record and list introductions,
+their selected telescopes, refinements, and shared copies. New type selections
+after recompilation preserve the original selection interface. A graph that
+exports both a composite introduction and a separate method from that same
+introduction currently reports incomplete export: emitting independent code
+origins would change closure identity. Incompatible lexical origins that would
+require the same unsupported code projection are also rejected explicitly.
 
 ## Implementation map and regression coverage
 

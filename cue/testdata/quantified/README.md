@@ -176,6 +176,25 @@ The small Go API tables exercise refinements and export/reimport in fresh
 scopes. Resource tests generate large binder products and check residual
 semantics, without relying on timing thresholds.
 
+The [follow-up audit](../../../doc/quantified-cue-audit-followup.md) composes
+these features and records further regressions:
+
+| Obligation | Regression |
+| --- | --- |
+| Parametric aliases preserve witness decoding, erasure, and per-use index guards | [alias_witness_test.go](../../alias_witness_test.go), [erasure](api/erasure.txtar) |
+| Completed calls retain actual callback conformance obligations | [certification_protocol_test.go](../../certification_protocol_test.go) |
+| Nested packages preserve seals and cannot hide free outer abstract dependencies | [nested_packages](opaque_composite_transport/nested_packages.txtar), [opaque_transport_test.go](../../opaque_transport_test.go) |
+| Callback round trips preserve identity through direct, composite, and partial transport | [round_trip_identity](opaque_callbacks/round_trip_identity.txtar), [round_trip_containers](opaque_callbacks/round_trip_containers.txtar) |
+| Residual predicate export preserves schemas and runtime captures preserve hidden fields | [lexical_export_test.go](../../lexical_export_test.go), [foreign_hidden_capture](../../../internal/core/export/testdata/quantified/foreign_hidden_capture.txtar) |
+| Composite introductions, selected views, and shared copies survive source export | [composite_export_test.go](../../composite_export_test.go), [lexical_selection](composite_instances/lexical_selection.txtar), [mixed_composite](../../../internal/core/export/testdata/quantified/mixed_composite.txtar) |
+| Shared proof graphs reuse completed evidence under compatible hypotheses and bound work | [certify_work_test.go](../../../internal/core/subsume/certify_work_test.go) |
+
+The proof-work tests count deterministic steps, require incomplete results on
+budget exhaustion, and retry independently. Composite export tests make new
+selections after recompilation and check unsupported mixed graphs through the
+typed incomplete-export API. Negative opacity cases distinguish a free outer
+dependency from a legal private witness bound by an independent inner seal.
+
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Syntax-only cases and malformed syntax belong in the parser
 corpus. No test compares fixtures with the proposal document.
