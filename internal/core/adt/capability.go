@@ -138,7 +138,35 @@ func capabilityMember(c *OpContext, env *Environment, constraint Expr, value Val
 		}
 		return proofUnknown
 	}
+	// A meet can attach an arrow to a closure without proving it. Check
+	// callable domains against the original candidate, never against the
+	// enriched descriptor produced above. Inclusion descends into records
+	// and lists and uses independent implementation proofs for callables.
+	if capabilityHasCallable(value, make(map[Value]bool)) {
+		bound, complete := c.Evaluate(env, constraint)
+		if !complete || !c.provesInclusion(bound, value) {
+			return proofUnknown
+		}
+	}
 	return proofEstablished
+}
+
+func capabilityHasCallable(v Value, seen map[Value]bool) bool {
+	if v == nil || seen[v] {
+		return false
+	}
+	seen[v] = true
+	switch v := Unwrap(v).(type) {
+	case *FuncValue, *Builtin:
+		return true
+	case *Vertex:
+		for _, a := range v.Arcs {
+			if a.ArcType == ArcMember && !a.Label.IsLet() && capabilityHasCallable(a, seen) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func sameCapabilityShape(c *OpContext, before, after Value) bool {

@@ -1,0 +1,30 @@
+// Attaching a contract is not evidence of membership in a callable domain.
+// Unknown applicability must remain a guard, including inside composites.
+
+-- in.cue --
+@test(validate, concrete, at="f")
+@test(validate, concrete, incomplete, at="out")
+@test(validate, at="out")
+@test(validate, at="nestedOut")
+@test(validate, concrete, incomplete, at="nestedOut")
+@test(validate, at="primitiveOut")
+@test(validate, concrete, incomplete, at="primitiveOut")
+@test(json, ["ok", "ok"], at="good")
+
+import "strings"
+
+g: func(x: int) -> int: {out: x}.out
+f: func(cb: func(int) -> _) -> _: cb(0)
+f: func(func(int) -> string) -> string
+out: f(g)
+
+nested: func(r: {cb: func(int) -> _}) -> _: r.cb(0)
+nested: func({cb: func(int) -> string}) -> string
+nestedOut: nested({cb: g})
+
+primitive: func(cb: func(string) -> _) -> _: cb("x")
+primitive: func(func(string) -> int) -> int
+primitiveOut: primitive(strings.ToUpper)
+
+text: func(x: int) -> string: {out: "ok"}.out
+good: [f(text), nested({cb: text})]
