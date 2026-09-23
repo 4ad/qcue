@@ -47,6 +47,20 @@ func (r *RigidType) validate(c *OpContext, value Value) *Bottom {
 // FunctionTypeParameters returns the still-bound universal telescope.
 func FunctionTypeParameters(t FuncType) []*TypeParameter { return typeParameters(t.Env) }
 
+// BoundArgumentInstance selects a witness for the saved part of a packet.
+// This checks that partial application is possible; it does not specialize
+// the closure's residual protocol or discharge its universal obligations.
+func (f *FuncValue) BoundArgumentInstance(c *OpContext) (FuncType, *Bottom) {
+	if f.IsPartial() && len(typeParameters(f.Env)) != 0 {
+		inst, b := f.inferInstance(c, f.args)
+		if b != nil {
+			return FuncType{}, b
+		}
+		return FuncType{Fn: f.Fn, Env: inst.Env}, nil
+	}
+	return FuncType{Fn: f.Fn, Env: f.Env}, nil
+}
+
 // FunctionTypeArguments returns the lexical substitutions selected for a
 // function value, keyed by source binder identity for faithful syntax export.
 func FunctionTypeArguments(t FuncType) map[*ast.TypeParam]Value {

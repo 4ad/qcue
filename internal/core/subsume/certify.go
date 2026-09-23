@@ -228,9 +228,21 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	defer func() { p.hypotheses = savedHypotheses }()
 	p.active = append(p.active, f)
 	defer func() { p.active = p.active[:len(p.active)-1] }()
+	boundType, boundErr := f.BoundArgumentInstance(p.ctx)
+	if boundErr != nil {
+		return false
+	}
 	for i := range f.Fn.Params {
 		env, expr := f.BoundArgument(i)
-		if expr != nil && p.captured(p.schema(env, expr)) == nil {
+		if expr == nil {
+			continue
+		}
+		// A saved argument needs both its own implementation proof and
+		// membership in the parameter's domain. The original body proof
+		// below introduces arbitrary admitted arguments, not these values.
+		value := p.captured(p.schema(env, expr))
+		want := p.schema(boundType.Env, boundType.Fn.Params[i].Value)
+		if value == nil || want == nil || !p.proveInclusion(p.ctx, want, value) {
 			return false
 		}
 	}
@@ -292,7 +304,8 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 				continue
 			}
 			v := p.captured(p.schema(env, expr))
-			if !p.includes(p.schema(source.Env, arg.Value), v) {
+			want := p.schema(source.Env, arg.Value)
+			if want == nil || v == nil || !p.proveInclusion(p.ctx, want, v) {
 				return false
 			}
 			values[arg.Local] = v
