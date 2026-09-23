@@ -459,20 +459,6 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 		return nil
 	}
 	callee := adt.Unwrap(p.expr(env, call.Fun))
-	if b, ok := callee.(*adt.Builtin); ok && b.Name == "len" && len(call.Args) == 1 {
-		v := p.expr(env, call.Args[0])
-		if v != nil && v.Kind()&(adt.ListKind|adt.StructKind|adt.StringKind|adt.BytesKind) == v.Kind() {
-			return &adt.BasicType{K: adt.IntKind}
-		}
-		return nil
-	}
-	f, ok := callee.(*adt.FuncValue)
-	if !ok {
-		return nil
-	}
-	if f.Src != nil && f.Src.Effect != nil {
-		return nil
-	}
 	packet := &adt.Function{}
 	args := make([]adt.Value, len(call.Args))
 	for i, arg := range call.Args {
@@ -487,7 +473,24 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 		packet.Params = append(packet.Params, adt.FuncParam{Value: args[i], Label: label, Positional: label == adt.InvalidLabel})
 	}
 	target := adt.FuncType{Fn: packet}
-	source := adt.FuncType{Fn: f.Fn, Env: f.Env}
+	var source adt.FuncType
+	switch f := callee.(type) {
+	case *adt.FuncValue:
+		if f.Src != nil && f.Src.Effect != nil {
+			return nil
+		}
+		source = adt.FuncType{Fn: f.ResidualSignature(), Env: f.Env}
+	case *adt.Builtin:
+		// Primitive totality and packet coverage are separate obligations.
+		// Use the same protocol as builtin capability inclusion, including
+		// its label and omission rules.
+		source.Fn = primitiveContract(p.ctx, f)
+		if source.Fn == nil || ValidateBuiltin(p.ctx, f) != nil {
+			return nil
+		}
+	default:
+		return nil
+	}
 	if len(adt.FunctionTypeParameters(source)) != 0 {
 		var b *adt.Bottom
 		source, b = adt.InstantiateFunctionType(p.ctx, source, target)
@@ -501,8 +504,10 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 	if !s.capabilitySignature(target, adt.FuncType{Fn: &noResult, Env: source.Env}) {
 		return nil
 	}
-	if !p.hypotheses[f] && !p.implementation(f) {
-		return nil
+	if f, ok := callee.(*adt.FuncValue); ok {
+		if !p.hypotheses[f] && !p.implementation(f) {
+			return nil
+		}
 	}
 	return p.schema(source.Env, source.Fn.Ret)
 }

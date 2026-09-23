@@ -1,0 +1,55 @@
+// Copyright 2026 CUE Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package cue_test
+
+import (
+	"testing"
+
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
+)
+
+// Certification must check the same packet protocol as runtime invocation.
+func TestQuantifiedCertificationProtocol(t *testing.T) {
+	for _, tt := range []struct {
+		name, source, call string
+		valid              bool
+	}{
+		{"partial", `p: (func(x: int, y: int) -> int: y)(1, ...)
+f: func(x: int) -> int: p(x)`, `f(2)`, true},
+		{"partial_arity", `p: (func(x: int, y: int) -> int: y)(1, ...)
+f: func(x: int, y: int) -> int: p(x, y)`, `f(2, 3)`, false},
+		{"partial_label", `p: (func(x: int, y: int) -> int: y)(x: 1, ...)
+f: func(y: int) -> int: p(y: y)`, `f(2)`, true},
+		{"partial_bound_label", `p: (func(x: int, y: int) -> int: y)(x: 1, ...)
+f: func(x: int, y: int) -> int: p(x: x, y: y)`, `f(2, 3)`, false},
+		{"len", `f: func(x: string) -> int: len(x)`, `f("abc")`, true},
+		{"len_label", `f: func(x: string) -> int: len(wrong: x)`, `f("abc")`, false},
+		{"len_arity", `f: func(x: string) -> int: len(x, x)`, `f("abc")`, false},
+		{"primitive", "import \"strings\"\nh: strings.ToUpper\nf: func(x: string) -> string: h(x)", `f("abc")`, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString(tt.source + "\nout: " + tt.call)
+			f := v.LookupPath(cue.ParsePath("f"))
+			if err := f.Validate(cue.Concrete(true)); (err == nil) != tt.valid {
+				t.Fatalf("certification: %v; want valid %v", err, tt.valid)
+			}
+			out := v.LookupPath(cue.ParsePath("out"))
+			if err := out.Validate(cue.Concrete(true)); (err == nil) != tt.valid {
+				t.Fatalf("execution: %v; want valid %v", err, tt.valid)
+			}
+		})
+	}
+}
