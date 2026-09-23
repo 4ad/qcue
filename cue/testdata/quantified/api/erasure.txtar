@@ -25,22 +25,23 @@ f:
 	forall (A) func(x: A) -> A: id[A](x)
 out: [f[1](1), f[2](2)]
 -- alias_free.cue --
-f(A: int): func() -> int: {
+f: forall (A: int) func() -> int: {
 	Hidden(B) = A
 	out: Hidden(int)
 }.out
-left: f[1] & f[2]
+left:  f[1] & f[2]
 right: f[2] & f[1]
-out: [left(), right()]
+out:   [left(), right()]
 -- alias_free_nested.cue --
-f(A: int): func() -> int: {
+f: forall (A: int) func() -> int: {
 	Hidden(B) = A
 	Wrap(C) = Hidden(C)
 	out: Wrap(int)
 }.out
 -- alias_substitutions.cue --
 Box(B) = B
-f(A: int): func() -> _: [Box(1), Box(A)]
+f:
+	forall (A: int) func() -> _: [Box(1), Box(A)]
 -- fixed_alias.cue --
 Box(A) = {value: A}
 f:   func() -> {value: 1}: Box(1)

@@ -15,11 +15,12 @@
 package cue_test
 
 import (
+	"testing"
+
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
-	"testing"
 )
 
 func TestQuantifiedCompositeExport(t *testing.T) {

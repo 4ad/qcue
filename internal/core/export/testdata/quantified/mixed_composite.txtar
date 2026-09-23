@@ -1,7 +1,7 @@
 #incomplete
 
 -- in.cue --
-base(A): {f: func(x: A) -> A: x}
-out: {whole: base, projected: base.f}
+base: forall (A) {f: func(x: A) -> A: x}
+out:  {whole: base, projected: base.f}
 -- out/export --
 shared composite code cannot be exported in separate lexical origins
