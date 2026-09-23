@@ -333,7 +333,7 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	if b := schema.Bottom(); b != nil {
 		return b
 	}
-	view := p.transportResolved(c, schema, implementation, true)
+	view := p.transportResolvedMode(c, schema, implementation, true, true)
 	if v, ok := view.(*Vertex); ok {
 		v.sealed = p
 		if c.sealedViews == nil {
@@ -408,8 +408,9 @@ func quantifiedEnvironment(c *OpContext, e *Existential, args map[*TypeParameter
 		types: &typeScope{quantifier: e.Template, arguments: args}}
 }
 
-// transport follows the interface shape. Private record fields are never
-// copied into the public view simply because the representation has them.
+// transport follows abstract occurrences in ordinary values. Open-record
+// data keeps its extra fields; projection of a module's private declarations
+// is requested separately at the root sealing boundary.
 func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, value Value, outward bool) Value {
 	if b, ok := Unwrap(value).(*Bottom); ok {
 		return b
@@ -476,6 +477,11 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 				return b
 			}
 			out.Decls = append(out.Decls, &Field{Label: field.Label, Value: result})
+		}
+		for _, a := range v.Arcs {
+			if a.ArcType == ArcMember && a.Label.IsRegular() && scope.LookupRaw(a.Label) == nil {
+				out.Decls = append(out.Decls, &Field{Label: a.Label, Value: a})
+			}
 		}
 		result := c.newInlineVertex(nil, nil, MakeRootConjunct(env, out))
 		result.Finalize(c)
@@ -566,6 +572,10 @@ func opaqueTypeOf(value Value) *opaqueCarrier {
 }
 
 func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, outward bool) Value {
+	return p.transportResolvedMode(c, schema, value, outward, false)
+}
+
+func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value, outward, project bool) Value {
 	if b, ok := Unwrap(value).(*Bottom); ok {
 		return b
 	}
@@ -637,6 +647,9 @@ func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, out
 		field.Label = a.Label
 		typ.MatchAndInsert(c, field)
 		if len(field.Conjuncts) == 0 {
+			if !project {
+				out.Decls = append(out.Decls, &Field{Label: a.Label, Value: a})
+			}
 			continue
 		}
 		field.Finalize(c)
