@@ -547,6 +547,30 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 		}
 		return &adt.BasicType{K: x.K}
+	case *adt.UnaryExpr:
+		v := p.expr(env, x.X)
+		if v == nil {
+			return nil
+		}
+		switch x.Op {
+		case adt.NotOp:
+			if v.Kind() == adt.BoolKind {
+				if b, ok := adt.Unwrap(v).(*adt.Bool); ok {
+					return &adt.Bool{B: !b.B}
+				}
+				return &adt.BasicType{K: adt.BoolKind}
+			}
+		case adt.AddOp, adt.SubtractOp:
+			if v.Kind()&adt.NumberKind == v.Kind() {
+				if x.Op == adt.AddOp {
+					return v
+				}
+				if result := p.negateNumber(v); result != nil {
+					return p.schema(nil, result)
+				}
+			}
+		}
+		return nil
 	case *adt.BinaryExpr:
 		a, b := p.expr(env, x.X), p.expr(env, x.Y)
 		if a == nil || b == nil {
@@ -583,6 +607,61 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.call(env, x)
 	}
 	return nil
+}
+
+// Negation reverses ordered interval endpoints, while preserving numeric
+// kinds, exclusions, and unions. This is a proof for the whole input domain.
+func (p *certifier) negateNumber(v adt.Value) adt.Value {
+	if !p.step() {
+		return nil
+	}
+	switch x := adt.Unwrap(v).(type) {
+	case *adt.Num:
+		return p.schema(nil, &adt.UnaryExpr{Op: adt.SubtractOp, X: x})
+	case *adt.BoundValue:
+		op := x.Op
+		switch op {
+		case adt.LessThanOp:
+			op = adt.GreaterThanOp
+		case adt.LessEqualOp:
+			op = adt.GreaterEqualOp
+		case adt.GreaterThanOp:
+			op = adt.LessThanOp
+		case adt.GreaterEqualOp:
+			op = adt.LessEqualOp
+		case adt.NotEqualOp:
+		default:
+			return &adt.BasicType{K: v.Kind()}
+		}
+		if n, ok := x.Value.(*adt.Num); ok {
+			value := p.negateNumber(n)
+			if value == nil {
+				return nil
+			}
+			return &adt.BoundValue{Op: op, Value: value}
+		}
+	case *adt.Conjunction:
+		out := &adt.Conjunction{}
+		for _, term := range x.Values {
+			v := p.negateNumber(term)
+			if v == nil {
+				return nil
+			}
+			out.Values = append(out.Values, v)
+		}
+		return out
+	case *adt.Disjunction:
+		out := &adt.Disjunction{}
+		for _, term := range x.Values {
+			v := p.negateNumber(term)
+			if v == nil {
+				return nil
+			}
+			out.Values = append(out.Values, v)
+		}
+		return out
+	}
+	return &adt.BasicType{K: v.Kind()}
 }
 
 // Translation by a constant preserves numeric interval predicates. This
