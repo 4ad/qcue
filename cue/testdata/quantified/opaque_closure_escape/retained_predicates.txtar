@@ -1,0 +1,42 @@
+// Escape checks follow all public predicate dependencies, including exact
+// singletons, retained arrow clauses and unused generic bounds. Runtime
+// captures can still remain private behind ordinary result types.
+
+-- in.cue --
+@test(validate, conflict, at="singleton")
+@test(validate, conflict, at="listSingleton")
+@test(validate, conflict, at="attached")
+@test(validate, conflict, at="attachedResult")
+@test(validate, conflict, at="genericBound")
+@test(validate, conflict, at="compoundBound")
+@test(validate, conflict, at="builtin")
+@test(json, [0, 1], at="good")
+
+#M: exists A {zero: A, tag: 1, read: func(A) -> int}
+p: seal #M with (A = int) {
+	zero: 0
+	tag: 1
+	read: func(x: int) -> int: x
+}
+singleton: (open p as (A, P) {
+	r: {w: {v: P.zero}, f: func(x: w) -> int: 0}.f
+}).r
+listSingleton: (open p as (A, P) {
+	r: {w: [P.zero], f: func(x: w) -> int: 0}.f
+}).r
+attached: (open p as (A, P) {
+	r: (func(x: _) -> _: x) & (func(A) -> A)
+}).r
+attachedResult: (open p as (A, P) {
+	r: (func() -> _: P.zero) & (func() -> A)
+}).r
+genericBound: (open p as (A, P) {
+	r: forall (B: A) func() -> int: 0
+}).r
+compoundBound: (open p as (A, P) {
+	r: forall (B, C: B & A) func() -> int: 0
+}).r
+builtin: (open p as (A, P) {r: len & (func(A) -> int)}).r
+private: (open p as (A, P) {r: func() -> int: P.read(P.zero)}).r
+ordinary: (open p as (A, P) {r: func(x: P.tag) -> int: x}).r
+good: [private(), ordinary(1)]

@@ -109,7 +109,7 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 		if _, imported := id.Node.(*ast.ImportSpec); imported {
 			return false
 		}
-		if scope, ok := id.Scope.(*ast.OpenExpr); ok && id.Node == scope.Type {
+		if scope, ok := id.Scope.(*ast.OpenExpr); ok && id.Node == scope.Type && runtimeOnly {
 			return false
 		}
 		key := id.Node

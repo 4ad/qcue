@@ -990,6 +990,12 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 		return v.carrier.owner == owner
 	case *OpaqueType:
 		return v.carrier.owner == owner
+	case *WitnessType:
+		// A singleton retains the witness as a predicate dependency even
+		// when its current upper approximation looks like ordinary data.
+		witness, _ := c.Evaluate(v.Env, v.Ref.X)
+		return abstractEscapes(c, v.Upper, owner, seen) ||
+			abstractEscapes(c, witness, owner, seen)
 	case *Vertex:
 		v = v.DerefValue()
 		if v.sealed == owner {
@@ -1038,20 +1044,68 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 			}
 		}
 	case *FuncValue:
-		for _, param := range v.Fn.Params {
-			if param.Value != nil {
-				x, _ := c.Evaluate(v.Env, param.Value)
-				if abstractEscapes(c, x, owner, seen) {
-					return true
-				}
+		for _, t := range v.selectionAndOriginalClauses() {
+			if abstractFunctionTypeEscapes(c, t, owner, seen) {
+				return true
 			}
 		}
-		if v.Fn.Ret != nil {
-			x, _ := c.Evaluate(v.Env, v.Fn.Ret)
-			return abstractEscapes(c, x, owner, seen)
+	case *Builtin:
+		for _, t := range v.Types {
+			if abstractFunctionTypeEscapes(c, t, owner, seen) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+// Check public predicates, including retained clauses and telescope bounds.
+// Private implementation captures remain permitted: checkResultScopes checks
+// what a returned closure exposes when it is eventually called.
+func abstractFunctionTypeEscapes(c *OpContext, t FuncType, owner *sealedPackage, seen map[Value]bool) bool {
+	for _, param := range t.Fn.Params {
+		if abstractPredicateEscapes(c, t.Env, param.Value, owner, seen) {
+			return true
+		}
+	}
+	if abstractPredicateEscapes(c, t.Env, t.Fn.Ret, owner, seen) {
+		return true
+	}
+	for e := t.Env; e != nil; e = e.Up {
+		if e.types == nil {
+			continue
+		}
+		for _, p := range e.types.quantifier.Params {
+			if e.types.arguments[p] == nil &&
+				(abstractPredicateEscapes(c, e, p.Bound, owner, seen) ||
+					abstractPredicateEscapes(c, e, p.ValueRange, owner, seen)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func abstractPredicateEscapes(c *OpContext, env *Environment, expr Expr, owner *sealedPackage, seen map[Value]bool) bool {
+	if expr == nil {
+		return false
+	}
+	// Evaluating a compound predicate with an uninstantiated binder can
+	// yield only an incomplete bottom. Inspect its independent premises
+	// before evaluation so that this does not hide another free carrier.
+	switch x := expr.(type) {
+	case *BinaryExpr:
+		return abstractPredicateEscapes(c, env, x.X, owner, seen) ||
+			abstractPredicateEscapes(c, env, x.Y, owner, seen)
+	case *DisjunctionExpr:
+		for _, term := range x.Values {
+			if abstractPredicateEscapes(c, env, term.Val, owner, seen) {
+				return true
+			}
+		}
+	}
+	value, _ := c.Evaluate(env, expr)
+	return abstractEscapes(c, value, owner, seen)
 }
 
 func abstractReferencesEscape(c *OpContext, q *Quantified, env *Environment, owner *sealedPackage, seen map[Value]bool) bool {

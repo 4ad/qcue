@@ -380,6 +380,39 @@ func TestQuantifiedOpaqueExport(t *testing.T) {
 	}
 }
 
+func TestQuantifiedOpaquePredicateExport(t *testing.T) {
+	// The public function type is ordinary, and its result can escape. Its
+	// implementation syntax still refers to the opening's abstract type.
+	// Export must retain that lexical dependency even though it is erased
+	// from the runtime capture vector.
+	const source = `
+#M: exists A {zero: A}
+p: seal #M with (A = int) {zero: 0}
+out: (open p as (A, P) {
+	r: func() -> int: {ignored: func(A) -> A, value: 0}.value
+}).r
+result: out()
+`
+	for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
+		root := cuecontext.New().CompileString(source)
+		if got, err := root.LookupPath(cue.ParsePath("result")).Int64(); err != nil || got != 0 {
+			t.Fatalf("ordinary result: got %d, %v", got, err)
+		}
+		v := root.LookupPath(cue.ParsePath("out"))
+		if err := v.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if node := v.Syntax(opts...); node != nil {
+			if _, ok := node.(*ast.BadExpr); !ok {
+				src, _ := format.Node(node)
+				t.Fatalf("export emitted a free abstract dependency: %s", src)
+			}
+		} else {
+			t.Fatal("missing export result")
+		}
+	}
+}
+
 func TestQuantifiedClosureExport(t *testing.T) {
 	for _, name := range []string{"captures", "factory", "literals", "records", "predicates", "generic", "nested_generic", "bounds", "hygiene", "callables", "chain"} {
 		for _, mode := range []string{"source", "final", "expression", "value"} {
