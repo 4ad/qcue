@@ -99,6 +99,7 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 		if p.Sort != nil {
 			if finiteValueRange(p.Sort) {
 				param.ValueRange = c.expr(p.Sort)
+				param.References = c.freeReferences(p, param.ValueRange, false)
 				c.typeParameters[p] = param
 				q.Params = append(q.Params, param)
 				continue
@@ -128,6 +129,7 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 			param.ExplicitLevel = true
 		}
 		param.Bound = c.typeExpr(p.Bound)
+		param.References = c.freeReferences(p, param.Bound, false)
 		c.typeParameters[p] = param
 		q.Params = append(q.Params, param)
 	}

@@ -26,6 +26,8 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/parser"
+	"cuelang.org/go/internal/core/export"
+	"cuelang.org/go/internal/value"
 )
 
 func TestQuantifiedDataMeet(t *testing.T) {
@@ -219,6 +221,63 @@ func TestQuantifiedResidualExport(t *testing.T) {
 				}
 				if got := normalize(string(text)); got != normalize(want) {
 					t.Fatalf("export = %s; want %s", got, normalize(want))
+				}
+			})
+		}
+	}
+}
+
+func TestQuantifiedClosureExport(t *testing.T) {
+	for _, name := range []string{"captures", "factory", "literals", "records", "predicates", "generic", "nested_generic", "bounds", "hygiene"} {
+		for _, mode := range []string{"source", "final", "expression", "value"} {
+			t.Run(name+"/"+mode, func(t *testing.T) {
+				ctx := cuecontext.New()
+				src := quantifiedAPIText(t, "closure_export", name+".cue")
+				check := quantifiedAPIText(t, "closure_export", name+"-check.cue")
+				want := quantifiedAPIText(t, "closure_export", name+"-want.json")
+				verify := func(src string) {
+					t.Helper()
+					v := ctx.CompileString(src + "\n" + check)
+					if got, err := v.LookupPath(cue.ParsePath("good")).MarshalJSON(); err != nil || string(got) != want {
+						t.Fatalf("source %s: got %s, %v; want %s", src, got, err, want)
+					}
+					if err := v.LookupPath(cue.ParsePath("bad")).Validate(); err == nil || !strings.Contains(err.Error(), "conflicting function identities") {
+						t.Fatalf("source %s: distinct descriptors did not conflict: %v", src, err)
+					}
+				}
+				verify(src)
+				var options []cue.Option
+				if mode == "final" {
+					options = append(options, cue.Final())
+				}
+				v := ctx.CompileString(src).LookupPath(cue.ParsePath("r"))
+				node := v.Syntax(options...)
+				if mode == "expression" || mode == "value" {
+					input := v
+					if mode == "expression" {
+						// Expr deliberately preserves references outside its input,
+						// so give it the enclosing declarations as well.
+						input = ctx.CompileString(src)
+					}
+					r, x := value.ToInternal(input)
+					var err error
+					if mode == "expression" {
+						node, err = export.Expr(r, "", x)
+					} else {
+						node, err = export.Value(r, "", x)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				text, err := format.Node(node)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if mode == "expression" {
+					verify("root: " + string(text) + "\nr: root.r")
+				} else {
+					verify("r: " + string(text))
 				}
 			})
 		}

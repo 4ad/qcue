@@ -477,6 +477,13 @@ func (e *exporter) funcSrc(src *ast.Func) ast.Expr {
 }
 
 func (e *exporter) quantifierSrc(q *adt.Quantified, env *adt.Environment) ast.Expr {
+	if fn, ok := q.Body.(*adt.Function); ok && fn.Body != nil && env != nil {
+		if v, ok := e.ctx.Evaluate(env, q); ok {
+			if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok {
+				return e.quantifiedFuncValue(f)
+			}
+		}
+	}
 	args := adt.FunctionTypeArguments(adt.FuncType{Env: env})
 	refs := make(map[ast.Node]adt.Value)
 	for _, ref := range q.References {
@@ -519,6 +526,9 @@ func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	}
 	if t.Fn.Src == nil {
 		return e.quantifiedExportError("function source is unavailable for export")
+	}
+	if t.Fn.Body != nil {
+		return e.functionOriginValue(t)
 	}
 	var src ast.Expr = ast.Clone(t.Fn.Src)
 	params := adt.FunctionTypeParameters(t)
@@ -636,11 +646,14 @@ func (e *exporter) funcExprSrc(src ast.Expr, experiment string) ast.Expr {
 	// The blank line following the attribute leaves the literal positioned
 	// at a section start, which would render it on its own line.
 	ast.SetRelPos(expr, token.NoRelPos)
-	if imports != nil {
+	if imports != nil || e.originNames != nil {
 		ast.Walk(expr, func(n ast.Node) bool {
 			if x, ok := n.(*ast.Ident); ok && x.Node == nil {
 				if spec, ok := imports[x.Name]; ok {
 					x.Node = spec
+				}
+				if origin := e.originNames[x.Name]; origin != nil {
+					x.Node = origin
 				}
 			}
 			return true

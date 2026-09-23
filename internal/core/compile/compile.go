@@ -1368,6 +1368,7 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		c.popScope()
 		if fn.Quantified && fn.Body != nil {
 			fn.Captures = c.functionCaptures(n, fn)
+			fn.References = c.freeReferences(n, fn, false)
 		}
 		return fn
 

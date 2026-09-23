@@ -46,6 +46,17 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 			return false
 		}
 		switch x := n.(type) {
+		case *adt.AliasApplication:
+			// The template's local declarations have their own lexical scope.
+			// Its free references, along with the arguments, are dependencies
+			// of the application in this scope.
+			for _, ref := range x.Template.References {
+				w.Elem(ref)
+			}
+			for _, arg := range x.Args {
+				w.Elem(arg)
+			}
+			return false
 		case *adt.Function:
 			saved := typePosition
 			for _, p := range x.Params {
@@ -70,7 +81,7 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 			return false
 		}
 		if _, ok := n.(adt.Resolver); !ok {
-			if r, ok := n.(*adt.TypeReference); !ok || r.Param.ValueRange == nil {
+			if r, ok := n.(*adt.TypeReference); !ok || (runtimeOnly && r.Param.ValueRange == nil) {
 				return true
 			}
 		} else if runtimeOnly && typePosition {

@@ -194,7 +194,8 @@ func Expr(r adt.Runtime, pkgID string, n adt.Expr) (ast.Expr, errors.Error) {
 func (p *Profile) Expr(r adt.Runtime, pkgID string, n adt.Expr) (ast.Expr, errors.Error) {
 	e := newExporter(p, r, pkgID, nil)
 
-	return e.expr(nil, n), nil
+	x := e.expr(nil, n)
+	return e.withOriginDecls(x), e.errs
 }
 
 func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
@@ -318,7 +319,7 @@ func Value(r adt.Runtime, pkgID string, n adt.Value) (ast.Expr, errors.Error) {
 // TODO: Should take context.
 func (p *Profile) Value(r adt.Runtime, pkgID string, n adt.Value) (ast.Expr, errors.Error) {
 	e := newExporter(p, r, pkgID, n)
-	v := e.value(n)
+	v := e.withOriginDecls(e.value(n))
 	// finalize runs astutil.Sanitize, which edits v in place via the shared
 	// StructLit Elts.
 	if vx, ok := n.(*adt.Vertex); ok {
@@ -364,9 +365,12 @@ type exporter struct {
 	experimentsErr error
 	postfixAliases bool
 	// fieldAlias is used to track original alias names of regular fields.
-	fieldAlias map[*ast.Field]fieldAndScope
-	letAlias   map[*ast.LetClause]*ast.LetClause
-	references map[*adt.Vertex]*referenceInfo
+	fieldAlias      map[*ast.Field]fieldAndScope
+	letAlias        map[*ast.LetClause]*ast.LetClause
+	references      map[*adt.Vertex]*referenceInfo
+	functionOrigins map[*adt.Function]*functionOrigin
+	originDecls     []ast.Decl
+	originNames     map[string]ast.Node
 
 	pivotter *pivotter
 }
@@ -462,6 +466,7 @@ func (e *exporter) initPivot(n *adt.Vertex) {
 // that require conversion to a File, Sanitization, and self containment.
 func (e *exporter) finalize(n *adt.Vertex, v ast.Expr) (f *ast.File, err errors.Error) {
 	f = e.toFile(n, v)
+	f.Decls = append(f.Decls, e.originDecls...)
 
 	// The file is built rather than parsed, so nothing in it records which
 	// language version it is written for. Say so, both for the passes below

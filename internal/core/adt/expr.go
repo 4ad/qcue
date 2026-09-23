@@ -1602,6 +1602,9 @@ type Function struct {
 	// fields that the function never uses do not contribute to its identity.
 	Quantified bool
 	Captures   []Expr
+	// References also includes erased free predicates needed to reconstruct
+	// the code at a different lexical position during source export.
+	References []Expr
 }
 
 // FuncParam represents a compiled function parameter.

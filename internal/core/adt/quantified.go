@@ -32,6 +32,9 @@ type TypeParameter struct {
 	// ValueRange is non-nil for the finite value-binder fragment. General
 	// dependent ranges and signatures remain outside this profile.
 	ValueRange Expr
+	// References records lexical dependencies of the bound or value range
+	// for exporting a telescope at a different lexical position.
+	References []Expr
 }
 
 // Quantified is a retained predicate template over one subject.

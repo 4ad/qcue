@@ -117,6 +117,20 @@ The [quantified fragment fixture](certification/quantified_fragment.txtar) recor
 both supported universal checks and the general Boolean predicates that remain
 residual. Successful concrete calls alone are not certification assertions.
 
+The following regressions cover the additional semantic audit findings:
+
+| Obligation | Regression |
+| --- | --- |
+| Guard membership preserves the supplied packet's shape | [record_membership](capabilities/record_membership.txtar) |
+| Type arguments prove inclusion in structural bounds | [structural_bounds](invalid_instances/structural_bounds.txtar) |
+| An unknown callback row cannot establish complete call coverage | [open_callback_row](certification/open_callback_row.txtar) |
+| Required results impose field presence, including top-valued fields | [required_results](certification/required_results.txtar) |
+| Opened abstract types retain their representation universe | [opened_level](opaque_universe_boundary/opened_level.txtar) |
+| Finite alias arguments satisfy their declared range | [value_ranges](parametric_aliases/value_ranges.txtar) |
+| Export preserves shared code origins and distinct captures | [closure_export](api/closure_export.txtar) |
+| Residual quantifier export retains lexical substitutions | [quantifier_export](api/quantifier_export.txtar) |
+| Subtype binders admit unary bodies | [bound_unary_body](finite_witnesses/bound_unary_body.txtar), plus parser and formatter fixtures |
+
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Paper exclusions state their reason, and the paper index
 test checks that every listing still matches the proposal exactly.

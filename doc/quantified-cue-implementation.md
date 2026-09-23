@@ -192,7 +192,11 @@ predicates against the same sealed witness; sharing a template is insufficient.
 
 Opaque values and package operations cannot be serialized as their private
 implementations. Observe ordinary data through public operations before exporting
-JSON. Source export preserves supported generic functions and concrete captures;
+JSON. Source export preserves supported generic functions and concrete captures.
+Shared function literals are emitted once, with separate arguments for erased
+predicates and runtime captures, so recompilation preserves closure identity.
+Residual quantifiers retain selected arguments, outer predicates, and local
+binder scopes. These rules apply to both ordinary and final source export;
 unsupported captures, independent partial closures, and opaque operations report
 incompleteness rather than being replaced with a weaker description.
 
