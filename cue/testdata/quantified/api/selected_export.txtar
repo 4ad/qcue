@@ -17,10 +17,10 @@ selected: pair[int]
 pair:     forall (A, B) func(x: A, y: B) -> [A, B]: [x, y]
 selected: pair[int][string]
 -- attached.cue --
-id(A): func(A) -> A
-id: func(x: _) -> _: x
+id:       forall (A) func(A) -> A
+id:       func(x: _) -> _: x
 selected: id[int]
 -- attached_partial.cue --
-pair(A, B): func(A, B) -> [A, B]
-pair: func(x: _, y: _) -> [_, _]: [x, y]
+pair:     forall (A, B) func(A, B) -> [A, B]
+pair:     func(x: _, y: _) -> [_, _]: [x, y]
 selected: pair[int]

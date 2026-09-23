@@ -6,10 +6,9 @@
 @test(validate, concrete, at="c")
 @test(json, [3, 4, 5], at="out")
 
-id: func(x: int) -> int: x
-wrap: func(f: func(int) -> int) -> func(int) -> int:
-	func(x: int) -> int: f(x)
-a: wrap(id)
-b: wrap(a)
-c: wrap(b)
-out: [a(3), b(4), c(5)]
+id:   func(x: int) -> int: x
+wrap: func(f: func(int) -> int) -> func(int) -> int: func(x: int) -> int: f(x)
+a:    wrap(id)
+b:    wrap(a)
+c:    wrap(b)
+out:  [a(3), b(4), c(5)]

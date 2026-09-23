@@ -7,11 +7,11 @@
 @test(validate, conflict, at="listExtra")
 @test(json, [{x: 1}, {inner: {x: 1}}, [{x: 1}]], at="good")
 
-a: {x: 1}
-n: {inner: a}
-l: [a]
+a:           {x: 1}
+n:           {inner: a}
+l:           [a]
 extra:       (func() -> a: {x: 1, y: 2})()
 missing:     (func() -> a: {})()
 nestedExtra: (func() -> n: {inner: {x: 1, y: 2}})()
 listExtra:   (func() -> l: [{x: 1, y: 2}])()
-good: [(func() -> a: {x: 1})(), (func() -> n: {inner: {x: 1}})(), (func() -> l: [{x: 1}])()]
+good:        [(func() -> a: {x: 1})(), (func() -> n: {inner: {x: 1}})(), (func() -> l: [{x: 1}])()]

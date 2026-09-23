@@ -4,9 +4,9 @@
 #inlinetest:exclude Run by cue/quantified_test.go.
 
 -- callables.cue --
-base: func(x: int) -> int: x
+base:    func(x: int) -> int: x
 refined: base & (func(int) -> int)
-wrap: func(f: func(int) -> int) -> func(int) -> int: func(x: int) -> int: f(x)
+wrap:    func(f: func(int) -> int) -> func(int) -> int: func(x: int) -> int: f(x)
 r: {
 	a: wrap(base)
 	b: wrap(refined)
@@ -14,17 +14,17 @@ r: {
 }
 -- callables-check.cue --
 good: (r.a & r.b)(3)
-bad: r.a & r.c
+bad:  r.a & r.c
 -- callables-want.json --
 3
 -- chain.cue --
-base: func(x: int) -> int: x
-wrap: func(f: func(int) -> int) -> func(int) -> int: func(x: int) -> int: f(x)
+base:  func(x: int) -> int: x
+wrap:  func(f: func(int) -> int) -> func(int) -> int: func(x: int) -> int: f(x)
 first: wrap(base)
-r: {a: first, b: wrap(first)}
+r:     {a: first, b: wrap(first)}
 -- chain-check.cue --
 good: r.b(4)
-bad: r.a & r.b
+bad:  r.a & r.b
 -- chain-want.json --
 4
 

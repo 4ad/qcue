@@ -8,24 +8,24 @@
 @test(validate, concrete, at="good")
 @test(json, 0, at="out")
 
-#I: exists A {value: A, run: func(A) -> int}
+#I:     exists (A) {value: A, run: func(A) -> int}
 #wrong: func() -> string: "wrong"
-#bad: func(x: int) -> int: #wrong()
-#good: func(x: int) -> int: x
+#bad:   func(x: int) -> int: #wrong()
+#good:  func(x: int) -> int: x
 bad: seal #I with (A = func(int) -> int) {
 	value: #bad
-	run: func(f: func(int) -> int) -> int: f(0)
+	run:   func(f: func(int) -> int) -> int: f(0)
 }
 record: seal #I with (A = {f: func(int) -> int}) {
 	value: {f: #bad}
-	run: func(x: {f: func(int) -> int}) -> int: x.f(0)
+	run:   func(x: {f: func(int) -> int}) -> int: x.f(0)
 }
 list: seal #I with (A = [func(int) -> int]) {
 	value: [#bad]
-	run: func(x: [func(int) -> int]) -> int: x[0](0)
+	run:   func(x: [func(int) -> int]) -> int: x[0](0)
 }
 good: seal #I with (A = func(int) -> int) {
 	value: #good
-	run: func(f: func(int) -> int) -> int: f(0)
+	run:   func(f: func(int) -> int) -> int: f(0)
 }
 out: (open good as (A, P) {r: P.run(P.value)}).r

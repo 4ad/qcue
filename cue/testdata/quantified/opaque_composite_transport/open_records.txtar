@@ -6,24 +6,24 @@
 @test(validate, concrete, at="p")
 @test(validate, concrete, incomplete, at="hidden")
 
-#I: exists A {
-	v: A
-	count: func({}) -> int
-	make: func() -> {}
+#I: exists (A) {
+	v:      A
+	count:  func({}) -> int
+	make:   func() -> {}
 	nested: func({inner: {}}) -> int
-	list: func([{}]) -> int
-	echo: func({v: A}) -> {v: A}
-	read: func(A) -> int
+	list:   func([{}]) -> int
+	echo:   func({v: A}) -> {v: A}
+	read:   func(A) -> int
 }
 p: seal #I with (A = int) {
-	v: 7
+	v:      7
 	secret: "private declaration"
-	count: func(x: {}) -> int: len(x)
-	make: func() -> {}: {a: 1}
+	count:  func(x: {}) -> int: len(x)
+	make:   func() -> {}: {a: 1}
 	nested: func(x: {inner: {}}) -> int: len(x.inner)
-	list: func(x: [{}]) -> int: len(x[0])
-	echo: func(x: {v: int}) -> {v: int}: x
-	read: func(x: int) -> int: x
+	list:   func(x: [{}]) -> int: len(x[0])
+	echo:   func(x: {v: int}) -> {v: int}: x
+	read:   func(x: int) -> int: x
 }
 out: (open p as (A, P) {
 	let packet = P.echo({v: P.v, extra: 9})

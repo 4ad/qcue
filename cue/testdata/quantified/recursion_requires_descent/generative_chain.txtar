@@ -4,6 +4,5 @@
 -- in.cue --
 @test(validate, conflict, at="out")
 
-make: func(n: int) -> func() -> int:
-	func() -> int: make(n + 1)()
-out: make(0)()
+make: func(n: int) -> func() -> int: func() -> int: make(n + 1)()
+out:  make(0)()

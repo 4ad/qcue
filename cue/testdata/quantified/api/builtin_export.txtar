@@ -3,7 +3,9 @@
 
 -- bad.cue --
 import "strings"
+
 f: strings.ToUpper & (func(string) -> "bad")
 -- good.cue --
 import "strings"
+
 f: strings.ToUpper & (func("a") -> "A")

@@ -9,24 +9,24 @@
 @test(validate, concrete, incomplete, at="unproved")
 @test(json, [1, "kept"], at="out")
 
-#I: exists A {value: A, tag: 1}
-#J: exists A {value: A, tag: 2}
-#Left: #I & #J
-#Right: #J & #I
-left: seal #Left with (A = int) {value: 0, tag: 1}
-right: seal #Right with (A = int) {value: 0, tag: 1}
-#Refuted: #I & {tag: 2}
-refuted: seal #Refuted with (A = int) {value: 0, tag: 1}
-#Refined: #I & {extra: string}
+#I:               exists (A) {value: A, tag: 1}
+#J:               exists (A) {value: A, tag: 2}
+#Left:            #I & #J
+#Right:           #J & #I
+left:             seal #Left with (A = int) {value: 0, tag: 1}
+right:            seal #Right with (A = int) {value: 0, tag: 1}
+#Refuted:         #I & {tag: 2}
+refuted:          seal #Refuted with (A = int) {value: 0, tag: 1}
+#Refined:         #I & {extra: string}
 #EmptyRefinement: #I & {}
-emptyRefinement: seal #EmptyRefinement with (A = int) {value: 0, tag: 1}
-refined: seal #Refined with (A = int) {value: 0, tag: 1, extra: "kept"}
-out: (open refined as (T, P) {r: [P.tag, P.extra]}).r
+emptyRefinement:  seal #EmptyRefinement with (A = int) {value: 0, tag: 1}
+refined:          seal #Refined with (A = int) {value: 0, tag: 1, extra: "kept"}
+out:              (open refined as (T, P) {r: [P.tag, P.extra]}).r
 
-#Operation: exists A {op: func(A) -> int}
-#Unproved: #I & #Operation
+#Operation: exists (A) {op: func(A) -> int}
+#Unproved:  #I & #Operation
 unproved: seal #Unproved with (A = int) {
 	value: 0
-	tag: 1
-	op: func(x: int) -> int: x
+	tag:   1
+	op:    func(x: int) -> int: x
 }

@@ -1,8 +1,8 @@
 #incomplete
 
 -- in.cue --
-#I: exists A {f: func(int) -> int}
-p: seal #I with (A = int) {f: func(x: int) -> int: x}
+#I:  exists (A) {f: func(int) -> int}
+p:   seal #I with (A = int) {f: func(x: int) -> int: x}
 out: (open p as (A, P) {f: P.f}).f
 -- out/export --
 opaque boundaries cannot be unfolded for export

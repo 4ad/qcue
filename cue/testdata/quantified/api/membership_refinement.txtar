@@ -2,10 +2,10 @@
 #inlinetest:exclude Go API refinement tests in cue/quantified_test.go.
 
 -- existential.cue --
-x: (exists A {tag: 1}) & {}
+x: (exists (A) {tag: 1}) & {}
 -- singleton.cue --
-a: {x: int}
-f: func() -> a: {x: 1}
+a:   {x: int}
+f:   func() -> a: {x: 1}
 out: f()
 -- equal.cue --
 a: {x: 1}

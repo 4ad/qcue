@@ -15,16 +15,16 @@
 
 import "strings"
 
-badResult: strings.ToUpper & (func(string) -> "bad")
-badDomain: strings.ToUpper & (func(string | int) -> string)
-badDefault: strings.ToUpper & (func(string = "abc") -> string)
-badLabel: strings.ToUpper & (func(renamed: string) -> string)
-good: strings.ToUpper & (func(string) -> string)
-singleton: strings.ToUpper & (func("a") -> "A")
-named: strings.ToUpper & (func(s!: "c") -> "C")
+badResult:      strings.ToUpper & (func(string) -> "bad")
+badDomain:      strings.ToUpper & (func(string | int) -> string)
+badDefault:     strings.ToUpper & (func(string = "abc") -> string)
+badLabel:       strings.ToUpper & (func(renamed: string) -> string)
+good:           strings.ToUpper & (func(string) -> string)
+singleton:      strings.ToUpper & (func("a") -> "A")
+named:          strings.ToUpper & (func(s!: "c") -> "C")
 counterexample: badResult("x")
-omitted: badDefault()
-relabeled: badLabel(renamed: "x")
-out: [singleton("a"), singleton("b"), named(s: "c")]
-length: len & (func("abc") -> 3)
-lengths: [length("abc"), length("a")]
+omitted:        badDefault()
+relabeled:      badLabel(renamed: "x")
+out:            [singleton("a"), singleton("b"), named(s: "c")]
+length:         len & (func("abc") -> 3)
+lengths:        [length("abc"), length("a")]
