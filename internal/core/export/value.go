@@ -214,10 +214,10 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 		}
 
 	case *adt.Existential:
-		result = ast.Clone(x.Template.Src)
+		result = e.quantifierSrc(x.Template, x.Env)
 
 	case *adt.Universal:
-		result = ast.Clone(x.Template.Src)
+		result = e.quantifierSrc(x.Template, x.Env)
 
 	case *adt.AbstractResult:
 		result = e.quantifiedExportError("cannot export an unresolved function execution")
@@ -474,6 +474,40 @@ func (e *exporter) funcSrc(src *ast.Func) ast.Expr {
 		return ast.NewIdent("_")
 	}
 	return e.funcExprSrc(src, "functions")
+}
+
+func (e *exporter) quantifierSrc(q *adt.Quantified, env *adt.Environment) ast.Expr {
+	args := adt.FunctionTypeArguments(adt.FuncType{Env: env})
+	refs := make(map[ast.Node]adt.Value)
+	for _, ref := range q.References {
+		id, ok := ref.Source().(*ast.Ident)
+		if !ok || id.Node == nil {
+			continue
+		}
+		value, complete := e.ctx.Evaluate(env, ref)
+		if !complete || value == nil {
+			return e.quantifiedExportError("quantifier dependency %s is unresolved", id.Name)
+		}
+		refs[id.Node] = value
+	}
+	src := astutil.Apply(ast.Clone(q.Src), func(c astutil.Cursor) bool {
+		id, ok := c.Node().(*ast.Ident)
+		if !ok {
+			return true
+		}
+		value := refs[id.Node]
+		if p, ok := id.Node.(*ast.TypeParam); ok && args[p] != nil {
+			value = args[p]
+		}
+		if value != nil {
+			// Parentheses keep an inserted arrow or quantifier from taking
+			// ownership of operators in the surrounding template.
+			c.Replace(&ast.ParenExpr{X: e.value(value)})
+			return false
+		}
+		return true
+	}, nil).(ast.Expr)
+	return e.funcExprSrc(src, "quantified")
 }
 
 func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {

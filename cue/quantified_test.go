@@ -25,6 +25,7 @@ import (
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
+	"cuelang.org/go/cue/parser"
 )
 
 func TestQuantifiedDataMeet(t *testing.T) {
@@ -180,6 +181,47 @@ func TestQuantifiedSelectedExport(t *testing.T) {
 				t.Fatalf("export %s: got %s, %v; want %s", text, out, err, tt.want)
 			}
 		})
+	}
+}
+
+func TestQuantifiedResidualExport(t *testing.T) {
+	for _, name := range []string{"existential", "universal", "capture", "shadow", "bound"} {
+		for _, final := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/final=%v", name, final), func(t *testing.T) {
+				ctx := cuecontext.New()
+				v := ctx.CompileString(quantifiedAPIText(t, "quantifier_export", name+".cue"))
+				var options []cue.Option
+				if final {
+					options = append(options, cue.Final())
+				}
+				text, err := format.Node(v.LookupPath(cue.ParsePath("r")).Syntax(options...))
+				if err != nil {
+					t.Fatal(err)
+				}
+				rebuilt := ctx.CompileString("r: " + string(text))
+				if err := rebuilt.Err(); err != nil {
+					t.Fatalf("export %s: %v", text, err)
+				}
+				// Normalize parentheses and spacing through the formatter. The
+				// expected template records both substitutions and binder scope.
+				want := quantifiedAPIText(t, "quantifier_export", name+"-want.cue")
+				normalize := func(src string) string {
+					t.Helper()
+					x, err := parser.ParseExpr("", src)
+					if err != nil {
+						t.Fatal(err)
+					}
+					b, err := format.Node(x, format.Simplify())
+					if err != nil {
+						t.Fatal(err)
+					}
+					return string(b)
+				}
+				if got := normalize(string(text)); got != normalize(want) {
+					t.Fatalf("export = %s; want %s", got, normalize(want))
+				}
+			})
+		}
 	}
 }
 

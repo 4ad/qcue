@@ -26,6 +26,12 @@ import (
 // in the surrounding scope removes the body's parameter and constructor
 // scopes from their environment offsets.
 func (c *compiler) functionCaptures(src *ast.Func, fn *adt.Function) []adt.Expr {
+	return c.freeReferences(src, fn, true)
+}
+
+// freeReferences compiles free references in the surrounding scope. Runtime
+// captures exclude erased predicates; residual syntax needs both kinds.
+func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool) []adt.Expr {
 	local := make(map[ast.Node]bool)
 	ast.Walk(src, func(n ast.Node) bool {
 		local[n] = true
@@ -67,14 +73,14 @@ func (c *compiler) functionCaptures(src *ast.Func, fn *adt.Function) []adt.Expr 
 			if r, ok := n.(*adt.TypeReference); !ok || r.Param.ValueRange == nil {
 				return true
 			}
-		} else if typePosition {
+		} else if runtimeOnly && typePosition {
 			return false
 		}
 		id, ok := n.Source().(*ast.Ident)
-		if !ok || local[id.Scope] {
+		if !ok || local[id.Scope] || local[id.Node] {
 			return true
 		}
-		if p, ok := id.Node.(*ast.TypeParam); ok {
+		if p, ok := id.Node.(*ast.TypeParam); ok && runtimeOnly {
 			if c.typeParameters[p].ValueRange == nil {
 				return false
 			}
@@ -95,6 +101,6 @@ func (c *compiler) functionCaptures(src *ast.Func, fn *adt.Function) []adt.Expr 
 		}
 		return false
 	}
-	w.Elem(fn)
+	w.Elem(expr)
 	return captures
 }

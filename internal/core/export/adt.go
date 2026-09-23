@@ -231,9 +231,14 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 		return e.funcTypeSrc(adt.FuncType{Fn: x, Env: env})
 
 	case *adt.Quantified:
-		return ast.Clone(x.Src)
+		return e.quantifierSrc(x, env)
 
 	case *adt.AliasApplication:
+		if env != nil {
+			if v, ok := e.ctx.Evaluate(env, x); ok {
+				return e.value(v)
+			}
+		}
 		return ast.Clone(x.Src)
 
 	case *adt.PackageSeal, *adt.PackageOpen, *adt.OpaqueCall, *adt.OpaqueScope:

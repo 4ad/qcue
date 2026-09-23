@@ -39,6 +39,10 @@ type Quantified struct {
 	Src    *ast.Quantifier
 	Params []*TypeParameter
 	Body   Expr
+	// References are free references in the surrounding environment. They
+	// include erased predicates so residual templates can be exported with
+	// their lexical dependencies intact.
+	References []Expr
 }
 
 func (q *Quantified) Source() ast.Node { return q.Src }

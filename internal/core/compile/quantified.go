@@ -85,7 +85,12 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 	}
 	q := &adt.Quantified{Src: src}
 	c.pushScope(nil, 1, scope)
-	defer c.popScope()
+	defer func() {
+		c.popScope()
+		if q.Body != nil {
+			q.References = c.freeReferences(src, q, false)
+		}
+	}()
 	if c.typeParameters == nil {
 		c.typeParameters = make(map[*ast.TypeParam]*adt.TypeParameter)
 	}
