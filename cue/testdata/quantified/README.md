@@ -31,13 +31,13 @@ adding a semantic case.
 | [finite_witnesses](finite_witnesses/) | Finite literal value binders |
 | [first_class_packages](first_class_packages/) | Existential packages as inputs and outputs |
 | [implementation_concreteness](implementation_concreteness/) | Materialization versus implementation conformance |
-| [inference](inference/) | Empty containers, unused type binders, and unresolved speculative instances |
+| [inference](inference/) | Variance, dependent bounds, empty arguments, and guarded speculative instances |
 | [instantiation](instantiation/) | Implicit and explicit type application |
 | [invalid_instances](invalid_instances/) | Rejected binder domains and invalid instances |
 | [opaque_boundaries](opaque_boundaries/) | Abstract values, escaping operations, and opacity errors |
 | [opaque_callbacks](opaque_callbacks/) | Transport of higher-order callbacks across a seal |
 | [opaque_closure_escape](opaque_closure_escape/) | Captured abstract values and delayed escape checks |
-| [opaque_composite_transport](opaque_composite_transport/) | Record and list transport across opaque boundaries |
+| [opaque_composite_transport](opaque_composite_transport/) | Composite data, hidden fields, and complete overloaded interfaces across opaque boundaries |
 | [opaque_generic_operations](opaque_generic_operations/) | Generic operations on abstract carriers |
 | [opaque_universe_boundary](opaque_universe_boundary/) | Universe restrictions at opaque boundaries |
 | [parametric_aliases](parametric_aliases/) | Description aliases, lexical scope, arity, and cycles |
@@ -194,6 +194,20 @@ budget exhaustion, and retry independently. Composite export tests make new
 selections after recompilation and check unsupported mixed graphs through the
 typed incomplete-export API. Negative opacity cases distinguish a free outer
 dependency from a legal private witness bound by an independent inner seal.
+
+The [current audit and repair record](../../../doc/quantified-cue-audit-current.md)
+adds these regressions:
+
+| Obligation | Regression |
+| --- | --- |
+| Saved callbacks satisfy the required domain as well as their own contracts | [certification_partial_test.go](../../certification_partial_test.go) |
+| Inference tracks variance and dependent bounds; failed guesses cannot discard guards | [variance_bounds](inference/variance_bounds.txtar), [guarded_instances](inference/guarded_instances.txtar) |
+| Opaque adapters retain every clause, result guard, and coherent transport | [overloaded_operations](opaque_composite_transport/overloaded_operations.txtar), [overloaded_abstract](opaque_composite_transport/overloaded_abstract.txtar) |
+| Complete interfaces survive callbacks, generic selection, partial calls, labels, and defaults | [overloaded_callbacks](opaque_composite_transport/overloaded_callbacks.txtar), [overloaded_generic](opaque_composite_transport/overloaded_generic.txtar), [overloaded_protocols](opaque_composite_transport/overloaded_protocols.txtar) |
+| Runtime identity ignores contracts while validation retains their obligations | [singleton_contracts](closure_identity/singleton_contracts.txtar), [recursive_singletons](closure_identity/recursive_singletons.txtar), [runtime_identity](opaque/runtime_identity.txtar) |
+| Ordinary record transport preserves hidden and definition labels | [hidden_records](opaque_composite_transport/hidden_records.txtar) |
+| Escape checks follow retained predicates, and export retains erased opened names | [retained_predicates](opaque_closure_escape/retained_predicates.txtar), `TestQuantifiedOpaquePredicateExport` in [quantified_test.go](../../quantified_test.go) |
+| Unary proofs cover full Boolean and numeric domains without accepting invalid promises | [certification_unary_test.go](../../certification_unary_test.go) |
 
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Syntax-only cases and malformed syntax belong in the parser

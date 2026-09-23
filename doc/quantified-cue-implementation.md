@@ -76,6 +76,13 @@ implementation. Each selection consumes one binder of the selected clauses;
 the implementation's original call protocol and universal obligations remain.
 Calls with empty containers or unused binders can infer the empty predicate,
 provided the selected instance admits every supplied argument.
+Inference keeps lower and upper constraints separate, reverses variance at
+callback inputs, and propagates requirements through dependent subtype bounds.
+Data fields are collected before instantiating callbacks, including callbacks
+nested in records and lists. A chosen instance must admit every supplied slot.
+A failed candidate remains incomplete unless an independent necessary bound or
+universe condition excludes every instance; guarded clauses cannot disappear
+because one guess failed. This remains a sufficient, incomplete inference rule.
 
 Type-sorted names denote predicates. An ordinary refinable field used in a
 signature denotes its eventual singleton. For example, `x: int` and
@@ -126,6 +133,10 @@ incomplete until refinement settles it.
 Adding contracts to a captured function does not change its runtime identity,
 including when it is nested in a captured record, list, or partial argument.
 Those contracts remain separate validation obligations.
+The same runtime identity governs singleton membership and abstract-value
+equality, recursively through records, lists, and builtins. An opaque meet keeps
+both private constraint graphs and their validation obligations. Constraint
+equality used for graph deduplication still distinguishes retained contracts.
 
 Higher-rank callback contracts can be checked with rigid type variables. A
 polymorphic callback can be instantiated independently at its uses; a monomorphic
@@ -156,6 +167,9 @@ primitives, and defaults proved to belong to the argument domain. Partial
 closures retain the original implementation obligations; attached residual
 contracts are checked using the saved argument slots. Bound and captured
 callbacks require their own proofs, including callbacks inside composites.
+Every saved argument must also belong to its parameter's required domain; a
+callback's own valid annotation is insufficient. This check is separate from
+the universal proof of the original implementation and residual contracts.
 An implementation supplies the remaining row of an open signature, preserving
 required parameters and omission defaults. A bodyless open signature retains
 an unresolved row. The checker does not use a target annotation as evidence for
@@ -164,10 +178,13 @@ call, does not discharge its declared contract.
 Calls within certified bodies use the remaining protocol of a partial closure.
 Primitive proof rules check the actual labels, arity, and omission policy before
 using a known total result rule.
-Numeric translation by a constant preserves supported bounds. Constructed
-records carry their exact field set during proof. Package clients can be checked
-by opening the admitted interface under a fresh abstract carrier, using its
-operation contracts as hypotheses, and checking that the carrier cannot escape.
+Numeric translation by a constant preserves supported bounds.
+Boolean negation and numeric signs are also certified. Numeric negation
+preserves unions and exclusions and reverses strict and non-strict bounds.
+Constructed records carry their exact field set during proof. Package clients
+can be checked by opening the admitted interface under a fresh abstract carrier,
+using its operation contracts as hypotheses, and checking that the carrier
+cannot escape.
 
 Certification shares one bounded proof context through nested evaluator calls.
 Completed proofs are reusable only when their inherited hypotheses are still
@@ -226,7 +243,8 @@ they would expose different public values. Optional and pattern fields follow
 the interface. Private implementation fields are not implicitly exported.
 This projection applies only to the module's root interface. Ordinary open-record
 arguments and results retain their extra data fields, including inside nested
-records and lists; adapters transport the abstract occurrences within them.
+records and lists; hidden and definition labels keep their package identity.
+Adapters transport the abstract occurrences within these values.
 Omission passes through an adapter, so the private implementation chooses its
 own default rather than receiving the interface's default as an argument.
 Independent nested packages pass through by identity, preserving their seals
@@ -248,6 +266,15 @@ total for the supported schema. This includes monomorphic structural operations,
 callbacks, and unions whose source branches have disjoint kinds. Unknown generic
 transport, recursive schemas, and overlapping transports can still leave an
 operation incomplete even when individual concrete calls succeed.
+An operation with an arrow intersection retains every clause and environment.
+Calls select an admitted transport view and enforce all applicable result
+promises. Independent private proofs are insufficient when public domains
+overlap: the transports must agree as well. Disjoint domains, or a supported
+proof of transport agreement, make the intersection checkable. Unknown guards
+and transport agreement remain incomplete. Partial overloaded operations
+currently require a common packet coordinate system; differing rows remain
+incomplete. Whole-interface metadata also participates in adapter caching and
+recognition of inverse callback transports.
 Concrete validation also traverses private representation values, including
 functions nested inside records or lists. Hiding a function behind an abstract
 carrier does not discharge its conformance obligations.
@@ -260,6 +287,10 @@ scope. The initial opaque profile uses unbounded representation binders; a
 transparent bound would expose extra representation structure.
 Delayed escape checks persist through optional fields, disjunctions, patterns,
 and open list tails, including values materialized by later API refinement.
+Escape checks also follow singleton witnesses, every retained function or
+builtin clause, and generic bounds. A returned closure can retain private
+runtime captures behind an ordinary public signature; its later results still
+undergo the scope check.
 Membership in another instance of an existential interface checks its captured
 predicates against the same sealed witness; sharing a template is insufficient.
 Every conjunct of a refined interface is retained during sealing and opening.
@@ -299,6 +330,9 @@ remain constraints on future calls. Both implementations and bodyless contracts
 carry their lexical dependencies. Parametric and ordinary aliases retain their
 declarations and bounds, with renamed bindings to avoid destination capture.
 Unknown runtime witnesses make independent export incomplete.
+Opened type names remain lexical export dependencies even though they are
+erased from runtime captures. Neither source nor final export may emit a free
+abstract name or silently acquire a binding from the destination scope.
 
 Evaluated source export also retains quantified record and list introductions,
 their selected telescopes, refinements, and shared copies. New type selections
