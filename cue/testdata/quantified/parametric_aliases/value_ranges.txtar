@@ -1,0 +1,21 @@
+Alias application checks value-binder ranges, including the empty range.
+An unresolved value is not evidence that its range constraint holds.
+
+-- in.cue --
+@test(json, [{value: 1}, {value: 2}, "yes", false], at="good")
+@test(validate, conflict, at="bad")
+@test(validate, conflict, at="empty")
+@test(validate, conflict, at="wrongKind")
+@test(validate, concrete, incomplete, at="unknown")
+@test(validate, concrete, incomplete, at="alternatives")
+
+Box(n in 1 | 2) = {value: n}
+Impossible(n in _|_) = true
+Text(s in "yes" | "no") = s
+Flag(b in true | false) = b
+good: [Box(1), Box(2), Text("yes"), Flag(false)]
+bad: Box(3)
+empty: Impossible(1)
+wrongKind: Box("1")
+unknown: Box(int)
+alternatives: Box(1 | 2)

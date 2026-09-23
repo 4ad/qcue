@@ -400,6 +400,16 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 			if v == nil {
 				continue
 			}
+			if p.ValueRange != nil {
+				switch capabilityMember(c, e, p.ValueRange, v) {
+				case proofRefuted:
+					return nil, c.NewErrf("value argument %s is outside the range of %s", v, p.Src.Name.Name)
+				case proofUnknown:
+					return nil, &Bottom{Src: p.Src, Code: IncompleteError,
+						Err: c.Newf("unresolved value argument range for %s", p.Src.Name.Name)}
+				}
+				continue
+			}
 			if b := checkTypeUniverse(c, p, v); b != nil {
 				return nil, b
 			}
