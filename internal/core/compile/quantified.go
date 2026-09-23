@@ -168,7 +168,7 @@ func ordinaryWitnessReference(x adt.Expr) bool {
 	case *adt.IndexExpr:
 		return ordinaryWitnessReference(x.X)
 	case *adt.LetReference:
-		return ordinaryWitnessReference(x.X)
+		return !x.IsPredicate && ordinaryWitnessReference(x.X)
 	}
 	return false
 }

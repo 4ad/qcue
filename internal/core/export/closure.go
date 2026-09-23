@@ -60,7 +60,7 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 	value := func(ref adt.Expr, runtime bool) ast.Expr {
 		if r, ok := ref.(*adt.TypeReference); ok {
 			if v := args[r.Param.Src]; v != nil {
-				return e.value(v)
+				return e.predicateValue(v)
 			}
 		}
 		v, complete := e.ctx.Evaluate(t.Env, ref)
@@ -72,10 +72,40 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 			if vtx, ok := v.(*adt.Vertex); ok {
 				v = vtx.ToDataAll(e.ctx)
 			}
+			return e.value(v)
 		}
-		return e.value(v)
+		return e.predicateValue(v)
 	}
 	return e.originApplication(origin, value)
+}
+
+// Predicates control future calls and refinements. Data output options such
+// as Final and omission of optional fields must never weaken them. Keep this
+// in the current exporter so callable dependencies share their code origins.
+func (e *exporter) predicateValue(v adt.Value) ast.Expr {
+	saved := e.cfg
+	profile := *All
+	profile.SelfContained = true
+	e.cfg = &profile
+	defer func() { e.cfg = saved }()
+	if v, ok := v.(*adt.Vertex); ok {
+		closed := v.IsRecursivelyClosed()
+		if closed {
+			e.inDefinition++
+			defer func() { e.inDefinition-- }()
+		}
+		x := e.expr(nil, v)
+		if closed && v.Kind() == adt.StructKind {
+			name := e.uniqueAlias("#CUEType")
+			decl := &ast.Field{Label: ast.NewIdent(name), Value: x}
+			e.originDecls = append(e.originDecls, decl)
+			id := ast.NewIdent(name)
+			id.Node = x
+			x = id
+		}
+		return x
+	}
+	return e.value(v)
 }
 
 func (e *exporter) originApplication(o *functionOrigin, value func(adt.Expr, bool) ast.Expr) ast.Expr {
@@ -171,9 +201,19 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		params []*adt.TypeParameter
 	}
 	var nested []nestedFunction
-	w := walk.Visitor{Before: func(n adt.Node) bool {
+	visited := make(map[adt.Node]bool)
+	var w walk.Visitor
+	w.Before = func(n adt.Node) bool {
+		if visited[n] {
+			return false
+		}
+		visited[n] = true
 		switch x := n.(type) {
 		case *adt.AliasApplication:
+			w.Elem(x.Template.Body)
+			for _, arg := range x.Args {
+				w.Elem(arg)
+			}
 			return false
 		case *adt.Quantified:
 			if f, ok := x.Body.(*adt.Function); ok && f.Body != nil {
@@ -187,7 +227,7 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 			}
 		}
 		return true
-	}}
+	}
 	w.Elem(fn)
 	// Clone first, but remember which copies correspond to nested literals.
 	replacements := make(map[ast.Node]ast.Expr)
@@ -205,6 +245,7 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		}
 		body = q
 	}
+	body = e.withLexicalAliases(body, replacements, names)
 	body = astutil.Apply(body, func(c astutil.Cursor) bool {
 		if id, ok := c.Node().(*ast.Ident); ok {
 			if name := names[id.Node]; name != "" {
@@ -253,4 +294,57 @@ func cloneFunctionSource(src ast.Expr, replacements map[ast.Node]ast.Expr) ast.E
 		}
 		return true
 	}, nil).(ast.Expr)
+}
+
+// Retain lexical abbreviations with their binders and bounds, rather than
+// exporting an unbound alias name or inlining away its admissibility checks.
+// Free references keep their original node identities until the enclosing
+// origin substitutes its predicate and runtime dependencies below.
+func (e *exporter) withLexicalAliases(body ast.Expr, replacements map[ast.Node]ast.Expr, names map[ast.Node]string) ast.Expr {
+	var decls []ast.Decl
+	seen := make(map[ast.Node]bool)
+	local := make(map[ast.Node]bool)
+	var visit func(ast.Node)
+	visit = func(src ast.Node) {
+		ast.Walk(src, func(n ast.Node) bool { local[n] = true; return true }, nil)
+		ast.Walk(src, func(n ast.Node) bool {
+			id, ok := n.(*ast.Ident)
+			if !ok || local[id.Node] || seen[id.Node] || names[id.Node] != "" {
+				return true
+			}
+			if e.originNames[id.Name] == id.Node {
+				return true // Already emitted once as a shared code origin.
+			}
+			var decl ast.Decl
+			switch original := id.Node.(type) {
+			case *ast.ParametricAlias:
+				copy := ast.Clone(original)
+				copy.Body = cloneFunctionSource(original.Body, replacements)
+				decl = copy
+			case *ast.LetClause:
+				copy := ast.Clone(original)
+				copy.Expr = cloneFunctionSource(original.Expr, replacements)
+				decl = copy
+			default:
+				return true
+			}
+			seen[id.Node] = true
+			name := e.uniqueAlias("CUEAlias")
+			names[id.Node] = name
+			switch d := decl.(type) {
+			case *ast.ParametricAlias:
+				d.Name = ast.NewIdent(name)
+			case *ast.LetClause:
+				d.Ident = ast.NewIdent(name)
+			}
+			visit(decl)
+			decls = append(decls, decl)
+			return true
+		}, nil)
+	}
+	visit(body)
+	if len(decls) == 0 {
+		return body
+	}
+	return &ast.StructLit{Elts: append([]ast.Decl{&ast.EmbedDecl{Expr: body}}, decls...)}
 }

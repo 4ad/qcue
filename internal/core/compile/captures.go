@@ -46,6 +46,11 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 			return false
 		}
 		switch x := n.(type) {
+		case *adt.LetReference:
+			if x.IsPredicate {
+				w.Elem(x.X)
+				return false
+			}
 		case *adt.AliasApplication:
 			// The template's local declarations have their own lexical scope.
 			// Its free references, along with the arguments, are dependencies

@@ -940,6 +940,9 @@ type LetReference struct {
 	UpCount int32
 	Label   Feature // for informative purposes
 	X       Expr
+	// IsPredicate selects a separately compiled type-position abbreviation.
+	// Its ordinary references already carry singleton witness decoding.
+	IsPredicate bool
 }
 
 func (x *LetReference) Source() ast.Node {
@@ -951,6 +954,18 @@ func (x *LetReference) Source() ast.Node {
 
 func (x *LetReference) resolve(ctx *OpContext, state Flags) *Vertex {
 	e := ctx.Env(x.UpCount)
+	if x.IsPredicate {
+		key := cacheKey{Expr: x.X}
+		if entry, ok := e.cache[key]; ok {
+			return entry.v
+		}
+		if e.cache == nil {
+			e.cache = make(map[cacheKey]letCacheEntry)
+		}
+		v := ctx.newInlineVertex(nil, nil, MakeRootConjunct(e, x.X))
+		e.cache[key] = letCacheEntry{v: v}
+		return v
+	}
 
 	// A let bound to a bare value reference, like `let X = self`, denotes
 	// the identity of an enclosing vertex, not a computed value. Resolve it
@@ -2558,6 +2573,14 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		a.Finalize(c)
 		if b := a.Bottom(); b != nil {
 			return b
+		}
+		if x.Fn.Quantified && a.ArcType == ArcMember {
+			// Constraints can leave obligations below the argument root.
+			// An unused record argument must not hide a required field or
+			// an unresolved singleton witness in one of its children.
+			if b := Validate(c, a, &ValidateConfig{Final: true, ReportIncomplete: true}); b != nil {
+				return b
+			}
 		}
 	}
 

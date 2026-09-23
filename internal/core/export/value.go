@@ -532,50 +532,7 @@ func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	if t.Fn.Src == nil {
 		return e.quantifiedExportError("function source is unavailable for export")
 	}
-	if t.Fn.Body != nil {
-		return e.functionOriginValue(t)
-	}
-	var src ast.Expr = ast.Clone(t.Fn.Src)
-	params := adt.FunctionTypeParameters(t)
-	if len(params) != 0 {
-		q := &ast.Quantifier{Body: src}
-		for _, p := range params {
-			q.Params = append(q.Params, ast.Clone(p.Src))
-		}
-		src = q
-	}
-	args := adt.FunctionTypeArguments(t)
-	captures := make(map[ast.Node]adt.Value)
-	for _, capture := range t.Fn.Captures {
-		id, ok := capture.Source().(*ast.Ident)
-		if !ok || id.Node == nil {
-			continue
-		}
-		v, complete := e.ctx.Evaluate(t.Env, capture)
-		if !complete || !e.exportableCapture(v, make(map[adt.Value]bool)) {
-			return e.quantifiedExportError("captured value %s cannot be exported independently", id.Name)
-		}
-		if vertex, ok := v.(*adt.Vertex); ok {
-			v = vertex.ToDataAll(e.ctx)
-		}
-		captures[id.Node] = adt.Unwrap(v)
-	}
-	src = astutil.Apply(src, func(c astutil.Cursor) bool {
-		if id, ok := c.Node().(*ast.Ident); ok {
-			if value := captures[id.Node]; value != nil {
-				c.Replace(e.value(value))
-				return false
-			}
-			if param, ok := id.Node.(*ast.TypeParam); ok {
-				if value := args[param]; value != nil {
-					c.Replace(e.value(value))
-					return false
-				}
-			}
-		}
-		return true
-	}, nil).(ast.Expr)
-	return e.funcExprSrc(src, "quantified")
+	return e.functionOriginValue(t)
 }
 
 func (e *exporter) exportableCapture(value adt.Value, seen map[adt.Value]bool) bool {

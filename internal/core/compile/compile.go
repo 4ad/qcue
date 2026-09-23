@@ -195,6 +195,10 @@ type aliasEntry struct {
 	source  ast.Node
 	feature adt.Feature // For let declarations
 	used    bool
+	// Predicate uses decode references inside the abbreviation. They must
+	// not share the runtime expression's compilation or evaluation cache.
+	predicate     adt.Expr
+	predicateBusy bool
 }
 
 func (c *compiler) insertAlias(id *ast.Ident, a aliasEntry) *adt.Bottom {
@@ -268,6 +272,16 @@ func (c *compiler) lookupAlias(k int, id *ast.Ident) aliasEntry {
 	}
 
 	entry.used = true
+	if src, ok := entry.source.(*ast.LetClause); ok && c.typePosition {
+		if entry.predicateBusy {
+			entry.predicate = c.errf(id, "cyclic references in predicate alias")
+		} else if entry.predicate == nil {
+			entry.predicateBusy = true
+			m[name] = entry
+			entry.predicate = c.labeledExprAt(k, nil, (*letScope)(src), src.Expr)
+			entry.predicateBusy = false
+		}
+	}
 	m[name] = entry
 	return entry
 }
@@ -643,13 +657,18 @@ func (c *compiler) resolve(n *ast.Ident) adt.Expr {
 			panic("unreachable")
 		}
 		label = entry.feature
+		x := entry.expr
+		if c.typePosition {
+			x = entry.predicate
+		}
 
 		// let x = y
 		return &adt.LetReference{
-			Src:     n,
-			UpCount: upCount,
-			Label:   label,
-			X:       entry.expr, // TODO: remove usage
+			Src:         n,
+			UpCount:     upCount,
+			Label:       label,
+			X:           x,
+			IsPredicate: c.typePosition,
 		}
 
 	case *ast.FuncParam:
@@ -1366,8 +1385,10 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		c.pushScope(nil, 1, n)
 		fn.Body = c.valueExpr(n.Body)
 		c.popScope()
-		if fn.Quantified && fn.Body != nil {
-			c.checkFunctionErasure(fn)
+		if fn.Quantified {
+			if fn.Body != nil {
+				c.checkFunctionErasure(fn)
+			}
 			fn.Captures = c.functionCaptures(n, fn)
 			fn.References = c.freeReferences(n, fn, false)
 		}
