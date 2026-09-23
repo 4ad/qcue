@@ -149,7 +149,7 @@ issue3801: nonRooted: full: {
           obs: ({}|*{
             missing: true
           })
-          let pickMsg#4 = [
+          let pickMsg#3 = [
             if 〈1;obs〉.missing {
               msg: "\(〈2;someMsg〉)"
             },
@@ -161,7 +161,7 @@ issue3801: nonRooted: full: {
             {
               op: "add"
               path: "/metadata"
-              value: 〈2;let pickMsg#4〉.msg
+              value: 〈2;let pickMsg#3〉.msg
             },
           ]
         }
@@ -187,14 +187,14 @@ issue3801: nonRooted: full: {
         })
         #Main: {
           namespace: string
-          output: 〈0;let jsonPatch#5〉.output
-          let jsonPatch#5 = (〈1;#JSONPatch〉 & {
-            let base#8 = (〈2;#Resource〉 & {})
-            let withMsg#9 = (〈0;let base#8〉 & {
+          output: 〈0;let jsonPatch#4〉.output
+          let jsonPatch#4 = (〈1;#JSONPatch〉 & {
+            let base#5 = (〈2;#Resource〉 & {})
+            let withMsg#6 = (〈0;let base#5〉 & {
               someMsg: "foo"
             })
             namespace: 〈1;namespace〉
-            patch: 〈0;let withMsg#9〉.patches
+            patch: 〈0;let withMsg#6〉.patches
           })
         }
         out: (〈0;#Main〉 & {
@@ -210,13 +210,13 @@ issue3801: nonRooted: full: {
           namespace: string
           output: (〈1;#SubOutput〉 & {
             namespace: 〈1;namespace〉
-            let base2#A = {
-              let base#B = (〈3;#Base〉 & {})
-              output: (〈0;let base#B〉 & {
+            let base2#7 = {
+              let base#8 = (〈3;#Base〉 & {})
+              output: (〈0;let base#8〉 & {
                 val0: "foo"
               })
             }
-            patch: 〈0;let base2#A〉.output.value
+            patch: 〈0;let base2#7〉.output.value
           }).output
         }
         out: (〈0;#Output〉 & {
@@ -231,10 +231,10 @@ issue3801: nonRooted: full: {
         }
         #Base: {
           val0: string
-          let msgObj#D = [
+          let msgObj#9 = [
             〈1;val0〉,
           ][0]
-          value: 〈0;let msgObj#D〉
+          value: 〈0;let msgObj#9〉
         }
       }
     }

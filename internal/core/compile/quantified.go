@@ -95,6 +95,10 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 		c.typeParameters = make(map[*ast.TypeParam]*adt.TypeParameter)
 	}
 	for _, p := range src.Params {
+		if param := c.typeParameters[p]; param != nil {
+			q.Params = append(q.Params, param)
+			continue
+		}
 		param := &adt.TypeParameter{Src: p}
 		if p.Sort != nil {
 			if finiteValueRange(p.Sort) {

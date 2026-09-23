@@ -327,8 +327,8 @@ issue4022: full: {
     t1: {
       ec: {}
       bs: {
-        let m#21 = 〈1;ec〉.b
-        if (〈0;let m#21〉 == _|_(explicit error (_|_ literal) in source)) {}
+        let m#20 = 〈1;ec〉.b
+        if (〈0;let m#20〉 == _|_(explicit error (_|_ literal) in source)) {}
         x: {
           y: ""
         }
@@ -340,8 +340,8 @@ issue4022: full: {
       x: 〈import;"encoding/yaml"〉.Marshal(〈0;bs〉)
       ec: {}
       bs: {
-        let m#22 = 〈1;ec〉.b
-        if (〈0;let m#22〉.b == _|_(explicit error (_|_ literal) in source)) {}
+        let m#21 = 〈1;ec〉.b
+        if (〈0;let m#21〉.b == _|_(explicit error (_|_ literal) in source)) {}
         X: {
           Y: 〈import;strings〉.Join([], "")
         }
@@ -357,8 +357,8 @@ issue4022: full: {
       b: "e"
     }
     for k, v in 〈0;_i〉 {
-      let T#23multi = 〈1;v〉
-      〈0;let T#23〉: "1"
+      let T#22multi = 〈1;v〉
+      〈0;let T#22〉: "1"
     }
   }
 }
@@ -378,9 +378,9 @@ issue4022: full: {
   }
   disabled_parent_test: {
     for k, v in 〈1;_configs〉 {
-      let parent_config#24multi = (*〈3;_parent_configs〉[〈1;v〉.parent]|false)
+      let parent_config#23multi = (*〈3;_parent_configs〉[〈1;v〉.parent]|false)
       "\(〈1;k〉)": {
-        parent_config: 〈1;let parent_config#24〉
+        parent_config: 〈1;let parent_config#23〉
       }
     }
   }

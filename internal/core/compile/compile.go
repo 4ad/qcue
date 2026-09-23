@@ -142,6 +142,8 @@ type compiler struct {
 	typeParameters    map[*ast.TypeParam]*adt.TypeParameter
 	parametricAliases map[*ast.ParametricAlias]adt.Expr
 	typePosition      bool
+	functionLiterals  map[*ast.Func]functionLiteral
+	letLabels         map[*ast.LetClause]adt.Feature
 
 	num literal.NumInfo
 
@@ -199,6 +201,11 @@ type aliasEntry struct {
 	// not share the runtime expression's compilation or evaluation cache.
 	predicate     adt.Expr
 	predicateBusy bool
+}
+
+type functionLiteral struct {
+	fn                  *adt.Function
+	refersToForVariable bool
 }
 
 func (c *compiler) insertAlias(id *ast.Ident, a aliasEntry) *adt.Bottom {
@@ -792,11 +799,24 @@ func (c *compiler) markAlias(d ast.Decl) {
 		}
 
 	case *ast.LetClause:
+		feature := adt.InvalidLabel
+		if c.experiments.Quantified {
+			if c.letLabels == nil {
+				c.letLabels = make(map[*ast.LetClause]adt.Feature)
+			}
+			feature = c.letLabels[x]
+		}
+		if feature == adt.InvalidLabel {
+			feature = adt.MakeLetLabel(c.index, x.Ident.Name)
+			if c.experiments.Quantified {
+				c.letLabels[x] = feature
+			}
+		}
 		a := aliasEntry{
 			label:   (*letScope)(x),
 			srcExpr: x.Expr,
 			source:  x,
-			feature: adt.MakeLetLabel(c.index, x.Ident.Name),
+			feature: feature,
 		}
 		c.insertAlias(x.Ident, a)
 
@@ -1337,6 +1357,32 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		return o
 
 	case *ast.Func:
+		// Recompiling an abbreviation in a predicate context must not
+		// allocate a new code origin. A literal's own annotation/body
+		// contexts are fixed independently of the surrounding use.
+		if literal, ok := c.functionLiterals[n]; ok {
+			c.refersToForVariable = c.refersToForVariable || literal.refersToForVariable
+			// Surrounding scopes may have been compiled again for another
+			// alias context. Preserve their usage bookkeeping as well as
+			// the literal's stable lexical references.
+			ast.Walk(n, func(node ast.Node) bool {
+				if id, ok := node.(*ast.Ident); ok {
+					for _, frame := range c.stack {
+						if frame.scope == id.Scope {
+							if entry, ok := frame.aliases[id.Name]; ok {
+								entry.used = true
+								frame.aliases[id.Name] = entry
+							}
+						}
+					}
+				}
+				return true
+			}, nil)
+			return literal.fn
+		}
+		savedUses := c.refersToForVariable
+		c.refersToForVariable = false
+		defer func() { c.refersToForVariable = savedUses || c.refersToForVariable }()
 		if !c.experiments.Functions && !c.experiments.Quantified {
 			return c.errf(n, "function syntax requires @experiment(functions)")
 		}
@@ -1391,6 +1437,10 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 			}
 			fn.Captures = c.functionCaptures(n, fn)
 			fn.References = c.freeReferences(n, fn, false)
+			if c.functionLiterals == nil {
+				c.functionLiterals = make(map[*ast.Func]functionLiteral)
+			}
+			c.functionLiterals[n] = functionLiteral{fn, c.refersToForVariable}
 		}
 		return fn
 

@@ -71,3 +71,28 @@ out: [f(2), g("s")]
 		t.Fatalf("predicate abbreviation: %s, %v", got, err)
 	}
 }
+
+func TestQuantifiedAliasCodeOrigin(t *testing.T) {
+	for _, source := range []string{
+		"let F = func(x: int) -> int: x\nf: func(cb: F) -> int: cb(1)\nout: f(F)",
+		"let F = forall (A) func(x: A) -> A: x\nf: func(cb: F) -> int: cb(1)\nout: f(F)",
+		"let R = {f: func(x: int) -> int: x}\nf: func(cb: R) -> int: cb.f(1)\nout: f(R)",
+		"let R = forall (A) {f: func(x: A) -> A: x}\nf: func(cb: R) -> int: cb.f(1)\nout: f(R)",
+	} {
+		v := cuecontext.New().CompileString(source)
+		if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 1 {
+			t.Fatalf("source %s: %d, %v (compile: %v)", source, got, err, v.Err())
+		}
+	}
+	v := cuecontext.New().CompileString(`
+xs: [for n in [1, 2] {
+	let F = func() -> int: n
+	f: func(cb: F) -> int: cb()
+	out: f(F)
+}]
+out: [xs[0].out, xs[1].out]
+`)
+	if got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON(); err != nil || string(got) != `[1,2]` {
+		t.Fatalf("iteration captures: %s, %v", got, err)
+	}
+}

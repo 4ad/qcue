@@ -48,6 +48,11 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 		switch x := n.(type) {
 		case *adt.LetReference:
 			if x.IsPredicate {
+				// The abbreviation can introduce its own record or function
+				// scopes. Only its free references escape to this closure.
+				if x.Src != nil && x.Src.Node != nil {
+					ast.Walk(x.Src.Node, func(n ast.Node) bool { local[n] = true; return true }, nil)
+				}
 				w.Elem(x.X)
 				return false
 			}
