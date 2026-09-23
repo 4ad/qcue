@@ -142,7 +142,13 @@ func (e *Existential) validateWitness(c *OpContext, env *Environment, value Valu
 		copy.ChildError, copy.HasRecursive = false, false
 		return &copy
 	}
-	cfg := &ValidateConfig{Concrete: true}
+	if !sameCapabilityShape(c, subject, v) {
+		if impossibleWitnessShape(c, value, v) {
+			return c.NewErrf("existential witness requires a field forbidden by the supplied value")
+		}
+		return e.unresolved(c)
+	}
+	cfg := &ValidateConfig{Concrete: true, Final: true}
 	if !covariantData(e.Template.Body) {
 		// Conjoining an arrow is not evidence that the existing operation
 		// satisfies it. Keep the membership obligation pending until its
@@ -150,6 +156,31 @@ func (e *Existential) validateWitness(c *OpContext, env *Environment, value Valu
 		cfg.CheckFunction = func(*OpContext, *FuncValue) *Bottom { return e.unresolved(c) }
 	}
 	return Validate(c, v, cfg)
+}
+
+// An open record can acquire missing fields through later refinement. A
+// closed record that forbids such a field already refutes membership. Check
+// the original witness: its data projection intentionally omits closedness.
+func impossibleWitnessShape(c *OpContext, before, after Value) bool {
+	a, aok := Unwrap(before).(*Vertex)
+	b, bok := Unwrap(after).(*Vertex)
+	if !aok || !bok {
+		return false
+	}
+	for _, field := range b.Arcs {
+		if !field.Label.IsRegular() || field.ArcType == ArcOptional {
+			continue
+		}
+		original := a.LookupRaw(field.Label)
+		if original == nil {
+			if !a.Accept(c, field.Label) {
+				return true
+			}
+		} else if impossibleWitnessShape(c, original, field) {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *Existential) unresolved(c *OpContext) *Bottom {

@@ -49,6 +49,36 @@ func TestQuantifiedDataMeet(t *testing.T) {
 	}
 }
 
+func TestQuantifiedMembershipRefinement(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(quantifiedAPIText(t, "membership_refinement", "existential.cue"))
+	x := v.LookupPath(cue.ParsePath("x"))
+	if err := x.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := x.Validate(cue.Concrete(true)); err == nil {
+		t.Fatal("missing existential field was certified")
+	}
+	if _, err := x.MarshalJSON(); err == nil {
+		t.Fatal("missing existential field was exported")
+	}
+	if err := v.FillPath(cue.ParsePath("x.tag"), 1).Validate(cue.Concrete(true)); err != nil {
+		t.Fatalf("refined existential witness: %v", err)
+	}
+	v = ctx.CompileString(quantifiedAPIText(t, "membership_refinement", "singleton.cue"))
+	if err := v.LookupPath(cue.ParsePath("out")).Validate(cue.Concrete(true)); err == nil {
+		t.Fatal("unresolved composite singleton was certified")
+	}
+	for _, name := range []string{"equal", "different"} {
+		r := v.Unify(ctx.CompileString(quantifiedAPIText(t, "membership_refinement", name+".cue")))
+		out := r.LookupPath(cue.ParsePath("out"))
+		_, err := out.MarshalJSON()
+		if (err == nil) != (name == "equal") {
+			t.Errorf("%s witness refinement: %v", name, err)
+		}
+	}
+}
+
 func TestQuantifiedAbstractCall(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(quantifiedAPIText(t, "abstract_call", "case01.cue"))

@@ -37,9 +37,12 @@ func (x *WitnessReference) evaluate(c *OpContext, state Flags) Value {
 		// opened representation type is not an ordinary runtime witness.
 		return v
 	}
-	if concreteCapture(c, v) {
+	if v.Kind()&(StructKind|ListKind) == 0 && concreteCapture(c, v) {
 		return v
 	}
+	// A concrete record is still an open structural predicate, and lists
+	// may contain such records. Preserve the equality obligation even when
+	// the current witness is fully known.
 	return &WitnessType{Ref: x, Env: c.Env(0), Upper: v}
 }
 

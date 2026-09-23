@@ -1,0 +1,19 @@
+// Existential membership cannot invent fields on an unrelated data copy.
+// Open witnesses may still be refined; closed contradictions are final.
+
+-- in.cue --
+@test(validate, conflict, at="closed")
+@test(validate, conflict, at="nestedClosed")
+@test(validate, concrete, incomplete, at="missing")
+@test(validate, concrete, incomplete, at="required")
+@test(validate, concrete, incomplete, at="nested")
+@test(validate, concrete, at="present")
+@test(validate, concrete, at="optional")
+
+closed:       (exists A {tag: 1}) & close({})
+nestedClosed: (exists A {inner: {tag: 1}}) & {inner: close({})}
+missing:      (exists A {tag: 1}) & {}
+required:     (exists (A: 1) {value!: A}) & {}
+nested:       (exists A {inner: {tag: 1}}) & {inner: {}}
+present:      missing & {tag: 1}
+optional:     (exists A {tag?: 1}) & {}
