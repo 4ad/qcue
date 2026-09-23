@@ -283,15 +283,23 @@ func (s *subsumer) listVertices(x, y *adt.Vertex) bool {
 			}
 		}
 
-		if !y.IsClosedList() {
-			b := &adt.Vertex{Label: adt.AnyIndex}
-			y.MatchAndInsert(ctx, b)
-			b.Finalize(ctx)
-		}
 	}
 
 	for i, a := range xElems {
 		if !s.vertices(a, yElems[i]) {
+			return false
+		}
+	}
+	if !y.IsClosedList() && !y.IsData() {
+		// An open suffix describes all possible additional elements, even
+		// when the two lists have equally long explicit prefixes.
+		a := &adt.Vertex{Label: adt.AnyIndex}
+		x.MatchAndInsert(ctx, a)
+		a.Finalize(ctx)
+		b := &adt.Vertex{Label: adt.AnyIndex}
+		y.MatchAndInsert(ctx, b)
+		b.Finalize(ctx)
+		if !s.vertices(a, b) {
 			return false
 		}
 	}

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package subsume
+package subsume_test
 
 import (
 	"testing"
@@ -23,6 +23,7 @@ import (
 	"cuelang.org/go/internal/core/compile"
 	"cuelang.org/go/internal/core/eval"
 	"cuelang.org/go/internal/core/runtime"
+	"cuelang.org/go/internal/core/subsume"
 	"cuelang.org/go/internal/cuedebug"
 )
 
@@ -42,7 +43,7 @@ func TestX(t *testing.T) {
 	a := parse(t, ctx, gt)
 	b := parse(t, ctx, lt)
 
-	p := Profile{Defaults: true}
+	p := subsume.Profile{Defaults: true}
 	err := p.Value(ctx, a, b)
 	t.Error(err)
 }

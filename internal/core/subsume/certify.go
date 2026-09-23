@@ -26,9 +26,12 @@ import (
 // Unsupported proofs remain incomplete; successful concrete calls and the
 // target annotation itself are not evidence of universal conformance.
 func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
-	p := &certifier{ctx: ctx, active: make(map[*adt.Function]bool),
+	return newCertifier(ctx).validateFunction(ctx, f)
+}
+
+func newCertifier(ctx *adt.OpContext) *certifier {
+	return &certifier{ctx: ctx, active: make(map[*adt.Function]bool),
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope)}
-	return p.validateFunction(ctx, f)
 }
 
 // Reuse the current proof context when validating captured composites.

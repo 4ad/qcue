@@ -1,0 +1,31 @@
+Type arguments must be included in their bounds. A compatible record meet
+or a retained arrow annotation does not prove that inclusion. Unsupported
+inclusions stay incomplete, while valid structural arguments remain usable.
+
+-- in.cue --
+@test(validate, concrete, incomplete, at="badAlias")
+@test(validate, concrete, incomplete, at="badSelection")
+@test(validate, concrete, incomplete, at="badFunction")
+@test(validate, concrete, incomplete, at="badBody")
+@test(validate, concrete, incomplete, at="badTail")
+@test(validate, concrete, incomplete, at="badLongTail")
+@test(json, true, at="goodTail")
+@test(json, [{x: 1}, {x: 1}, true, true], at="good")
+
+Narrow(A: {x: 1}) = A
+badAlias: Narrow({}) & {x: 2}
+id(A: {x: 1}): func(x: A) -> A: x
+badSelection: id[{}]({x: 2})
+Accept(F: func({x: int}) -> int) = true
+badFunction: Accept(func(r: {x: string}) -> int: 1)
+badBody: Accept(func(r: {x: int}) -> int: "wrong")
+List(A: [...int]) = true
+badTail: List([...string])
+badLongTail: List([1, ...string])
+goodTail: List([1, ...int])
+good: [
+    Narrow({x: 1}),
+    id[{x: 1}]({x: 1}),
+    Accept(func(r: {x: int}) -> int: r.x),
+    Accept(func(r: {x: int}) -> number: 1),
+]

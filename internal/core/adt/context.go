@@ -134,7 +134,13 @@ func (c *OpContext) IsValidator() bool {
 // errors and vertex to be restored.
 type OpContext struct {
 	Runtime
-	format func(Runtime, Node) string
+	format          func(Runtime, Node) string
+	inclusionChecks map[inclusionCheck]bool
+	// ProveInclusion establishes that every inhabitant of the second
+	// predicate satisfies the first. False means unproved, not disjoint.
+	// The runtime installs it to keep the evaluator independent of the
+	// sufficient proof procedures in the subsumption package.
+	ProveInclusion func(*OpContext, Value, Value) bool
 
 	cuedebug.Config
 	Version internal.EvaluatorVersion // Copied from Runtime

@@ -75,6 +75,21 @@ func Value(ctx *adt.OpContext, a, b adt.Value) errors.Error {
 	return CUE.Value(ctx, a, b)
 }
 
+// ProveInclusion is the evaluator's sufficient predicate-inclusion check.
+// Unlike ordinary signature comparison, a concrete closure used as a type
+// argument needs an independent proof of its implementation's contracts.
+// Failure retains the original inclusion obligation in the evaluator.
+func ProveInclusion(ctx *adt.OpContext, bound, argument adt.Value) bool {
+	for _, v := range []adt.Value{bound, argument} {
+		if v, ok := v.(*adt.Vertex); ok {
+			v.Finalize(ctx)
+		}
+	}
+	p := newCertifier(ctx)
+	s := &subsumer{ctx: ctx, certifier: p}
+	return s.values(bound, argument)
+}
+
 func (p *Profile) Value(ctx *adt.OpContext, a, b adt.Value) errors.Error {
 	s := subsumer{ctx: ctx, Profile: *p}
 	if !s.values(a, b) {
@@ -89,8 +104,9 @@ func isBottom(x adt.Node) bool {
 }
 
 type subsumer struct {
-	ctx  *adt.OpContext
-	errs errors.Error
+	ctx       *adt.OpContext
+	errs      errors.Error
+	certifier *certifier
 
 	Profile
 

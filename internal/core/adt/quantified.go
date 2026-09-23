@@ -468,7 +468,17 @@ func typeArgumentFits(c *OpContext, bound, arg Value) proofResult {
 	if b, ok := arg.(*Bottom); ok && !b.IsIncomplete() {
 		return proofEstablished
 	}
-	return capabilityMember(c, nil, bound, arg)
+	if c.provesInclusion(bound, arg) {
+		return proofEstablished
+	}
+	// Only concrete scalar singletons can use ordinary value membership
+	// as an inclusion check. A record literal is an extensible predicate,
+	// and conjoining a function contract does not prove its implementation.
+	switch arg.(type) {
+	case *Null, *Bool, *Num, *String, *Bytes, *OpaqueValue:
+		return capabilityMember(c, nil, bound, arg)
+	}
+	return proofUnknown
 }
 
 func (f *FuncValue) inferInstance(c *OpContext, bindings []funcArg) (*FuncValue, *Bottom) {

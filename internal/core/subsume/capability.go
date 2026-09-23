@@ -36,6 +36,17 @@ func (s *subsumer) capabilityValues(a, b *adt.FuncValue) bool {
 		return true
 	}
 	targets := append([]adt.FuncType{{Fn: a.Fn, Env: a.Env}}, a.Types...)
+	if s.certifier != nil && !adt.IsFuncType(b) {
+		if !s.certifier.implementation(b) {
+			return false
+		}
+		for _, target := range targets {
+			if !s.certifier.function(b, target) {
+				return false
+			}
+		}
+		return true
+	}
 	sources := append([]adt.FuncType{{Fn: b.Fn, Env: b.Env}}, b.Types...)
 	if b.IsPartial() {
 		// The remaining implementation protocol is known. Its old clauses
