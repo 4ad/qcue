@@ -1,0 +1,36 @@
+An opening preserves the representation binder's declared or inferred
+universe. Abstract types and their singleton values cannot lower that level.
+
+-- in.cue --
+@test(validate, concrete, at="p")
+@test(validate, conflict, at="badType")
+@test(validate, conflict, at="badValue")
+@test(validate, conflict, at="badRecord")
+@test(validate, conflict, at="badInferred")
+@test(validate, conflict, at="badDeclared")
+@test(json, [true, true, true], at="good")
+
+#Poly: forall (B in Type(0)) func(B) -> B
+#I: exists (A in Type(1)) {value: A}
+p: seal #I with (A = #Poly) {
+    value: forall (B in Type(0)) func(x: B) -> B: x
+}
+Base(T in Type(0)) = true
+Higher(T in Type(1)) = true
+badType: (open p as (A, P) {x: Base(A)}).x
+badValue: (open p as (A, P) {x: Base(P.value)}).x
+badRecord: (open p as (A, P) {x: Base({value: A})}).x
+
+#Inferred: exists A {value: A}
+inferred: seal #Inferred with (A = #Poly) {
+    value: forall (B in Type(0)) func(x: B) -> B: x
+}
+badInferred: (open inferred as (A, P) {x: Base(A)}).x
+declared: seal #I with (A = int) {value: 1}
+badDeclared: (open declared as (A, P) {x: Base(A)}).x
+base: seal #Inferred with (A = int) {value: 1}
+good: [
+    (open p as (A, P) {x: Higher(A)}).x,
+    (open p as (A, P) {x: Higher(P.value)}).x,
+    (open base as (A, P) {x: Base(A)}).x,
+]

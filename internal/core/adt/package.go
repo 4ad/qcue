@@ -174,6 +174,9 @@ type opaqueCarrier struct {
 	owner          *sealedPackage
 	parameter      *TypeParameter
 	representation Value
+	// level is the representation binder's universe, inferred from the
+	// witness when unannotated. Opening must not lower an abstract sort.
+	level int
 }
 
 // OpaqueType denotes the complete abstract carrier, not its private bound.
@@ -270,7 +273,9 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 		if b := checkTypeUniverse(c, param, v); b != nil {
 			return b
 		}
-		carrier := &opaqueCarrier{owner: p, parameter: param, representation: v}
+		level, _ := universeOf(c, v, make(map[Expr]bool)) // checked above
+		carrier := &opaqueCarrier{owner: p, parameter: param, representation: v,
+			level: max(param.Level, level)}
 		p.carriers[param] = carrier
 		private[param], public[param] = v, &OpaqueType{carrier: carrier}
 	}

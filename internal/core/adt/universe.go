@@ -52,6 +52,10 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 	switch v := v.(type) {
 	case *RigidType:
 		return v.Param.Level, true
+	case *OpaqueType:
+		return v.carrier.level, true
+	case *OpaqueValue:
+		return v.carrier.level, true
 	case *FuncValue:
 		known := true
 		for _, p := range typeParameters(v.Env) {
