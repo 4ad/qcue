@@ -125,13 +125,41 @@ func capabilityMember(c *OpContext, env *Environment, constraint Expr, value Val
 		}
 		return proofUnknown
 	}
-	if b := Validate(c, v, &ValidateConfig{Concrete: true}); b != nil {
+	// Meeting a record predicate can materialize fields that were absent
+	// from the supplied packet. That establishes compatibility, not
+	// membership of the original value. Keep its exact data shape, at every
+	// depth, when deciding the guard.
+	if !sameCapabilityShape(c, value, v) {
+		return proofRefuted
+	}
+	if b := Validate(c, v, &ValidateConfig{Concrete: true, Final: true}); b != nil {
 		if !b.IsIncomplete() {
 			return proofRefuted
 		}
 		return proofUnknown
 	}
 	return proofEstablished
+}
+
+func sameCapabilityShape(c *OpContext, before, after Value) bool {
+	a, aok := Unwrap(before).(*Vertex)
+	b, bok := Unwrap(after).(*Vertex)
+	if !aok || !bok {
+		return true // Scalar conflicts are handled by the meet itself.
+	}
+	a.Finalize(c)
+	b.Finalize(c)
+	for _, field := range b.Arcs {
+		if !field.Label.IsRegular() || field.ArcType == ArcOptional {
+			continue
+		}
+		original := a.LookupRaw(field.Label)
+		if original == nil || original.ArcType != ArcMember ||
+			!sameCapabilityShape(c, original, field) {
+			return false
+		}
+	}
+	return true
 }
 
 // capabilityPackets searches a bounded, deterministic vocabulary. Its results

@@ -1,0 +1,22 @@
+An applicable capability must admit the actual supplied record. Unifying
+with a domain cannot add fields, including inside records or lists, to
+establish its own guard. Optional absent fields impose no presence demand.
+
+-- in.cue --
+@test(json, [0, 1, 0, 1, 0, 1, 0], at="out")
+
+#One: {a: 1}
+count: func(x: {}) -> int: len(x)
+count: func(#One) -> 1
+nested: func(x: {inner: {}}) -> int: len(x.inner)
+nested: func({inner: #One}) -> 1
+list: func(x: [{}]) -> int: len(x[0])
+list: func([#One]) -> 1
+optional: func(x: {}) -> int: len(x)
+optional: func({a?: 1}) -> int
+out: [
+    count({}), count({a: 1}),
+    nested({inner: {}}), nested({inner: {a: 1}}),
+    list([{}]), list([{a: 1}]),
+    optional({}),
+]
