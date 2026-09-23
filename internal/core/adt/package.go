@@ -39,7 +39,7 @@ func (*Existential) Concreteness() Concreteness { return Constraint }
 // existential introduction. It never guesses a representation for a record.
 func (e *Existential) SubsumesPackage(c *OpContext, value Value) bool {
 	if other, ok := Unwrap(value).(*Existential); ok {
-		return e.Template == other.Template && sameTypeEnvironment(c, e.Env, other.Env)
+		return e.Template == other.Template && e.sameEnvironment(c, other.Env)
 	}
 	if v, ok := value.(*Vertex); ok && v.DerefValue().sealed != nil {
 		return e.validate(c, v) == nil
@@ -63,7 +63,7 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 	if v, ok := value.(*Vertex); ok {
 		v = v.DerefValue()
 		if p := v.sealed; p != nil && p.interfaceType.Template == e.Template {
-			if sameTypeEnvironment(c, p.interfaceType.Env, e.Env) {
+			if e.sameEnvironment(c, p.interfaceType.Env) {
 				return nil
 			}
 			// Reusing a template does not identify its captured predicates.
@@ -73,6 +73,12 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 			args := make(map[*TypeParameter]Value, len(p.carriers))
 			for param, carrier := range p.carriers {
 				args[param] = &OpaqueType{carrier: carrier}
+				if p.implementation != nil && v == p.implementation.DerefValue() {
+					// A lexical interface wrapper is re-scoped when conjoined
+					// with the private implementation. Recheck that view using
+					// the seal's supplied representation, before transport.
+					args[param] = carrier.representation
+				}
 			}
 			return e.validateWitness(c, quantifiedEnvironment(c, e, args), value)
 		}
@@ -108,6 +114,45 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 		return e.validateWitness(c, env, value)
 	}
 	return e.unresolved(c)
+}
+
+// Lexical wrappers can move an introduction without changing any of its
+// dependencies. Compare those dependencies, not unrelated fields in the
+// wrapper. Ordinary incomplete witnesses still require shared value cells;
+// equal upper approximations do not establish equal assignments.
+func (e *Existential) sameEnvironment(c *OpContext, other *Environment) bool {
+	if sameTypeEnvironment(c, e.Env, other) {
+		return true
+	}
+	for _, ref := range e.Template.References {
+		x, xok := c.Evaluate(e.Env, ref)
+		y, yok := c.Evaluate(other, ref)
+		if !xok || !yok || x == nil || y == nil {
+			return false
+		}
+		if a, ok := x.(*Vertex); ok {
+			if b, ok := y.(*Vertex); ok && a.DerefValue() == b.DerefValue() {
+				continue
+			}
+		}
+		predicate := false
+		switch r := ref.(type) {
+		case *TypeReference:
+			predicate = true
+		case *FieldReference:
+			predicate = r.Label.IsDef()
+		case *LetReference:
+			predicate = r.IsPredicate
+		}
+		if predicate {
+			if !c.provesInclusion(x, y) || !c.provesInclusion(y, x) {
+				return false
+			}
+		} else if !concreteCapture(c, x) || !concreteCapture(c, y) || !Equal(c, x, y, CheckStructural) {
+			return false
+		}
+	}
+	return true
 }
 
 // Type frames contain immutable predicate arguments and no runtime fields.
@@ -412,6 +457,22 @@ func existentialExprOf(c *OpContext, env *Environment, expr Expr, seen map[Expr]
 		}
 		return existentialExprOf(c, env, x.Y, seen)
 	}
+	if x, ok := expr.(*StructLit); ok {
+		// A lexical wrapper can embed an interface alongside the local
+		// definitions or aliases needed by its predicates. The embedded
+		// introduction belongs to that wrapper's scope, not its parent.
+		v := c.newInlineVertex(nil, nil, MakeRootConjunct(env, x))
+		v.Finalize(c)
+		scope := &Environment{Up: env, Vertex: v}
+		for _, decl := range x.Decls {
+			if embedded, ok := decl.(Expr); ok {
+				if e := existentialExprOf(c, scope, embedded, seen); e != nil {
+					return e
+				}
+			}
+		}
+		return nil
+	}
 	v, _ := c.Evaluate(env, expr)
 	return existentialOf(c, v, seen)
 }
@@ -473,6 +534,10 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 		for _, decl := range x.Decls {
 			field, ok := decl.(*Field)
 			if !ok {
+				continue
+			}
+			if field.Label.IsDef() {
+				out.Decls = append(out.Decls, &Field{Label: field.Label, Value: scope.LookupRaw(field.Label)})
 				continue
 			}
 			var arc *Vertex
@@ -646,6 +711,12 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 	out := &StructLit{}
 	for _, field := range typ.Arcs {
 		if field.Label.IsLet() {
+			continue
+		}
+		if field.Label.IsDef() {
+			// Definitions are predicates in the public type scope. They
+			// are not runtime witnesses to reconstruct or make concrete.
+			out.Decls = append(out.Decls, &Field{Label: field.Label, Value: field})
 			continue
 		}
 		a := v.LookupRaw(field.Label)

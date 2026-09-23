@@ -22,6 +22,14 @@ import "maps"
 // If overlapping branches transport the value differently, the untagged
 // interface does not determine a unique observation; keep it incomplete.
 func (p *sealedPackage) transportUnion(c *OpContext, union *Disjunction, value Value, outward bool) Value {
+	if union.Kind()&^(NullKind|BoolKind|NumberKind|StringKind|BytesKind) == 0 {
+		// Every branch uses identity transport. Preserve the disjunction
+		// and its preferences instead of demanding a unique branch and
+		// mistaking an ordinary default for an ambiguous representation.
+		v := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, union), MakeRootConjunct(nil, value))
+		v.Finalize(c)
+		return v
+	}
 	var result Value
 	unknown := false
 	for _, branch := range union.Values {

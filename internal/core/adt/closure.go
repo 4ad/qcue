@@ -130,8 +130,7 @@ func sameTransportSignature(c *OpContext, a *Function, ae *Environment, b *Funct
 		xv, xok := c.Evaluate(xe, x)
 		yv, yok := c.Evaluate(ye, y)
 		return xok && yok && xv != nil && yv != nil &&
-			(Equal(c, xv, yv, CheckStructural) ||
-				(c.provesInclusion(xv, yv) && c.provesInclusion(yv, xv)))
+			c.provesInclusion(xv, yv) && c.provesInclusion(yv, xv)
 	}
 	for i, x := range a.Params {
 		y := b.Params[i]

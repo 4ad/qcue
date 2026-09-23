@@ -69,14 +69,24 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 			return e.quantifiedExportError("captured value %s cannot be exported independently", id.Name)
 		}
 		if runtime {
-			if vtx, ok := v.(*adt.Vertex); ok {
-				v = vtx.ToDataAll(e.ctx)
-			}
-			return e.value(v)
+			return e.runtimeCaptureValue(v)
 		}
 		return e.predicateValue(v)
 	}
 	return e.originApplication(origin, value)
+}
+
+// Runtime environments contain all fields observable by the code, including
+// hidden fields. JSON's regular-field projection is not closure conversion.
+// Use evaluated values to avoid carrying their old lexical scopes along.
+func (e *exporter) runtimeCaptureValue(v adt.Value) ast.Expr {
+	saved := e.cfg
+	profile := *Final
+	profile.ShowHidden = true
+	profile.ShowDefinitions = true
+	e.cfg = &profile
+	defer func() { e.cfg = saved }()
+	return e.value(v)
 }
 
 // Predicates control future calls and refinements. Data output options such
@@ -89,6 +99,11 @@ func (e *exporter) predicateValue(v adt.Value) ast.Expr {
 	e.cfg = &profile
 	defer func() { e.cfg = saved }()
 	if v, ok := v.(*adt.Vertex); ok {
+		if v.Kind()&(adt.StructKind|adt.ListKind) == 0 && len(v.Arcs) == 0 {
+			// Evaluated scalar predicates already carry their resolved
+			// bounds. Reusing their source could reintroduce a free name.
+			return e.value(v.Value())
+		}
 		closed := v.IsRecursivelyClosed()
 		if closed {
 			e.inDefinition++

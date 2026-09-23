@@ -405,7 +405,7 @@ func (e *exporter) builtin(x *adt.Builtin) ast.Expr {
 // reimport; printing only the selected body would lose universal obligations.
 func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
 	if subject, argument, extra := f.TypeSelection(); subject != nil {
-		x := &ast.IndexExpr{X: &ast.ParenExpr{X: e.quantifiedFuncValue(subject)}, Index: e.value(argument)}
+		x := &ast.IndexExpr{X: &ast.ParenExpr{X: e.quantifiedFuncValue(subject)}, Index: e.predicateValue(argument)}
 		return e.withFuncTypes(x, extra)
 	}
 	head := adt.FuncType{Fn: f.Fn, Env: f.Env}
@@ -427,7 +427,7 @@ func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
 		if v == nil {
 			break
 		}
-		x = &ast.IndexExpr{X: &ast.ParenExpr{X: x}, Index: e.value(v)}
+		x = &ast.IndexExpr{X: &ast.ParenExpr{X: x}, Index: e.predicateValue(v)}
 	}
 	return e.withFuncTypes(x, types)
 }
@@ -511,7 +511,7 @@ func (e *exporter) quantifierSrc(q *adt.Quantified, env *adt.Environment) ast.Ex
 		if value != nil {
 			// Parentheses keep an inserted arrow or quantifier from taking
 			// ownership of operators in the surrounding template.
-			c.Replace(&ast.ParenExpr{X: e.value(value)})
+			c.Replace(&ast.ParenExpr{X: e.predicateValue(value)})
 			return false
 		}
 		return true
@@ -550,6 +550,11 @@ func (e *exporter) exportableCapture(value adt.Value, seen map[adt.Value]bool) b
 			return false
 		}
 		for _, a := range v.Arcs {
+			if a.Label.IsHidden() && a.Label.PkgID(e.ctx) != cmp.Or(e.pkgID, "_") {
+				// A hidden label from another package cannot be rebound by
+				// printing its spelling in the destination package.
+				return false
+			}
 			if a.ArcType == adt.ArcMember && !a.Label.IsLet() && !e.exportableCapture(a, seen) {
 				return false
 			}
