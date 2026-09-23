@@ -1,0 +1,9 @@
+// Allocating fresh closures during a call is not descent through an existing
+// finite capture graph, and still requires a decreasing list argument.
+
+-- in.cue --
+@test(validate, conflict, at="out")
+
+make: func(n: int) -> func() -> int:
+	func() -> int: make(n + 1)()
+out: make(0)()

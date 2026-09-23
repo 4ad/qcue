@@ -30,7 +30,7 @@ func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 }
 
 func newCertifier(ctx *adt.OpContext) *certifier {
-	return &certifier{ctx: ctx, active: make(map[*adt.Function]bool),
+	return &certifier{ctx: ctx,
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope)}
 }
 
@@ -53,7 +53,7 @@ type proofScope struct {
 
 type certifier struct {
 	ctx        *adt.OpContext
-	active     map[*adt.Function]bool
+	active     []*adt.FuncValue
 	hypotheses map[*adt.FuncValue]bool
 	scopes     map[*adt.Environment]*proofScope
 }
@@ -126,8 +126,15 @@ func (p *certifier) implementation(f *adt.FuncValue) bool {
 }
 
 func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
-	if f.Fn.Body == nil || p.active[f.Fn] {
+	if f.Fn.Body == nil || len(p.active) >= 256 {
 		return false
+	}
+	for _, active := range p.active {
+		if active.Fn == f.Fn {
+			if same, known := adt.SameFunctionInstance(p.ctx, active, f); same || !known {
+				return false
+			}
+		}
 	}
 	if f.Src != nil && (f.Src.Extern.IsValid() || f.Src.Effect != nil) {
 		return false
@@ -135,8 +142,8 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 	savedHypotheses := p.hypotheses
 	p.hypotheses = maps.Clone(p.hypotheses)
 	defer func() { p.hypotheses = savedHypotheses }()
-	p.active[f.Fn] = true
-	defer delete(p.active, f.Fn)
+	p.active = append(p.active, f)
+	defer func() { p.active = p.active[:len(p.active)-1] }()
 	for i := range f.Fn.Params {
 		env, expr := f.BoundArgument(i)
 		if expr != nil && p.captured(p.schema(env, expr)) == nil {

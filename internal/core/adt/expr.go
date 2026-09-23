@@ -2388,7 +2388,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	}
 	recursive := false
 	if x.Fn.Quantified {
-		activation, b := c.enterFunction(callee.Fn, bindings)
+		activation, b := c.enterFunction(callee, bindings)
 		if b != nil {
 			return b
 		}

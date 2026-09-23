@@ -29,6 +29,11 @@ const (
 	// RegularOnly indicates that only regular fields should be considered,
 	// thus excluding hidden and definition fields.
 	RegularOnly
+
+	// runtimeIdentity compares callable descriptors inside already concrete
+	// captures. Constraint equality must still compare retained contracts:
+	// using this flag for disjunction deduplication would lose obligations.
+	runtimeIdentity
 )
 
 func Equal(ctx *OpContext, v, w Value, flags Flag) bool {
@@ -230,6 +235,9 @@ func equalTerminal(ctx *OpContext, v, w Value, flags Flag) bool {
 
 	case *FuncValue:
 		if y, ok := w.(*FuncValue); ok {
+			if flags&runtimeIdentity != 0 && !IsFuncType(x) && !IsFuncType(y) {
+				return closureIdentity(ctx, x, y) == proofEstablished
+			}
 			return equalFuncValues(ctx, x, y)
 		}
 
@@ -238,7 +246,8 @@ func equalTerminal(ctx *OpContext, v, w Value, flags Flag) bool {
 		// above; this identifies tightened clones of the same builtin
 		// carrying equal type constraints.
 		if y, ok := w.(*Builtin); ok {
-			return x.self() == y.self() && equalFuncTypes(x.Types, y.Types)
+			return x.self() == y.self() &&
+				(flags&runtimeIdentity != 0 || equalFuncTypes(x.Types, y.Types))
 		}
 
 	case *ExternalValidator:

@@ -1,0 +1,31 @@
+// Runtime identity ignores redundant contracts, recursively through captures
+// and bound partial arguments. It still distinguishes implementations.
+
+-- in.cue --
+@test(json, [1, 2, 3], at="out")
+@test(validate, conflict, at="distinct")
+@test(validate, concrete, incomplete, at="retained")
+
+f: func(x: int) -> int: x
+g: f & (func(int) -> int)
+#Wrap: {op: func(int) -> int, result: func() -> int: op(1)}
+a: #Wrap & {op: f}
+b: #Wrap & {op: g}
+c: a.result & b.result
+#Nested: {ops: [{op: func(int) -> int}], result: func() -> int: ops[0].op(2)}
+na: #Nested & {ops: [{op: f}]}
+nb: #Nested & {ops: [{op: g}]}
+nc: na.result & nb.result
+apply: func(op: func(int) -> int, x: int) -> int: op(x)
+partial: apply(f, ...) & apply(g, ...)
+out: [c(), nc(), partial(3)]
+h: func(x: int) -> int: x
+other: #Wrap & {op: h}
+distinct: a.result & other.result
+
+text: func(x: string) -> string: x
+constrained: text & (func("audit") -> "wrong")
+#Text: {op: func(string) -> string, result: func() -> string: op("ok")}
+ta: #Text & {op: text}
+tb: #Text & {op: constrained}
+retained: ta.result & tb.result

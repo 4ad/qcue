@@ -1,0 +1,15 @@
+// These closures share a code origin but form a finite acyclic call graph.
+
+-- in.cue --
+@test(validate, concrete, at="a")
+@test(validate, concrete, at="b")
+@test(validate, concrete, at="c")
+@test(json, [3, 4, 5], at="out")
+
+id: func(x: int) -> int: x
+wrap: func(f: func(int) -> int) -> func(int) -> int:
+	func(x: int) -> int: f(x)
+a: wrap(id)
+b: wrap(a)
+c: wrap(b)
+out: [a(3), b(4), c(5)]

@@ -18,6 +18,14 @@ import "slices"
 
 type closureComparison struct{ a, b *FuncValue }
 
+// SameFunctionInstance compares code origins, captures, and partial arguments
+// independently of retained contracts. If known is false, their identity
+// still depends on unresolved captures or a cyclic comparison.
+func SameFunctionInstance(c *OpContext, a, b *FuncValue) (same, known bool) {
+	r := closureIdentity(c, a, b)
+	return r == proofEstablished, r != proofUnknown
+}
+
 // closureIdentity compares operational descriptors, not the functions they
 // compute. Unknown captures retain an equality obligation: comparing two
 // upper approximations is not evidence that their witnesses are equal.
@@ -60,7 +68,7 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 			}
 			return
 		}
-		if !Equal(c, xv, yv, 0) {
+		if !Equal(c, xv, yv, runtimeIdentity) {
 			result = proofRefuted
 		}
 	}

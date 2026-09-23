@@ -19,13 +19,13 @@ package adt
 // re-entry of this code origin; alternating decreases in different slots is
 // not a termination argument.
 type functionActivation struct {
-	fn        *Function
+	fn        *FuncValue
 	lengths   []int
 	measure   int
 	recursive bool
 }
 
-func (c *OpContext) enterFunction(fn *Function, bindings []funcArg) (functionActivation, *Bottom) {
+func (c *OpContext) enterFunction(fn *FuncValue, bindings []funcArg) (functionActivation, *Bottom) {
 	a := functionActivation{fn: fn, measure: -1, lengths: make([]int, len(bindings))}
 	for i, arg := range bindings {
 		a.lengths[i] = -1
@@ -46,7 +46,14 @@ func (c *OpContext) enterFunction(fn *Function, bindings []funcArg) (functionAct
 	}
 	for i := len(c.activeFunctionCalls) - 1; i >= 0; i-- {
 		parent := &c.activeFunctionCalls[i]
-		if parent.fn != fn {
+		if parent.fn.Fn != fn.Fn {
+			continue
+		}
+		// Calling a distinct closure already present in the caller's finite
+		// capture graph traverses an existing descriptor. Creating another
+		// closure at the same origin during the call does not establish that
+		// descent, and still needs a decreasing list argument.
+		if closureIdentity(c, parent.fn, fn) == proofRefuted && capturedFunction(c, parent.fn, fn) {
 			continue
 		}
 		a.recursive = true
@@ -68,6 +75,53 @@ func (c *OpContext) enterFunction(fn *Function, bindings []funcArg) (functionAct
 		break
 	}
 	return a, nil
+}
+
+func capturedFunction(c *OpContext, outer, inner *FuncValue) bool {
+	seen := make(map[Value]bool)
+	functions := make(map[funcAnchorKey]bool)
+	var visit func(Value) bool
+	var captures func(*FuncValue) bool
+	captures = func(f *FuncValue) bool {
+		key := funcAnchorKey{fn: f.Fn, env: f.Env}
+		if functions[key] {
+			return false
+		}
+		functions[key] = true
+		for _, ref := range f.Fn.Captures {
+			v, _ := c.Evaluate(f.Env, ref)
+			if visit(v) {
+				return true
+			}
+		}
+		for _, arg := range f.args {
+			if arg.expr != nil {
+				v, _ := c.Evaluate(arg.env, arg.expr)
+				if visit(v) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	visit = func(v Value) bool {
+		if v == nil || seen[v] {
+			return false
+		}
+		seen[v] = true
+		if f, ok := Unwrap(v).(*FuncValue); ok {
+			return closureIdentity(c, f, inner) == proofEstablished || captures(f)
+		}
+		if v, ok := v.(*Vertex); ok {
+			for _, a := range v.Arcs {
+				if a.ArcType == ArcMember && !a.Label.IsLet() && visit(a) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return captures(outer)
 }
 
 // recursiveArgument records already established ground scalar/list results
