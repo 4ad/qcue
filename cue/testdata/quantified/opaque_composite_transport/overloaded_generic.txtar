@@ -1,0 +1,21 @@
+// Generic clauses retain their telescopes in either position. Partial calls
+// save arguments without fixing still-unused binders to an empty trial.
+
+-- in.cue --
+@test(json, [2, "s", true, 3, false, "later"], at="out")
+
+#M: exists A {
+	first: (forall T func(T) -> T) & (func(string) -> string)
+	last: (func(string) -> string) & (forall T func(T) -> T)
+	pair: (forall (T, U) func(T, U) -> U) & (func(int, int) -> int)
+}
+p: seal #M with (A = int) {
+	first: func(x: _) -> _: x
+	last: func(x: _) -> _: x
+	pair: func(x: _, y: _) -> _: y
+}
+out: (open p as (A, P) {
+	let saved = P.pair(1, ...)
+	r: [P.first(2), P.first("s"), P.first[bool](true),
+		P.last(3), P.last[bool](false), saved("later")]
+}).r

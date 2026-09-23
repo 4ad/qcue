@@ -1,0 +1,24 @@
+// Callback adapters preserve complete interfaces in both directions. Public
+// carrier frames direct transport even inside the private operation's frame.
+
+-- in.cue --
+@test(validate, concrete, at="p")
+@test(json, [0, 0, "text"], at="out")
+
+#M: exists A {
+	zero: A
+	apply: func((func(A) -> A) & (func(string) -> string), A) -> A
+	echo: func((func(A) -> A) & (func(string) -> string)) -> ((func(A) -> A) & (func(string) -> string))
+	read: func(A) -> int
+}
+p: seal #M with (A = int) {
+	zero: 0
+	apply: func(f: (func(int) -> int) & (func(string) -> string), x: int) -> int: f(x)
+	echo: func(f: (func(int) -> int) & (func(string) -> string)) -> ((func(int) -> int) & (func(string) -> string)): f
+	read: func(x: int) -> int: x
+}
+out: (open p as (A, P) {
+	let id = func(x: _) -> _: x
+	let back = P.echo(id)
+	r: [P.read(P.apply(id, P.zero)), P.read(back(P.zero)), (back & id)("text")]
+}).r

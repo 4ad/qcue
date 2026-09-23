@@ -2259,46 +2259,12 @@ func unresolvedDisjunction(v Value) *Disjunction {
 	return d
 }
 
-func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
-	callee := x // Stable identity before selecting this call's type instance.
-	if b := x.checkIdentities(c); b != nil {
-		return b
-	}
-	if x.Fn == nil || x.Fn.Body == nil {
-		if x.Fn != nil && x.Fn.Quantified {
-			return x.abstractCall(c, call, state)
-		}
-		c.AddErrf("cannot call function without implementation")
-		return nil
-	}
-
+// bindCall shares packet normalization between execution and adapter
+// applicability. An unused argument is reported separately because a complete
+// call gives missing required arguments precedence over extra arguments.
+func (x *FuncValue) bindCall(c *OpContext, call *CallExpr) (bindings []funcArg, unused, err *Bottom) {
 	callEnv := c.Env(0)
-
-	// A call's result is fully determined by its call site, the caller
-	// environment in which its arguments resolve, and the callee. If this
-	// combination has already produced a finalized, error-free result, reuse
-	// it: a parameter referenced N times, or a call nested as an argument and
-	// re-scheduled once per use of the enclosing parameter, would otherwise
-	// rebuild the activation and re-finalize the body every time, making
-	// deeply nested calls exponential in their nesting depth. Only completed
-	// error-free results are memoized (see the write below), so a call
-	// re-entered through recursion — which the structural cycle detector must
-	// observe on the shared anchor — has no entry and is never
-	// short-circuited here.
-	resultKey := funcCallResultKey{call: call, env: callEnv}
-	for i := range c.funcCallResults[resultKey] {
-		if r := &c.funcCallResults[resultKey][i]; r.matches(c, x) {
-			return x.checkResultScopes(c, r.result)
-		}
-	}
-
-	// Phase 1: bind arguments to parameters. bindings[i] is the argument bound
-	// to parameter i — by an earlier partial application (x.args) or by this
-	// call — with the environment it resolves in; a nil expr marks an unbound
-	// parameter. Labeled arguments resolve through the value's declared
-	// contract labels, including one supplied by an attached signature for an
-	// otherwise unnamed positional slot.
-	bindings := make([]funcArg, len(x.Fn.Params))
+	bindings = make([]funcArg, len(x.Fn.Params))
 	copy(bindings, x.args)
 	used := make([]bool, len(call.Args))
 	byLabel, _ := funcParamLabels(x.Fn, x.Types)
@@ -2329,11 +2295,9 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			}
 			switch {
 			case boundLabel != InvalidLabel:
-				c.AddErrf("duplicate argument %s", label.SelectorString(c))
-				return nil
+				return nil, nil, c.NewErrf("duplicate argument %s", label.SelectorString(c))
 			case arg != nil:
-				c.AddErrf("argument %s provided by position and label", label.SelectorString(c))
-				return nil
+				return nil, nil, c.NewErrf("argument %s provided by position and label", label.SelectorString(c))
 			}
 			arg = call.Args[j]
 			used[j] = true
@@ -2344,33 +2308,80 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			// A function composed with x declares no such parameter, so no
 			// call can bind it, whichever of the functions is the head.
 			if boundLabel != InvalidLabel {
-				c.AddErrf("unknown argument %s", boundLabel.SelectorString(c))
-			} else {
-				c.AddErrf("too many positional arguments in function call")
+				return nil, nil, c.NewErrf("unknown argument %s", boundLabel.SelectorString(c))
 			}
-			return nil
+			return nil, nil, c.NewErrf("too many positional arguments in function call")
 		}
 		if arg != nil {
 			bindings[i] = funcArg{expr: arg, env: callEnv}
 		}
 	}
 
-	// reportUnusedArg reports an argument that bound no parameter. A missing
-	// required or non-defaulted argument (checked below in phase 2) takes
-	// precedence for a completing call, so this runs after that check there,
-	// but before returning a partial application.
-	reportUnusedArg := func() bool {
-		for i := range call.Args {
-			if !used[i] {
-				if i < len(call.ArgLabels) && call.ArgLabels[i] != InvalidLabel {
-					c.AddErrf("unknown argument %s", call.ArgLabels[i].SelectorString(c))
-				} else {
-					c.AddErrf("too many positional arguments in function call")
+	for i := range call.Args {
+		if !used[i] {
+			if i < len(call.ArgLabels) && call.ArgLabels[i] != InvalidLabel {
+				unused = c.NewErrf("unknown argument %s", call.ArgLabels[i].SelectorString(c))
+			} else {
+				unused = c.NewErrf("too many positional arguments in function call")
+			}
+			break
+		}
+	}
+	return bindings, unused, nil
+}
+
+func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
+	callee := x // Stable identity before selecting this call's type instance.
+	if b := x.checkIdentities(c); b != nil {
+		return b
+	}
+	if x.Fn == nil || x.Fn.Body == nil {
+		if x.Fn != nil && x.Fn.Quantified {
+			return x.abstractCall(c, call, state)
+		}
+		c.AddErrf("cannot call function without implementation")
+		return nil
+	}
+
+	// A call's result is fully determined by its call site, the caller
+	// environment in which its arguments resolve, and the callee. If this
+	// combination has already produced a finalized, error-free result, reuse
+	// it: a parameter referenced N times, or a call nested as an argument and
+	// re-scheduled once per use of the enclosing parameter, would otherwise
+	// rebuild the activation and re-finalize the body every time, making
+	// deeply nested calls exponential in their nesting depth. Only completed
+	// error-free results are memoized (see the write below), so a call
+	// re-entered through recursion — which the structural cycle detector must
+	// observe on the shared anchor — has no entry and is never
+	// short-circuited here.
+	resultKey := funcCallResultKey{call: call, env: c.Env(0)}
+	for i := range c.funcCallResults[resultKey] {
+		if r := &c.funcCallResults[resultKey][i]; r.matches(c, x) {
+			return x.checkResultScopes(c, r.result)
+		}
+	}
+	if boundary, ok := x.Fn.Body.(*OpaqueCall); ok && boundary.dispatch {
+		result := boundary.callOverload(c, x, call, state)
+		complete := result != nil && !call.Partial
+		if v, ok := result.(*Vertex); ok && v.Bottom() != nil {
+			complete = false
+		}
+		if complete {
+			if _, failed := Unwrap(result).(*Bottom); !failed {
+				if c.funcCallResults == nil {
+					c.funcCallResults = make(map[funcCallResultKey][]funcCallResult)
 				}
-				return true
+				c.funcCallResults[resultKey] = append(c.funcCallResults[resultKey],
+					funcCallResult{fn: x.Fn, env: x.Env, types: x.Types, args: x.args,
+						identities: x.identities, result: result})
 			}
 		}
-		return false
+		return x.checkResultScopes(c, result)
+	}
+
+	bindings, unused, bindErr := x.bindCall(c, call)
+	if bindErr != nil {
+		return bindErr
 	}
 
 	// A partial application binds the given arguments and yields a function
@@ -2378,8 +2389,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	// bound arguments are carried on the returned value and combined with a
 	// later call's arguments when the function is called to completion.
 	if call.Partial {
-		if reportUnusedArg() {
-			return nil
+		if unused != nil {
+			return unused
 		}
 		if x.Fn.Quantified {
 			for i, arg := range bindings {
@@ -2524,8 +2535,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		arcs = append(arcs, arc)
 	}
 
-	if reportUnusedArg() {
-		return nil
+	if unused != nil {
+		return unused
 	}
 
 	// Assemble the per-call activation and evaluate the call as a fresh

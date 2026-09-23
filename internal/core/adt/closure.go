@@ -47,7 +47,8 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 	if a.Fn != b.Fn {
 		x, xok := a.Fn.Body.(*OpaqueCall)
 		y, yok := b.Fn.Body.(*OpaqueCall)
-		if !xok || !yok || x.owner != y.owner || x.signature != y.signature || x.outward != y.outward {
+		if !xok || !yok || x.owner != y.owner || x.outward != y.outward ||
+			(x.origin() != y.origin() && x.signature != y.signature) {
 			return proofRefuted
 		}
 		// Adapter allocation is not a new public code identity. Its
@@ -106,12 +107,27 @@ func transportIdentity(c *OpContext, f *FuncValue) *FuncValue {
 		}
 		inner, ok := outer.private.Fn.Body.(*OpaqueCall)
 		if !ok || outer.owner != inner.owner || outer.outward == inner.outward ||
-			!sameTransportSignature(c, outer.signature, outer.env, inner.signature, inner.env) {
+			!sameTransportInterface(c, outer, inner) {
 			break
 		}
 		f = inner.private
 	}
 	return f
+}
+
+func sameTransportInterface(c *OpContext, a, b *OpaqueCall) bool {
+	x, y := a.origin().clauses, b.origin().clauses
+	if len(x) != len(y) {
+		return false
+	}
+	for _, t := range x {
+		if !slices.ContainsFunc(y, func(u FuncType) bool {
+			return sameTransportSignature(c, t.Fn, t.Env, u.Fn, u.Env)
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 func sameTransportSignature(c *OpContext, a *Function, ae *Environment, b *Function, be *Environment) bool {

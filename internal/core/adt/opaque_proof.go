@@ -70,6 +70,9 @@ func (x *OpaqueType) Escapes(c *OpContext, value Value) bool {
 // ordinary traversals. The transport theorem applies only to schemas whose
 // transport is known to be total in the appropriate direction.
 func (s *OpaqueCall) ProofTypes(c *OpContext, env *Environment) (advertised FuncType, implementation *FuncValue, required FuncType, ok bool) {
+	if !s.coherent(c) {
+		return advertised, nil, required, false
+	}
 	bindings := make(map[*TypeParameter]Value)
 	for e := env; e != nil; e = e.Up {
 		if e.types != nil {
@@ -129,6 +132,8 @@ func (p *sealedPackage) totalTransport(c *OpContext, env *Environment, schema Ex
 		return true
 	case *OpaqueType:
 		return v.carrier.owner == p
+	case *RigidType:
+		return !abstractEscapes(c, v.Bound, p, make(map[Value]bool))
 	case *Existential:
 		// A closed interface with no free predicate dependencies cannot
 		// mention this boundary's carrier. Its packages pass unchanged.
@@ -164,15 +169,25 @@ func (p *sealedPackage) totalTransport(c *OpContext, env *Environment, schema Ex
 		}
 		return true
 	case *FuncValue:
-		if len(typeParameters(v.Env)) != 0 || v.Fn.Open || len(v.Types) != 0 {
+		clauses := v.selectionAndOriginalClauses()
+		boundary := &OpaqueCall{owner: p, clauses: clauses, outward: outward}
+		if !boundary.coherent(c) {
 			return false
 		}
-		for _, param := range v.Fn.Params {
-			if !p.totalTransport(c, v.Env, param.Value, !outward, active) {
+		for _, t := range clauses {
+			if len(typeParameters(t.Env)) != 0 || t.Fn.Open {
+				return false
+			}
+			for _, param := range t.Fn.Params {
+				if !p.totalTransport(c, t.Env, param.Value, !outward, active) {
+					return false
+				}
+			}
+			if !p.totalTransport(c, t.Env, t.Fn.Ret, outward, active) {
 				return false
 			}
 		}
-		return p.totalTransport(c, v.Env, v.Fn.Ret, outward, active)
+		return true
 	case *Vertex:
 		if v.Bottom() != nil || v.sealed != nil {
 			return false

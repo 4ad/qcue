@@ -276,14 +276,24 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 			target = adt.BindFunctionTypes(target, []adt.Value{&adt.RigidType{Param: param, Bound: bound}})
 		}
 	}
+	if boundary, ok := source.Fn.Body.(*adt.OpaqueCall); ok {
+		for _, alternative := range boundary.ProofAlternatives() {
+			target, source, ok := s.capabilityScopes(target, adt.FuncType{Fn: alternative.Fn, Env: alternative.Env})
+			if !ok {
+				continue
+			}
+			boundary := alternative.Fn.Body.(*adt.OpaqueCall)
+			advertised, implementation, required, ok := boundary.ProofTypes(p.ctx, source.Env)
+			if ok && s.capabilitySignature(target, advertised) && p.implementation(implementation) &&
+				p.function(implementation, required) {
+				return true
+			}
+		}
+		return false
+	}
 	target, source, ok := s.capabilityScopes(target, source)
 	if !ok {
 		return false
-	}
-	if boundary, ok := source.Fn.Body.(*adt.OpaqueCall); ok {
-		advertised, implementation, required, ok := boundary.ProofTypes(p.ctx, source.Env)
-		return ok && p.implementation(implementation) &&
-			p.function(implementation, required) && s.capabilitySignature(target, advertised)
 	}
 	target, ok = s.completeProtocol(target, source)
 	if !ok {
@@ -732,27 +742,36 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 	default:
 		return nil
 	}
-	if len(adt.FunctionTypeParameters(source)) != 0 {
-		var b *adt.Bottom
-		source, b = adt.InstantiateFunctionType(p.ctx, source, target)
-		if b != nil {
-			return nil
-		}
-	}
-	s := &subsumer{ctx: p.ctx}
-	noResult := *source.Fn
-	noResult.Ret = nil
-	if !s.capabilitySignature(target, adt.FuncType{Fn: &noResult, Env: source.Env}) {
-		return nil
-	}
+	sources := []adt.FuncType{source}
 	if f, ok := callee.(*adt.FuncValue); ok {
 		if p.hypotheses[f] {
 			p.useHypothesis(f)
 		} else if !p.implementation(f) {
 			return nil
 		}
+		if boundary, ok := f.Fn.Body.(*adt.OpaqueCall); ok && !f.IsPartial() {
+			sources = nil
+			for _, alternative := range boundary.ProofAlternatives() {
+				sources = append(sources, adt.FuncType{Fn: alternative.Fn, Env: alternative.Env})
+			}
+		}
 	}
-	return p.schema(source.Env, source.Fn.Ret)
+	s := &subsumer{ctx: p.ctx}
+	for _, source := range sources {
+		if len(adt.FunctionTypeParameters(source)) != 0 {
+			var b *adt.Bottom
+			source, b = adt.InstantiateFunctionType(p.ctx, source, target)
+			if b != nil {
+				continue
+			}
+		}
+		noResult := *source.Fn
+		noResult.Ret = nil
+		if s.capabilitySignature(target, adt.FuncType{Fn: &noResult, Env: source.Env}) {
+			return p.schema(source.Env, source.Fn.Ret)
+		}
+	}
+	return nil
 }
 
 func proofUnion(values []adt.Value) adt.Value {

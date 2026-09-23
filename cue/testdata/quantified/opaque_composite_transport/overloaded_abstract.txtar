@@ -1,0 +1,23 @@
+// Disjoint abstract and ordinary domains transport through their own clause.
+// Private representation overlap must not certify incompatible public views.
+
+-- in.cue --
+@test(validate, concrete, at="p")
+@test(json, [0, "text"], at="out")
+@test(validate, concrete, incomplete, at="incoherent")
+@test(validate, concrete, incomplete, at="badCall")
+
+#M: exists A {zero: A, f: (func(A) -> A) & (func(string) -> string), read: func(A) -> int}
+p: seal #M with (A = int) {
+	zero: 0
+	f: func(x: _) -> _: x
+	read: func(x: int) -> int: x
+}
+out: (open p as (A, P) {r: [P.read(P.f(P.zero)), P.f("text")]}).r
+
+#Bad: exists A {zero: A, f: (func(A) -> A) & (func(_) -> int)}
+incoherent: seal #Bad with (A = int) {
+	zero: 0
+	f: func(x: _) -> int: 1
+}
+badCall: (open incoherent as (A, P) {r: P.f(P.zero) == P.zero}).r

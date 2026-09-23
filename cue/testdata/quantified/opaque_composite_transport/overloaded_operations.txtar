@@ -1,0 +1,48 @@
+// Transport keeps every arrow of an operation, independent of clause order.
+// Overlapping ordinary domains agree on transport and keep all result guards.
+
+-- in.cue --
+@test(validate, concrete, at="p")
+@test(validate, concrete, at="q")
+@test(validate, concrete, at="wrapped")
+@test(json, [2, "x", 2, "x", 2, 2.5, "nested", "list", "callback", "partial"], at="out")
+@test(validate, conflict, at="outside")
+@test(validate, conflict, at="badCall")
+@test(validate, concrete, incomplete, at="unknownGuard")
+
+#M: exists A {
+	f: (func(int) -> int) & (func(string) -> string)
+	overlap: (func(int) -> int) & (func(number) -> number)
+	box: {f: (func(int) -> int) & (func(string) -> string)}
+	list: [(func(int) -> int) & (func(string) -> string)]
+	callback: func((func(int) -> int) & (func(string) -> string)) -> (func(int) -> int) & (func(string) -> string)
+}
+#Reverse: exists A {f: (func(string) -> string) & (func(int) -> int)}
+id: func(x: _) -> _: x
+p: seal #M with (A = int) {
+	f: id
+	overlap: id
+	box: {f: id}
+	list: [id]
+	callback: func(f: (func(int) -> int) & (func(string) -> string)) -> (func(int) -> int) & (func(string) -> string): f
+}
+q: seal #Reverse with (A = int) {f: id}
+out: (open p as (A, P) {
+	r: (open q as (B, Q) {
+		let partial = P.f("partial", ...)
+		v: [P.f(2), P.f("x"), Q.f(2), Q.f("x"), P.overlap(2), P.overlap(2.5),
+			P.box.f("nested"), P.list[0]("list"), P.callback(id)("callback"), partial()]
+	}).v
+}).r
+outside: (open p as (A, P) {r: P.f(true)}).r
+wrapped: (open p as (A, P) {r: func(x: string) -> string: P.f(x)}).r
+
+#Bad: exists A {f: (func(number) -> number) & (func(int) -> 0)}
+bad: seal #Bad with (A = int) {f: func(x: number) -> number: {v: x}.v}
+badCall: (open bad as (A, P) {r: P.f(1)}).r
+
+#Guard: exists A {f: (func(_) -> int) & (func(func(int) -> 1) -> 1)}
+guard: seal #Guard with (A = int) {f: func(x: _) -> int: {v: 0}.v}
+unknownGuard: (open guard as (A, P) {
+	r: P.f(func(x: int) -> int: {v: x}.v)
+}).r

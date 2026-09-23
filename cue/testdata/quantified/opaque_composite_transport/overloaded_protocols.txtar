@@ -1,0 +1,21 @@
+// The chosen clause supplies the public packet protocol. Private defaults
+// supply omitted values, and labels remain those of the public signature.
+
+-- in.cue --
+@test(json, [3, 5, 3, 7, "s"], at="out")
+@test(validate, concrete, incomplete, at="unresolvedPartial")
+
+#M: exists A {
+	f: (func() -> int) & (func(int) -> int)
+	h: (func(x: int = 9) -> int) & (func(string) -> string)
+	g: (func(x!: int) -> int) & (func(y!: string) -> string)
+}
+p: seal #M with (A = int) {
+	f: func(x: int = 3) -> int: x
+	h: func(x: _ = 3) -> _: x
+	g: func(x?: int, y?: string) -> _: ({if x != _|_ {r: x}, if y != _|_ {r: y}}).r
+}
+out: (open p as (A, P) {
+	r: [P.f(), P.f(5), P.h(), P.g(x: 7), P.g(y: "s")]
+}).r
+unresolvedPartial: (open p as (A, P) {r: P.f(...)}).r

@@ -574,40 +574,7 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 		result.Finalize(c)
 		return result
 	case *Function:
-		f, ok := Unwrap(value).(*FuncValue)
-		if !ok {
-			return c.NewErrf("interface requires a function implementation")
-		}
-		for _, a := range p.operations {
-			if a.schema == x && a.env == env && a.outward == outward &&
-				equalFuncTypes(a.target.Types, f.Types) && closureIdentity(c, a.target, f) == proofEstablished {
-				return a.value
-			}
-		}
-		fn := *x
-		fn.Params = slices.Clone(x.Params)
-		for i := range fn.Params {
-			if fn.Params[i].Default != nil {
-				// The public contract admits omission; it does not supply
-				// the private closure's default. Leave the slot absent so
-				// the adapter forwards omission through the boundary.
-				fn.Params[i].Default = nil
-				fn.Params[i].ArcType = ArcOptional
-			}
-		}
-		fn.Captures = nil
-		fn.Body = &OpaqueCall{owner: p, private: f, signature: x, env: env, outward: outward}
-		fnEnv := env
-		if !outward {
-			args := make(map[*TypeParameter]Value, len(p.carriers))
-			for param, carrier := range p.carriers {
-				args[param] = carrier.representation
-			}
-			fnEnv = instantiateEnvironment(env, args)
-		}
-		adapter := &FuncValue{Src: x.Src, Fn: &fn, Env: fnEnv}
-		p.operations = append(p.operations, opaqueAdapter{x, env, f, outward, adapter})
-		return adapter
+		return p.transportFunction(c, &FuncValue{Fn: x, Env: env}, value, outward)
 	case *ListLit:
 		v, ok := value.(*Vertex)
 		if !ok || !v.IsList() {
@@ -685,7 +652,7 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 		return packageValue
 	}
 	if f, ok := Unwrap(schema).(*FuncValue); ok {
-		return p.transport(c, f.Env, f.Fn, value, outward)
+		return p.transportFunction(c, f, value, outward)
 	}
 	typ, ok := schema.(*Vertex)
 	if !ok || typ.Kind()&(StructKind|ListKind) == 0 {
@@ -801,6 +768,7 @@ func (p *sealedPackage) transportPackage(c *OpContext, env *Environment, schema 
 // its private implementation or capture environment.
 type opaqueAdapter struct {
 	schema  *Function
+	types   []FuncType
 	env     *Environment
 	target  *FuncValue
 	outward bool
@@ -813,6 +781,13 @@ type OpaqueCall struct {
 	signature *Function
 	env       *Environment
 	outward   bool
+
+	// All views of an overloaded operation share one boundary identity.
+	// A selected execution view disables dispatch while retaining every
+	// advertised clause as a result obligation on its FuncValue.
+	clauses  []FuncType
+	root     *OpaqueCall
+	dispatch bool
 }
 
 func (*OpaqueCall) Source() ast.Node { return nil }
@@ -826,7 +801,9 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 	for e := c.Env(0); e != nil; e = e.Up {
 		if e.types != nil {
 			for p, v := range e.types.arguments {
-				bindings[p] = v
+				if s.owner.carriers[p] == nil {
+					bindings[p] = v
+				}
 			}
 		}
 	}
