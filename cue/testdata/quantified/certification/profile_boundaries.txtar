@@ -1,0 +1,22 @@
+// Unsupported eliminations and effect proofs remain residual obligations.
+// In particular, several representation carriers are not a contradiction.
+
+-- in.cue --
+@test(validate, concrete, at="multiple")
+@test(validate, concrete, incomplete, at="multipleOpened")
+@test(validate, concrete, at="scalar")
+@test(validate, concrete, incomplete, at="scalarOpened")
+@test(validate, concrete, incomplete, at="transparentOpened")
+@test(validate, concrete, incomplete, at="effectful")
+@test(validate, concrete, incomplete, at="foreign")
+
+#Multiple:         exists (A, B) {a: A, b: B}
+multiple:          seal #Multiple with (A = int, B = string) {a: 1, b: "x"}
+multipleOpened:    (open multiple as (T, P) {out: 1}).out
+#Scalar:           exists (A) A
+scalar:            seal #Scalar with (A = int) {1}
+scalarOpened:      (open scalar as (T, P) {out: 1}).out
+transparent:       (exists (A: int) {a: A}) & {a: 1}
+transparentOpened: (open transparent as (T, P) {out: 1}).out
+effectful:         func(x: int) -> int !bridge: x
+foreign:           extern func(int) -> int !bridge

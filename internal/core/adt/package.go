@@ -816,7 +816,8 @@ func (o *PackageOpen) evaluate(c *OpContext, state Flags) Value {
 	view = view.DerefValue()
 	p := view.sealed
 	if len(p.carriers) != 1 {
-		return c.NewErrf("this opening requires exactly one representation type")
+		return &Bottom{Src: o.Src, Code: IncompleteError,
+			Err: c.Newf("opening multiple representation types is not yet supported")}
 	}
 	var typ Value
 	for _, carrier := range p.carriers {
