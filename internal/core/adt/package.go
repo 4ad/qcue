@@ -277,8 +277,7 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	if view := c.sealedViews[key]; view != nil {
 		return view
 	}
-	value, _ := c.Evaluate(c.Env(0), s.Interface)
-	e := existentialOf(value)
+	e := existentialExprOf(c, c.Env(0), s.Interface, make(map[Expr]bool))
 	if e == nil {
 		return c.NewErrf("seal requires an existential interface")
 	}
@@ -314,15 +313,27 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	p.privateEnv = quantifiedEnvironment(c, e, private)
 	p.publicEnv = quantifiedEnvironment(c, e, public)
 	implementation := c.newInlineVertex(nil, nil,
-		MakeRootConjunct(c.Env(0), s.Body), MakeRootConjunct(p.privateEnv, q.Body))
+		MakeRootConjunct(c.Env(0), s.Body), MakeRootConjunct(p.privateEnv, q.Body),
+		MakeRootConjunct(c.Env(0), s.Interface))
+	// The supplied witness discharges only this existential introduction.
+	// Its instantiated body and every other interface conjunct still apply.
+	implementation.sealed, implementation.sealedOpened = p, true
+	// Transport hides representations, not their membership obligations.
+	p.implementation = implementation
 	implementation.Finalize(c)
 	if b := Validate(c, implementation, &ValidateConfig{Concrete: true}); b != nil {
 		return b
 	}
-	// Transport hides representations, not their membership obligations.
-	// Retain the private graph for the public concrete-validation demand.
-	p.implementation = implementation
-	view := p.transport(c, p.publicEnv, q.Body, implementation, true)
+	// Refined fields also belong to the public interface. Transport its
+	// complete shape, rather than projecting just the existential's body.
+	schema := c.newInlineVertex(nil, nil, MakeRootConjunct(p.publicEnv, q.Body),
+		MakeRootConjunct(c.Env(0), s.Interface))
+	schema.sealed, schema.sealedOpened = p, true
+	schema.Finalize(c)
+	if b := schema.Bottom(); b != nil {
+		return b
+	}
+	view := p.transportResolved(c, schema, implementation, true)
 	if v, ok := view.(*Vertex); ok {
 		v.sealed = p
 		if c.sealedViews == nil {
@@ -333,18 +344,63 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	return view
 }
 
-func existentialOf(value Value) *Existential {
+// Find a top-level existential introduction without mistaking incomplete
+// membership of an interface schema for the absence of an introduction.
+// Extraction does not discharge any other conjunct of that interface.
+func existentialOf(c *OpContext, value Value, seen map[Expr]bool) *Existential {
+	if seen[value] {
+		return nil
+	}
+	seen[value] = true
+	if b, ok := value.(*Bottom); ok && b.Node != nil {
+		return existentialOf(c, b.Node, seen)
+	}
 	switch v := Unwrap(value).(type) {
 	case *Existential:
 		return v
 	case *Conjunction:
 		for _, term := range v.Values {
-			if e := existentialOf(term); e != nil {
+			if e := existentialOf(c, term, seen); e != nil {
+				return e
+			}
+		}
+	}
+	if v, ok := value.(*Vertex); ok {
+		for conjunct := range v.LeafConjuncts() {
+			env, expr := conjunct.EnvExpr()
+			if e := existentialExprOf(c, env, expr, seen); e != nil {
 				return e
 			}
 		}
 	}
 	return nil
+}
+
+func existentialExprOf(c *OpContext, env *Environment, expr Expr, seen map[Expr]bool) *Existential {
+	if value, ok := expr.(Value); ok {
+		return existentialOf(c, value, seen)
+	}
+	if seen[expr] {
+		return nil
+	}
+	seen[expr] = true
+	if r, ok := expr.(Resolver); ok {
+		saved := c.PushState(env, expr.Source())
+		v := r.resolve(c, Flags{status: partial, condition: arcTypeKnown, mode: yield})
+		c.PopState(saved)
+		if v != nil {
+			return existentialOf(c, v.DerefValue(), seen)
+		}
+		return nil
+	}
+	if x, ok := expr.(*BinaryExpr); ok && x.Op == AndOp {
+		if e := existentialExprOf(c, env, x.X, seen); e != nil {
+			return e
+		}
+		return existentialExprOf(c, env, x.Y, seen)
+	}
+	v, _ := c.Evaluate(env, expr)
+	return existentialOf(c, v, seen)
 }
 
 func quantifiedEnvironment(c *OpContext, e *Existential, args map[*TypeParameter]Value) *Environment {

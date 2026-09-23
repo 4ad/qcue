@@ -3,6 +3,7 @@
 
 -- in.cue --
 @test(validate, conflict, at="closed")
+@test(validate, conflict, at="closedDefinition")
 @test(validate, conflict, at="nestedClosed")
 @test(validate, concrete, incomplete, at="missing")
 @test(validate, concrete, incomplete, at="required")
@@ -11,6 +12,8 @@
 @test(validate, concrete, at="optional")
 
 closed:       (exists A {tag: 1}) & close({})
+#Empty: {}
+closedDefinition: (exists A {tag: 1}) & #Empty
 nestedClosed: (exists A {inner: {tag: 1}}) & {inner: close({})}
 missing:      (exists A {tag: 1}) & {}
 required:     (exists (A: 1) {value!: A}) & {}

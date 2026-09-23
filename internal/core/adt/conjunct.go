@@ -773,7 +773,12 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 		// only associated with a validator, we leave it to the validator to
 		// decide what fields are allowed.
 		if kind&(ListKind|StructKind) != 0 {
-			if b, ok := x.(*BuiltinValidator); ok && b.Builtin.NonConcrete {
+			_, existential := x.(*Existential)
+			if b, ok := x.(*BuiltinValidator); existential || ok && b.Builtin.NonConcrete {
+				// Existential bodies may require fields that are not
+				// enumerated by the surrounding definition. Their validator,
+				// rather than that definition's partial field set, decides
+				// membership. An independent close(...) still applies.
 				n.updateConjunctInfo(TopKind, id, cHasOpenValidator|cHasTop)
 			} else {
 				n.updateConjunctInfo(TopKind, id, cHasTop)
