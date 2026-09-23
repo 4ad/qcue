@@ -182,10 +182,6 @@ go test ./cmd/cue/cmd -run TestScript/quantified
 
 # Complete repository regression suite.
 go test ./...
-
-# Independent finite semantic models and deterministic reports.
-python3 checks/check_model.py
-python3 checks/check_residual.py
 ```
 
 A narrower `-run` can select a topic or example name, for example

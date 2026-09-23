@@ -281,8 +281,3 @@ go test ./cue -run TestQuantified
 
 See [the test index](../cue/testdata/quantified/README.md) for focused commands
 for each layer. Run the complete regression suite with `go test ./...`.
-
-The [finite reference checks](../checks/README.md) independently exercise the
-proposal's finite set laws and residual completion semantics. Their deterministic
-reports are reproducible with Python 3; they do not certify the Go implementation
-or the infinite-domain calculus.

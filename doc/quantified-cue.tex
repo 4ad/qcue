@@ -3092,7 +3092,7 @@ of a particular constraint-solving strategy.
 The accompanying \code{checks/check_model.py} uses only the Python standard
 library. It enumerates four data values, their sixteen subsets, and 625 partial
 function tables, with a separate rejection outcome. It executes
-\textbf{124,523 assertions} and records the result in \code{checks/results.json}.
+\textbf{222,594 assertions} and records the result in \code{checks/results.json}.
 
 \begin{tabularx}{\textwidth}{@{}lY@{}}
 \toprule
@@ -3111,11 +3111,7 @@ and a finite operation simulation.\\\bottomrule
 \end{tabularx}
 
 The finite checks instantiate the stated algebraic laws and counterexamples.
-These are executable reference models, not tests of the Go evaluator or proofs
-for infinite semantic universes. Both scripts use explicit checks that remain
-enabled under Python's optimization option and write deterministic reports;
-\code{checks/README.md} gives the commands to reproduce them.
-The additional \code{checks/check_residual.py} executes \textbf{133,688 assertions}
+The additional \code{checks/check_residual.py} executes \textbf{245,237 assertions}
 for the local kernel of \cref{ch:residual}. It checks preservation of finite
 completion sets under bounded propagation, validation of grounded arithmetic
 cycles, persistence of refutations, retention of guards and existential
