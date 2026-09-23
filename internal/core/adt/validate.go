@@ -37,6 +37,9 @@ type ValidateConfig struct {
 	// retaining its unresolved contract, without claiming conformance.
 	CheckFunction func(*OpContext, *FuncValue) *Bottom
 
+	// CheckBuiltin independently proves client-added primitive contracts.
+	CheckBuiltin func(*OpContext, *Builtin) *Bottom
+
 	// TODO: omitOptional, if this is becomes relevant.
 }
 
@@ -205,6 +208,11 @@ func (v *validator) validate(x *Vertex) {
 		}
 	}
 	v.validatePackage(x.sealed)
+	if b, ok := x.BaseValue.(*Builtin); ok && b.capabilityMode() && v.checkConcrete() && v.CheckBuiltin != nil {
+		if err := v.CheckBuiltin(v.ctx, b); err != nil {
+			v.add(err)
+		}
+	}
 	if opaque, ok := x.BaseValue.(*OpaqueValue); ok {
 		v.validatePackage(opaque.carrier.owner)
 	}

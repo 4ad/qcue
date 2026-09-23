@@ -2939,7 +2939,15 @@ func (builtin *Builtin) rawCall(c *OpContext, call *CallExpr, state Flags) Value
 		// RawFunc builtins evaluate their arguments themselves, so the
 		// parameter constraints of any recorded function types are not
 		// enforced for them; the result constraints are.
-		return builtin.applyResultTypes(c, builtin.RawFunc(callCtx))
+		result := builtin.RawFunc(callCtx)
+		var args []Value
+		if builtin.capabilityMode() {
+			for _, arg := range call.Args {
+				v, _ := c.Evaluate(c.Env(0), arg)
+				args = append(args, v)
+			}
+		}
+		return builtin.applyResultTypes(c, result, args)
 	}
 	// Arguments to functions are open. This mostly matters for NonConcrete
 	// builtins.
@@ -3047,6 +3055,7 @@ func (builtin *Builtin) rawCall(c *OpContext, call *CallExpr, state Flags) Value
 // finishCall applies the attached function types to args, calls the
 // builtin with them, and evaluates its result.
 func (builtin *Builtin) finishCall(c *OpContext, callCtx BuiltinCallContext, args []Value, state Flags) Value {
+	packet := slices.Clone(args[:len(callCtx.call.Args)])
 	args, b := builtin.applyParamTypes(c, args)
 	if b != nil {
 		return b
@@ -3067,7 +3076,7 @@ func (builtin *Builtin) finishCall(c *OpContext, callCtx BuiltinCallContext, arg
 	}
 	v, ci := c.evalStateCI(result, Flags{status: partial, condition: state.condition, mode: state.mode})
 	c.ci = ci
-	return builtin.applyResultTypes(c, v)
+	return builtin.applyResultTypes(c, v, packet)
 }
 
 // callPerDisjunct calls the builtin once per disjunct of d, the disjunction
@@ -3124,6 +3133,9 @@ func (builtin *Builtin) callPerDisjunct(c *OpContext, callCtx BuiltinCallContext
 // evaluated in the environment in which their signature was declared.
 func (builtin *Builtin) applyParamTypes(c *OpContext, args []Value) ([]Value, *Bottom) {
 	for _, t := range builtin.Types {
+		if builtin.guardedType(t) {
+			continue
+		}
 		matches := matchBuiltinParams(t.Fn, builtin)
 		for j, tp := range t.Fn.Params {
 			i := matches[j]
@@ -3154,7 +3166,7 @@ func (builtin *Builtin) applyParamTypes(c *OpContext, args []Value) ([]Value, *B
 // applyResultTypes unifies the result of a builtin call with the result
 // constraints of the function types the builtin was unified with. The
 // constraints are evaluated in their type's environment.
-func (x *Builtin) applyResultTypes(c *OpContext, v Value) Value {
+func (x *Builtin) applyResultTypes(c *OpContext, v Value, args []Value) Value {
 	if len(x.Types) == 0 || v == nil {
 		return v
 	}
@@ -3164,6 +3176,16 @@ func (x *Builtin) applyResultTypes(c *OpContext, v Value) Value {
 	a := make([]Conjunct, 0, len(x.Types)+1)
 	a = append(a, MakeConjunct(nil, v, c.ci))
 	for _, t := range x.Types {
+		if x.guardedType(t) {
+			var applies proofResult
+			t, applies = x.capabilityApplies(c, t, args)
+			switch applies {
+			case proofRefuted:
+				continue
+			case proofUnknown:
+				return &Bottom{Code: IncompleteError, Err: c.Newf("incomplete builtin contract domain")}
+			}
+		}
 		if t.Fn.Ret == nil {
 			continue
 		}
@@ -3225,6 +3247,10 @@ type Builtin struct {
 	// Builtin carrying Types is a clone of a package-level builtin, which
 	// remains identified through orig.
 	Types []FuncType
+
+	// declared records the signatures supplied by the builtin's own package.
+	// User contracts cannot add labels or defaults to this fixed protocol.
+	declared []FuncType
 
 	// orig points to the package-level builtin from which a tightened clone
 	// (a builtin carrying Types) was derived. It is nil for an original
@@ -3353,7 +3379,7 @@ func (x *Builtin) completeArgs(c *OpContext, p token.Pos, args []Value, flags Fl
 // builtin declares for its parameter at position pos, and reports whether
 // there is one.
 func (x *Builtin) signatureDefault(c *OpContext, pos int, flags Flags) (Value, bool) {
-	for _, t := range x.Types {
+	for _, t := range x.protocolTypes() {
 		for k, j := range matchBuiltinParams(t.Fn, x) {
 			d := t.Fn.Params[k].Default
 			if j != pos || d == nil {

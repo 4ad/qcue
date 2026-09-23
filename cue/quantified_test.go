@@ -22,6 +22,8 @@ import (
 	"golang.org/x/tools/txtar"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
@@ -249,6 +251,60 @@ func TestQuantifiedResidualExport(t *testing.T) {
 				}
 				if got := normalize(string(text)); got != normalize(want) {
 					t.Fatalf("export = %s; want %s", got, normalize(want))
+				}
+			})
+		}
+	}
+}
+
+func TestQuantifiedBuiltinExport(t *testing.T) {
+	for _, name := range []string{"bad", "good"} {
+		for _, mode := range []string{"source", "final", "expression", "value"} {
+			t.Run(name+"/"+mode, func(t *testing.T) {
+				ctx := cuecontext.New()
+				v := ctx.CompileString(quantifiedAPIText(t, "builtin_export", name+".cue"))
+				var node ast.Node
+				switch mode {
+				case "source":
+					node = v.Syntax()
+				case "final":
+					node = v.Syntax(cue.Final())
+				default:
+					r, x := value.ToInternal(v)
+					var expr ast.Expr
+					var err error
+					if mode == "expression" {
+						expr, err = export.Expr(r, "", x)
+					} else {
+						expr, err = export.Value(r, "", x)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					file, err := astutil.ToFile(expr)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := astutil.Sanitize(file); err != nil {
+						t.Fatal(err)
+					}
+					node = file
+				}
+				text, err := format.Node(node)
+				if err != nil {
+					t.Fatal(err)
+				}
+				rebuilt := ctx.CompileString(string(text) + "\nout: f(\"b\")")
+				if err := rebuilt.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); (err == nil) != (name == "good") {
+					t.Fatalf("export %s: conformance = %v", text, err)
+				}
+				out := rebuilt.LookupPath(cue.ParsePath("out"))
+				if name == "bad" {
+					if out.Validate() == nil {
+						t.Fatalf("export lost the conflicting result obligation: %s", text)
+					}
+				} else if got, err := out.String(); err != nil || got != "B" {
+					t.Fatalf("export %s: got %q, %v; want B", text, got, err)
 				}
 			})
 		}

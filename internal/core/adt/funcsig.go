@@ -749,7 +749,7 @@ func builtinParamLabels(types []FuncType) (map[Feature]int, Feature) {
 // raw position. One source signature cannot map two declarations to one raw
 // position.
 func matchBuiltinParams(x *Function, b *Builtin) []int {
-	return matchBuiltinParamsWith(x, b, b.Types)
+	return matchBuiltinParamsWith(x, b, b.protocolTypes())
 }
 
 // matchBuiltinParamsWith is [matchBuiltinParams] with the labels taken from
@@ -811,7 +811,7 @@ func checkBuiltinParamLabels(c *OpContext, types []FuncType) *Bottom {
 // on b's attached signatures. It is exported for structural subsumption
 // checks.
 func BuiltinParamLabelIndex(b *Builtin, label Feature) (int, bool) {
-	byLabel, _ := builtinParamLabels(b.Types)
+	byLabel, _ := builtinParamLabels(b.protocolTypes())
 	i, ok := byLabel[label]
 	return i, ok && i >= 0
 }
@@ -833,13 +833,13 @@ func BuiltinParamLabelIndex(b *Builtin, label Feature) (int, bool) {
 // parameters have no names — which keeps hand-registered packages such
 // as path at the pre-existing error.
 func bindBuiltinArgs(c *OpContext, b *Builtin, call *CallExpr) ([]Expr, bool) {
-	if len(b.Types) == 0 {
+	if len(b.protocolTypes()) == 0 {
 		c.AddErrf("labeled arguments are not supported for builtin %s: it declares no parameter names",
 			b.qualifiedName(c))
 		return nil, false
 	}
 
-	byLabel, _ := builtinParamLabels(b.Types)
+	byLabel, _ := builtinParamLabels(b.protocolTypes())
 
 	bound := make([]Expr, len(b.Params))
 	labeled := make([]bool, len(b.Params))
@@ -915,6 +915,12 @@ func mergeBuiltinFunc(c *OpContext, b *Builtin, f *FuncValue) (*Builtin, *Bottom
 		return nil, nil
 	}
 	add := append([]FuncType{{Fn: f.Fn, Env: f.Env}}, f.Types...)
+	if b.capabilityMode() || capabilityMode(f.Fn, f.Types) {
+		merged := *b
+		merged.Types = mergeFuncTypes(b.Types, add)
+		merged.orig = b.self()
+		return &merged, nil
+	}
 	types := b.Types
 	added := false
 	for _, t := range add {
@@ -997,6 +1003,11 @@ func mergeBuiltins(c *OpContext, a, b *Builtin) (*Builtin, *Bottom) {
 	}
 	if len(a.Types) == 0 {
 		return b, nil
+	}
+	if a.capabilityMode() || b.capabilityMode() {
+		merged := *a
+		merged.Types = mergeFuncTypes(a.Types, b.Types)
+		return &merged, nil
 	}
 	if err := checkFuncTypeSetsMeet(c, a.Types, b.Types); err != nil {
 		return nil, err

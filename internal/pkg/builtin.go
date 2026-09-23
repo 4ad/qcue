@@ -123,6 +123,7 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) *adt.Vertex
 	// unified with.
 	for _, a := range obj.Arcs {
 		if b, ok := a.BaseValue.(*adt.Builtin); ok && len(b.Types) > 0 {
+			b.FreezeSignature()
 			a.Conjuncts = []adt.Conjunct{adt.MakeRootConjunct(nil, b)}
 		}
 	}

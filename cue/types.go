@@ -2310,6 +2310,7 @@ func (v Value) Validate(opts ...Option) error {
 		DisallowCycles: o.disallowCycles,
 		AllErrors:      true,
 		CheckFunction:  subsume.ValidateFunction,
+		CheckBuiltin:   subsume.ValidateBuiltin,
 	}
 
 	b := adt.Validate(v.ctx(), v.v, cfg)

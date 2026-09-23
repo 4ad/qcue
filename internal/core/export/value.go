@@ -391,14 +391,9 @@ func (e *exporter) builtin(x *adt.Builtin) ast.Expr {
 		ident.Node = spec
 		result = ast.NewSel(ident, x.Name)
 	}
-	// A builtin's function types are not rendered. Unlike a function value,
-	// whose type is part of what the user wrote, a builtin's types come from
-	// the signature its own package declares: they were already discharged
-	// when the builtin was unified with them, and the builtin still enforces
-	// them on every call. Rendering them changes the builtin's textual
-	// identity, which silently breaks consumers that recognize builtins by
-	// name (see encoding/jsonschema's generator).
-	return result
+	// The import restores the builtin's own declarations. Every additional
+	// contract must survive export, including unproved capability clauses.
+	return e.withFuncTypes(result, x.AdditionalTypes())
 }
 
 // A selected view and its retained universal clause have one code origin.

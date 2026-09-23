@@ -97,6 +97,12 @@ func (p *certifier) frame(up *adt.Environment, values map[adt.Feature]adt.Value)
 // Captured runtime values must be complete, including conformance of any
 // functions nested inside them. Reuse this proof's dependency context.
 func (p *certifier) captured(v adt.Value) adt.Value {
+	if b, ok := adt.Unwrap(v).(*adt.Builtin); ok {
+		if ValidateBuiltin(p.ctx, b) != nil {
+			return nil
+		}
+		return b
+	}
 	if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok {
 		if !p.implementation(f) {
 			return nil
@@ -105,7 +111,7 @@ func (p *certifier) captured(v adt.Value) adt.Value {
 	}
 	if vertex, ok := v.(*adt.Vertex); ok {
 		if adt.Validate(p.ctx, vertex, &adt.ValidateConfig{
-			Concrete: true, CheckFunction: p.validateFunction,
+			Concrete: true, CheckFunction: p.validateFunction, CheckBuiltin: ValidateBuiltin,
 		}) != nil {
 			return nil
 		}

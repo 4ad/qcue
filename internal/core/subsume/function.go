@@ -140,6 +140,9 @@ func (s *subsumer) funcBuiltin(a *adt.FuncValue, b *adt.Builtin) bool {
 // callable labels and non-kind constraints which a bare builtin does not yet
 // expose or enforce.
 func (s *subsumer) builtinSignature(fn *adt.Function, env *adt.Environment, b *adt.Builtin) bool {
+	if fn.Quantified {
+		return s.builtinCapability(adt.FuncType{Fn: fn, Env: env}, b)
+	}
 	if slices.Contains(b.Types, adt.FuncType{Fn: fn, Env: env}) {
 		return true
 	}
