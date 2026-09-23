@@ -142,6 +142,13 @@ type OpContext struct {
 	// sufficient proof procedures in the subsumption package.
 	ProveInclusion func(*OpContext, Value, Value) bool
 
+	// CheckFunction and CheckBuiltin independently discharge conformance
+	// obligations of runtime arguments before a call can forget its packet.
+	// Proof procedures may temporarily replace these hooks to retain their
+	// active dependencies and work budget across evaluator callbacks.
+	CheckFunction func(*OpContext, *FuncValue) *Bottom
+	CheckBuiltin  func(*OpContext, *Builtin) *Bottom
+
 	// Shared only by one finite expansion and work it invokes. Retained
 	// lexical frames also carry it for bodies whose evaluation is deferred.
 	finiteExpansion *finiteExpansionBudget

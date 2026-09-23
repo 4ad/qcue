@@ -15,6 +15,7 @@
 package cue_test
 
 import (
+	"strings"
 	"testing"
 
 	"cuelang.org/go/cue"
@@ -51,5 +52,76 @@ f: func(x: int, y: int) -> int: p(x: x, y: y)`, `f(2, 3)`, false},
 				t.Fatalf("execution: %v; want valid %v", err, tt.valid)
 			}
 		})
+	}
+}
+
+// Argument obligations survive even when the body ignores its callback or
+// successfully calls it at one point in the promised domain.
+func TestQuantifiedCallbackPacket(t *testing.T) {
+	for _, body := range []string{"5", "cb(1)", "{value: cb(1)}.value"} {
+		for _, nested := range []bool{false, true} {
+			for _, good := range []bool{false, true} {
+				t.Run(body, func(t *testing.T) {
+					body := body
+					callbackBody := "{value: n}.value"
+					if good {
+						callbackBody = "1"
+					}
+					signature, argument := "func(int) -> 1", "func(n: int) -> int: "+callbackBody
+					if nested {
+						signature = "{f: " + signature + "}"
+						argument = "{f: " + argument + "}"
+						body = strings.ReplaceAll(body, "cb(", "cb.f(")
+					}
+					v := cuecontext.New().CompileString("out: (func(cb: " + signature + ") -> int: " + body + ")(" + argument + ")")
+					out := v.LookupPath(cue.ParsePath("out"))
+					if err := out.Validate(cue.Concrete(true)); (err == nil) != good {
+						t.Fatalf("good=%v nested=%v body=%s: %v", good, nested, body, err)
+					}
+					if _, err := out.MarshalJSON(); (err == nil) != good {
+						t.Fatalf("serialization discarded callback proof: %v", err)
+					}
+					if !good && out.Validate() != nil {
+						t.Fatal("unproved conformance became a contradiction")
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestQuantifiedCertificationBounds(t *testing.T) {
+	for _, tt := range []struct {
+		source string
+		valid  bool
+	}{
+		{`func(x: int & >=0) -> (int & >=1): x + 1`, true},
+		{`func(x: int & >=0) -> (int & >=2): x + 1`, false},
+		{`func(x: int & <0) -> (int & <1): 1 + x`, true},
+		{`func(x: int & <=0) -> (int & <= -1): x - 1`, true},
+		{`func(x: int & <=0) -> (int & < -1): x - 1`, false},
+		{`func(x: int & >=0) -> (int & >=0): x - 1`, false},
+	} {
+		v := cuecontext.New().CompileString("f: " + tt.source)
+		if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); (err == nil) != tt.valid {
+			t.Errorf("%s: %v; want valid %v", tt.source, err, tt.valid)
+		}
+	}
+}
+
+func TestQuantifiedCertificationPackageOpening(t *testing.T) {
+	for _, escape := range []bool{false, true} {
+		body := "P.show(P.value)"
+		result := "string"
+		if escape {
+			body, result = "P.value", "_"
+		}
+		v := cuecontext.New().CompileString(`
+#Showable: exists A {value: A, show: func(A) -> string}
+f: func(p: #Showable) -> ` + result + `: (open p as (A, P) {out: ` + body + `}).out
+`)
+		if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); (err == nil) == escape {
+			t.Fatalf("escape=%v: %v", escape, err)
+		}
 	}
 }

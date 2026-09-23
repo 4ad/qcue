@@ -80,12 +80,20 @@ func Value(ctx *adt.OpContext, a, b adt.Value) errors.Error {
 // argument needs an independent proof of its implementation's contracts.
 // Failure retains the original inclusion obligation in the evaluator.
 func ProveInclusion(ctx *adt.OpContext, bound, argument adt.Value) bool {
+	p := newCertifier(ctx)
+	defer p.enter()()
+	return p.proveInclusion(ctx, bound, argument)
+}
+
+func (p *certifier) proveInclusion(ctx *adt.OpContext, bound, argument adt.Value) bool {
+	if !p.step() {
+		return false
+	}
 	for _, v := range []adt.Value{bound, argument} {
 		if v, ok := v.(*adt.Vertex); ok {
 			v.Finalize(ctx)
 		}
 	}
-	p := newCertifier(ctx)
 	s := &subsumer{ctx: ctx, certifier: p}
 	return s.values(bound, argument)
 }

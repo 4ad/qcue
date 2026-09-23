@@ -34,6 +34,19 @@ func (*Existential) expr()                      {}
 func (*Existential) declNode()                  {}
 func (*Existential) elemNode()                  {}
 func (*Existential) Concreteness() Concreteness { return Constraint }
+
+// SubsumesPackage uses an existing package witness, or the identical scoped
+// existential introduction. It never guesses a representation for a record.
+func (e *Existential) SubsumesPackage(c *OpContext, value Value) bool {
+	if other, ok := Unwrap(value).(*Existential); ok {
+		return e.Template == other.Template && sameTypeEnvironment(c, e.Env, other.Env)
+	}
+	if v, ok := value.(*Vertex); ok && v.DerefValue().sealed != nil {
+		return e.validate(c, v) == nil
+	}
+	return false
+}
+
 func (e *Existential) Kind() Kind {
 	switch e.Template.Body.(type) {
 	case *StructLit:

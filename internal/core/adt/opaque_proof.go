@@ -14,6 +14,57 @@
 
 package adt
 
+// ProofView eliminates an arbitrary admitted package under a fresh abstract
+// carrier. It exposes its interface hypotheses, never a representation or
+// an executable package witness. Extra interface constraints may be omitted:
+// proving the body for this wider view is sufficient for every refinement.
+func (o *PackageOpen) ProofView(c *OpContext, value Value) (*OpaqueType, Value) {
+	if value == nil {
+		return nil, nil
+	}
+	e := proofInterface(c, value)
+	if e == nil || len(e.Template.Params) != 1 {
+		return nil, nil
+	}
+	param := e.Template.Params[0]
+	if param.Bound != nil || param.ValueRange != nil {
+		return nil, nil
+	}
+	p := &sealedPackage{interfaceType: e}
+	typ := &OpaqueType{carrier: &opaqueCarrier{owner: p, parameter: param, level: param.Level}}
+	env := quantifiedEnvironment(c, e, map[*TypeParameter]Value{param: typ})
+	view := c.newInlineVertex(nil, nil, MakeRootConjunct(env, e.Template.Body))
+	view.Finalize(c)
+	if view.Bottom() != nil {
+		return nil, nil
+	}
+	return typ, view
+}
+
+func proofInterface(c *OpContext, value Value) *Existential {
+	if union, ok := Unwrap(value).(*Disjunction); ok {
+		var common *Existential
+		for _, branch := range union.Values {
+			e := proofInterface(c, branch)
+			if e == nil || (common != nil && !common.SubsumesPackage(c, e)) {
+				return nil
+			}
+			common = e
+		}
+		return common
+	}
+	if v, ok := value.(*Vertex); ok && v.DerefValue().sealed != nil {
+		return v.DerefValue().sealed.interfaceType
+	}
+	return existentialOf(c, value, make(map[Expr]bool))
+}
+
+// Escapes checks that the result of a proof-level package elimination is
+// independent of the fresh carrier, just as for runtime opening.
+func (x *OpaqueType) Escapes(c *OpContext, value Value) bool {
+	return abstractEscapes(c, value, x.carrier.owner, make(map[Value]bool))
+}
+
 // ProofTypes exposes the adapter's proof obligations to the conformance
 // checker, without making its private implementation visible to clients or
 // ordinary traversals. The transport theorem applies only to schemas whose
@@ -73,6 +124,16 @@ func (p *sealedPackage) totalTransport(c *OpContext, env *Environment, schema Ex
 		return true
 	case *OpaqueType:
 		return v.carrier.owner == p
+	case *Conjunction:
+		if abstractEscapes(c, v, p, make(map[Value]bool)) {
+			return false
+		}
+		for _, term := range v.Values {
+			if !p.totalTransport(c, nil, term, outward, active) {
+				return false
+			}
+		}
+		return true
 	case *Disjunction:
 		var kinds Kind
 		for _, branch := range v.Values {

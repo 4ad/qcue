@@ -26,12 +26,26 @@ import (
 // Unsupported proofs remain incomplete; successful concrete calls and the
 // target annotation itself are not evidence of universal conformance.
 func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
-	return newCertifier(ctx).validateFunction(ctx, f)
+	p := newCertifier(ctx)
+	defer p.enter()()
+	return p.validateFunction(ctx, f)
+}
+
+// Evaluation during a proof must retain the same active dependencies and
+// budget. A fresh certifier could let a callback obligation justify itself.
+func (p *certifier) enter() func() {
+	check, inclusion := p.ctx.CheckFunction, p.ctx.ProveInclusion
+	p.ctx.CheckFunction = p.validateFunction
+	p.ctx.ProveInclusion = p.proveInclusion
+	return func() {
+		p.ctx.CheckFunction, p.ctx.ProveInclusion = check, inclusion
+	}
 }
 
 func newCertifier(ctx *adt.OpContext) *certifier {
 	return &certifier{ctx: ctx,
-		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope)}
+		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope),
+		completed: make(map[proofKey][]*adt.FuncValue), remaining: 10000}
 }
 
 // Reuse the current proof context when validating captured composites.
@@ -39,6 +53,10 @@ func newCertifier(ctx *adt.OpContext) *certifier {
 // permit cycles through records or lists to justify their own annotations.
 func (p *certifier) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 	if !p.implementation(f) {
+		if p.remaining == 0 {
+			return &adt.Bottom{Src: f.Source(), Code: adt.IncompleteError,
+				Err: p.ctx.Newf("function conformance remains unproved: proof work limit reached")}
+		}
 		return &adt.Bottom{Src: f.Source(), Code: adt.IncompleteError,
 			Err: p.ctx.Newf("function conformance remains unproved")}
 	}
@@ -56,9 +74,44 @@ type certifier struct {
 	active     []*adt.FuncValue
 	hypotheses map[*adt.FuncValue]bool
 	scopes     map[*adt.Environment]*proofScope
+	completed  map[proofKey][]*adt.FuncValue
+	attempts   []*proofAttempt
+	remaining  int
+}
+
+type proofKey struct {
+	f      *adt.FuncValue
+	target adt.FuncType
+}
+
+// A completed proof can be reused only while its inherited hypotheses are
+// still available. Hypotheses introduced by the function's own packet are
+// discharged by that proof and are not prerequisites for its callers.
+type proofAttempt struct {
+	inherited map[*adt.FuncValue]bool
+	required  map[*adt.FuncValue]bool
+}
+
+func (p *certifier) useHypothesis(f *adt.FuncValue) {
+	for _, a := range p.attempts {
+		if a.inherited[f] {
+			a.required[f] = true
+		}
+	}
+}
+
+func (p *certifier) step() bool {
+	if p.remaining == 0 {
+		return false
+	}
+	p.remaining--
+	return true
 }
 
 func (p *certifier) schema(env *adt.Environment, x adt.Expr) adt.Value {
+	if !p.step() {
+		return nil
+	}
 	if x == nil {
 		return &adt.Top{}
 	}
@@ -131,8 +184,8 @@ func (p *certifier) implementation(f *adt.FuncValue) bool {
 	return true
 }
 
-func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
-	if f.Fn.Body == nil || len(p.active) >= 256 {
+func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool) {
+	if !p.step() || f.Fn.Body == nil || len(p.active) >= 256 {
 		return false
 	}
 	for _, active := range p.active {
@@ -145,6 +198,31 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) bool {
 	if f.Src != nil && (f.Src.Extern.IsValid() || f.Src.Effect != nil) {
 		return false
 	}
+	key := proofKey{f, target}
+	if required, ok := p.completed[key]; ok {
+		available := true
+		for _, h := range required {
+			available = available && p.hypotheses[h]
+		}
+		if available {
+			for _, h := range required {
+				p.useHypothesis(h)
+			}
+			return true
+		}
+	}
+	attempt := &proofAttempt{inherited: p.hypotheses, required: make(map[*adt.FuncValue]bool)}
+	p.attempts = append(p.attempts, attempt)
+	defer func() {
+		p.attempts = p.attempts[:len(p.attempts)-1]
+		if proved {
+			required := make([]*adt.FuncValue, 0, len(attempt.required))
+			for h := range attempt.required {
+				required = append(required, h)
+			}
+			p.completed[key] = required
+		}
+	}()
 	savedHypotheses := p.hypotheses
 	p.hypotheses = maps.Clone(p.hypotheses)
 	defer func() { p.hypotheses = savedHypotheses }()
@@ -277,6 +355,9 @@ func (p *certifier) assume(v adt.Value, seen map[adt.Value]bool) {
 }
 
 func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
+	if !p.step() {
+		return nil
+	}
 	switch x := expr.(type) {
 	case *adt.Null, *adt.Bool, *adt.Num, *adt.String, *adt.Bytes:
 		return x.(adt.Value)
@@ -351,6 +432,21 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			return nil
 		}
 		return f
+	case *adt.PackageOpen:
+		typ, view := x.ProofView(p.ctx, p.expr(env, x.Value))
+		if typ == nil || view == nil {
+			return nil
+		}
+		saved := p.hypotheses
+		p.hypotheses = maps.Clone(saved)
+		defer func() { p.hypotheses = saved }()
+		p.assume(view, make(map[adt.Value]bool))
+		e := p.frame(env, map[adt.Feature]adt.Value{x.Type: typ, x.View: view})
+		result := p.expr(e, x.Body)
+		if typ.Escapes(p.ctx, result) {
+			return nil
+		}
+		return result
 	case *adt.StructLit:
 		e := p.frame(env, make(map[adt.Feature]adt.Value))
 		if len(x.Decls) == 1 {
@@ -379,7 +475,15 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 			out.Decls = append(out.Decls, &adt.Field{Label: f.Label, Value: v})
 		}
-		return p.schema(nil, out)
+		v := p.schema(nil, out)
+		if v, ok := v.(*adt.Vertex); ok {
+			// A constructed runtime record has exactly these fields, even
+			// though their symbolic values describe many possible packets.
+			out := v.ToDataSingle()
+			out.ClosedNonRecursive = true
+			return out
+		}
+		return v
 	case *adt.ListLit:
 		env = p.frame(env, make(map[adt.Feature]adt.Value))
 		out := &adt.ListLit{}
@@ -433,6 +537,14 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		switch x.Op {
 		case adt.AddOp, adt.SubtractOp, adt.MultiplyOp:
 			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
+				if x.Op == adt.AddOp || x.Op == adt.SubtractOp {
+					if n, ok := adt.Unwrap(b).(*adt.Num); ok {
+						return p.schema(nil, p.translateNumber(a, n, x.Op))
+					}
+					if n, ok := adt.Unwrap(a).(*adt.Num); ok && x.Op == adt.AddOp {
+						return p.schema(nil, p.translateNumber(b, n, x.Op))
+					}
+				}
 				return &adt.BasicType{K: ka | kb}
 			}
 			if x.Op == adt.AddOp && ka == adt.StringKind && kb == adt.StringKind {
@@ -452,6 +564,37 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.call(env, x)
 	}
 	return nil
+}
+
+// Translation by a constant preserves numeric interval predicates. This
+// proves operations such as a nonnegative counter's successor without
+// testing concrete examples or discarding its lower bound.
+func (p *certifier) translateNumber(v adt.Value, n *adt.Num, op adt.Op) adt.Value {
+	if !p.step() {
+		return nil
+	}
+	switch x := adt.Unwrap(v).(type) {
+	case *adt.Num:
+		return adt.BinOp(p.ctx, nil, op, x, n)
+	case *adt.BoundValue:
+		switch x.Op {
+		case adt.LessThanOp, adt.LessEqualOp, adt.GreaterThanOp, adt.GreaterEqualOp, adt.NotEqualOp:
+			if b, ok := x.Value.(*adt.Num); ok {
+				return &adt.BoundValue{Op: x.Op, Value: adt.BinOp(p.ctx, nil, op, b, n)}
+			}
+		}
+	case *adt.Conjunction:
+		out := &adt.Conjunction{}
+		for _, term := range x.Values {
+			value := p.translateNumber(term, n, op)
+			if value == nil {
+				return nil
+			}
+			out.Values = append(out.Values, value)
+		}
+		return out
+	}
+	return &adt.BasicType{K: v.Kind() | n.Kind()}
 }
 
 func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
@@ -505,7 +648,9 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 		return nil
 	}
 	if f, ok := callee.(*adt.FuncValue); ok {
-		if !p.hypotheses[f] && !p.implementation(f) {
+		if p.hypotheses[f] {
+			p.useHypothesis(f)
+		} else if !p.implementation(f) {
 			return nil
 		}
 	}

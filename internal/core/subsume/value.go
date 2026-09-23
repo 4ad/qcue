@@ -54,7 +54,7 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		// Check based on first value.
 
 	case *adt.Conjunction:
-		if _, ok := a.(*adt.Conjunction); ok {
+		if _, ok := adt.Unwrap(a).(*adt.Conjunction); ok {
 			break
 		}
 		for _, y := range b.Values {
@@ -103,6 +103,8 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		return false
 	case *adt.OpaqueType:
 		return x.Subsumes(b)
+	case *adt.Existential:
+		return x.SubsumesPackage(s.ctx, b)
 	case *adt.OpaqueValue:
 		return adt.Equal(s.ctx, x, b, adt.CheckStructural)
 

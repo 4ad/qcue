@@ -2581,6 +2581,19 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			if b := Validate(c, a, &ValidateConfig{Final: true, ReportIncomplete: true}); b != nil {
 				return b
 			}
+			if capabilityHasCallable(a, make(map[Value]bool)) {
+				// A successful call or a compatible arrow meet is not a proof
+				// that its callback packet satisfies the promised capability.
+				// Discharge those obligations before returning or memoizing a
+				// result that would otherwise lose all links to the packet.
+				if c.CheckFunction == nil || c.CheckBuiltin == nil {
+					return &Bottom{Code: IncompleteError, Err: c.Newf("argument conformance remains unproved")}
+				}
+				if b := Validate(c, a, &ValidateConfig{Concrete: true, Final: true,
+					CheckFunction: c.CheckFunction, CheckBuiltin: c.CheckBuiltin}); b != nil {
+					return b
+				}
+			}
 		}
 	}
 
