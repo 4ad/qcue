@@ -381,7 +381,7 @@ func TestQuantifiedOpaqueExport(t *testing.T) {
 }
 
 func TestQuantifiedClosureExport(t *testing.T) {
-	for _, name := range []string{"captures", "factory", "literals", "records", "predicates", "generic", "nested_generic", "bounds", "hygiene"} {
+	for _, name := range []string{"captures", "factory", "literals", "records", "predicates", "generic", "nested_generic", "bounds", "hygiene", "callables", "chain"} {
 		for _, mode := range []string{"source", "final", "expression", "value"} {
 			t.Run(name+"/"+mode, func(t *testing.T) {
 				ctx := cuecontext.New()

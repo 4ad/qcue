@@ -584,7 +584,7 @@ func (e *exporter) exportableCapture(value adt.Value, seen map[adt.Value]bool) b
 	}
 	seen[value] = true
 	defer delete(seen, value)
-	if value.Kind()&(adt.FuncKind|adt.OpaqueKind) != 0 {
+	if value.Kind()&adt.OpaqueKind != 0 {
 		return false
 	}
 	if v, ok := value.(*adt.Vertex); ok {
@@ -594,6 +594,24 @@ func (e *exporter) exportableCapture(value adt.Value, seen map[adt.Value]bool) b
 		}
 		for _, a := range v.Arcs {
 			if a.ArcType == adt.ArcMember && !a.Label.IsLet() && !e.exportableCapture(a, seen) {
+				return false
+			}
+		}
+		if unwrapped := adt.Unwrap(v); unwrapped != v {
+			return e.exportableCapture(unwrapped, seen)
+		}
+		return true
+	}
+	if f, ok := value.(*adt.FuncValue); ok {
+		if adt.IsFuncType(f) || f.IsPartial() || !f.Fn.Quantified || f.Fn.Src == nil {
+			return false
+		}
+		if _, opaque := f.Fn.Body.(*adt.OpaqueCall); opaque {
+			return false
+		}
+		for _, ref := range f.Fn.Captures {
+			v, complete := e.ctx.Evaluate(f.Env, ref)
+			if !complete || !e.exportableCapture(v, seen) {
 				return false
 			}
 		}
