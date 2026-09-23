@@ -5,14 +5,20 @@
 @test(validate, conflict, at="self")
 @test(validate, conflict, at="tooSmall")
 @test(validate, at="largeEnough")
+@test(validate, conflict, at="compositeTooSmall")
+@test(validate, conflict, at="nestedSelf")
 
-f: func(x: _) -> _: x
-f: forall (A in Type(0)) func(A) -> A
-self: f[f](f)
+f:          func(x: _) -> _: x
+f:          forall (A in Type(0)) func(A) -> A
+self:       f[f](f)
+nestedSelf: f[{value: f}]
 
 g: func(x: _) -> _: x
 g: forall (A in Type(1)) func(A) -> A
 Box(A in Type(1)) = {value: A}
 Large(A in Type(2)) = {value: A}
-tooSmall: Box(g)
+tooSmall:    Box(g)
 largeEnough: Large(g)
+
+composite:         forall (A in Type(1)) {}
+compositeTooSmall: Box(composite)

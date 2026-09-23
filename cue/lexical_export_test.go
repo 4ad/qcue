@@ -32,6 +32,8 @@ func TestQuantifiedLexicalExport(t *testing.T) {
 		{"closed", `#T: {a: int}; f: func(x: #T) -> int: x.a`, "", `f({a: 1})`, `f({a: 1, b: 2})`},
 		{"optional", `#T: {a?: int}; f: func(x: #T) -> int: 0`, "", `f({})`, `f({a: "bad"})`},
 		{"nested_closed", `#T: {r: {a: int}}; f: func(x: #T) -> int: x.r.a`, "", `f({r: {a: 1}})`, `f({r: {a: 1, b: 2}})`},
+		{"schema_reference", `#U: int; #T: {a?: #U}; f: func(x: #T) -> int: 0`, "", `f({a: 2})`, `f({a: "bad"})`},
+		{"schema_default", `#T: {a: *1 | 2}; f: func(x: #T) -> int: x.a`, "", `f({a: 2})`, `f({a: 3})`},
 		{"pattern", `#T: {[string]: int}; f: func(x: #T) -> int: 0`, "", `f({a: 1})`, `f({a: "bad"})`},
 		{"required", `#T: {a!: int}; f: func(x: #T) -> int: 0`, "", `f({a: 1})`, `f({})`},
 		{"alias_result", `Box(A) = {value: A}; f(A): func(x: A) -> Box(A): {value: x}`, "", `f(1).value`, `f(1) & {value: "bad"}`},

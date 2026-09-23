@@ -56,6 +56,8 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		return v.carrier.level, true
 	case *OpaqueValue:
 		return v.carrier.level, true
+	case *WitnessType:
+		return universeOf(c, v.Upper, seen)
 	case *FuncValue:
 		known := true
 		for _, t := range v.selectionAndOriginalClauses() {
@@ -233,6 +235,8 @@ func universeOccurs(c *OpContext, param *TypeParameter, value Value, seen map[Va
 	}
 	seen[value] = true
 	switch v := Unwrap(value).(type) {
+	case *WitnessType:
+		return universeOccurs(c, param, v.Upper, seen)
 	case *FuncValue:
 		for _, t := range v.selectionAndOriginalClauses() {
 			if environmentOccurs(c, param, t.Env, seen) {

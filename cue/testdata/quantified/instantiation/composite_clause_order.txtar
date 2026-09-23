@@ -5,16 +5,25 @@
 @test(json, ["s", "s", 2, 2], at="out")
 @test(json, ["t", "t"], at="second")
 @test(validate, conflict, at="bad")
+@test(validate, conflict, at="allBad")
+@test(json, [1, 2], at="allGood")
+@test(validate, conflict, at="excluded")
 
-a: forall (A: int) {f: func(x: A) -> A: x}
-a: forall (B: string) {g: func(x: B) -> B: x}
-b: forall (B: string) {g: func(x: B) -> B: x}
-b: forall (A: int) {f: func(x: A) -> A: x}
+a:   forall (A: int) {f: func(x: A) -> A: x}
+a:   forall (B: string) {g: func(x: B) -> B: x}
+b:   forall (B: string) {g: func(x: B) -> B: x}
+b:   forall (A: int) {f: func(x: A) -> A: x}
 out: [a[string].g("s"), b[string].g("s"), a[int].f(2), b[int].f(2)]
 bad: a[bool]
 
-c: forall (A: int, C: int) {f: func(x: C) -> C: x}
-c: forall (B: string, D: string) {g: func(x: D) -> D: x}
-d: forall (B: string, D: string) {g: func(x: D) -> D: x}
-d: forall (A: int, C: int) {f: func(x: C) -> C: x}
-second: [c[string][string].g("t"), d[string][string].g("t")]
+c:        forall (A: int, C: int) {f: func(x: C) -> C: x}
+c:        forall (B: string, D: string) {g: func(x: D) -> D: x}
+d:        forall (B: string, D: string) {g: func(x: D) -> D: x}
+d:        forall (A: int, C: int) {f: func(x: C) -> C: x}
+second:   [c[string][string].g("t"), d[string][string].g("t")]
+excluded: c[string][int]
+
+all:     forall (A) {f: func(x: A) -> A: x}
+all:     forall (B) {g: func(x: B) -> B: x}
+allGood: [all[int].f(1), all[int].g(2)]
+allBad:  all[int].g("bad")
