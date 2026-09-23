@@ -1,0 +1,11 @@
+A subtype-bound quantifier can have a unary body. Parenthesized ordinary
+calls disambiguate labeled contextual-keyword arguments from binders.
+
+-- in.cue --
+x: forall (A: number) >=0
+y: exists (A: number) -1
+z: forall (A: bool) !false
+ordinary: forall(x) + 1
+labeled: (forall(x: 1)) + 1
+-- debug.txt --
+x: forall (A: number) >=0

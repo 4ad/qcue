@@ -44,15 +44,15 @@ func (p *parser) quantifierAhead(block bool) bool {
 		return false
 	}
 	depth := 1
-	ranged := false
+	constrained := false
 	if tok == token.RPAREN {
 		depth = 0
 	}
 	for depth > 0 {
 		switch next() {
-		case token.IN:
+		case token.IN, token.COLON:
 			if depth == 1 {
-				ranged = true
+				constrained = true
 			}
 		case token.LPAREN:
 			depth++
@@ -71,9 +71,11 @@ func (p *parser) quantifierAhead(block bool) bool {
 	case token.ADD, token.SUB, token.NOT, token.MUL,
 		token.LSS, token.LEQ, token.GEQ, token.GTR,
 		token.NEQ, token.MAT, token.NMAT, token.EQL:
-		// A range binder cannot be a call argument. Without that marker,
-		// preserve ordinary expressions such as forall(x) + 1.
-		return ranged
+		// A constrained binder takes precedence over a contextual-keyword
+		// call followed by an operator. An ordinary call with labeled
+		// arguments can be parenthesized to disambiguate it. Unconstrained
+		// calls such as forall(x) + 1 keep their ordinary interpretation.
+		return constrained
 	}
 	return false
 }

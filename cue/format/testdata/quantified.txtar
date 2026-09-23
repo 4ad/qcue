@@ -45,6 +45,10 @@ p: (exists A {value: A}).value
 
 -- syntax14.input --
 p: forall (A in Type(1): number) [...A]
+-- syntax15.input --
+p: forall (A: number) >=0
+q: exists (A: number) -1
+r: (forall(x: 1)) + 1
 -- out/format/syntax01.golden --
 bridge: extern func(int) -> int !bridge
 -- out/format/syntax02.golden --
@@ -76,3 +80,7 @@ p: (forall (A) A) | int
 p: (exists (A) {value: A}).value
 -- out/format/syntax14.golden --
 p: forall (A in Type(1): number) [...A]
+-- out/format/syntax15.golden --
+p: forall (A: number) >=0
+q: exists (A: number) -1
+r: (forall(x: 1)) + 1

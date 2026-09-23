@@ -1,0 +1,14 @@
+Unary bodies parse consistently for subtype-bound and explicit-universe
+quantifiers, and ordinary contextual-keyword calls remain available.
+
+-- in.cue --
+@test(json, [1, 1, 2, 2, 2], at="out")
+
+x: forall (A: number) >=0
+x: 1
+y: exists (A: number) >=0
+y: 1
+z: forall (A in Type(0): bool) <=2
+z: 2
+forall: func(x: int) -> int: x
+out: [x, y, z, forall(1) + 1, (forall(x: 1)) + 1]
