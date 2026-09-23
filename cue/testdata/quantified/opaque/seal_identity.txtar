@@ -1,0 +1,22 @@
+// Public structural equality must not erase existential package identity.
+
+-- in.cue --
+@test(validate, conflict, at="bad")
+@test(validate, conflict, at="differentCaptures")
+@test(validate, concrete, at="sameCaptures")
+@test(json, 1, at="good")
+
+#M: exists A {tag: 1}
+a: seal #M with (A = int) {tag: 1}
+b: seal #M with (A = int) {tag: 1}
+copy: a
+f: func(x: a) -> int: 1
+bad: f(b)
+good: f(copy)
+
+make: func(p: _) -> (func() -> _): func() -> _: p
+fa: make(a)
+fb: make(b)
+fc: make(copy)
+differentCaptures: fa & fb
+sameCaptures: fa & fc

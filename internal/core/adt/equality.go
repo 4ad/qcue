@@ -72,6 +72,11 @@ func equalVertex(ctx *OpContext, x *Vertex, v Value, flags Flag) bool {
 	if x == y {
 		return true
 	}
+	// Sealing contributes runtime identity even when the public view has
+	// no abstract fields. Opening changes lexical access, not that identity.
+	if x.sealed != y.sealed {
+		return false
+	}
 
 	xk := x.Kind()
 	yk := y.Kind()
