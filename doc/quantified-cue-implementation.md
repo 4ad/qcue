@@ -28,6 +28,10 @@ versions retain their earlier defaults.
 General value-dependent binders and the dependent profile **D** are out of scope.
 Finite literal value ranges, such as `exists (n in 1 | 2)`, are supported as finite
 unions or intersections.
+Expansion has a work budget shared by nested and deferred finite bodies.
+Exhaustion retains the complete scoped predicate and leaves validation
+incomplete; it never publishes a truncated union or intersection. Constant
+literal bodies avoid the product after checking the ranges for emptiness.
 
 For a new module, use
 `qcue mod init --language-version v0.18.0 example.com/quantified`. For an existing
@@ -79,6 +83,10 @@ signature denotes its eventual singleton. For example, `x: int` and
 value of `x`. The current approximation `int` cannot discharge that obligation.
 For records and lists, the singleton includes the entire eventual data shape;
 it is not an open structural predicate that admits additional fields.
+Let abbreviations decode their constituent references in the context of each
+use. Predicate and runtime uses have separate evaluation caches, while lexical
+binder identities and function code origins remain shared. Unresolved singleton
+constraints inside unused record arguments also keep a call incomplete.
 
 Erased type parameters may appear in signatures, type selections, and seal
 witnesses. They cannot supply runtime return values, arguments, defaults, or
@@ -93,6 +101,8 @@ Conjoining function contracts retains every guarded capability clause. An
 implementation keeps its original labels, defaults, omitted-argument behavior,
 and extra-argument policy. Applicable clauses constrain its actual call result.
 An unresolved applicability guard remains an obligation.
+For callable domains, including callbacks inside records or lists, applicability
+requires independent conformance evidence from the original argument.
 
 Builtins obey the same rule. Their package declarations define their original
 protocol; adding a client contract cannot install a default or rename a slot.
@@ -145,6 +155,9 @@ required parameters and omission defaults. A bodyless open signature retains
 an unresolved row. The checker does not use a target annotation as evidence for
 itself. Knowing a closure's code and captures, or successfully evaluating one
 call, does not discharge its declared contract.
+Calls within certified bodies use the remaining protocol of a partial closure.
+Primitive proof rules check the actual labels, arity, and omission policy before
+using a known total result rule.
 
 Unproved arithmetic implications, recursive termination proofs, optional
 presence branches, arbitrary quantified Boolean inclusion, and general
@@ -246,6 +259,15 @@ unsupported captures, independent partial closures, and opaque operations report
 incompleteness rather than being replaced with a weaker description.
 Sealed packages also report incomplete source export when their visible
 interface contains only ordinary data; export cannot erase their seal identity.
+Singleton membership and closure capture equality likewise retain seal identity,
+including packages whose interface is empty or contains only ordinary data.
+
+Captured predicates always export in schema mode, including with `cue.Final()`:
+definition closedness, optional and required fields, patterns, and defaults
+remain constraints on future calls. Both implementations and bodyless contracts
+carry their lexical dependencies. Parametric and ordinary aliases retain their
+declarations and bounds, with renamed bindings to avoid destination capture.
+Unknown runtime witnesses make independent export incomplete.
 
 ## Implementation map and regression coverage
 
@@ -268,8 +290,9 @@ interface contains only ordinary data; export cannot erase their seal identity.
   residual status. Syntax-only cases live in the parser corpus.
 - Additional txtar fixtures cover refinement, universes, opacity, identity,
   file ordering, certification, and export. Small Go harnesses retain checks
-  requiring Go API operations or AST identity; their input programs are txtar
-  sections too. Parser, formatter, AST, exporter, and CLI corpora all have
+  requiring Go API operations or AST identity. Most inputs are txtar sections;
+  small API tables and generated resource stress cases also live in Go tests.
+  Parser, formatter, AST, exporter, and CLI corpora all have
   `quantified` in their paths or filenames.
 
 Run the semantic corpus and the API checks with:

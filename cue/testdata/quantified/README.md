@@ -158,6 +158,24 @@ The [profile boundaries](certification/profile_boundaries.txtar) fixture records
 the remaining unsupported package eliminations and effect/foreign proofs;
 these limitations must not become successful certification.
 
+The subsequent [audit](../../../doc/quantified-cue-audit.md) has additional
+regressions for every reproduced defect:
+
+| Obligation | Regression |
+| --- | --- |
+| Callable guard membership requires independent proof | [higher_order_guard_proof](capabilities/higher_order_guard_proof.txtar) |
+| Certified calls respect partial and builtin protocols | [certification_protocol_test.go](../../certification_protocol_test.go) |
+| Seal identity survives singleton and capture equality | [seal_identity](opaque/seal_identity.txtar) |
+| Every retained telescope participates in universe checks | [attached_clauses](universes/attached_clauses.txtar) |
+| Composite selection considers every admissible clause | [composite_clause_order](instantiation/composite_clause_order.txtar) |
+| Aliases retain contextual witness decoding and code identity | [alias_witness_test.go](../../alias_witness_test.go) |
+| Export preserves lexical predicates and contract environments | [lexical_export_test.go](../../lexical_export_test.go) |
+| Finite enumeration retains exact residuals when bounded | [finite_expansion_test.go](../../finite_expansion_test.go) |
+
+The small Go API tables exercise refinements and export/reimport in fresh
+scopes. Resource tests generate large binder products and check residual
+semantics, without relying on timing thresholds.
+
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Syntax-only cases and malformed syntax belong in the parser
 corpus. No test compares fixtures with the proposal document.

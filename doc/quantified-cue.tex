@@ -3089,10 +3089,11 @@ existential witness. These principles specify the reference calculus independent
 of a particular constraint-solving strategy.
 
 \section{Regression checks}
-The accompanying \code{checks/check_model.py} uses only the Python standard
-library. It enumerates four data values, their sixteen subsets, and 625 partial
-function tables, with a separate rejection outcome. It executes
-\textbf{222,594 assertions} and records the result in \code{checks/results.json}.
+The following families describe finite reference checks for the algebraic laws
+and counterexamples. A suitable model enumerates four data values, their sixteen
+subsets, and 625 partial function tables, with a separate rejection outcome.
+This checkout does not include the reference-model scripts or their result
+files; no executed assertion count is claimed here.
 
 \begin{tabularx}{\textwidth}{@{}lY@{}}
 \toprule
@@ -3110,13 +3111,14 @@ Abstract values & Bijection transport preserves meet, join, equality, refinement
 and a finite operation simulation.\\\bottomrule
 \end{tabularx}
 
-The finite checks instantiate the stated algebraic laws and counterexamples.
-The additional \code{checks/check_residual.py} executes \textbf{245,237 assertions}
-for the local kernel of \cref{ch:residual}. It checks preservation of finite
-completion sets under bounded propagation, validation of grounded arithmetic
-cycles, persistence of refutations, retention of guards and existential
-alternatives, and finite quantified-function counterexamples. The results are
-recorded in \code{checks/residual-results.json}.
+Finite checks for the local kernel of \cref{ch:residual} should additionally
+cover preservation of completion sets under bounded propagation, validation
+of grounded arithmetic cycles, persistence of refutations, retention of guards
+and existential alternatives, and quantified-function counterexamples.
+Such reference checks supplement rather than establish correctness of the Go
+implementation. Executable implementation regressions are indexed in
+\code{cue/testdata/quantified/README.md}; supported fragments and checking limits
+are documented in \code{doc/quantified-cue-implementation.md}.
 Checker, elaboration, and abstraction obligations are specified in
 \cref{ch:checking,ch:residual}.
 
