@@ -57,29 +57,26 @@ func (f *FuncValue) abstractCall(c *OpContext, call *CallExpr, state Flags) Valu
 	if call.Partial {
 		return pending
 	}
-	clauses := append([]FuncType{{Fn: f.Fn, Env: f.Env}}, f.Types...)
-	for i, t := range clauses {
-		// Check packet membership in a fresh activation without asserting
-		// that any implementation has run. Failure to find an admitted
-		// packet merely leaves this abstract call without a useful clause.
-		fn := *t.Fn
-		fn.Body, fn.Ret = &Top{}, nil
-		probe := &FuncValue{Fn: &fn, Env: t.Env}
+	conjuncts := []Conjunct{MakeRootConjunct(nil, pending)}
+	for _, t := range f.selectionAndOriginalClauses() {
+		// Binding determines protocol slots only. Admission must examine
+		// the original packet, without executing a synthetic function or
+		// conjoining parameter predicates into an activation.
+		view := &FuncValue{Fn: t.Fn, Env: t.Env}
 		saved := c.PushState(c.Env(0), call.Source())
-		result := probe.call(c, call, state)
-		err := c.PopState(saved)
-		if result == nil || err != nil {
+		args, unused, bindErr := view.bindCall(c, call)
+		var admitted *packetAdmission
+		if unused == nil && bindErr == nil {
+			admitted, _ = (callPacket{args: args}).admit(c, t, false)
+		}
+		if err := c.PopState(saved); err != nil || admitted == nil {
 			continue
 		}
-		if b, ok := Unwrap(result).(*Bottom); ok && b != nil {
-			continue
+		if t := admitted.clause; t.Fn.Ret != nil {
+			conjuncts = append(conjuncts, MakeRootConjunct(t.Env, t.Fn.Ret))
 		}
-		actual := *t.Fn
-		actual.Body = pending
-		view := &FuncValue{Src: t.Fn.Src, Fn: &actual, Env: t.Env}
-		view.Types = append(view.Types, clauses[:i]...)
-		view.Types = append(view.Types, clauses[i+1:]...)
-		return view.call(c, call, state)
 	}
-	return pending
+	result := c.newInlineVertex(nil, nil, conjuncts...)
+	result.Finalize(c)
+	return result
 }

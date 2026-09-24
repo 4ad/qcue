@@ -90,6 +90,10 @@ type Environment struct {
 	// value cells and their copying rules.
 	types *typeScope
 
+	// packet is present only on a function activation frame. Keep the
+	// original supplied packet separate from the refined activation arcs.
+	packet *callPacket
+
 	// Vertex should not be accessed directly in most cases.
 	// Use DerefVertex(ctx) instead to handle overlay mappings correctly.
 	//
@@ -119,7 +123,7 @@ type Environment struct {
 
 // Equal reports whether e and f refer to the same node.
 func (e *Environment) Equal(ctx *OpContext, f *Environment) bool {
-	return e.Up == f.Up && e.types == f.types && e.DynamicLabel == f.DynamicLabel &&
+	return e.Up == f.Up && e.types == f.types && e.packet == f.packet && e.DynamicLabel == f.DynamicLabel &&
 		e.DerefVertex(ctx) == f.DerefVertex(ctx)
 }
 

@@ -76,3 +76,70 @@ out: (open p as (A, P) {result: [
 	}
 	semanticJSON(t, v, "out", `[true,true,true,false]`)
 }
+
+// A contract may constrain an abstract call only after original-packet
+// admission. These cases independently enumerate exact record presence and
+// scalar membership, then put the packet in several structural contexts.
+func TestQuantifiedBoundaryAbstractAdmission(t *testing.T) {
+	for _, label := range []string{"a", "_a"} {
+		for _, context := range []string{`%s`, `{nested: %s}`, `[%s]`} {
+			for _, tc := range []struct {
+				packet string
+				member bool
+			}{
+				{`{}`, false},
+				{fmt.Sprintf(`{%s?: 1}`, label), false},
+				{fmt.Sprintf(`{%s: 2}`, label), false},
+				{fmt.Sprintf(`{%s: 1}`, label), true},
+				{fmt.Sprintf(`{%s: 1, extra: 2}`, label), true},
+			} {
+				t.Run(label+"/"+context+"/"+tc.packet, func(t *testing.T) {
+					guard := fmt.Sprintf(context, fmt.Sprintf(`{%s: 1}`, label))
+					packet := fmt.Sprintf(context, tc.packet)
+					v := semanticValue(t, fmt.Sprintf("f: func(%s) -> string\nout: f(%s) & 0", guard, packet))
+					if refuted := v.Validate() != nil; refuted != tc.member {
+						t.Fatalf("refuted=%v, original packet admitted=%v: %v", refuted, tc.member, v.Validate())
+					}
+					if err := v.Validate(cue.Concrete(true)); err == nil {
+						t.Fatal("abstract call manufactured an execution witness")
+					}
+				})
+			}
+		}
+	}
+	// An intersection contributes every established consequence, regardless
+	// of its head clause. A packet outside one domain remains possible.
+	for _, contract := range []string{
+		`(func({a: 1}) -> string) & (func({}) -> int)`,
+		`(func({}) -> int) & (func({a: 1}) -> string)`,
+	} {
+		v := semanticValue(t, "f: "+contract+"\nout: f({}) & 0")
+		if err := v.Validate(); err != nil {
+			t.Fatalf("inapplicable clause constrained abstract result: %v", err)
+		}
+	}
+}
+
+func TestQuantifiedBoundaryAbstractRefinement(t *testing.T) {
+	const original = `f: func({a: 1}) -> string
+out: f({}) & 0`
+	const implementation = `f: func(x: {}) -> (int|string): {
+    if len(x) == 0 {r: 0}
+    if len(x) > 0 {r: "ok"}
+}.r`
+	v := semanticValue(t, original)
+	if err := v.Validate(); err != nil {
+		t.Fatalf("satisfiable abstract program refuted: %v", err)
+	}
+	// Refinement of the same graph and rebuilding the combined source must
+	// agree. An implementation can resolve uncertainty, never repair bottom.
+	for _, refined := range []cue.Value{
+		v.Unify(semanticValue(t, implementation)),
+		semanticValue(t, original+"\n"+implementation),
+	} {
+		if err := refined.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		semanticJSON(t, refined, "out", "0")
+	}
+}

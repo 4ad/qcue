@@ -2584,7 +2584,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	for _, a := range arcs {
 		a.Parent = activation
 	}
-	bodyEnv := &Environment{Up: x.Env, Vertex: activation}
+	bodyEnv := &Environment{Up: x.Env, Vertex: activation, packet: &callPacket{args: bindings}}
 	bodyCI := c.ci
 	if recursive {
 		// This activation's finite descent discharges the call-cycle edge.

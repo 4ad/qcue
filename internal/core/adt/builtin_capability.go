@@ -98,27 +98,17 @@ func (b *Builtin) Protocol(c *OpContext) *Function {
 
 func (b *Builtin) capabilityApplies(c *OpContext, t FuncType, args []Value) (FuncType, proofResult) {
 	f := b.Protocol(c)
-	act := c.newInlineVertex(nil, &StructMarker{})
+	packet := callPacket{args: make([]funcArg, len(f.Params))}
 	for i, arg := range args {
-		v := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, arg))
-		v.Label = f.Params[i].Local
-		act.Arcs = append(act.Arcs, v)
+		packet.args[i] = funcArg{expr: arg}
 	}
-	if len(typeParameters(t.Env)) != 0 {
-		bindings := make([]funcArg, len(t.Fn.Params))
-		for i, j := range matchFuncParams(t.Fn, f, false) {
-			if j >= 0 && j < len(args) {
-				bindings[i] = funcArg{expr: args[j]}
-			}
-		}
-		inst, err := (&FuncValue{Fn: t.Fn, Env: t.Env}).inferInstance(c, bindings)
-		if err != nil {
-			if err.IsIncomplete() {
-				return t, proofUnknown
-			}
-			return t, proofRefuted
-		}
-		t.Env = inst.Env
+	projected, result := packet.project(t, f)
+	if result != proofEstablished {
+		return t, result
 	}
-	return t, capabilityApplies(c, t, f, nil, act)
+	admission, result := projected.admit(c, t, false)
+	if admission != nil {
+		t = admission.clause
+	}
+	return t, result
 }

@@ -57,3 +57,12 @@ will be recorded as the work proceeds.
   packets, redundant contracts, erased selections, builtins, and nesting;
   `TestQuantifiedBoundaryOpaqueEquality` checks the same opaque comparison
   directly and through containers. `go test ./cue ./internal/core/...` passes.
+- `callPacket` retains normalized supplied arguments and their lexical
+  environments separately from execution activations. Abstract calls,
+  selected views, opaque overload dispatch, builtin contracts, and ordinary
+  guarded results use its shared admission operation. An abstract call now
+  propagates all proved result clauses without executing a synthetic body.
+  Inference uses original-packet membership for concrete candidates and
+  predicate inclusion for symbolic proof inputs. Presence/nesting matrices
+  and API/source refinement regressions pass, as does the public API and
+  complete core test suite.

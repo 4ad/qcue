@@ -97,12 +97,21 @@ func (f *FuncValue) inferInstance(c *OpContext, bindings []funcArg) (*FuncValue,
 	if err == nil {
 		// A successful bound check only admits the type arguments. Verify
 		// that the resulting instance admits every supplied packet slot.
-		// Inclusion also works for symbolic packets used by certification.
+		// Concrete packets use the admission boundary. Symbolic packets
+		// used by certification instead require predicate inclusion: their
+		// approximation is not an executable inhabitant.
 		for i, binding := range bindings {
 			if binding.expr == nil || f.Fn.Params[i].Value == nil {
 				continue
 			}
 			v, _ := c.Evaluate(binding.env, binding.expr)
+			if concreteCapture(c, v) {
+				if capabilityMember(c, inst.Env, f.Fn.Params[i].Value, v) != proofEstablished {
+					err = c.NewErrf("inferred instance does not prove argument membership")
+					break
+				}
+				continue
+			}
 			bound, complete := c.Evaluate(inst.Env, f.Fn.Params[i].Value)
 			if !complete || typeArgumentFits(c, bound, v) != proofEstablished {
 				err = c.NewErrf("inferred instance does not prove argument membership")

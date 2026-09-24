@@ -150,36 +150,10 @@ func (s *OpaqueCall) callOverload(c *OpContext, f *FuncValue, call *CallExpr, st
 		if unused != nil || err != nil {
 			continue
 		}
-		if len(typeParameters(view.Env)) != 0 {
-			inst, err := view.inferInstance(c, bindings)
-			if err != nil {
-				unknown = unknown || err.IsIncomplete()
-				continue
-			}
-			view = inst
-		}
-		applicable := proofEstablished
-		for i, p := range view.Fn.Params {
-			arg := bindings[i]
-			if arg.expr == nil {
-				if !call.Partial && p.ArcType != ArcOptional && p.Default == nil {
-					applicable = proofRefuted
-					break
-				}
-				continue
-			}
-			v, _ := c.Evaluate(arg.env, arg.expr)
-			switch capabilityMember(c, view.Env, p.Value, v) {
-			case proofRefuted:
-				applicable = proofRefuted
-			case proofUnknown:
-				if applicable != proofRefuted {
-					applicable = proofUnknown
-				}
-			}
-		}
+		admission, applicable := (callPacket{args: bindings}).admit(c, FuncType{Fn: view.Fn, Env: view.Env}, call.Partial)
 		switch applicable {
 		case proofEstablished:
+			view.Env = admission.clause.Env
 			if call.Partial {
 				// Partial application saves a packet without fixing the
 				// still-polymorphic residual interface to this trial.

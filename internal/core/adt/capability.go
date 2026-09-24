@@ -315,38 +315,18 @@ func (n *nodeContext) scheduleCapabilityResults(ref *FuncCallRef, env *Environme
 		if t.Fn.Body != nil {
 			continue
 		}
-		if len(typeParameters(t.Env)) != 0 {
-			bindings := make([]funcArg, len(t.Fn.Params))
-			matches := capabilityMatches(t, ref.fn)
-			for i, j := range matches {
-				if j < 0 {
-					continue
-				}
-				label := ref.fn.Params[j].Local
-				if label == InvalidLabel {
-					label = anonParamLabel(n.ctx, j)
-				}
-				for _, a := range env.Vertex.Arcs {
-					if a.Label == label {
-						bindings[i] = funcArg{expr: a, env: env}
-					}
-				}
+		result := proofUnknown
+		var admitted *packetAdmission
+		if env.packet != nil {
+			var packet callPacket
+			packet, result = env.packet.project(t, ref.fn)
+			if result == proofEstablished {
+				admitted, result = packet.admit(n.ctx, t, false)
 			}
-			f := &FuncValue{Fn: t.Fn, Env: t.Env}
-			inst, b := f.inferInstance(n.ctx, bindings)
-			if b != nil {
-				// Inference reports a hard error only when a necessary
-				// condition excludes every instance. A failed candidate
-				// remains incomplete and cannot discard this clause.
-				if b.IsIncomplete() {
-					n.addBottom(b)
-				}
-				continue
-			}
-			t.Env = inst.Env
 		}
-		switch capabilityApplies(n.ctx, t, ref.fn, ref.types, env.Vertex) {
+		switch result {
 		case proofEstablished:
+			t := admitted.clause
 			if t.Fn.Ret != nil {
 				n.scheduleConjunct(MakeConjunct(t.Env, t.Fn.Ret, ci), ci)
 			}
@@ -355,66 +335,6 @@ func (n *nodeContext) scheduleCapabilityResults(ref *FuncCallRef, env *Environme
 				Err: n.ctx.Newf("incomplete function contract domain")})
 		}
 	}
-}
-
-// capabilityApplies checks the guard against the bound packet, without adding
-// the guard to the argument cells. All applicable result obligations apply;
-// a packet outside one clause does not lose the other clauses' guarantees.
-func capabilityApplies(c *OpContext, t FuncType, fn *Function, types []FuncType, act *Vertex) proofResult {
-	if act == nil {
-		return proofUnknown
-	}
-	arcs := make(map[Feature]*Vertex, len(act.Arcs))
-	for _, a := range act.Arcs {
-		arcs[a.Label] = a
-	}
-	matches := capabilityMatches(t, fn)
-	result := proofEstablished
-	for i, p := range t.Fn.Params {
-		j := matches[i]
-		if j < 0 {
-			if p.ArcType == ArcOptional || p.Default != nil {
-				continue
-			}
-			return proofRefuted
-		}
-		local := fn.Params[j].Local
-		if local == InvalidLabel {
-			local = anonParamLabel(c, j)
-		}
-		a := arcs[local]
-		if a == nil || !funcArgBound(a, fn, types) {
-			if p.ArcType != ArcOptional && p.Default == nil {
-				return proofRefuted
-			}
-			continue
-		}
-		a.Finalize(c)
-		switch capabilityMember(c, t.Env, p.Value, a) {
-		case proofRefuted:
-			return proofRefuted
-		case proofUnknown:
-			result = proofUnknown
-		}
-	}
-	if !t.Fn.Open {
-		for j, p := range fn.Params {
-			if t.partial != nil && j < len(t.partial.args) && t.partial.args[j].expr != nil {
-				continue
-			}
-			if slices.Contains(matches, j) {
-				continue
-			}
-			local := p.Local
-			if local == InvalidLabel {
-				local = anonParamLabel(c, j)
-			}
-			if a := arcs[local]; a != nil && funcArgBound(a, fn, types) {
-				return proofRefuted
-			}
-		}
-	}
-	return result
 }
 
 // capabilityMatches translates a residual packet back to the implementation

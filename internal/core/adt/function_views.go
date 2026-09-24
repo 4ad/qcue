@@ -72,37 +72,12 @@ func (f *FuncValue) admittedCallView(c *OpContext, bindings []funcArg) (*FuncVal
 	var admitted []*FuncValue
 	unknown := false
 	for _, view := range f.callViews {
-		if len(typeParameters(view.Env)) != 0 {
-			inst, b := view.inferInstance(c, bindings)
-			if b != nil {
-				unknown = unknown || b.IsIncomplete()
-				continue
-			}
-			view = inst
-		}
-		applies := proofEstablished
-		for i, p := range view.Fn.Params {
-			arg := bindings[i]
-			if arg.expr == nil {
-				if p.ArcType != ArcOptional && p.Default == nil {
-					applies = proofRefuted
-					break
-				}
-				continue
-			}
-			value, _ := c.Evaluate(arg.env, arg.expr)
-			switch capabilityMember(c, view.Env, p.Value, value) {
-			case proofRefuted:
-				applies = proofRefuted
-			case proofUnknown:
-				if applies != proofRefuted {
-					applies = proofUnknown
-				}
-			}
-		}
+		admission, applies := (callPacket{args: bindings}).admit(c, FuncType{Fn: view.Fn, Env: view.Env}, false)
 		switch applies {
 		case proofEstablished:
-			admitted = append(admitted, view)
+			copy := *view
+			copy.Env = admission.clause.Env
+			admitted = append(admitted, &copy)
 		case proofUnknown:
 			unknown = true
 		}
