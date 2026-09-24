@@ -37,6 +37,14 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 		local[n] = true
 		return true
 	}, nil)
+	// A field reference resolves to its value's syntax node. When that value
+	// is this literal, the reference still belongs to the enclosing field:
+	// it is a recursive capture, not a binding introduced by the function.
+	// In particular, do not treat monomorphic recursion differently from a
+	// reference to a function wrapped in a quantifier.
+	if _, ok := src.(*ast.Func); ok {
+		delete(local, src)
+	}
 	seen := make(map[ast.Node]bool)
 	var captures []adt.Expr
 	var w walk.Visitor

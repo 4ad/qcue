@@ -3,6 +3,7 @@
 
 -- in.cue --
 @test(validate, concrete, incomplete, at="out")
+@test(validate, concrete, incomplete, at="selfOut")
 
 #C: {cb: func() -> _, f: func() -> _: cb}
 a: #C & {cb: a.f}
@@ -10,3 +11,13 @@ b: #C & {cb: b.f}
 witness: {f: a.f}
 accept: func(x: witness) -> int: 1
 out: accept({f: b.f})
+
+// A direct reference to the field containing a function is also a capture.
+// Its identifier resolves to the literal's syntax node, but the binding
+// belongs to the enclosing record, not to the function's local scope.
+#Self: {f: func() -> _: f}
+selfA: #Self
+selfB: #Self
+selfWitness: {f: selfA.f}
+acceptSelf: func(x: selfWitness) -> int: 1
+selfOut: acceptSelf({f: selfB.f})
