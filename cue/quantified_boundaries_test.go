@@ -143,3 +143,62 @@ out: f({}) & 0`
 		semanticJSON(t, refined, "out", "0")
 	}
 }
+
+func TestQuantifiedBoundaryIdentityTransport(t *testing.T) {
+	for _, tc := range []struct{ subject, refinement string }{
+		{`{x?: int}`, `{x: "bad"}`},
+		{`close({})`, `{x: 1}`},
+		{`{[string]: int}`, `{x: "bad"}`},
+		{`{nested: {x?: int}}`, `{nested: {x: "bad"}}`},
+		{`{_x?: int}`, `{_x: "bad"}`},
+	} {
+		t.Run(tc.subject, func(t *testing.T) {
+			v := semanticValue(t, `
+#M: exists A {id: func({}) -> {}}
+p: seal #M with (A = int) {id: func(x: {}) -> {}: x}
+out: (open p as (A, P) {r: P.id(`+tc.subject+`) & `+tc.refinement+`}).r
+`)
+			if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
+				t.Fatal("identity transport discarded a constraint")
+			}
+		})
+	}
+}
+
+func TestQuantifiedBoundaryScopedTransport(t *testing.T) {
+	for _, tc := range []struct{ public, private, value, access string }{
+		{`[...(A|null)]`, `[...int]`, `[7]`, `[0]`},
+		{`[(A|null)]`, `[int]`, `[7]`, `[0]`},
+		{`[{value: A|null}]`, `[{value: int}]`, `[{value: 7}]`, `[0].value`},
+	} {
+		t.Run(tc.public, func(t *testing.T) {
+			v := semanticValue(t, fmt.Sprintf(`
+#M: exists A {
+    make: func() -> %s
+    read: func(A) -> int
+}
+p: seal #M with (A = int) {
+    make: func() -> %s: %s
+    read: func(x: int) -> int: x
+}
+out: (open p as (A, P) {r: P.read(P.make()%s)}).r
+`, tc.public, tc.private, tc.value, tc.access))
+			if err := v.Validate(cue.Concrete(true)); err != nil {
+				t.Fatal(err)
+			}
+			semanticJSON(t, v, "out", "7")
+		})
+	}
+	v := semanticValue(t, `
+#M: exists A {zero: A, f: func({#T: A, value: A}) -> int}
+p: seal #M with (A = int) {
+    zero: 7
+    f: func(x: {#T: int, value: int}) -> int: x.value
+}
+out: (open p as (A, P) {r: P.f({#T: A, value: P.zero})}).r
+`)
+	if err := v.Validate(cue.Concrete(true)); err != nil {
+		t.Fatal(err)
+	}
+	semanticJSON(t, v, "out", "7")
+}

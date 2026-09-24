@@ -483,125 +483,6 @@ func quantifiedEnvironment(c *OpContext, e *Existential, args map[*TypeParameter
 		types: &typeScope{quantifier: e.Template, arguments: args}}
 }
 
-// transport follows abstract occurrences in ordinary values. Open-record
-// data keeps its extra fields; projection of a module's private declarations
-// is requested separately at the root sealing boundary.
-func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, value Value, outward bool) Value {
-	if b, ok := Unwrap(value).(*Bottom); ok {
-		return b
-	}
-	if r, ok := schema.(*TypeReference); ok {
-		carrier := p.carriers[r.Param]
-		if carrier == nil {
-			v, _ := c.Evaluate(env, r)
-			carrier = opaqueTypeOf(v)
-		}
-		if carrier != nil && carrier.owner == p {
-			if !outward {
-				if v, ok := Unwrap(value).(*OpaqueValue); ok && v.carrier == carrier {
-					return v.private
-				}
-				return c.NewErrf("argument belongs to a different abstract type")
-			}
-			if !concreteCapture(c, value) {
-				return &Bottom{Code: IncompleteError, Err: c.Newf("incomplete private representation")}
-			}
-			return &OpaqueValue{carrier: carrier, private: value}
-		}
-	}
-	if packageValue := p.transportPackage(c, env, schema, value); packageValue != nil {
-		return packageValue
-	}
-	switch x := schema.(type) {
-	case *StructLit:
-		for _, d := range x.Decls {
-			if _, ok := d.(*Field); !ok {
-				template, _ := c.Evaluate(env, schema)
-				return p.transportResolved(c, template, value, outward)
-			}
-		}
-		v, ok := value.(*Vertex)
-		if !ok {
-			return c.NewErrf("interface requires a record")
-		}
-		v.Finalize(c)
-		template, _ := c.Evaluate(env, schema)
-		scope, ok := template.(*Vertex)
-		if !ok {
-			return template
-		}
-		fieldEnv := &Environment{Up: env, Vertex: scope}
-		out := &StructLit{}
-		for _, decl := range x.Decls {
-			field, ok := decl.(*Field)
-			if !ok {
-				continue
-			}
-			if field.Label.IsDef() {
-				out.Decls = append(out.Decls, &Field{Label: field.Label, Value: scope.LookupRaw(field.Label)})
-				continue
-			}
-			var arc *Vertex
-			for _, a := range v.Arcs {
-				if a.Label == field.Label && a.ArcType == ArcMember {
-					arc = a
-					break
-				}
-			}
-			if arc == nil {
-				if field.ArcType == ArcOptional {
-					continue
-				}
-				return c.NewErrf("missing interface field %s", field.Label.SelectorString(c))
-			}
-			result := p.transport(c, fieldEnv, field.Value, arc, outward)
-			if b, ok := result.(*Bottom); ok {
-				return b
-			}
-			out.Decls = append(out.Decls, &Field{Label: field.Label, Value: result})
-		}
-		for _, a := range v.Arcs {
-			if a.ArcType == ArcMember && !a.Label.IsLet() && scope.LookupRaw(a.Label) == nil {
-				out.Decls = append(out.Decls, &Field{Label: a.Label, Value: a})
-			}
-		}
-		result := c.newInlineVertex(nil, nil, MakeRootConjunct(env, out))
-		result.Finalize(c)
-		return result
-	case *Function:
-		return p.transportFunction(c, &FuncValue{Fn: x, Env: env}, value, outward, nil)
-	case *ListLit:
-		v, ok := value.(*Vertex)
-		if !ok || !v.IsList() {
-			return c.NewErrf("interface requires a list")
-		}
-		v.Finalize(c)
-		out := &ListLit{}
-		i := 0
-		for a := range v.Elems() {
-			if len(x.Elems) == 0 {
-				return c.NewErrf("unexpected interface list element")
-			}
-			schema, ok := x.Elems[min(i, len(x.Elems)-1)].(Expr)
-			if rest, restOK := x.Elems[min(i, len(x.Elems)-1)].(*Ellipsis); restOK {
-				schema = rest.Value
-			} else if !ok {
-				return c.NewErrf("unsupported interface list element")
-			}
-			out.Elems = append(out.Elems, p.transport(c, env, schema, a, outward))
-			i++
-		}
-		result := c.newInlineVertex(nil, nil, MakeRootConjunct(env, out))
-		result.Finalize(c)
-		return result
-	}
-	if schema != nil {
-		typ, _ := c.Evaluate(env, schema)
-		return p.transportResolved(c, typ, value, outward)
-	}
-	return value
-}
-
 func opaqueTypeOf(value Value) *opaqueCarrier {
 	switch v := Unwrap(value).(type) {
 	case *OpaqueType:
@@ -621,115 +502,11 @@ func opaqueTypeOf(value Value) *opaqueCarrier {
 }
 
 func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, outward bool) Value {
-	return p.transportResolvedMode(c, schema, value, outward, false)
-}
-
-func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value, outward, project bool) Value {
-	return p.transportResolvedExport(c, schema, value, outward, project, nil)
+	return p.transportResolvedExport(c, schema, value, outward, false, nil)
 }
 
 func (p *sealedPackage) transportResolvedExport(c *OpContext, schema, value Value, outward, project bool, export *publicExport) Value {
-	if b, ok := Unwrap(value).(*Bottom); ok {
-		return b
-	}
-	if union, ok := Unwrap(schema).(*Disjunction); ok {
-		return p.transportUnion(c, union, value, outward, project, export)
-	}
-	if carrier := opaqueTypeOf(schema); carrier != nil && carrier.owner == p {
-		if !outward {
-			if v, ok := Unwrap(value).(*OpaqueValue); ok && v.carrier == carrier {
-				return v.private
-			}
-			return c.NewErrf("argument belongs to a different abstract type")
-		}
-		if !concreteCapture(c, value) {
-			return &Bottom{Code: IncompleteError, Err: c.Newf("incomplete private representation")}
-		}
-		return &OpaqueValue{carrier: carrier, private: value}
-	}
-	if packageValue := p.transportPackage(c, nil, schema, value); packageValue != nil {
-		return packageValue
-	}
-	if f, ok := Unwrap(schema).(*FuncValue); ok {
-		return p.transportFunction(c, f, value, outward, export.canonical())
-	}
-	typ, ok := schema.(*Vertex)
-	if !ok || typ.Kind()&(StructKind|ListKind) == 0 {
-		return value
-	}
-	v, ok := value.(*Vertex)
-	if !ok {
-		return c.NewErrf("interface requires a composite value")
-	}
-	typ.Finalize(c)
-	v.Finalize(c)
-	typ, v = typ.DerefValue(), v.DerefValue()
-	if typ.IsList() {
-		out := &ListLit{}
-		for a := range v.Elems() {
-			element := typ.LookupRaw(a.Label)
-			if element == nil {
-				element = c.newInlineVertex(nil, nil)
-				element.Label = a.Label
-				typ.MatchAndInsert(c, element)
-				element.Finalize(c)
-			}
-			out.Elems = append(out.Elems, p.transportResolvedExport(c, element, a, outward, false, export.field(a.Label)))
-		}
-		result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, out))
-		result.Finalize(c)
-		return result
-	}
-	out := &StructLit{}
-	for _, field := range typ.Arcs {
-		if field.Label.IsLet() {
-			continue
-		}
-		if field.Label.IsDef() {
-			// Definitions are predicates in the public type scope. They
-			// are not runtime witnesses to reconstruct or make concrete.
-			out.Decls = append(out.Decls, &Field{Label: field.Label, Value: field})
-			continue
-		}
-		a := v.LookupRaw(field.Label)
-		if a == nil || a.ArcType != ArcMember {
-			if field.ArcType == ArcOptional {
-				continue
-			}
-			return c.NewErrf("missing interface field %s", field.Label.SelectorString(c))
-		}
-		out.Decls = append(out.Decls, &Field{Label: field.Label,
-			Value: p.transportResolvedExport(c, field, a, outward, false, export.field(field.Label))})
-	}
-	for _, a := range v.Arcs {
-		if a.ArcType != ArcMember || a.Label.IsLet() || typ.LookupRaw(a.Label) != nil {
-			continue
-		}
-		// Hidden and definition labels are observable data in an ordinary
-		// record. Preserve their original package-qualified identity. Only
-		// the module projection may discard undeclared private fields.
-		if !a.Label.IsRegular() {
-			if !project {
-				out.Decls = append(out.Decls, &Field{Label: a.Label, Value: a})
-			}
-			continue
-		}
-		field := c.newInlineVertex(nil, nil)
-		field.Label = a.Label
-		typ.MatchAndInsert(c, field)
-		if len(field.Conjuncts) == 0 {
-			if !project {
-				out.Decls = append(out.Decls, &Field{Label: a.Label, Value: a})
-			}
-			continue
-		}
-		field.Finalize(c)
-		out.Decls = append(out.Decls, &Field{Label: a.Label,
-			Value: p.transportResolvedExport(c, field, a, outward, false, export.field(a.Label))})
-	}
-	result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, out))
-	result.Finalize(c)
-	return result
+	return p.planTransport(c, scopedPredicate{expr: schema}, outward).apply(c, value, project, export)
 }
 
 // A nested package is an existential value, not a record to reconstruct.
@@ -811,6 +588,7 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 	// The adapter's code is shared across all erased instances, but its
 	// input and output transport must use this call's selected predicates.
 	env := instantiateEnvironment(s.env, bindings)
+	plan := s.planOperation(c, env)
 	private := s.private
 	publicParams, privateParams := typeParameters(s.env), typeParameters(private.Env)
 	if len(publicParams) == len(privateParams) && len(publicParams) != 0 {
@@ -869,7 +647,7 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 		if value == nil {
 			continue
 		}
-		v := s.owner.transport(c, env, p.Value, value, !s.outward)
+		v := plan.inputs[i].apply(c, value, false, nil)
 		if b, ok := v.(*Bottom); ok {
 			return b
 		}
@@ -904,7 +682,7 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 	if b, ok := Unwrap(v).(*Bottom); ok {
 		return b
 	}
-	return s.owner.transport(c, env, s.signature.Ret, v, s.outward)
+	return plan.result.apply(c, v, false, nil)
 }
 
 type PackageOpen struct {

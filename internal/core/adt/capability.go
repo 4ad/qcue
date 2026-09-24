@@ -128,7 +128,7 @@ func capabilityHasCallable(v Value, seen map[Value]bool) bool {
 		return true
 	case *Vertex:
 		for _, a := range v.Arcs {
-			if a.ArcType == ArcMember && !a.Label.IsLet() && capabilityHasCallable(a, seen) {
+			if a.ArcType == ArcMember && !a.Label.IsLet() && !a.Label.IsDef() && capabilityHasCallable(a, seen) {
 				return true
 			}
 		}

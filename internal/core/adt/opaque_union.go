@@ -16,63 +16,6 @@ package adt
 
 import "maps"
 
-// transportUnion selects a branch in the source representation. Matching
-// the public opaque predicate against private data would incorrectly discard
-// that branch and could expose the representation through another union arm.
-// If overlapping branches transport the value differently, the untagged
-// interface does not determine a unique observation; keep it incomplete.
-func (p *sealedPackage) transportUnion(c *OpContext, union *Disjunction, value Value, outward, project bool, export *publicExport) Value {
-	if union.Kind()&^(NullKind|BoolKind|NumberKind|StringKind|BytesKind) == 0 {
-		// Every branch uses identity transport. Preserve the disjunction
-		// and its preferences instead of demanding a unique branch and
-		// mistaking an ordinary default for an ambiguous representation.
-		v := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, union), MakeRootConjunct(nil, value))
-		v.Finalize(c)
-		return v
-	}
-	var result Value
-	unknown := false
-	for _, branch := range union.Values {
-		source := branch
-		if outward {
-			var b *Bottom
-			source, b = p.privatePredicate(c, branch, make(map[Value]bool))
-			if b != nil {
-				unknown = true
-				continue
-			}
-		}
-		candidate := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, source), MakeRootConjunct(nil, value))
-		candidate.Finalize(c)
-		if b := candidate.Bottom(); b != nil {
-			unknown = unknown || b.IsIncomplete()
-			continue
-		}
-		// Keep the branch predicate on the candidate. In particular a
-		// compatible closure descriptor does not prove its arrow contract.
-		x := p.transportResolvedExport(c, branch, candidate, outward, project, export)
-		if _, ok := Unwrap(x).(*Bottom); ok {
-			unknown = true
-			continue
-		}
-		if !concreteCapture(c, x) {
-			unknown = true
-			continue
-		}
-		if result != nil && !Equal(c, result, x, CheckStructural) {
-			unknown = true
-		}
-		result = x
-	}
-	if unknown {
-		return &Bottom{Code: IncompleteError, Err: c.Newf("opaque union transport remains ambiguous or unresolved")}
-	}
-	if result == nil {
-		return c.NewErrf("value does not match any opaque interface union branch")
-	}
-	return result
-}
-
 // privatePredicate substitutes representations in a resolved public schema.
 // Re-evaluating original conjuncts preserves record correlations, patterns,
 // and closedness instead of rebuilding a product of field approximations.

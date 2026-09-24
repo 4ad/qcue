@@ -273,14 +273,14 @@ func analyseStructs(v *adt.Vertex, builder *GraphBuilder) []structMeta {
 				continue
 			}
 			debug(" ref %p :: %T (%v)\n",
-				refs.Ref, refs.Ref, refs.Ref.Source().Pos())
+				refs.Ref, refs.Ref, adt.Pos(refs.Ref))
 			for refs.Next != nil {
 				refs = refs.Next
 				debug(" ref %p :: %T (%v)\n",
-					refs.Ref, refs.Ref, refs.Ref.Source().Pos())
+					refs.Ref, refs.Ref, adt.Pos(refs.Ref))
 			}
 			maps.Insert(structMetaMap(refs.Ref), maps.All(sMetas))
-			if pos := refs.Ref.Source().Pos(); pos.IsValid() {
+			if pos := adt.Pos(refs.Ref); pos.IsValid() {
 				for sMeta := range nodeToStructMetas[refs.Ref] {
 					sMeta.pos = pos
 				}

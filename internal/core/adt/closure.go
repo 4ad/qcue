@@ -194,7 +194,7 @@ func concreteCapture(c *OpContext, v Value) bool {
 				if a.ArcType == ArcRequired {
 					return false
 				}
-				if a.ArcType == ArcMember && !a.Label.IsLet() && !check(a) {
+				if a.ArcType == ArcMember && !a.Label.IsLet() && !a.Label.IsDef() && !check(a) {
 					return false
 				}
 			}

@@ -88,12 +88,8 @@ func (s *OpaqueCall) ProofTypes(c *OpContext, env *Environment) (advertised Func
 	if b != nil {
 		return advertised, nil, required, false
 	}
-	for _, param := range s.signature.Params {
-		if !s.owner.totalTransport(c, public, param.Value, !s.outward, make(map[Value]bool)) {
-			return advertised, nil, required, false
-		}
-	}
-	if !s.owner.totalTransport(c, public, s.signature.Ret, s.outward, make(map[Value]bool)) {
+	plan := s.planOperation(c, public)
+	if !plan.total() {
 		return advertised, nil, required, false
 	}
 	advertised = FuncType{Fn: s.signature, Env: public}
@@ -102,109 +98,4 @@ func (s *OpaqueCall) ProofTypes(c *OpContext, env *Environment) (advertised Func
 		advertised, required = required, advertised
 	}
 	return advertised, s.private, required, true
-}
-
-func (p *sealedPackage) totalTransport(c *OpContext, env *Environment, schema Expr, outward bool, active map[Value]bool) bool {
-	if schema == nil {
-		return true
-	}
-	value, complete := c.Evaluate(env, schema)
-	if !complete || value == nil {
-		return false
-	}
-	if v, ok := value.(*Vertex); ok {
-		v.Finalize(c)
-		value = v.DerefValue()
-		if _, ok := Unwrap(value).(*Existential); ok &&
-			(len(v.Arcs) != 0 || v.PatternConstraints != nil) {
-			// Refinements of an existential may borrow the outer carrier.
-			return false
-		}
-	}
-	value = Unwrap(value)
-	if active[value] {
-		return false
-	}
-	active[value] = true
-	defer delete(active, value)
-	switch v := value.(type) {
-	case *Top, *BasicType, *Null, *Bool, *Num, *String, *Bytes, *BoundValue:
-		return true
-	case *OpaqueType:
-		return v.carrier.owner == p
-	case *RigidType:
-		return !abstractEscapes(c, v.Bound, p, make(map[Value]bool))
-	case *Existential:
-		// A closed interface with no free predicate dependencies cannot
-		// mention this boundary's carrier. Its packages pass unchanged.
-		return len(v.Template.References) == 0
-	case *Conjunction:
-		if abstractEscapes(c, v, p, make(map[Value]bool)) {
-			return false
-		}
-		for _, term := range v.Values {
-			if !p.totalTransport(c, nil, term, outward, active) {
-				return false
-			}
-		}
-		return true
-	case *Disjunction:
-		var kinds Kind
-		for _, branch := range v.Values {
-			source := branch
-			if outward {
-				var b *Bottom
-				source, b = p.privatePredicate(c, branch, make(map[Value]bool))
-				if b != nil {
-					return false
-				}
-			}
-			// Disjoint source kinds suffice to select exactly one arm.
-			// Overlapping arms require a stronger transport equivalence
-			// proof and therefore remain residual here.
-			if kinds&source.Kind() != 0 || !p.totalTransport(c, nil, branch, outward, active) {
-				return false
-			}
-			kinds |= source.Kind()
-		}
-		return true
-	case *FuncValue:
-		clauses := v.selectionAndOriginalClauses()
-		boundary := &OpaqueCall{owner: p, clauses: clauses, outward: outward}
-		if !boundary.coherent(c) {
-			return false
-		}
-		for _, t := range clauses {
-			if len(typeParameters(t.Env)) != 0 || t.Fn.Open {
-				return false
-			}
-			for _, param := range t.Fn.Params {
-				if !p.totalTransport(c, t.Env, param.Value, !outward, active) {
-					return false
-				}
-			}
-			if !p.totalTransport(c, t.Env, t.Fn.Ret, outward, active) {
-				return false
-			}
-		}
-		return true
-	case *Vertex:
-		if v.Bottom() != nil || v.sealed != nil {
-			return false
-		}
-		for _, arc := range v.Arcs {
-			if !arc.Label.IsLet() && !p.totalTransport(c, nil, arc, outward, active) {
-				return false
-			}
-		}
-		if pc := v.PatternConstraints; pc != nil {
-			for _, pair := range pc.Pairs {
-				if !p.totalTransport(c, nil, pair.Constraint, outward, active) {
-					return false
-				}
-			}
-		}
-		return true
-	}
-	return false
 }

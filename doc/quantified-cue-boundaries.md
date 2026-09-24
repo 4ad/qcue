@@ -66,3 +66,12 @@ will be recorded as the work proceeds.
   predicate inclusion for symbolic proof inputs. Presence/nesting matrices
   and API/source refinement regressions pass, as does the public API and
   complete core test suite.
+- `transportPlan` resolves schemas in their declaration environments and
+  supplies both execution and totality certification. `operationTransport`
+  gives opaque calls and their proofs the same input/result interpretation.
+  The separate AST executor and totality walker have been removed. Ordinary
+  identity branches retain the original graph; list unions and inward
+  definitions use the resolved scoped schema. New regressions and existing
+  opaque transport tests pass with the full core/public API suite. Preservation
+  of latent constraints through non-identity composite plans remains work in
+  progress; this stage is not a claim of complete transport preservation.
