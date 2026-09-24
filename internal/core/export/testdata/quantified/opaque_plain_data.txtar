@@ -1,7 +1,9 @@
-#incomplete
-
 -- in.cue --
 #I:  exists (A) {tag: 1}
 out: seal #I with (A = int) {tag: 1}
 -- out/export --
-opaque boundaries cannot be unfolded for export
+{
+	CUEExport: _CUEClosures.CUEClosure
+	_CUEClosures: CUEClosure: (seal (#CUEType) with (A = int) {tag: 1})
+	#CUEType: exists (A) {tag: 1}
+}.CUEExport

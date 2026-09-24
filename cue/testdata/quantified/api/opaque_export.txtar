@@ -12,3 +12,82 @@ out: (open p as (A, P) {f: P.f}).f
 -- data.cue --
 #I:  exists (A) {tag: 1}
 out: seal #I with (A = int) {tag: 1}
+
+-- abstract.cue --
+#Counter: exists A {
+	zero: A
+	next: func(A) -> A
+	read: func(A) -> int
+}
+out: seal #Counter with (A = int) {
+	zero: 0
+	next: func(x: int) -> int: x + 1
+	read: func(x: int) -> int: x
+}
+-- captures.cue --
+#I: exists A {f: func(int) -> int}
+#Rep: int
+n: 2
+helper: func(x: int) -> int: x + n
+out: seal #I with (A = #Rep) {f: helper}
+-- nested_operation.cue --
+#I: exists A {nested: {f: func(int) -> int}}
+p: seal #I with (A = int) {nested: {f: func(x: int) -> int: x}}
+out: (open p as (A, P) {f: P.nested.f}).f
+-- list_operation.cue --
+#I: exists A {fs: [func(int) -> int]}
+p: seal #I with (A = int) {fs: [func(x: int) -> int: x]}
+out: (open p as (A, P) {f: P.fs[0]}).f
+-- identity.cue --
+#I: exists A {f: func(int) -> int, alias: f, other: func(int) -> int}
+helper: func(x: int) -> int: x
+first: seal #I with (A = int) {f: helper, alias: helper, other: helper}
+copied: first
+second: seal #I with (A = int) {f: helper, alias: helper, other: helper}
+out: {
+	p: first
+	q: second
+	f: (open first as (A, P) {f: P.f}).f
+	alias: (open first as (A, P) {f: P.alias}).f
+	other: (open first as (A, P) {f: P.other}).f
+	copy: (open copied as (A, P) {f: P.f}).f
+	fresh: (open second as (A, P) {f: P.f}).f
+}
+-- factory.cue --
+#I: exists A {f: func(int) -> int}
+make: func(n: int) -> #I: seal #I with (A = int) {f: func(x: int) -> int: x + n}
+out: make(2)
+-- capture_package.cue --
+#I: exists A {zero: A, read: func(A) -> int}
+p: seal #I with (A = int) {zero: 0, read: func(x: int) -> int: x}
+out: func(n: int) -> int: (open p as (A, P) {r: n + P.read(P.zero)}).r
+-- capture_operation.cue --
+#I: exists A {f: func(int) -> int}
+p: seal #I with (A = int) {f: func(x: int) -> int: x}
+f: (open p as (A, P) {r: P.f}).r
+out: func(n: int) -> int: f(n)
+-- capture_record.cue --
+#I: exists A {f: func(int) -> int}
+n: 2
+config: {_offset: n}
+out: seal #I with (A = int) {f: func(x: int) -> int: x + config._offset}
+-- refinement.cue --
+#I: exists A {tag: 1}
+p: seal #I with (A = int) {tag: 1}
+n: 2
+out: p & {extra: n, optional?: int, [=~"^x"]: >=0}
+-- hygiene.cue --
+#I: exists A {f: func(int) -> int}
+_CUEClosures: 2
+CUEClosure: _CUEClosures
+CUEAbstract: CUEClosure
+CUEPackage: CUEAbstract
+out: seal #I with (A = int) {f: func(x: int) -> int: x + CUEPackage}
+-- generic_operation.cue --
+#I: exists A {id(T): func(T) -> T}
+p: seal #I with (A = int) {id(T): func(x: T) -> T: x}
+out: (open p as (A, P) {f: P.id}).f
+-- overloaded_operation.cue --
+#I: exists A {f: (func(int) -> int) & (func(string) -> string)}
+p: seal #I with (A = int) {f(T): func(x: T) -> T: x}
+out: (open p as (A, P) {f: P.f}).f

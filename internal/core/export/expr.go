@@ -113,6 +113,9 @@ func (e *exporter) expr(env *adt.Environment, v adt.Elem) (result ast.Expr) {
 
 func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct, orig ...adt.Conjunct) (expr ast.Expr) {
 	if src != nil {
+		if src.IsOpaquePackage() && src != x.packageResidual {
+			return x.packageValue(src)
+		}
 		if src.HasSubjectSchemes() {
 			// A composite introduction supplies its methods' outer binders.
 			// Export their source conjuncts in that scope, without turning the

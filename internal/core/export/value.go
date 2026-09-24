@@ -49,7 +49,7 @@ func (e *exporter) bareValue(v adt.Value) ast.Expr {
 
 func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 	if n.IsOpaquePackage() {
-		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
+		return e.packageValue(n)
 	}
 	if subject, argument := n.SubjectSelection(); subject != nil {
 		return e.subjectSelectionExpr(subject, argument)
@@ -647,8 +647,8 @@ func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	if _, ok := e.quantifierCode[t.Fn]; ok {
 		return e.quantifiedExportError("shared composite code cannot be exported in separate lexical origins")
 	}
-	if _, ok := t.Fn.Body.(*adt.OpaqueCall); ok {
-		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
+	if call, ok := t.Fn.Body.(*adt.OpaqueCall); ok {
+		return e.packageOperation(call)
 	}
 	if !t.Fn.Quantified {
 		return e.funcSrc(t.Fn.Src)
@@ -689,6 +689,9 @@ func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functio
 		if adt.Validate(e.ctx, v, &adt.ValidateConfig{Concrete: true}) != nil {
 			return false
 		}
+		if v.IsOpaquePackage() {
+			return v.PackageSource().Seal != nil
+		}
 		for _, a := range v.Arcs {
 			if a.Label.IsHidden() && a.Label.PkgID(e.ctx) != cmp.Or(e.pkgID, "_") {
 				// A hidden label from another package cannot be rebound by
@@ -708,8 +711,9 @@ func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functio
 		if adt.IsFuncType(f) || f.IsPartial() || !f.Fn.Quantified || f.Fn.Src == nil {
 			return false
 		}
-		if _, opaque := f.Fn.Body.(*adt.OpaqueCall); opaque {
-			return false
+		if call, opaque := f.Fn.Body.(*adt.OpaqueCall); opaque {
+			source, _ := call.PackageProjection()
+			return source.Seal != nil
 		}
 		key := adt.FuncType{Fn: f.Fn, Env: f.Env}
 		functions[key] = true

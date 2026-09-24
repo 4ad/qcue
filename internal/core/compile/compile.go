@@ -1354,6 +1354,8 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 			s.Names = append(s.Names, witness.Ident.Name)
 			s.Witnesses = append(s.Witnesses, c.typeExpr(witness.Expr))
 		}
+		s.References = c.freeReferences(n, s, false)
+		s.Captures = c.freeReferences(n, s, true)
 		return s
 
 	case *ast.OpenExpr:
@@ -1361,6 +1363,8 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		c.pushScope(nil, 1, n)
 		o.Body = c.expr(n.Body)
 		c.popScope()
+		o.References = c.freeReferences(n, o, false)
+		o.Captures = c.freeReferences(n, o, true)
 		return o
 
 	case *ast.Func:

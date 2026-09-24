@@ -21,6 +21,7 @@ package adt
 type publicExport struct {
 	schema *Vertex
 	parent *publicExport
+	label  Feature
 	fields map[Feature]*publicExport
 	alias  *publicExport
 }
@@ -42,7 +43,7 @@ func (x *publicExport) field(label Feature) *publicExport {
 	}
 	// A pattern or open list can declare exports whose labels become known
 	// only during projection. Their identity is still the public path.
-	child := &publicExport{parent: x, fields: make(map[Feature]*publicExport)}
+	child := &publicExport{parent: x, label: label, fields: make(map[Feature]*publicExport)}
 	x.fields[label] = child
 	return child
 }
@@ -78,6 +79,7 @@ func publicExportGraph(c *OpContext, schema *Vertex) *publicExport {
 		for _, a := range v.Arcs {
 			if !a.Label.IsDef() && !a.Label.IsLet() {
 				n.fields[a.Label] = build(a, n)
+				n.fields[a.Label].label = a.Label
 			}
 		}
 		return n

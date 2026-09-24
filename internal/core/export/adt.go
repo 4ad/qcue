@@ -239,9 +239,35 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 				return e.value(v)
 			}
 		}
-		return ast.Clone(x.Src)
+		// An application may remain incomplete, for example inside an
+		// environment template. Retain its lexical alias declarations as
+		// well as the application; a bare copy would leave a free name.
+		return e.scopedSource(nil, x.Src, nil, nil)
 
-	case *adt.PackageSeal, *adt.PackageOpen, *adt.OpaqueCall, *adt.OpaqueScope:
+	case *adt.PackageSeal:
+		if v := e.packageResidual; v != nil {
+			if source := v.PackageSource(); source.Seal == x {
+				// The source traversal's structural frames may have been
+				// rebased by a refinement. The constructed seal retains its
+				// original lexical environment independently of that view.
+				return e.packageSource(source)
+			}
+		}
+		if env == nil {
+			return e.scopedSource(nil, x.Src, nil, nil)
+		}
+		return e.packageSource(adt.PackageSource{Seal: x, Env: env})
+	case *adt.PackageOpen:
+		if env == nil {
+			return e.scopedSource(nil, x.Src, nil, nil)
+		}
+		if v, complete := e.ctx.Evaluate(env, x); complete && v != nil {
+			return e.value(v)
+		}
+		return e.scopedSource(env, x.Src, x.References, x.Captures)
+	case *adt.OpaqueCall:
+		return e.packageOperation(x)
+	case *adt.OpaqueScope:
 		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
 
 	case *adt.TypeReference:
@@ -405,6 +431,15 @@ func wrapIfOptional(expr ast.Expr, isOptional bool) ast.Expr {
 }
 
 func (e *exporter) resolve(env *adt.Environment, r adt.Resolver) ast.Expr {
+	if e.inlineFreeRefs {
+		if e.isExternalReference(r) {
+			v, complete := e.ctx.Evaluate(env, r.(adt.Expr))
+			if !complete || v == nil {
+				return e.quantifiedExportError("package refinement dependency is unresolved")
+			}
+			return e.predicateValue(v)
+		}
+	}
 	if c := e.pivotter; c != nil {
 		if alt := c.refExpr(r); alt != nil {
 			return alt
@@ -541,6 +576,24 @@ func (e *exporter) resolve(env *adt.Environment, r adt.Resolver) ast.Expr {
 		return wrapIfOptional(idx, x.Optional)
 	}
 	panic("unreachable")
+}
+
+func (e *exporter) isExternalReference(r adt.Resolver) bool {
+	switch x := r.(type) {
+	case *adt.FieldReference:
+		return e.frame(x.UpCount, false).fields == nil
+	case *adt.LetReference:
+		return e.frame(x.UpCount, false).fields == nil
+	case *adt.SelectorExpr:
+		if r, ok := x.X.(adt.Resolver); ok {
+			return e.isExternalReference(r)
+		}
+	case *adt.IndexExpr:
+		if r, ok := x.X.(adt.Resolver); ok && isSelfContained(x.Index) {
+			return e.isExternalReference(r)
+		}
+	}
+	return false
 }
 
 func (e *exporter) newIdentForField(

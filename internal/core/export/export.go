@@ -196,6 +196,9 @@ func (p *Profile) Expr(r adt.Runtime, pkgID string, n adt.Expr) (ast.Expr, error
 	e.markUsedFeatures(n)
 
 	x := e.expr(nil, n)
+	if v, ok := n.(*adt.Vertex); ok && v.IsOpaquePackage() {
+		return e.withPackageDecls(x), e.errs
+	}
 	return e.withOriginDecls(x), e.errs
 }
 
@@ -320,7 +323,12 @@ func Value(r adt.Runtime, pkgID string, n adt.Value) (ast.Expr, errors.Error) {
 // TODO: Should take context.
 func (p *Profile) Value(r adt.Runtime, pkgID string, n adt.Value) (ast.Expr, errors.Error) {
 	e := newExporter(p, r, pkgID, n)
-	v := e.withOriginDecls(e.value(n))
+	v := e.value(n)
+	if x, ok := n.(*adt.Vertex); ok && x.IsOpaquePackage() {
+		v = e.withPackageDecls(v)
+	} else {
+		v = e.withOriginDecls(v)
+	}
 	// finalize runs astutil.Sanitize, which edits v in place via the shared
 	// StructLit Elts.
 	if vx, ok := n.(*adt.Vertex); ok {
@@ -372,6 +380,10 @@ type exporter struct {
 	references        map[*adt.Vertex]*referenceInfo
 	functionOrigins   map[*adt.Function]*functionOrigin
 	closures          *closureGraph
+	packages          map[adt.PackageSource]*ast.Field
+	packageValues     map[*adt.Vertex]*ast.Field
+	packageResidual   *adt.Vertex
+	inlineFreeRefs    bool
 	quantifierOrigins map[quantifierOriginKey]*ast.LetClause
 	quantifierCode    map[*adt.Function]quantifierOriginKey
 	originDecls       []ast.Decl
@@ -470,6 +482,9 @@ func (e *exporter) initPivot(n *adt.Vertex) {
 // finalize finalizes the result of an export. It is only needed for use cases
 // that require conversion to a File, Sanitization, and self containment.
 func (e *exporter) finalize(n *adt.Vertex, v ast.Expr) (f *ast.File, err errors.Error) {
+	if n.IsOpaquePackage() {
+		v = e.withPackageDecls(v)
+	}
 	f = e.toFile(n, v)
 
 	// The file is built rather than parsed, so nothing in it records which
@@ -524,6 +539,12 @@ func (e *exporter) markUsedFeatures(x adt.Expr) {
 	}
 
 	w.Feature = func(f adt.Feature, src adt.Node) {
+		if f.IsHidden() {
+			// Generated names must avoid the source spelling even when its
+			// hidden label belongs to a different package identity.
+			name := adt.MakeIdentLabel(e.ctx, f.IdentString(e.ctx), "")
+			e.usedFeature[name] = nil
+		}
 		_, ok := e.usedFeature[f]
 
 		switch x := src.(type) {

@@ -89,6 +89,19 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 			w.Elem(x.Body)
 			typePosition = saved
 			return false
+		case *adt.PackageSeal:
+			// The interface and representation witnesses are predicates;
+			// only the implementation contributes runtime captures.
+			saved := typePosition
+			typePosition = true
+			w.Elem(x.Interface)
+			for _, witness := range x.Witnesses {
+				w.Elem(witness)
+			}
+			typePosition = false
+			w.Elem(x.Body)
+			typePosition = saved
+			return false
 		case *adt.WitnessReference:
 			// A value used as a singleton remains a runtime dependency.
 			// Other references in annotations describe erased predicates.

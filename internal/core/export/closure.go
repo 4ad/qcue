@@ -52,10 +52,10 @@ type closureGraph struct {
 func (e *exporter) graph() *closureGraph {
 	if e.closures == nil {
 		fields := &ast.StructLit{}
-		// A let is an abbreviation and may reconstruct the record at each
-		// use. A definition provides stable bindings, so references to the
-		// same recursive closure also retain the same environment identity.
-		decl := &ast.Field{Label: ast.NewIdent(e.uniqueAlias("#CUEClosures")), Value: fields}
+		// A field provides stable bindings for recursive environments and
+		// generative seals. Keep it hidden so it is not part of the data
+		// projection, and avoid a definition, which would close its values.
+		decl := &ast.Field{Label: ast.NewIdent(e.uniqueAlias("_CUEClosures")), Value: fields}
 		e.closures = &closureGraph{decl: decl, fields: fields,
 			functions: make(map[adt.FuncType]*ast.Field), values: make(map[*adt.Vertex]*ast.Field)}
 		e.originDecls = append(e.originDecls, decl)
@@ -183,6 +183,9 @@ func (e *exporter) predicateValue(v adt.Value) ast.Expr {
 	e.cfg = &profile
 	defer func() { e.cfg = saved }()
 	if v, ok := v.(*adt.Vertex); ok {
+		if v.IsOpaquePackage() {
+			return e.packageValue(v)
+		}
 		if v.Kind()&(adt.StructKind|adt.ListKind) == 0 && len(v.Arcs) == 0 && !v.HasSubjectSchemes() {
 			// Evaluated scalar predicates already carry their resolved
 			// bounds. Reusing their source could reintroduce a free name.

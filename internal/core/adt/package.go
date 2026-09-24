@@ -227,6 +227,8 @@ type sealKey struct {
 }
 
 type sealedPackage struct {
+	source         PackageSource
+	view           *Vertex
 	interfaceType  *Existential
 	implementation *Vertex
 	publicSchema   *Vertex
@@ -298,6 +300,10 @@ type PackageSeal struct {
 	Names     []string
 	Witnesses []Expr
 	Body      Expr
+	// References includes predicate dependencies; Captures contains only
+	// runtime dependencies. Both are relative to the construction's scope.
+	References []Expr
+	Captures   []Expr
 }
 
 func (s *PackageSeal) Source() ast.Node { return s.Src }
@@ -319,7 +325,7 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	if len(s.Names) != len(q.Params) {
 		return c.NewErrf("seal requires one witness for each interface binder")
 	}
-	p := &sealedPackage{interfaceType: e,
+	p := &sealedPackage{interfaceType: e, source: PackageSource{Seal: s, Env: c.Env(0)},
 		carriers: make(map[*TypeParameter]*opaqueCarrier)}
 	private := make(map[*TypeParameter]Value)
 	public := make(map[*TypeParameter]Value)
@@ -378,6 +384,7 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	view := p.transportResolvedExport(c, schema, implementation, true, true, publicExportGraph(c, schema))
 	if v, ok := view.(*Vertex); ok {
 		v.sealed = p
+		p.view = v
 		if c.sealedViews == nil {
 			c.sealedViews = make(map[sealKey]*Vertex)
 		}
@@ -674,6 +681,9 @@ type PackageOpen struct {
 	Type  Feature
 	View  Feature
 	Body  Expr
+	// Free dependencies are relative to the scope outside the opening.
+	References []Expr
+	Captures   []Expr
 }
 
 func (o *PackageOpen) Source() ast.Node { return o.Src }

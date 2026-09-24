@@ -357,27 +357,121 @@ func TestQuantifiedBuiltinExport(t *testing.T) {
 }
 
 func TestQuantifiedOpaqueExport(t *testing.T) {
-	for _, name := range []string{"operation", "selected_operation", "data"} {
-		t.Run(name, func(t *testing.T) {
-			root := cuecontext.New().CompileString(quantifiedAPIText(t, "opaque_export", name+".cue"))
-			v := root.LookupPath(cue.ParsePath("out"))
-			if err := v.Validate(cue.Concrete(true)); err != nil {
+	for _, tc := range []struct{ name, check, want string }{
+		{"operation", `(open out as (A, P) {r: P.f(42)}).r`, "42"},
+		{"selected_operation", `out(42)`, "42"},
+		{"data", `(open out as (A, P) {r: P.tag}).r`, "1"},
+		{"abstract", `(open out as (A, P) {r: P.read(P.next(P.zero))}).r`, "1"},
+		{"captures", `(open out as (A, P) {r: P.f(40)}).r`, "42"},
+		{"nested_operation", `out(42)`, "42"},
+		{"list_operation", `out(42)`, "42"},
+		{"identity", `(out.f & out.alias & out.copy)(42)`, "42"},
+		{"factory", `(open out as (A, P) {r: P.f(40)}).r`, "42"},
+		{"capture_package", `out(42)`, "42"},
+		{"capture_operation", `out(42)`, "42"},
+		{"capture_record", `(open out as (A, P) {r: P.f(40)}).r`, "42"},
+		{"refinement", `(open out as (A, P) {r: P.extra}).r`, "2"},
+		{"hygiene", `(open out as (A, P) {r: P.f(40)}).r`, "42"},
+		{"generic_operation", `[out[int](42), out[string]("hi")]`, `[42,"hi"]`},
+		{"overloaded_operation", `[out(42), out("hi")]`, `[42,"hi"]`},
+	} {
+		for _, mode := range []string{"source", "final", "expression", "value"} {
+			t.Run(tc.name+"/"+mode, func(t *testing.T) {
+				source := quantifiedAPIText(t, "opaque_export", tc.name+".cue")
+				for round := range 3 {
+					ctx := cuecontext.New()
+					root := ctx.CompileString(source)
+					v := root.LookupPath(cue.ParsePath("out"))
+					if err := v.Validate(cue.Concrete(true)); err != nil {
+						t.Fatalf("round %d: %s\n%v", round, source, err)
+					}
+					checked := ctx.CompileString(source + "\ncheck: " + tc.check)
+					if got, err := checked.LookupPath(cue.ParsePath("check")).MarshalJSON(); err != nil || string(got) != tc.want {
+						t.Fatalf("round %d: %s\ngot %s, %v; want %s", round, source, got, err, tc.want)
+					}
+					if tc.name == "identity" {
+						for _, bad := range []string{"out.f & out.other", "out.f & out.fresh", "out.p & out.q", "out.p.f"} {
+							v := ctx.CompileString(source + "\nbad: " + bad).LookupPath(cue.ParsePath("bad"))
+							if err := v.Validate(); err == nil {
+								t.Fatalf("round %d: export lost opaque identity or access control: %s\n%s", round, bad, source)
+							}
+						}
+					}
+					if tc.name == "refinement" {
+						for _, bad := range []string{`out & {optional: "bad"}`, `out & {x: -1}`} {
+							v := ctx.CompileString(source + "\nbad: " + bad).LookupPath(cue.ParsePath("bad"))
+							if err := v.Validate(); err == nil {
+								t.Fatalf("round %d: lost refinement %s\n%s", round, bad, source)
+							}
+						}
+					}
+					if tc.name == "data" {
+						// A shared binding must not implicitly close an open package.
+						v := ctx.CompileString(source + `
+refined: out & {extra: 2}
+added: (open refined as (A, P) {r: P.extra}).r
+`)
+						if got, err := v.LookupPath(cue.ParsePath("added")).Int64(); err != nil || got != 2 {
+							t.Fatalf("round %d: package was closed by export: %s\n%v", round, source, err)
+						}
+					}
+					if round == 2 {
+						break
+					}
+					var node ast.Node
+					var err error
+					switch mode {
+					case "source":
+						node = v.Syntax()
+					case "final":
+						node = v.Syntax(cue.Final())
+					case "expression":
+						if err := root.Validate(); err != nil {
+							t.Fatal(err)
+						}
+						r, x := value.ToInternal(root)
+						node, err = export.Expr(r, "", x)
+					case "value":
+						r, x := value.ToInternal(v)
+						node, err = export.Value(r, "", x)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					text, err := format.Node(node)
+					if err != nil {
+						t.Fatal(err)
+					}
+					source = "out: " + string(text)
+					if mode == "expression" {
+						source = "root: " + string(text) + "\nout: root.out"
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestQuantifiedOpaqueExportErrors(t *testing.T) {
+	for _, conflict := range []string{`p & q`, `p & {tag: 2}`} {
+		for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
+			ctx := cuecontext.New()
+			v := ctx.CompileString(`
+#I: exists A {tag: 1}
+p: seal #I with (A = int) {tag: 1}
+q: seal #I with (A = int) {tag: 1}
+out: ` + conflict).LookupPath(cue.ParsePath("out"))
+			if v.Validate() == nil {
+				t.Fatal("missing input conflict")
+			}
+			text, err := format.Node(v.Syntax(opts...))
+			if err != nil {
 				t.Fatal(err)
 			}
-			for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
-				if _, ok := v.Syntax(opts...).(*ast.BadExpr); !ok {
-					t.Fatal("opaque export lost the package or operation identity")
-				}
+			if rebuilt := ctx.CompileString(string(text)); rebuilt.Validate() == nil {
+				t.Fatalf("export discarded a package conflict: %s", text)
 			}
-			r, x := value.ToInternal(v)
-			if _, err := export.Value(r, "", x); err == nil {
-				t.Fatal("value export dropped the opaque boundary")
-			}
-			r, x = value.ToInternal(root)
-			if _, err := export.Expr(r, "", x); err == nil {
-				t.Fatal("expression export dropped the opaque boundary")
-			}
-		})
+		}
 	}
 }
 

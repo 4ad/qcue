@@ -1,8 +1,10 @@
-#incomplete
-
 -- in.cue --
 #I:  exists (A) {f: func(int) -> int}
 p:   seal #I with (A = int) {f: func(x: int) -> int: x}
 out: (open p as (A, P) {f: P.f}).f
 -- out/export --
-opaque boundaries cannot be unfolded for export
+{
+	(open _CUEClosures.CUEClosure as (CUEAbstract, CUEPackage) {CUEOperation: CUEPackage.f}).CUEOperation
+	_CUEClosures: CUEClosure: (seal (#CUEType) with (A = int) {f: func(x: int) -> int: x})
+	#CUEType: exists (A) {f: func(int) -> int}
+}

@@ -39,8 +39,14 @@ listed: (open q as (A, Q) {result: Q.list[0]}).result
 				t.Fatalf("%s: %v", path, err)
 			}
 			src, err := format.Node(x.Syntax(cue.Final()))
-			if err == nil && !strings.Contains(string(src), "opaque boundaries") {
-				t.Fatalf("%s lost its package boundary: %s", path, src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rebuilt := cuecontext.New().CompileString("p: " + string(src) + `
+tag: (open p as (B, P) {result: P.tag}).result
+`)
+			if got, err := rebuilt.LookupPath(cue.ParsePath("tag")).Int64(); err != nil || got != 1 {
+				t.Fatalf("%s lost its package boundary: %s\n%v", path, src, err)
 			}
 		}
 	}
