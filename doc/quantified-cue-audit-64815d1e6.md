@@ -1,5 +1,9 @@
 **Quantified CUE audit — revision `64815d1e625d`, 24 September 2026**
 
+This report records the original revision. The subsequent repairs, broader
+boundary audit, and verification are documented in
+[Quantified CUE boundary architecture](quantified-cue-boundaries.md).
+
 The implementation does **not** faithfully implement the whole proposal. It
 implements a substantial, explicitly restricted fragment, but there are also
 correctness defects within that fragment. In particular, it can refute a

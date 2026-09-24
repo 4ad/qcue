@@ -19,6 +19,7 @@ universes and runs coverage-guided fuzzing with replayable minimized failures.
 | Seeded random finite models | 128 | 4,096 |
 | Generated preservation transformations | 48 models × 10 transformations | 512 models × 10 transformations |
 | Feature combinations | 128 sampled combinations, with positive and negative controls | All 6,272 combinations in the defined vocabulary |
+| Composite transport/refinement | All 576 finite cases | Same, plus native fuzzing |
 
 The packet counts correspond to 342,732 and 540,021,248 packet comparisons.
 The tests precompute independent admission bitsets rather than rerunning the
@@ -60,13 +61,13 @@ copying, public alias equations, and rejection of distinct public identities
 are checked along these paths. The private implementation deliberately shares
 code across distinct public exports.
 
-Opaque transport still has a documented proof limit for unions of overlapping
-source kinds. Valid cases encountering that limit may remain incomplete;
-they are counted separately and never counted as proved. The extended matrix
-currently produces 1,984 established cases, 3,840 rejected invalid promises,
-and 448 residual cases. Invalid promises may never certify or produce an
-unchecked result. Every supported positive case must produce the expected
-identity result; rejecting everything would fail the suite.
+Opaque transport still has a documented proof limit when overlapping branches
+perform different transports. This matrix uses identity transport on finite
+scalar unions, for which every valid case must now certify and execute. Its
+former residual allowance has been removed. The extended matrix produces 2,432
+established cases, 3,840 rejected invalid promises, and no residual cases. Invalid
+promises may never certify or produce an unchecked result; rejecting all inputs
+or regressing valid cases to unknown fails the suite.
 
 ## Preservation and shrinking
 
@@ -82,12 +83,13 @@ identify the transformation needed to reproduce the observation. Greedy
 semantic shrinking removes relation tuples, domain members and dependencies
 while preserving the actual mismatch. Feature failures additionally remove
 feature switches; packet failures remove parameters. These are local reductions,
-not claims of globally minimal programs. Four native Go fuzz targets add
+not claims of globally minimal programs. Five native Go fuzz targets add
 coverage-guided generation and automatic corpus minimization:
 
 - `FuzzQuantifiedFiniteOracle`
 - `FuzzQuantifiedPreservation`
 - `FuzzQuantifiedFeatureCombinations`
+- `FuzzQuantifiedTransportBoundary`
 - `FuzzQuantifiedPacketDomain` (in `internal/core/adt`)
 
 Normal tests use a fixed seed, printed with `-v`. Set
@@ -105,7 +107,7 @@ From the repository root:
 # Fast oracle suite, including all existing semantic preservation checks.
 tools/test-quantified-oracles.sh fast
 
-# Extended exhaustive models followed by four 30-second fuzz runs.
+# Extended exhaustive models followed by five 30-second fuzz runs.
 tools/test-quantified-oracles.sh extended
 
 # Longer fuzzing and a different deterministic model sample.
@@ -154,3 +156,23 @@ These suites establish results for the finite vocabularies and supported
 observations described above. They do not exhaust all three-valued ternary
 relations, unrestricted dependent types, arbitrary program syntax, or every
 possible interaction of the extension.
+
+
+## Boundary preservation model
+
+`quantified_boundaries_test.go` covers the later boundary audit and the
+predicate/witness and scope defects found during its implementation. It checks
+runtime equality through nesting, original-packet admission, sorted seals,
+constructive existential elimination, and complete callback intersections.
+Positive controls accompany rejected cases; a finite identity-function model
+computes overload coverage and result inclusion from sets of scalars.
+
+A separate transport model enumerates 576 cases. Its expected answer depends
+only on a finite scalar set, whether a field is supplied, whether an extra field
+is supplied, and whether the row is closed. It then applies the same constraints
+through records, nested records, lists, direct operations, and callbacks.
+Every operation must certify; every independently admitted packet must execute;
+every invalid refinement must conflict. Pattern, optional, definition, API
+refinement, label-alias, and abstract escape regressions accompany this model.
+`FuzzQuantifiedTransportBoundary` varies the model inputs and minimizes failures.
+Both runner modes include all `TestQuantifiedBoundary` tests.

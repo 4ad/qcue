@@ -1,11 +1,11 @@
 # Quantified CUE boundary architecture
 
-This work implements the requirements in `quantified-cue.tex` and addresses
-the audit of revision `64815d1e6`. The existing constraint lattice remains the
+This work implements the boundary requirements of the supported fragments in
+`quantified-cue.tex` and addresses the audit of revision `64815d1e6`. The existing constraint lattice remains the
 semantic carrier. Compatibility, membership, executable witnesses, and proofs
 of successful execution are different judgments over that carrier.
 
-## Required implementation changes
+## Implemented boundaries
 
 1. Runtime observations use one recursive inhabitant comparison. Constraint
    graph equality remains separate. Contracts and erased selections cannot
@@ -27,7 +27,7 @@ of successful execution are different judgments over that carrier.
 6. Call certification obtains the whole callable contract through a shared
    interface, including intersections and selected or partial views.
 
-## Evidence required before completion
+## Acceptance criteria
 
 - Regressions for all eight findings, with concrete validation, ordinary
   validation, and selected observations distinguished.
@@ -42,9 +42,8 @@ of successful execution are different judgments over that carrier.
 - A final review of every boundary consumer and each audit finding against
   the implemented design. Green example regressions alone are insufficient.
 
-This document is a work plan, not a claim that these requirements have been
-implemented or verified. Implementation evidence and remaining limitations
-will be recorded as the work proceeds.
+The implementation evidence, consumer review, verification results, and
+remaining supported-profile limits are recorded below.
 
 ## Implementation evidence
 
@@ -80,8 +79,10 @@ will be recorded as the work proceeds.
   recovers an original callable descriptor rather than substituting the
   narrower protocol of an inverse adapter. New positive/negative matrices
   cover direct and callback transport, source and API refinement, and nested
-  definition projection; the full core/public API suite passes. The final
-  preservation and boundary audit remains pending.
+  definition projection; the full core/public API suite passes. Unchanged
+  pattern regions retain their label aliases and public lexical dependencies.
+  Partitioning uses the same child plans as execution, and complement checks
+  use the checking operand to avoid replaying their own validator.
 - `TypeParameter.checkWitness` is shared by type application and sealing.
   It dispatches by the declared binder sort, checks value-range membership
   or type-universe/bound inclusion, and retains unknown formation obligations.
@@ -106,10 +107,93 @@ will be recorded as the work proceeds.
   checks overload coverage and result inclusion against execution; additional
   tests cover clause order, nesting, partial application, and rejected
   attempts to manufacture evidence or reopen selected domains.
-
 - The final consumer audit found and repaired another predicate/witness mixup:
   callback hypotheses could be introduced from definition fields. Admission
   now introduces hypotheses only from present runtime fields. Tests vary
   regular, hidden, definition, hidden-definition, and optional fields through
   direct records, nested records, and lists, and compare certification with
   actual application. The full core/public API suite passes.
+
+- Call-result normalization retains universal subject introductions and seals.
+  A scalar or closed-list approximation cannot erase subsequent selection,
+  consumed-binder checks, or universe bounds. Tests cover direct and nested
+  subjects through ordinary identity calls and opaque operations.
+
+## Audit resolution and consumer review
+
+| Original finding | Shared boundary and evidence |
+| --- | --- |
+| 1. Enriched abstract-call admission | `callPacket.admit`; abstract, selected, opaque, builtin, and guarded-result consumers retain original packet evidence. Presence and API-refinement tests distinguish unknown from refuted. |
+| 2. Contract-sensitive nested equality | `compareRuntimeValues`; ordinary data observations, closure captures, saved arguments, singleton membership, and opaque inhabitants use recursive runtime identity. |
+| 3. Lost record predicates | Identity transport retains the graph; changing transport retains its inverse-image predicate and projectable predicates. Optional, closed, hidden, nested, pattern, definition, API-refinement, and callback cases have positive and negative controls. |
+| 4. Unexecutable existential elimination | Covariant membership and opening share `existentialDataWitness`; certification also requires total construction of the public view. |
+| 5. Unsorted seal witnesses | Selection and sealing share `TypeParameter.checkWitness`; mixed telescope orders preserve value witnesses and reject invalid ranges. |
+| 6. Mis-scoped list transport | Execution and `OpaqueCall.ProofTypes` consume the same `operationTransport`; children and tails are resolved in their declaration scopes. |
+| 7. Untranslated definitions | `transportPlan.predicate` transforms definition and optional predicates without demanding runtime witnesses; nested projection tests retain narrower constraints. |
+| 8. Head-clause-only certification | `Obligations`, `CallClausesFor`, and `ResultClausesFor` preserve intersections, selection, partial coordinates, and guarded consequences. A finite identity model compares certification with execution. |
+
+The consumer review also checked the following points:
+
+- The only constructor of successful `packetAdmission` is the shared admission
+  check. Execution activations do not replace its original packet.
+- Graph `Equal`, environment sharing, and call-cache equality remain stricter
+  than runtime identity. They must retain contracts and formation metadata;
+  replacing them wholesale with runtime equality would introduce new losses.
+- The former transport AST executor and independent totality walker are gone.
+  Callable inverse checking recovers the original descriptor only as a checking
+  operand; actual adapters retain their protocols and contract obligations.
+- Callback hypotheses originate from admitted runtime components. Definitions,
+  absent optional fields, and constructed bodyless schemas do not supply them.
+- Transport preserves both predicate denotation and visible dependencies.
+  Pattern regions with unchanged representation retain their original scopes;
+  changed regions remain checked against the original graph. Missing codecs
+  cause incomplete source export rather than private representation disclosure.
+- Formation and escape walkers account for retained transport predicates.
+  Runtime call-result detachment cannot erase a universal introduction or seal.
+- Membership and pattern complement checks do not replay their own validators.
+  Recursive transport checks and unresolved proofs remain incomplete.
+
+## Verification results
+
+Verified on 24 September 2026 with Go 1.27.1 on darwin/arm64:
+
+| Gate | Result |
+| --- | --- |
+| `go test ./cue ./internal/core/...` | Passed. |
+| `go test ./...` | Passed with localhost access for registry and language-server test servers. |
+| `tools/test-quantified-oracles.sh fast` | Passed, including all boundary tests. |
+| `tools/test-quantified-oracles.sh extended` | Passed, followed by all five 30-second native fuzz runs. |
+| Extended feature-combination model with its residual allowance removed | All 2,432 valid cases established; all 3,840 invalid promises rejected; zero residual cases. |
+| `go test -race ./cue -run '^(TestQuantifiedBoundary|TestQuantifiedSemantic)'` | Passed. |
+| `go test -race ./internal/core/adt -run '^TestEvalV3$/quantified'` | Passed. |
+| `go test -race ./internal/core/subsume` | Passed. |
+| `git diff --check` | Passed. |
+
+The extended run includes 262,144 exhaustive finite-quantifier cases, 122,880
+finite dependent-domain cases, 25,088 record-membership cases, 5,120 generated
+preservation transformations, 512 dependent subtype chains, and 540,021,248
+packet-domain comparisons. The new independent transport model adds 576 cases.
+The feature model's previous allowance for 448 incomplete positive cases has
+been removed: every valid case in that supported vocabulary must now certify
+and execute. General proof limits remain tested separately.
+
+The first sandboxed repository run could not bind local test-server ports.
+Rerunning with localhost access passed; no test expectation was relaxed to
+work around that restriction.
+
+## Remaining supported-profile limits
+
+This is not an implementation of the entire denotational reference model.
+The [implementation guide](quantified-cue-implementation.md) remains the supported
+feature contract. General dependent profile D, unrestricted Boolean quantified
+inclusion, arbitrary termination proofs, and effect/extern implementation proofs
+remain unsupported. Opening is limited to record-shaped interfaces with one
+unbounded representation carrier; constructive transparent opening uses the
+covariant membership rule. Overlapping or recursive transports without a
+sufficient totality proof remain incomplete. Opaque source export requires an
+interface codec. These limits do not justify certifying an operation whose
+admitted execution fails, or turning an unresolved judgment into a refutation.
+
+The finite models and transformations provide independent executable evidence
+for their stated vocabularies. They are not a formal proof of all possible CUE
+programs or a guarantee that no future interaction defect can exist.

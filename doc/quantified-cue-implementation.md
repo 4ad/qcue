@@ -107,14 +107,20 @@ through local aliases. The check follows free dependencies and nested argument
 substitutions. Index guards belong to each alias use: checking an erased argument
 does not invalidate a separate fixed integer index through the same template.
 Finite literal value binders retain their selected values as runtime captures
-and are distinct from erased type binders.
+and are distinct from erased type binders. Type application and sealing share
+the same sorted witness check: value witnesses must belong to their range; type
+witnesses must satisfy their universe and subtype bounds. A mixed seal creates
+opaque carriers only for its type witnesses.
 
 ## Functions, refinement, and checking
 
 Conjoining function contracts retains every guarded capability clause. An
 implementation keeps its original labels, defaults, omitted-argument behavior,
 and extra-argument policy. Applicable clauses constrain its actual call result.
-An unresolved applicability guard remains an obligation.
+An unresolved applicability guard remains an obligation. Applicability is
+checked against the original supplied packet, before parameter constraints or
+defaults enrich the activation. Abstract application retains missing execution
+as an obligation and propagates only independently admitted result clauses.
 For callable domains, including callbacks inside records or lists, applicability
 requires independent conformance evidence from the original argument.
 Completing a call also checks the actual packet's callable membership
@@ -139,7 +145,9 @@ Two copies of one closure retain their identity. Unknown capture equality stays
 incomplete until refinement settles it.
 Adding contracts to a captured function does not change its runtime identity,
 including when it is nested in a captured record, list, or partial argument.
-Those contracts remain separate validation obligations.
+Those contracts remain separate validation obligations. Data `==` and `!=` use
+the same recursive runtime comparison through container and opaque boundaries;
+nesting cannot make erased selections or redundant contracts observable.
 The same runtime identity governs singleton membership and abstract-value
 equality, recursively through records, lists, and builtins. An opaque meet keeps
 both private constraint graphs and their validation obligations. Constraint
@@ -183,6 +191,10 @@ an unresolved row. The checker does not use a target annotation as evidence for
 itself. Knowing a closure's code and captures, or successfully evaluating one
 call, does not discharge its declared contract.
 Calls within certified bodies use the remaining protocol of a partial closure.
+They consider the whole available arrow intersection, including finite unions
+of admitted input packets, while keeping original obligations separate from a
+selected view's available domain. Definition fields and absent optional fields
+do not introduce executable callback hypotheses.
 Primitive proof rules check the actual labels, arity, and omission policy before
 using a known total result rule.
 Numeric translation by a constant preserves supported bounds.
@@ -251,7 +263,14 @@ the interface. Private implementation fields are not implicitly exported.
 This projection applies only to the module's root interface. Ordinary open-record
 arguments and results retain their extra data fields, including inside nested
 records and lists; hidden and definition labels keep their package identity.
-Adapters transport the abstract occurrences within these values.
+Adapters transport the abstract occurrences within these values. A scoped
+transport plan supplies both execution and totality certification. Identity
+branches retain their entire constraint graph. Changing composite branches
+retain the original graph behind an inverse-image predicate, preserving
+closedness, correlations, optional restrictions, and patterns under later
+refinement. Definitions and absent optional fields undergo predicate transport.
+Unchanged pattern regions also retain their visible lexical dependencies and
+label bindings, so scope and universe checks cannot lose them.
 Omission passes through an adapter, so the private implementation chooses its
 own default rather than receiving the interface's default as an argument.
 Independent nested packages pass through by identity, preserving their seals
@@ -307,11 +326,15 @@ missing refinable fields remain incomplete, while fields forbidden by a closed
 candidate establish a contradiction. It cannot certify a missing field by
 checking a separate, augmented record.
 
-The current `open` operation supports record-shaped sealed interfaces with one
-unbounded representation binder. Multi-carrier and scalar existential packages
-cannot yet be opened. Transparent existential descriptions do not provide an
-`open` witness; their current membership rules cover covariant data and reuse of
-sealed witnesses, rather than general witness synthesis or elimination.
+The current `open` operation supports record-shaped interfaces with one
+unbounded representation binder. Multi-carrier, bounded, and scalar existential
+packages cannot yet be opened. For an admitted transparent covariant record,
+opening constructs the same greatest admissible type witness used by its
+membership rule. Repeated opening of a shared subject preserves that witness.
+Certification of a client also checks that this witness construction has total
+public transport; it cannot assume every existential member was explicitly
+sealed. Noncovariant transparent descriptions still require a supplied witness;
+general existential witness synthesis remains unsupported.
 
 Opaque values and package operations cannot be serialized as their private
 implementations. Observe ordinary data through public operations before exporting
@@ -324,7 +347,8 @@ inside records and lists. A hidden label from another package that cannot be
 rebound faithfully makes independent export incomplete.
 Residual quantifiers retain selected arguments, outer predicates, and local
 binder scopes. These rules apply to both ordinary and final source export;
-unsupported captures, independent partial closures, and opaque operations report
+unsupported captures, independent partial closures, retained transport
+predicates without an interface codec, and opaque operations report
 incompleteness rather than being replaced with a weaker description.
 Sealed packages also report incomplete source export when their visible
 interface contains only ordinary data; export cannot erase their seal identity.
@@ -351,14 +375,17 @@ require the same unsupported code projection are also rejected explicitly.
 Projected methods from selected records and fixed lists retain their remaining
 method telescope through export and reimport, including separately supplied
 implementations. Original universal clauses remain proof obligations and cannot
-restart a consumed binder. Scalar normalization and graph deduplication likewise
-retain the introduction's universe and selection information.
+restart a consumed binder. Scalar normalization, call-result detachment, and graph deduplication likewise
+retain the introduction's universe and selection information. Passing a
+quantified scalar or list through an identity call cannot erase its remaining
+telescope or restart a consumed binder.
 
 ## Implementation map and regression coverage
 
 [The semantic preservation design](quantified-cue-semantics-redesign.md)
 describes the judgment boundaries, their representations and independent finite
-models. The original audit reports are historical descriptions of their stated
+models. [The boundary implementation audit](quantified-cue-boundaries.md) records
+the subsequent consolidation, regressions, and final verification. The original audit reports are historical descriptions of their stated
 revisions.
 
 - `cue/ast`, `cue/parser`, and `cue/format` define lexical syntax and its round
@@ -368,9 +395,15 @@ revisions.
 - `internal/core/adt/capability.go`, `closure.go`, `abstract.go`, and `recursion.go`
   implement call obligations, operational identity, symbolic calls, and checked
   finite-list descent.
-- `internal/core/adt/package.go` implements existential residuals and opaque
-  boundary transport. `internal/core/subsume` separates sufficient inclusion
-  checks from implementation certification.
+- `internal/core/adt/call_admission.go`, `call_contract.go`, and
+  `runtime_identity.go` share original-packet admission, available call clauses,
+  guarded results, and recursive runtime observations across their consumers.
+- `internal/core/adt/package.go`, `existential_witness.go`, and
+  `binder_witness.go` implement existential residuals and sorted construction
+  and elimination of witnesses. `transport_plan.go` and
+  `transport_constraint.go` share scoped transport and retain source predicates.
+  `internal/core/subsume` separates sufficient inclusion checks from
+  implementation certification.
 - [The quantified test index](../cue/testdata/quantified/README.md) links every
   layer's txtar fixtures and explains their assertions. Semantic cases run in
   the ordinary evaluator corpus under `cue/testdata/quantified/`.

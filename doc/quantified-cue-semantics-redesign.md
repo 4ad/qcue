@@ -95,7 +95,7 @@ incomplete rather than being accepted or refuted by approximation.
 
 ## Verification
 
-The seven counterexamples in the audit are regression requirements, not the
+The counterexamples in each audit are regression requirements, not the
 completion criterion. Generated checks must additionally compare equivalent
 programs across field classes and nesting, declaration and conjunction order,
 alias expansion, private implementation sharing, explicit selection, API
@@ -145,3 +145,22 @@ finite-model results from the opaque-transport cases that remain unproved.
 The larger randomized model also found exponential expansion of equivalent
 finite alternatives; normalization now collapses proved-equal ground results
 without discarding residual predicates or mutable lexical dependencies.
+
+
+## Consolidation after the boundary audit
+
+The later [boundary audit and implementation record](quantified-cue-boundaries.md)
+tracks the consumers that still bypassed these judgments. Admission now uses a
+retained original packet; runtime observations use one recursive comparator;
+transport execution and certification consume the same scoped plan; sorted
+witness formation is shared by selection and sealing; covariant membership and
+opening share one constructive witness rule; and call contracts expose available
+views separately from retained obligations and guarded results.
+
+A compatibility result never introduces a callback hypothesis. In particular,
+definition fields remain predicates even when their approximation is a function
+signature. Composite transport retains the inverse image of the source graph,
+while projected predicates and unchanged pattern regions preserve public scope
+dependencies. These mechanisms are exercised by independent acceptance models,
+API refinements, callback round trips, and positive and negative scope checks in
+`quantified_boundaries_test.go`.

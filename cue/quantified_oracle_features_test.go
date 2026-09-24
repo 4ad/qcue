@@ -108,10 +108,9 @@ p: seal #M with (State = int) {
 	return "@experiment(quantified)\n" + strings.Join(parts, "\n")
 }
 
-// The transport prover currently leaves unions of overlapping source kinds
-// unresolved, even for distinct integer singletons. Those cases are counted as
-// residual evidence, never as established conformance. All other positive
-// cases here require successful observation; no invalid contract may certify.
+// These finite scalar unions all use identity transport. Every independently
+// valid case must now certify and execute, including opaque combinations.
+// Unknown is not accepted as evidence for this supported vocabulary.
 func featureOracleObservation(m featureOracle) (outcome, mismatch string) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(m.source(""))
@@ -145,9 +144,6 @@ func featureOracleObservation(m featureOracle) (outcome, mismatch string) {
 		return "", fmt.Sprintf("valid callback refuted: %v", ordinary)
 	}
 	if concrete != nil || jsonErr != nil {
-		if m.flags&featureOpaque != 0 && bits.OnesCount8(m.domain) > 1 && concrete != nil && jsonErr != nil {
-			return "residual", ""
-		}
 		return "", fmt.Sprintf("supported valid callback unresolved: concrete=%v JSON=%s, %v", concrete, value, jsonErr)
 	}
 	wantJSON := strconv.Itoa(bits.TrailingZeros8(m.domain))
@@ -203,10 +199,10 @@ func checkFeatureOracle(t *testing.T, m featureOracle) string {
 func TestQuantifiedOracleFeatureCombinations(t *testing.T) {
 	extended := extendedQuantifiedOracle(t)
 	outcomes := make(map[string]int)
-	residualControls := 0
+	opaqueUnionControls := 0
 	check := func(m featureOracle) {
 		if m.domain & ^m.result == 0 && m.flags&featureOpaque != 0 && bits.OnesCount8(m.domain) > 1 {
-			residualControls++
+			opaqueUnionControls++
 		}
 		outcomes[checkFeatureOracle(t, m)]++
 	}
@@ -226,10 +222,10 @@ func TestQuantifiedOracleFeatureCombinations(t *testing.T) {
 			}
 		}
 	}
-	// Exercise the current proof limit, without requiring it to remain a limit
-	// if the transport prover learns to establish these valid cases later.
-	if outcomes["established"] == 0 || outcomes["rejected"] == 0 || residualControls == 0 {
-		t.Fatalf("missing positive, negative or residual controls: %v", outcomes)
+	// Keep positive, negative, and overlapping ordinary-union controls.
+	// Regressing a proved identity transport to unknown must fail this suite.
+	if outcomes["established"] == 0 || outcomes["rejected"] == 0 || opaqueUnionControls == 0 {
+		t.Fatalf("missing positive, negative or opaque-union controls: %v", outcomes)
 	}
 	t.Logf("feature combinations: established=%d rejected=%d residual=%d", outcomes["established"], outcomes["rejected"], outcomes["residual"])
 }
