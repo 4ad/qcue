@@ -62,7 +62,12 @@ type Package struct {
 	CUE    string
 }
 
-func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) *adt.Vertex {
+// MustCompile initializes a builtin package. Invalid builtin definitions panic,
+// but cancellation is returned to the importer as an error.
+func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) (*adt.Vertex, errors.Error) {
+	if b := ctx.Cancelled(); b != nil {
+		return nil, b.Err
+	}
 	obj := &adt.Vertex{}
 	pkgLabel := ctx.StringLabel(importPath)
 	st := &adt.StructLit{}
@@ -81,7 +86,11 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) *adt.Vertex
 		// n := &node{baseValue: newBase(imp.Path)}
 		var v adt.Expr
 		if b.Const != "" {
-			v = mustParseConstBuiltin(ctx, b.Name, b.Const)
+			var err errors.Error
+			v, err = mustParseConstBuiltin(ctx, b.Name, b.Const)
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			v = ToBuiltin(&b)
 		}
@@ -97,13 +106,19 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) *adt.Vertex
 	// without it the syntax it enables is rejected. Its declarations unify
 	// with the natives above.
 	if p.CUE != "" {
-		f, err := parser.ParseFile(importPath, p.CUE)
+		f, err := parser.ParseFile(importPath, p.CUE, parser.WithContext(ctx.Context()))
+		if b := ctx.Cancelled(); b != nil {
+			return nil, b.Err
+		}
 		if err != nil {
 			panic(fmt.Errorf("could not parse %v: %v", p.CUE, err))
 		}
 		v, err := compile.Files(nil, ctx.Runtime, importPath, f)
+		if b := ctx.Cancelled(); b != nil {
+			return nil, b.Err
+		}
 		if err != nil {
-			panic(fmt.Errorf("could compile parse %v: %v", p.CUE, err))
+			panic(fmt.Errorf("could not compile %v: %v", p.CUE, err))
 		}
 		for _, c := range v.Conjuncts {
 			obj.AddConjunct(c)
@@ -111,8 +126,11 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) *adt.Vertex
 	}
 
 	// We could compile lazily, but this is easier for debugging.
-	obj.Finalize(ctx)
-	if err := obj.Err(ctx); err != nil {
+	err := obj.Err(ctx)
+	if b := ctx.Cancelled(); b != nil {
+		return nil, b.Err
+	}
+	if err != nil {
 		panic(err.Err)
 	}
 
@@ -128,7 +146,7 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) *adt.Vertex
 		}
 	}
 
-	return obj
+	return obj, nil
 }
 
 // ToBuiltin converts a Builtin into an adt.Builtin.
@@ -194,19 +212,24 @@ func ToBuiltin(b *Builtin) *adt.Builtin {
 	return x
 }
 
-// newConstBuiltin parses and creates any CUE expression that does not have
-// fields.
-func mustParseConstBuiltin(ctx adt.Runtime, name, val string) adt.Expr {
-	expr, err := parser.ParseExpr("<builtin:"+name+">", val)
+// mustParseConstBuiltin parses and compiles a builtin constant. Invalid
+// definitions panic; cancellation is returned as an error.
+func mustParseConstBuiltin(ctx *adt.OpContext, name, val string) (adt.Expr, errors.Error) {
+	expr, err := parser.ParseExpr("<builtin:"+name+">", val, parser.WithContext(ctx.Context()))
+	if b := ctx.Cancelled(); b != nil {
+		return nil, b.Err
+	}
 	if err != nil {
 		panic(err)
 	}
 	c, err := compile.Expr(nil, ctx, "_", expr)
+	if b := ctx.Cancelled(); b != nil {
+		return nil, b.Err
+	}
 	if err != nil {
 		panic(err)
 	}
-	return c.Expr()
-
+	return c.Expr(), nil
 }
 
 func processErr(call *CallCtxt, errVal interface{}, ret adt.Expr) adt.Expr {

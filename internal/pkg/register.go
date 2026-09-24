@@ -32,7 +32,7 @@ func Register(importPath string, p *Package) {
 	f := func(r adt.Runtime) (*adt.Vertex, errors.Error) {
 		ctx := eval.NewContext(r, nil)
 
-		return p.MustCompile(ctx, importPath), nil
+		return p.MustCompile(ctx, importPath)
 	}
 	runtime.RegisterBuiltin(inst, f)
 }
