@@ -724,7 +724,7 @@ func (b *buildPlan) parseFlags() (err error) {
 		PkgName:   flagPackage.String(b.cmd),
 	}
 
-	// For commands with an output mode, like `qcue export` or `qcue def`.
+	// For commands with an output mode, like `cue export` or `cue def`.
 	if b.cfg.mode != filetypes.Input {
 		out := flagOut.String(b.cmd)
 		outFile := flagOutFile.String(b.cmd)
@@ -801,7 +801,7 @@ func buildInstances(cmd *Command, binst []*build.Instance, ignoreErrors bool) ([
 
 func buildToolInstances(ctx *cue.Context, binst []*build.Instance) ([]*cue.Instance, error) {
 	// Reuse the same context, if there is one, so that the @embed injection can be used.
-	// Note that ctx may be nil when we do `qcue help cmd`.
+	// Note that ctx may be nil when we do `cue help cmd`.
 	r := new(cue.Runtime)
 	if ctx != nil {
 		r = (*cue.Runtime)(ctx)
@@ -824,11 +824,11 @@ func buildToolInstances(ctx *cue.Context, binst []*build.Instance) ([]*cue.Insta
 
 // mergeToolData unifies the data files named on the command line, such as JSON
 // or YAML files, with the package they are given alongside, just like commands
-// such as `qcue export` do. The orphan instance which held the data files is
+// such as `cue export` do. The orphan instance which held the data files is
 // dropped once its data has been placed.
 func mergeToolData(cmd *Command, binst []*build.Instance) ([]*build.Instance, error) {
 	// load.Instances gathers the files named on the command line in a single
-	// instance, always last. cmd.ctx is nil for `qcue help cmd`, which needs no data.
+	// instance, always last. cmd.ctx is nil for `cue help cmd`, which needs no data.
 	orphan := binst[len(binst)-1]
 	if !orphan.User || len(orphan.OrphanedFiles) == 0 || cmd.ctx == nil {
 		return binst, nil

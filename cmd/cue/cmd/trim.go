@@ -68,7 +68,7 @@ Examples:
 	}
 	EOF
 
-	$ qcue trim foo.cue
+	$ cue trim foo.cue
 	$ cat foo.cue
 	light: [string]: {
 		room:          string

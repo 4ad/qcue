@@ -481,7 +481,7 @@ To reproduce API observations, compile a snippet with
 `cuecontext.New().CompileString("@experiment(quantified)\n" + source)`, call
 `Validate()` and `Validate(cue.Concrete(true))`, and inspect
 `LookupPath(cue.ParsePath("out")).MarshalJSON()`. For CLI reproduction, build
-`./cmd/qcue` and run the files outside this repository's older pinned CUE
+`./cmd/cue` and run the files outside this repository's older pinned CUE
 module, or in a separate module using language version `v0.18.0`.
 
 The main testing gap is composition across semantic boundaries. Existing

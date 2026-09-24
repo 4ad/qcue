@@ -32,15 +32,15 @@ cd premodules-downstream-direct
 # Downstream consumption via `cue export` fails; when the current module lacks
 # a language.version field, we always nudge the user or developer to add one.
 ! exec cue export
-stderr '^no language version declared in module.cue; run ''qcue mod fix''$'
+stderr '^no language version declared in module.cue; run ''cue mod fix''$'
 
 # Upstream development works once `cue mod fix` adds a language.version field.
 ! exec cue mod tidy --check
-stderr '^no language version declared in module.cue; run ''qcue mod fix''$'
+stderr '^no language version declared in module.cue; run ''cue mod fix''$'
 ! exec cue mod get some.dependency
-stderr '^no language version declared in module.cue; run ''qcue mod fix''$'
+stderr '^no language version declared in module.cue; run ''cue mod fix''$'
 ! exec cue mod publish v0.0.2
-stderr '^no language version declared in module.cue; run ''qcue mod fix''$'
+stderr '^no language version declared in module.cue; run ''cue mod fix''$'
 exec cue mod fix
 cmp cue.mod/module.cue ${WORK}/premodules-module.cue.fixed
 exec cue export

@@ -37,7 +37,7 @@ func newEvalCmd(c *Command) *cobra.Command {
 Printing is skipped if validation fails.
 
 Input arguments can be CUE packages, CUE files, non-CUE files, or some
-combinations of those. See "qcue help inputs" for more detail.
+combinations of those. See "cue help inputs" for more detail.
 
 The --expression flag is used to evaluate an expression within the
 configuration file, instead of the entire configuration file itself.
@@ -48,7 +48,7 @@ Examples:
   a: ["a", "b", "c"]
   EOF
 
-  $ qcue eval foo.cue -e a[0] -e a[2]
+  $ cue eval foo.cue -e a[0] -e a[2]
   "a"
   "c"
 `,
@@ -101,7 +101,7 @@ func runEval(cmd *Command, args []string) error {
 		cue.ErrorsAsValues(flagIgnore.Bool(cmd)),
 	}
 
-	// Keep for legacy reasons. Note that `qcue eval` is to be deprecated by
+	// Keep for legacy reasons. Note that `cue eval` is to be deprecated by
 	// `cue` eventually.
 	// TODO use format.Indent("    ") once formatv2 is the only formatter;
 	// unlike these options, it would select formatv2 for this call.

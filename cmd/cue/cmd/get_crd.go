@@ -52,8 +52,8 @@ each extracted CRD.
 
 Example:
 
-	qcue get crd --group example.com ./crds/*.yaml
-	curl https://raw.githubusercontent.com/example/crd.yaml | qcue get crd yaml: -
+	cue get crd --group example.com ./crds/*.yaml
+	curl https://raw.githubusercontent.com/example/crd.yaml | cue get crd yaml: -
 `,
 		RunE: mkRunE(c, runCRD),
 	}
@@ -73,7 +73,7 @@ func runCRD(cmd *Command, args []string) error {
 	insts := load.Instances(args, nil)
 	if len(insts) != 1 {
 		if len(insts) > 1 {
-			return fmt.Errorf("cannot specify multiple packages to qcue get crd")
+			return fmt.Errorf("cannot specify multiple packages to cue get crd")
 		}
 		// TODO although other similar places in cmd/cue check
 		// for this case (load.Instances returning zero instances),

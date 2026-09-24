@@ -102,7 +102,7 @@ convention.
 The following command imports all .proto files in all
 subdirectories as well all dependencies.
 
-   qcue import proto -I ../include ./...
+   cue import proto -I ../include ./...
 
 The module root is implicitly added as an import path.
 
@@ -130,10 +130,10 @@ The module root is implicitly added as an import if it exists.
 Examples:
 
   # Convert individual files:
-  $ qcue import foo.json bar.json  # create foo.cue and bar.cue
+  $ cue import foo.json bar.json  # create foo.cue and bar.cue
 
   # Convert all json files in the indicated directories:
-  $ qcue import json ./...
+  $ cue import json ./...
 
 The "flags" help topic describes how to assign values to a
 specific path within a CUE namespace. Some examples of that
@@ -146,7 +146,7 @@ Examples:
   EOF
 
   # include the parsed file as an emit value:
-  $ qcue import foo.yaml
+  $ cue import foo.yaml
   $ cat foo.cue
   {
       kind: Service
@@ -154,13 +154,13 @@ Examples:
   }
 
   # include the parsed file at the root of the CUE file:
-  $ qcue import -f foo.yaml
+  $ cue import -f foo.yaml
   $ cat foo.cue
   kind: Service
   name: booster
 
   # include the import config at the mystuff path
-  $ qcue import -f -l '"mystuff"' foo.yaml
+  $ cue import -f -l '"mystuff"' foo.yaml
   $ cat foo.cue
   myStuff: {
       kind: Service
@@ -176,7 +176,7 @@ Examples:
   EOF
 
   # base the path values on the input
-  $ qcue import -f -l 'strings.ToLower(kind)' -l name foo.yaml
+  $ cue import -f -l 'strings.ToLower(kind)' -l name foo.yaml
   $ cat foo.cue
   service: booster: {
       kind: "Service"
@@ -184,7 +184,7 @@ Examples:
   }
 
   # base the path values on the input and file name
-  $ qcue import -f --with-context -l 'path.Base(filename)' -l data.kind foo.yaml
+  $ cue import -f --with-context -l 'path.Base(filename)' -l data.kind foo.yaml
   $ cat foo.cue
   "foo.yaml": Service: {
       kind: "Service"
@@ -198,7 +198,7 @@ Examples:
   }
 
   # include all files as list elements
-  $ qcue import -f --list foo.yaml
+  $ cue import -f --list foo.yaml
   $ cat foo.cue
   [{
       kind: "Service"
@@ -210,7 +210,7 @@ Examples:
   }]
 
   # collate files with the same path into a list
-  $ qcue import -f -list -l 'strings.ToLower(kind)' foo.yaml
+  $ cue import -f -list -l 'strings.ToLower(kind)' foo.yaml
   $ cat foo.cue
   service: [{
       kind: "Service"
@@ -239,7 +239,7 @@ Example:
   }
   EOF
 
-  $ qcue import -R example.json
+  $ cue import -R example.json
   $ cat example.cue
   import "encoding/json"
 

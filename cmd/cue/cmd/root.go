@@ -138,11 +138,11 @@ func fetchStats() Stats {
 }
 
 // commandGroup makes cmd runnable in a way that implements commands grouping more subcommands,
-// such as `qcue mod` or `qcue refactor`. Note that the user can't actually run these commands to
+// such as `cue mod` or `cue refactor`. Note that the user can't actually run these commands to
 // do anything useful, but we need RunE for good error messages, as Cobra itself is lacking:
 // https://github.com/spf13/cobra/issues/706
 func commandGroup(cmd *cobra.Command) *cobra.Command {
-	// If the user ran `qcue mod nosuchcommand --nosuchflag`, we run the `qcue mod` command
+	// If the user ran `cue mod nosuchcommand --nosuchflag`, we run the `cue mod` command
 	// because `nosuchcommand` was not a known subcommand.
 	// In such a case, do not fail with "unknown flag"; what matters to the user is that
 	// `nosuchcommand`, which might have such a flag if it existed, was not found at all.
@@ -157,7 +157,7 @@ func commandGroup(cmd *cobra.Command) *cobra.Command {
 		} else {
 			fmt.Fprintf(stderr, "%s must be run as one of its subcommands: unknown subcommand %q\n", name, args[0])
 		}
-		fmt.Fprintf(stderr, "Run 'qcue help %s' for known subcommands.\n", name)
+		fmt.Fprintf(stderr, "Run 'cue help %s' for known subcommands.\n", name)
 		return ErrPrintedError
 	}
 	return cmd
@@ -298,9 +298,9 @@ func New(args []string) (*Command, error) {
 	})
 
 	cmd := &cobra.Command{
-		Use: "qcue",
-		// TODO: the short help text below seems to refer to `qcue cmd`, like helpTemplate.
-		Short: "qcue evaluates CUE with higher-rank quantifiers and opaque packages.",
+		Use: "cue",
+		// TODO: the short help text below seems to refer to `cue cmd`, like helpTemplate.
+		Short: "cue evaluates CUE with higher-rank quantifiers and opaque packages.",
 
 		// We print errors ourselves in Main, which allows for ErrPrintedError.
 		// Similarly, we don't want to print the entire help text on any error.
@@ -322,7 +322,7 @@ func New(args []string) (*Command, error) {
 	cmd.Flag("help").Hidden = true
 
 	// "help" is treated as a special command by cobra.
-	// We use our own template to be more in control of the structure of `qcue help`.
+	// We use our own template to be more in control of the structure of `cue help`.
 	// Note that we need to add helpCmd as a subcommand first, for cobra to work out
 	// the proper help text paddings for additional help topics.
 	helpCmd := newHelpCmd(c)
@@ -362,14 +362,14 @@ func New(args []string) (*Command, error) {
 	return c, nil
 }
 
-// Main runs the qcue tool and returns the code for passing to os.Exit.
+// Main runs the cue tool and returns the code for passing to os.Exit.
 func Main() int {
 	start := time.Now()
 	cmd, _ := New(os.Args[1:])
-	// CUE_BENCH makes the qcue tool act like a `go test -bench=. -benchmem` benchmark,
+	// CUE_BENCH makes the cue tool act like a `go test -bench=. -benchmem` benchmark,
 	// doing all of its work and then only printing a benchmark result line to stdout
 	// including the elapsed time, Go allocated bytes, and Go allocations count.
-	// This is helpful for benchmarking `qcue export` or `qcue vet` like one would a Go API
+	// This is helpful for benchmarking `cue export` or `cue vet` like one would a Go API
 	// without having to write one-off bench_test.go files imitating what the CLI does.
 	benchName := os.Getenv("CUE_BENCH")
 	if benchName != "" {

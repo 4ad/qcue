@@ -1,10 +1,10 @@
-# Quantified CUE (`qcue`)
+# Quantified CUE (`cue`)
 
 This fork adds predicative higher-rank quantifiers (`S_H`) and opaque
 existential packages (`A`). Quantifiers are enabled by default at CUE language
-version v0.18.0 and later. Build with `go install ./cmd/qcue`; the resulting
-`qcue` executable can coexist with an upstream `cue` installation.
-Run `qcue version` for the supported language version and extension profiles.
+version v0.18.0 and later. Build with `go install ./cmd/cue`; the resulting
+`cue` executable can directly replace an upstream `cue` binary.
+Run `cue version` for the supported language version and extension profiles.
 
 See [the implementation guide](doc/quantified-cue-implementation.md) and
 [the quantified test index](cue/testdata/quantified/README.md) for examples and
@@ -55,11 +55,11 @@ Download the [latest release](https://github.com/cue-lang/cue/releases/latest/) 
 
 You need [Go 1.26 or later](https://go.dev/doc/install) to install CUE from source:
 
-	go install ./cmd/qcue
+	go install ./cmd/cue
 
-You can also `git clone` the repository and build it directly via `go install ./cmd/qcue`.
+You can also `git clone` the repository and build it directly via `go install ./cmd/cue`.
 
-Built `qcue` binaries include version information as reported by `qcue version`,
+Built `cue` binaries include version information as reported by `cue version`,
 which `go build` derives from the VCS. We recommend that downstream packagers
 build releases from git tags rather than source archives to ensure this works.
 

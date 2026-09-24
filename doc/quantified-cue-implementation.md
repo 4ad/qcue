@@ -9,12 +9,12 @@ and Go API calls with no pinned language version.
 Build and install from this checkout:
 
 ```sh
-go install ./cmd/qcue
-qcue version
+go install ./cmd/cue
+cue version
 ```
 
-The executable is `qcue`, so it can coexist with upstream `cue`. Its version
-output identifies the build, supported CUE language version, S_H and A
+The executable is `cue`, so it can directly replace an upstream `cue` binary.
+Its version output identifies the build, supported CUE language version, S_H and A
 extensions, and default activation. The CLI library keeps the import path
 `cuelang.org/go/cmd/cue/cmd`.
 
@@ -34,8 +34,8 @@ incomplete; it never publishes a truncated union or intersection. Constant
 literal bodies avoid the product after checking the ranges for emptiness.
 
 For a new module, use
-`qcue mod init --language-version v0.18.0 example.com/quantified`. For an existing
-module, set its language version with `qcue mod edit --language-version v0.18.0`.
+`cue mod init --language-version v0.18.0 example.com/quantified`. For an existing
+module, set its language version with `cue mod edit --language-version v0.18.0`.
 
 ## Quantifiers and type application
 
@@ -168,10 +168,10 @@ Validation distinguishes retaining constraints from requiring a complete value:
 | `value.Validate()` | Report established contradictions; allow residual obligations. |
 | `value.Validate(cue.Concrete(true))` | Require materialized values, complete runtime captures, and function implementations proved to satisfy their declared contracts for arbitrary admitted inputs. |
 
-`qcue vet file.cue` requires concrete validation, including function type
-conformance. An unresolved contract makes validation incomplete; use `qcue vet -c`
+`cue vet file.cue` requires concrete validation, including function type
+conformance. An unresolved contract makes validation incomplete; use `cue vet -c`
 to see the detailed errors. There is no separate function-verification flag.
-`qcue vet -c=false` explicitly permits incomplete constraints for further
+`cue vet -c=false` explicitly permits incomplete constraints for further
 refinement and does not establish that every retained implementation satisfies
 its type. Definitions and absent optional fields remain schemas until demanded
 as ordinary values, following CUE's usual concreteness rules.

@@ -34,12 +34,12 @@ cmd executes the named workflow command for each of the named instances.
 Workflow commands are defined in tool files, which are regular CUE
 files within the same package with a filename ending in _tool.cue.
 
-Run "qcue help commands" for more details on authoring tasks and
+Run "cue help commands" for more details on authoring tasks and
 workflow commands.
 
 Usage:
-  qcue cmd [flags] <name> [inputs]
-  qcue cmd [command]
+  cue cmd [flags] <name> [inputs]
+  cue cmd [command]
 
 Available Commands:
   echo        echo something back
@@ -56,4 +56,4 @@ Global Flags:
   -i, --ignore         proceed in the presence of errors
   -s, --simplify       simplify output
 
-Use "qcue cmd [command] --help" for more information about a command.
+Use "cue cmd [command] --help" for more information about a command.

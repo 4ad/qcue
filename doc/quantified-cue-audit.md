@@ -12,9 +12,9 @@ I read the proposal's semantics, surface forms, profiles, examples, and checking
 
 Both the focused core-package tests and `go test ./...` passed. The initial sandboxed full-suite run failed where tests needed local listening sockets; rerunning with those permissions completed successfully. The defects below therefore escape the existing test suite. The performance reproduction was deliberately terminated after four seconds; I did not attempt an out-of-memory test.
 
-Build the CLI with `go build -o /tmp/qcue-audit ./cmd/qcue`. Run reproductions from a temporary directory outside this checkout's older-version CUE module. The following snippets assume quantified mode; adding `@experiment(quantified)` makes that explicit. An older module's language-version gate still applies even with the attribute.
+Build the CLI with `go build -o /tmp/cue-audit ./cmd/cue`. Run reproductions from a temporary directory outside this checkout's older-version CUE module. The following snippets assume quantified mode; adding `@experiment(quantified)` makes that explicit. An older module's language-version gate still applies even with the attribute.
 
-For implementation certification, run `/tmp/qcue-audit vet -c case.cue`. For an individual result, use `/tmp/qcue-audit eval -e out case.cue` or the public API:
+For implementation certification, run `/tmp/cue-audit vet -c case.cue`. For an individual result, use `/tmp/cue-audit eval -e out case.cue` or the public API:
 
 ```go
 v := cuecontext.New().CompileString(source)
@@ -84,7 +84,7 @@ f: func(x: #T) -> int: x.a
 out: f({a: 1})
 ```
 
-The original program passes concrete validation. Original `f({a: 1, b: 2})` correctly fails with `field not allowed`. However, `qcue eval` exports the closure as:
+The original program passes concrete validation. Original `f({a: 1, b: 2})` correctly fails with `field not allowed`. However, `cue eval` exports the closure as:
 
 ```cue
 f: CUECode({a: int})

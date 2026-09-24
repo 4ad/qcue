@@ -10,21 +10,21 @@ This report describes seven current findings. It does not repeat the repaired ex
 
 **Method and test results**
 
-I read the proposal's semantics, profiles, surface forms, examples, checking rules, residual-state obligations, and implementation contracts; compared these with the implementation guide; and traced parsing/binding, compilation, quantifier reduction, inference, universe checks, function contracts, certification, closure identity, sealing/opening, validation, and source export. Additional small programs were exercised through both `qcue` and the public Go API. Controls included regular versus hidden fields, direct versus separately supplied implementations, reordered clauses, and inlined versus shared type descriptions.
+I read the proposal's semantics, profiles, surface forms, examples, checking rules, residual-state obligations, and implementation contracts; compared these with the implementation guide; and traced parsing/binding, compilation, quantifier reduction, inference, universe checks, function contracts, certification, closure identity, sealing/opening, validation, and source export. Additional small programs were exercised through both `cue` and the public Go API. Controls included regular versus hidden fields, direct versus separately supplied implementations, reordered clauses, and inlined versus shared type descriptions.
 
 The focused evaluator, API, parser, formatter, AST, exporter, and certification tests passed. The full `go test ./...` also passed: **121 packages reported `ok`, with zero failing packages**. The first sandboxed full run failed because a CLI test could not bind a loopback test-server port; the successful run allowed those sockets. A writable temporary Go build cache was used. Passing existing tests does not cover the counterexamples below.
 
 Reproduction setup:
 
 ```sh
-GOCACHE=/tmp/cue-audit-go-cache go build -o /tmp/qcue-audit ./cmd/qcue
+GOCACHE=/tmp/cue-audit-go-cache go build -o /tmp/cue-audit ./cmd/cue
 ```
 
 Save each example in its own temporary directory outside the repository's pinned CUE module, with `@experiment(quantified)` at the beginning of the file. Then run:
 
 ```sh
-/tmp/qcue-audit vet -c case.cue
-/tmp/qcue-audit export -e out case.cue
+/tmp/cue-audit vet -c case.cue
+/tmp/cue-audit export -e out case.cue
 ```
 
 Where the distinction between root and selected-value validation matters, the observations below use:
@@ -106,7 +106,7 @@ p: seal #M with (A = int) {
 }
 ```
 
-Actual: root `Validate(cue.Concrete(true))`, validation of `p`, and `qcue vet -c` all succeed.
+Actual: root `Validate(cue.Concrete(true))`, validation of `p`, and `cue vet -c` all succeed.
 
 The public interface is impossible. Both clauses admit the packet `(x: 1)`. Its one result would have to be both an ordinary integer and a member of the fresh opaque carrier `A`. Those public kinds are disjoint, even though both private representations are integers. Both arrows are pure, so a shared admitted effect cannot resolve the conflict.
 

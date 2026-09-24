@@ -37,7 +37,7 @@ current directory. If more than one package is present in the current directory
 then an input argument must be provided.
 
 Input arguments can be CUE packages, CUE files, non-CUE files, or some
-combinations of those. See "qcue help inputs" for more detail.
+combinations of those. See "cue help inputs" for more detail.
 
 ## Output
 
@@ -59,39 +59,39 @@ The following encodings are recognized by the --out flag:
     text       Output as text   (can only encode values of type string)
     binary     Output as binary (can only encode values of type string or bytes)
 
-See "qcue help filetypes" for more information on values accepted by --out.
+See "cue help filetypes" for more information on values accepted by --out.
 
 ## Examples
 
 - Export the contents of the only CUE package in the current directory as JSON:
-  $ qcue export
+  $ cue export
 
 - Export the contents of an absolute package path as YAML:
-  $ qcue export cue.example/foo/bar --out yaml
+  $ cue export cue.example/foo/bar --out yaml
 
 - Unify the contents of the "example" package (which exists alongside other
   package in the current directory) with a YAML file, emitting the value of the
   "aKey" field as JSON:
-  $ qcue export .:example path/to/data.yml --expression aKey
+  $ cue export .:example path/to/data.yml --expression aKey
 
 - Export the contents of one of many CUE packages in a different, relative
   directory as TOML:
-  $ qcue export ./relative/path/to/directory:example --out toml
+  $ cue export ./relative/path/to/directory:example --out toml
 
 - Export the unified contents of multiple CUE files as CUE:
-  $ qcue export config.cue dir/extraData.cue --out cue
+  $ cue export config.cue dir/extraData.cue --out cue
 
 - Unify the contents of a CUE package and a TOML file, emittting the values of
   multiple expressions (rather than the top-level of the evaluation) as JSON:
-  $ qcue export cue.example/some/package data.toml -e key1 -e key2
+  $ cue export cue.example/some/package data.toml -e key1 -e key2
 
 ## More help
 
-- An in-depth guide to the "qcue export" command:
+- An in-depth guide to the "cue export" command:
     https://cuelang.org/docs/concept/using-the-cue-export-command/
-- The "qcue help inputs" command:
+- The "cue help inputs" command:
     https://cuelang.org/docs/reference/command/cue-help-inputs/
-- The "qcue help filetypes" command:
+- The "cue help filetypes" command:
     https://cuelang.org/docs/reference/command/cue-help-filetypes/
 `[1:],
 		// TODO: some formats are missing for sure, like "jsonl" or "textproto" from internal/filetypes/types.cue.

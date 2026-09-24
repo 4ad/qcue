@@ -17,10 +17,10 @@ The focused quantified evaluator, API, parser, formatter, AST, and exporter test
 Build the executable from the audited checkout:
 
 ```sh
-GOCACHE=/tmp/cue-audit-go-cache go build -o /tmp/qcue-audit ./cmd/qcue
+GOCACHE=/tmp/cue-audit-go-cache go build -o /tmp/cue-audit ./cmd/cue
 ```
 
-Save each example as a separate file under a temporary directory outside this repository's pinned CUE module. Each example below uses `@experiment(quantified)` explicitly. Use `qcue vet -c case.cue` for root concrete validation and `qcue export -e out case.cue` for a demanded result. A named function or package can be checked separately through:
+Save each example as a separate file under a temporary directory outside this repository's pinned CUE module. Each example below uses `@experiment(quantified)` explicitly. Use `cue vet -c case.cue` for root concrete validation and `cue export -e out case.cue` for a demanded result. A named function or package can be checked separately through:
 
 ```go
 v := cuecontext.New().CompileString(source)
@@ -43,7 +43,7 @@ p: f(cb, ...)
 g: func(y: int) -> int: p(y)
 ```
 
-Actual: root `Validate(cue.Concrete(true))` and `qcue vet -c` succeed. Both `p` and `g` are individually certified. Adding `out: g(2)` makes the demanded call incomplete with `function conformance remains unproved`.
+Actual: root `Validate(cue.Concrete(true))` and `cue vet -c` succeed. Both `p` and `g` are individually certified. Adding `out: g(2)` makes the demanded call incomplete with `function conformance remains unproved`.
 
 The saved callback is identity, and input `0` witnesses that it does not inhabit `func(int) -> 1`. Certification should not establish either the partial closure's residual capability or the wrapper's successful arrow. Retaining an incomplete obligation would be sound.
 
@@ -91,7 +91,7 @@ out: ((func(cb: _) -> int: 0) &
       (forall (A: int) func(func(A) -> int) -> 1))(cb)
 ```
 
-Actual: root concrete validation and `qcue vet -c` succeed; `out` exports `0`. But `cb` belongs to `func(int) -> int`, so the retained universal's `A=int` clause requires the actual result to be `1`. Selecting `[int]` explicitly before this call exposes the conflict `0` versus `1`.
+Actual: root concrete validation and `cue vet -c` succeed; `out` exports `0`. But `cb` belongs to `func(int) -> int`, so the retained universal's `A=int` clause requires the actual result to be `1`. Selecting `[int]` explicitly before this call exposes the conflict `0` versus `1`.
 
 `inferInstance` returns the guessed assignment's non-incomplete bound error. `scheduleCapabilityResults` interprets that as exclusion of the guarded clause and continues without preserving another possible instance or an unresolved guard. A failed existential candidate is thereby promoted into evidence about all possible candidates.
 
@@ -282,7 +282,7 @@ The specification's finite reference-model checks are described but are not incl
 **Resolution and verification — 24 September 2026**
 
 The ten original executable CUE examples above were rerun through the repaired
-`qcue` CLI. The valid cases now export their expected values; the saved-callback
+`cue` CLI. The valid cases now export their expected values; the saved-callback
 case remains unproved, the guarded result conflict is retained, and both abstract
 escape cases are rejected. The eleventh CUE block is the old malformed export,
 not an input example. API regressions now reject independent export of a closure

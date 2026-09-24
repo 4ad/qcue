@@ -12,6 +12,6 @@ stderr 'cuelsp daemon: exiting'
 
 # Positional arguments are rejected.
 ! exec cue lsp bogus
-stderr 'unknown command "bogus" for "qcue lsp"'
+stderr 'unknown command "bogus" for "cue lsp"'
 ! exec cue lsp serve bogus
-stderr 'unknown command "bogus" for "qcue lsp serve"'
+stderr 'unknown command "bogus" for "cue lsp serve"'

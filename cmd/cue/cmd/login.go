@@ -31,7 +31,7 @@ import (
 	"cuelang.org/go/internal/mod/modresolve"
 )
 
-// TODO: We need a testscript to cover "qcue login" with its oauth2 device flow.
+// TODO: We need a testscript to cover "cue login" with its oauth2 device flow.
 // Perhaps with a small net/http/httptest server to mock the basics of the oauth2 flow?
 //
 // It should also test edge cases like:
@@ -40,11 +40,11 @@ import (
 //  * existing login entries are kept when adding a new one
 //  * using the well-known endpoint to locate oauth2 endpoints
 //  * obtaining a new access token when it expires via the refresh token, and store the refreshed one
-//  * asking the user to re-run "qcue login" if the access token expires without a refresh token
+//  * asking the user to re-run "cue login" if the access token expires without a refresh token
 //  * registry strings with a path prefix or an insecure option
 //
 // We will have end-to-end tests which will cover authentication with registry.cue.works,
-// but they will use an existing token stored as a secret to avoid the human device flow in "qcue login".
+// but they will use an existing token stored as a secret to avoid the human device flow in "cue login".
 
 func newLoginCmd(c *Command) *cobra.Command {
 	cmd := &cobra.Command{
@@ -58,10 +58,10 @@ Use the --token flag to provide a token generated via the web interface,
 removing the need for a human to interact with the OAuth device flow.
 
 Once the authorization is successful, a token is stored in a logins.json file
-inside $CUE_CONFIG_DIR; see 'qcue help environment'.
+inside $CUE_CONFIG_DIR; see 'cue help environment'.
 
 To log into other OCI registries, use 'docker login' or 'podman login'.
-The qcue tool supports credentials configured via these tools:
+The cue tool supports credentials configured via these tools:
 
 	https://cuelang.org/docs/reference/modules/#authorization
 `[1:],
@@ -119,7 +119,7 @@ The qcue tool supports credentials configured via these tools:
 				oauthCfg := cueconfig.RegistryOAuthConfig(host)
 				resp, err := oauthCfg.DeviceAuth(ctx)
 				if err != nil {
-					// If the user attempted to use `qcue login` with an OCI registry that isn't a CUE registry
+					// If the user attempted to use `cue login` with an OCI registry that isn't a CUE registry
 					// like registry.cue.works, try to give some useful guidance. We don't print the full body
 					// because some respond with rather lengthy HTML content. We observed the following status codes:
 					//

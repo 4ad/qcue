@@ -11,19 +11,19 @@ lsp runs a CUE language server.
 
 The server communicates using the Language Server Protocol (LSP), with
 JSONRPC2 over stdin and stdout, and is intended to be run as a child
-process of an editor. Running "qcue lsp" with no subcommand is
-equivalent to running "qcue lsp serve".
+process of an editor. Running "cue lsp" with no subcommand is
+equivalent to running "cue lsp serve".
 
 By default, the server serves a single editor session over stdin and
 stdout. It can instead run as a shared daemon serving several editors:
 start the daemon with --listen, and configure each editor to run
-"qcue lsp --remote" to connect to it. With --remote=auto, an editor's
-"qcue lsp" starts the daemon automatically if it is not already
+"cue lsp --remote" to connect to it. With --remote=auto, an editor's
+"cue lsp" starts the daemon automatically if it is not already
 running.
 
 Usage:
-  qcue lsp [flags]
-  qcue lsp [command]
+  cue lsp [flags]
+  cue lsp [command]
 
 Available Commands:
   serve       run a CUE language server
@@ -42,4 +42,4 @@ Global Flags:
   -i, --ignore         proceed in the presence of errors
   -s, --simplify       simplify output
 
-Use "qcue lsp [command] --help" for more information about a command.
+Use "cue lsp [command] --help" for more information about a command.

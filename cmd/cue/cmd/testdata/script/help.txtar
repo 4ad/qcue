@@ -31,7 +31,7 @@ stdout -count=1 '^Publish the current module to an OCI registry\.'
 # Requesting additional help topics; the form without "help" is phased out.
 
 exec cue help filetypes
-stdout -count=1 '^The qcue tool supports the following file types:$'
+stdout -count=1 '^The cue tool supports the following file types:$'
 
 ! exec cue filetypes
 ! stdout .
@@ -78,19 +78,19 @@ Available Commands:
   lsp         start or interact with a CUE Language Server instance
   mod         module maintenance
   trim        remove superfluous fields
-  version     print the qcue version, CUE language version, and extensions
+  version     print the cue version, CUE language version, and extensions
   vet         validate data
 
-Use "qcue help [command]" for more information about a command.
+Use "cue help [command]" for more information about a command.
 
 Additional help topics:
-  qcue help commands       user-defined commands
-  qcue help embed          file embedding
-  qcue help environment    environment variables
-  qcue help experiments    experimental language features
-  qcue help filetypes      supported file types and qualifiers
-  qcue help flags          common flags for composing packages
-  qcue help injection      inject files or values into specific fields for a build
-  qcue help inputs         package list, patterns, and files
-  qcue help modules        module support
-  qcue help registryconfig module registry configuration
+  cue help commands       user-defined commands
+  cue help embed          file embedding
+  cue help environment    environment variables
+  cue help experiments    experimental language features
+  cue help filetypes      supported file types and qualifiers
+  cue help flags          common flags for composing packages
+  cue help injection      inject files or values into specific fields for a build
+  cue help inputs         package list, patterns, and files
+  cue help modules        module support
+  cue help registryconfig module registry configuration

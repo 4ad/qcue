@@ -68,7 +68,7 @@ go test ./internal/core/adt ./cue ./cue/parser ./cue/format \
 
 The complete `go test ./...` suite also passed: **121 packages with tests**. The first full-suite attempt was blocked by the sandbox's prohibition on listening sockets. Rerunning with local networking available passed. These are therefore gaps in the passing regression suite, not failures already caught by it.
 
-I built the CLI with `go build -o /tmp/qcue-audit-current ./cmd/qcue`. CLI examples below should be run from a temporary directory outside this repository's older-version module, or with the quantified experiment explicitly enabled. These reproductions were collected before changing production code. Performance trials had a five-second timeout; I did not run an exhaustion test against the baseline.
+I built the CLI with `go build -o /tmp/cue-audit-current ./cmd/cue`. CLI examples below should be run from a temporary directory outside this repository's older-version module, or with the quantified experiment explicitly enabled. These reproductions were collected before changing production code. Performance trials had a five-second timeout; I did not run an exhaustion test against the baseline.
 
 For API examples, `ctx` denotes `cuecontext.New()`. Concrete validation means `v.Validate(cue.Concrete(true))`; ordinary `v.Validate()` is allowed to retain unresolved obligations. A failure to prove an unsupported proposition is not classified as a semantic defect here.
 
@@ -87,7 +87,7 @@ right: f[2] & f[1]
 out: [left(), right()]
 ```
 
-Actual: `qcue export -e out` succeeds and prints `[1, 2]`.
+Actual: `cue export -e out` succeeds and prints `[1, 2]`.
 
 The alias has a fixed argument, `int`, but its body captures the enclosing erased parameter `A`. The erasure walker examines an alias template's body only when an **argument** contains an erased parameter. It never checks this free dependency. In contrast, directly returning `A` is correctly rejected.
 
@@ -139,7 +139,7 @@ out: (func(cb: func(int) -> 1) -> int: 5)(
 )
 ```
 
-Actual: root `Validate(cue.Concrete(true))` and `qcue vet -c` both succeed. JSON export produces `5`.
+Actual: root `Validate(cue.Concrete(true))` and `cue vet -c` both succeed. JSON export produces `5`.
 
 The supplied callback is identity, so it does not inhabit `func(int) -> 1`: input `0` is a counterexample. Checking that callback with the contract independently leaves conformance unproved. Calling `cb(0)` instead of returning `5` exposes the conflict. Even calling `cb(1)` allows the enclosing program to pass concrete validation, despite the invalid universal callback promise.
 
@@ -267,7 +267,7 @@ r(A): {f: func(x: A) -> A: x}
 out: r[int].f(1)
 ```
 
-The original passes concrete validation. `qcue eval` emits:
+The original passes concrete validation. `cue eval` emits:
 
 ```cue
 r: f: CUECode
@@ -296,7 +296,7 @@ f2: func(x: int) -> int: f1(f1(x))
 // Continue the same pattern through fN.
 ```
 
-There are no ground calls in this input; `qcue vet -c` is checking the declared functions. Observed elapsed times on this checkout were:
+There are no ground calls in this input; `cue vet -c` is checking the declared functions. Observed elapsed times on this checkout were:
 
 | Highest function | Source bytes | Result |
 | --- | ---: | --- |

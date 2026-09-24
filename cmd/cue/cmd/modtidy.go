@@ -41,7 +41,7 @@ It will attempt to fetch modules that aren't yet present in the
 dependencies by fetching the latest available version from
 a registry.
 
-See "qcue help environment" for details on how $CUE_REGISTRY is used to
+See "cue help environment" for details on how $CUE_REGISTRY is used to
 determine the modules registry.
 `,
 		RunE: mkRunE(c, runModTidy),
@@ -136,8 +136,8 @@ func writeModuleFile(filename string, format func(*modfile.File) ([]byte, error)
 
 // suggestModCommand rewrites a non-nil error to suggest to the user
 // what command they could use to fix a problem.
-// [modload.ErrModuleNotTidy] suggests running `qcue mod tidy`,
-// and [modfile.ErrNoLanguageVersion] suggests running `qcue mod fix`.
+// [modload.ErrModuleNotTidy] suggests running `cue mod tidy`,
+// and [modfile.ErrNoLanguageVersion] suggests running `cue mod fix`.
 func suggestModCommand(err error) error {
 	notTidyErr := new(modload.ErrModuleNotTidy)
 	switch {
@@ -145,12 +145,12 @@ func suggestModCommand(err error) error {
 		// TODO(mvdan): note that we cannot use standard Go error wrapping here via %w
 		// as then errors.Print calls errors.Errors which reaches for the first CUE error
 		// via errors.As, skipping over any non-CUE-wrapped errors.
-		err = fmt.Errorf("%v; run 'qcue mod fix'", err)
+		err = fmt.Errorf("%v; run 'cue mod fix'", err)
 	case errors.As(err, &notTidyErr):
 		if notTidyErr.Reason == "" {
-			err = fmt.Errorf("module is not tidy, use 'qcue mod tidy'")
+			err = fmt.Errorf("module is not tidy, use 'cue mod tidy'")
 		} else {
-			err = fmt.Errorf("module is not tidy, use 'qcue mod tidy': %v", notTidyErr.Reason)
+			err = fmt.Errorf("module is not tidy, use 'cue mod tidy': %v", notTidyErr.Reason)
 		}
 	}
 	return err

@@ -18,11 +18,11 @@ type Config struct {
 	// Sort from oldest to newest based on when they were introduced as a `preview`.
 
 	// FormatV2 selects the Wadler-Lindig pretty-printer as the
-	// implementation behind "qcue fmt" and "cue/format".
+	// implementation behind "cue fmt" and "cue/format".
 	FormatV2 bool `experiment:"preview:v0.18.0,default:v0.18.0"`
 
 	// OpenAPIV2 selects the new whole-document OpenAPI implementation behind
-	// the openapi encoding used by "qcue import" and "qcue export", extracting
+	// the openapi encoding used by "cue import" and "cue export", extracting
 	// and generating a complete OpenAPI document rather than only its schemas.
 	OpenAPIV2 bool `experiment:"preview:v0.18.0"`
 
@@ -92,7 +92,7 @@ func initExperimentFlags() error {
 
 // Init initializes Flags. Note: this isn't named "init" because we
 // don't always want it to be called (for example we don't want it to be
-// called when running "qcue help"), and also because we want the failure
+// called when running "cue help"), and also because we want the failure
 // mode to be one of error not panic, which would be the only option if
 // it was a top level init function.
 func Init() error {

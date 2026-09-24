@@ -1,33 +1,33 @@
 # Function type conformance is part of ordinary concrete validation.
-exec qcue vet structural.cue
+exec cue vet structural.cue
 ! stderr .
-exec qcue vet -c structural.cue
+exec cue vet -c structural.cue
 ! stderr .
 
 # An unresolved proof is incomplete, not successful typed validation.
-! exec qcue vet residual.cue
+! exec cue vet residual.cue
 stderr 'some instances are incomplete'
-! exec qcue vet -c residual.cue
+! exec cue vet -c residual.cue
 stderr 'positive: function conformance remains unproved'
 
 # Explicitly allowing incomplete constraints permits continued refinement.
-exec qcue vet -c=false residual.cue
+exec cue vet -c=false residual.cue
 ! stderr .
-exec qcue export residual.cue -e observation
+exec cue export residual.cue -e observation
 stdout '^0$'
 
 # The proof request is no longer an independent option.
-! exec qcue vet --verify-functions structural.cue
+! exec cue vet --verify-functions structural.cue
 stderr 'unknown flag: --verify-functions'
 
 # A contradiction remains an error even in incomplete mode.
-! exec qcue vet invalid.cue
+! exec cue vet invalid.cue
 stderr 'function'
-! exec qcue vet -c=false invalid.cue
+! exec cue vet -c=false invalid.cue
 stderr 'function'
 
 # All nested errors retain their paths, including later siblings.
-! exec qcue vet -c nested.cue
+! exec cue vet -c nested.cue
 stderr 'box.f: function conformance remains unproved'
 stderr 'box.g: function conformance remains unproved'
 stderr 'items.0: function conformance remains unproved'

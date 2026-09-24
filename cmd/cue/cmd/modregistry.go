@@ -42,11 +42,11 @@ for use in testing.
 
 For example, start a local registry with:
 
-	qcue mod registry localhost:8080
+	cue mod registry localhost:8080
 
 and point CUE_REGISTRY to it to publish a module version:
 
-	CUE_REGISTRY=localhost:8080 qcue mod publish v0.0.1
+	CUE_REGISTRY=localhost:8080 cue mod publish v0.0.1
 
 Note: this command might be removed or changed significantly in the future.
 `[1:],

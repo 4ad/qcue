@@ -38,17 +38,17 @@ cmp stderr unknown_mod_cmd.out
 cmp stderr typo_cmd.stdout
 
 -- unknown_cmd.out --
-unknown command "unknown" for "qcue"
+unknown command "unknown" for "cue"
 -- missing_mod_cmd.out --
 mod must be run as one of its subcommands
-Run 'qcue help mod' for known subcommands.
+Run 'cue help mod' for known subcommands.
 -- unknown_mod_cmd.out --
 mod must be run as one of its subcommands: unknown subcommand "unknown"
-Run 'qcue help mod' for known subcommands.
+Run 'cue help mod' for known subcommands.
 -- unknown_flag.out --
 unknown flag: --unknown
 -- typo_cmd.stdout --
-unknown command "evla" for "qcue"
+unknown command "evla" for "cue"
 
 Did you mean this?
 	eval

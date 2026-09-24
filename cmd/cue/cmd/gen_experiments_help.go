@@ -318,7 +318,7 @@ previous function experiment's semantics, use:
 	@experiment(functions,quantified=false)
 
 The behavior of per-file experiments tracks the language version declared in their module,
-or if none exists, the language version reported by "qcue version".
+or if none exists, the language version reported by "cue version".
 
 Available per-file experiments:
 
@@ -364,9 +364,9 @@ Available per-file experiments:
 Global experiments are enabled via the CUE_EXPERIMENT environment variable:
 
 	export CUE_EXPERIMENT=cmdreferencepkg,keepvalidators
-	qcue export myfile.cue
+	cue export myfile.cue
 
-The behavior of global experiments tracks the language version reported by "qcue version".
+The behavior of global experiments tracks the language version reported by "cue version".
 
 Available global experiments:
 

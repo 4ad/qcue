@@ -51,19 +51,19 @@ command: echo: {
 
 -- cue-cmd.stderr --
 cmd must be run as one of its subcommands
-Run 'qcue help cmd' for known subcommands.
+Run 'cue help cmd' for known subcommands.
 -- cue-help-cmd.stdout --
 cmd executes the named workflow command for each of the named instances.
 
 Workflow commands are defined in tool files, which are regular CUE
 files within the same package with a filename ending in _tool.cue.
 
-Run "qcue help commands" for more details on authoring tasks and
+Run "cue help commands" for more details on authoring tasks and
 workflow commands.
 
 Usage:
-  qcue cmd [flags] <name> [inputs]
-  qcue cmd [command]
+  cue cmd [flags] <name> [inputs]
+  cue cmd [command]
 
 Available Commands:
   echo        echo something back
@@ -79,12 +79,12 @@ Global Flags:
   -i, --ignore         proceed in the presence of errors
   -s, --simplify       simplify output
 
-Use "qcue cmd [command] --help" for more information about a command.
+Use "cue cmd [command] --help" for more information about a command.
 -- cue-help-cmd-hello.stdout --
 Hello can be used to say hello to the world.
 
 Usage:
-  qcue cmd hello [flags]
+  cue cmd hello [flags]
 
 Global Flags:
   -E, --all-errors     print all available errors

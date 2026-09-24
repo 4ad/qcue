@@ -68,10 +68,10 @@ type File struct {
 	// ExplicitOpen enables the postfix ... operator to explicitly open
 	// closed structs, allowing additional fields to be added. It is stable as
 	// of v0.18.0, so a file at that language version or later embeds strictly
-	// and may use the postfix ... operator; qcue fix migrates older files.
+	// and may use the postfix ... operator; cue fix migrates older files.
 	//
 	// Proposal: https://cuelang.org/issue/4032
-	// Note: Requires qcue fix when upgrading
+	// Note: Requires cue fix when upgrading
 	ExplicitOpen bool `experiment:"preview:v0.15.0,stable:v0.18.0"`
 
 	// AliasV2 enables the use of 'self' identifier to refer to the
@@ -81,7 +81,7 @@ type File struct {
 	// language version or later must use the postfix syntax.
 	//
 	// Proposal: https://cuelang.org/issue/4014
-	// Note: Requires qcue fix when upgrading
+	// Note: Requires cue fix when upgrading
 	AliasV2 bool `experiment:"preview:v0.15.0,stable:v0.18.0"`
 
 	// Try enables the try clause and optional reference markers (?).

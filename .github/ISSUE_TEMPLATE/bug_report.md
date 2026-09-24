@@ -12,10 +12,10 @@ Please answer these questions before submitting your issue. Thanks!
 To ask questions, see https://github.com/cue-lang/cue#contact.
 -->
 
-### What version of Quantified CUE are you using (`qcue version`)?
+### What version of Quantified CUE are you using (`cue version`)?
 
 <pre>
-$ qcue version
+$ cue version
 
 </pre>
 

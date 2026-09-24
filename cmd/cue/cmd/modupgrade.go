@@ -28,7 +28,7 @@ import (
 )
 
 // TODO: in the future we could also check that at least the export semantics
-// remains identical, similarly to how we do this with qcue trim.
+// remains identical, similarly to how we do this with cue trim.
 
 func newModUpgradeCmd(c *Command) *cobra.Command {
 	cmd := &cobra.Command{

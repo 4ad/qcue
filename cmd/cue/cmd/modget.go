@@ -49,7 +49,7 @@ If the desired version cannot be chosen (for example because a
 dependency already uses a later version than the desired version),
 this command will fail.
 
-See "qcue help environment" for details on how $CUE_REGISTRY is used to
+See "cue help environment" for details on how $CUE_REGISTRY is used to
 determine the modules registry.
 `,
 		RunE: mkRunE(c, runModGet),

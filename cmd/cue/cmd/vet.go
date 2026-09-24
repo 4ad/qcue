@@ -26,7 +26,7 @@ const vetDoc = `The vet command validates CUE and other data files.
 The command is silent when it succeeds; otherwise it reports any errors found.
 
 Input arguments can be CUE packages, CUE files, non-CUE files, or some
-combinations of those. See "qcue help inputs" for more detail.
+combinations of those. See "cue help inputs" for more detail.
 
 By default, vet ensures that the result of validation is concrete
 by reporting an error if any resulting regular fields have non-concrete values.
@@ -54,13 +54,13 @@ Use the -d flag to select a schema at a particular expression instead.
 Examples:
 
   # Check that a collection of CUE packages has no errors.
-  qcue vet -c=false ./...
+  cue vet -c=false ./...
 
   # Check against a schema at the root of a CUE file:
-  qcue vet -c foo.cue foo.yaml
+  cue vet -c foo.cue foo.yaml
 
   # Check against a schema from a registry:
-  qcue vet -c -d '#Workflow' cue.dev/x/githubactions@latest workflow.yml
+  cue vet -c -d '#Workflow' cue.dev/x/githubactions@latest workflow.yml
 
 The -d flag can be repeated to validate against multiple schemas at once.
 `

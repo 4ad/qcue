@@ -1,37 +1,37 @@
-exec qcue version
-stdout '^qcue version '
+exec cue version
+stdout '^cue version '
 stdout '^CUE language version v0.18.0$'
 stdout 'S_H \(higher-rank quantifiers\), A \(opaque packages\)'
 stdout '^quantified: enabled by default'
 
-exec qcue help experiments
+exec cue help experiments
 stdout 'quantified \(preview: v0.18.0, default: v0.18.0\)'
-exec qcue completion bash
-stdout '__start_qcue'
-! stdout '__start_cue'
-exec qcue help completion
-stdout 'bash_completion.d/qcue'
-stdout '/_qcue'
-stdout '/qcue.fish'
+exec cue completion bash
+stdout '__start_cue'
+! stdout '__start_qcue'
+exec cue help completion
+stdout 'bash_completion.d/cue'
+stdout '/_cue'
+stdout '/cue.fish'
 
-exec qcue export main.cue -e 'out[0]'
+exec cue export main.cue -e 'out[0]'
 stdout '^3$'
-exec qcue export main.cue -e 'out[1]'
+exec cue export main.cue -e 'out[1]'
 stdout '^"hello"$'
 
-! exec qcue eval invalid.cue
+! exec cue eval invalid.cue
 stderr 'quantifier syntax requires @experiment\(quantified\)'
 
-exec qcue export legacy.cue -e out
+exec cue export legacy.cue -e out
 stdout '^3$'
-exec qcue def legacy.cue
+exec cue def legacy.cue
 stdout '@experiment\(functions,quantified=false\)'
 
-exec qcue export explicit.cue -e out
+exec cue export explicit.cue -e out
 stdout '^3$'
 
 cp unknown.cue.txt unknown.cue
-! exec qcue eval unknown.cue
+! exec cue eval unknown.cue
 stderr 'unknown experiment "quantified=invalid"'
 
 -- cue.mod/module.cue --

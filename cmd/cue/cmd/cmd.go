@@ -32,14 +32,14 @@ func newCmdCmd(c *Command) *cobra.Command {
 Workflow commands are defined in tool files, which are regular CUE
 files within the same package with a filename ending in _tool.cue.
 
-Run "qcue help commands" for more details on authoring tasks and
+Run "cue help commands" for more details on authoring tasks and
 workflow commands.
 `,
 		RunE: mkRunE(c, func(cmd *Command, args []string) error {
 			if len(args) == 0 {
 				w := cmd.ErrOrStderr()
 				fmt.Fprintln(w, "cmd must be run as one of its subcommands")
-				fmt.Fprintln(w, "Run 'qcue help cmd' for known subcommands.")
+				fmt.Fprintln(w, "Run 'cue help cmd' for known subcommands.")
 				return ErrPrintedError
 			}
 			tools, err := buildTools(cmd, args[1:])
@@ -51,7 +51,7 @@ workflow commands.
 				w := cmd.ErrOrStderr()
 				fmt.Fprint(w, errors.Details(err, &errors.Config{Cwd: rootWorkingDir()}))
 				fmt.Fprintln(w, `Ensure custom commands are defined in a "_tool.cue" file.`)
-				fmt.Fprintln(w, "Run 'qcue help cmd' to list available custom commands.")
+				fmt.Fprintln(w, "Run 'cue help cmd' to list available custom commands.")
 				return ErrPrintedError
 			}
 			// Presumably the *cobra.Command argument should be cmd.Command,
@@ -62,8 +62,8 @@ workflow commands.
 
 	addInjectionFlags(cmd)
 
-	// Load custom commands from the current package so that `qcue cmd --help`
-	// lists them. The guard ensures we only do this for `qcue cmd` itself,
+	// Load custom commands from the current package so that `cue cmd --help`
+	// lists them. The guard ensures we only do this for `cue cmd` itself,
 	// since subcommands inherit our HelpFunc via cobra's parent walk.
 	cmdCmd := cmd
 	defaultHelp := cmd.HelpFunc()

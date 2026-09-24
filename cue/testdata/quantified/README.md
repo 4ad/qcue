@@ -75,7 +75,7 @@ Every additional corpus has `quantified` in its path or filename:
 | CLI certification | [quantified_vet.txtar](../../../cmd/cue/cmd/testdata/script/quantified_vet.txtar) | `TestScript/quantified_vet` |
 
 The retained package path `cmd/cue/cmd` is the CLI library. Its executable is
-`cmd/qcue`; these CLI fixtures invoke `qcue`.
+`cmd/cue`; these CLI fixtures invoke `cue`.
 
 ## Reading and adding assertions
 
@@ -242,7 +242,7 @@ go test ./cue -run TestQuantified
 go test ./cue/parser ./cue/format ./cue/ast/astutil ./internal/core/export \
   -run 'TestQuantified|TestAliasAndOpenScopes|TestFiles/quantified'
 
-# qcue defaults, version information, opt-out, and certification.
+# cue defaults, version information, opt-out, and certification.
 go test ./cmd/cue/cmd -run TestScript/quantified
 
 # Complete repository regression suite.

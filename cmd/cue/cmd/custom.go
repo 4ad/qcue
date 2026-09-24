@@ -59,7 +59,7 @@ func splitLine(s string) (line, tail string) {
 
 // addCustomCommands iterates over all commands defined under field typ
 // and adds them as cobra subcommands to cmd.
-// The func is only used in `qcue help cmd`, which doesn't show errors.
+// The func is only used in `cue help cmd`, which doesn't show errors.
 func addCustomCommands(c *Command, cmd *cobra.Command, typ string, tools *cue.Instance) {
 	commands := tools.Value().LookupPath(cue.MakePath(cue.Str(typ)))
 	if !commands.Exists() {
@@ -152,10 +152,10 @@ func doTasks(cmd *Command, command string, root *cue.Instance) error {
 
 	// Command and task discovery
 	//
-	// It should clearly be an error if we attempt to invoke qcue cmd with a path
+	// It should clearly be an error if we attempt to invoke cue cmd with a path
 	// expression that does not exist within the command struct:
 	//
-	//    $ qcue cmd doesNotExist
+	//    $ cue cmd doesNotExist
 	//    command: field not found: doesNotExist
 	//
 	// Less clear is the case that the command struct value referenced itself is
@@ -166,7 +166,7 @@ func doTasks(cmd *Command, command string, root *cue.Instance) error {
 	//    command: willFail: {
 	//    	"\(input)": exec.Run & {cmd: "true"}
 	//    }
-	//    $ qcue cmd willFail
+	//    $ cue cmd willFail
 	//    command.willFail: invalid interpolation: non-concrete value string (type string)
 	//
 	// For now, this is an error, but previous discussions (captured in
@@ -181,7 +181,7 @@ func doTasks(cmd *Command, command string, root *cue.Instance) error {
 	//    command: shouldFail: NESTED: {
 	//    	"\(input)": exec.Run & {cmd: "true"}
 	//    }
-	//    $ qcue cmd shouldFail
+	//    $ cue cmd shouldFail
 	//    command.shouldFail: no tasks found
 	//
 	// Note that the case of the RHS of a task being incomplete is different. We
