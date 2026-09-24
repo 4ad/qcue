@@ -106,3 +106,10 @@ will be recorded as the work proceeds.
   checks overload coverage and result inclusion against execution; additional
   tests cover clause order, nesting, partial application, and rejected
   attempts to manufacture evidence or reopen selected domains.
+
+- The final consumer audit found and repaired another predicate/witness mixup:
+  callback hypotheses could be introduced from definition fields. Admission
+  now introduces hypotheses only from present runtime fields. Tests vary
+  regular, hidden, definition, hidden-definition, and optional fields through
+  direct records, nested records, and lists, and compare certification with
+  actual application. The full core/public API suite passes.

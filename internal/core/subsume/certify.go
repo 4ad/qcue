@@ -384,7 +384,11 @@ func (p *certifier) assume(v adt.Value, seen map[adt.Value]bool) {
 	}
 	if v, ok := v.(*adt.Vertex); ok {
 		for _, a := range v.Arcs {
-			p.assume(a, seen)
+			// Definitions describe predicates, and optional fields need not
+			// exist. Neither supplies an executable callback hypothesis.
+			if !a.Label.IsDef() && !a.Label.IsLet() && a.ArcType != adt.ArcOptional {
+				p.assume(a, seen)
+			}
 		}
 	}
 }

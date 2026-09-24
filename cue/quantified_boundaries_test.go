@@ -16,6 +16,7 @@ package cue_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"cuelang.org/go/cue"
@@ -492,6 +493,43 @@ id: func(x: int) -> int: x
 					}
 				}
 			}
+		}
+	}
+}
+
+// Membership in a record with a function-valued definition does not supply
+// an executable callback. The same rule applies below every data constructor.
+func TestQuantifiedBoundaryCallbackEvidence(t *testing.T) {
+	for _, label := range []string{"f", "_f", "#F", "_#F", "f?"} {
+		for _, tc := range []struct{ domain, packet, path string }{
+			{`{%s: func(int) -> int}`, `{%s: func(int) -> int}`, `p.%s`},
+			{`{nested: {%s: func(int) -> int}}`, `{nested: {%s: func(int) -> int}}`, `p.nested.%s`},
+			{`[{%s: func(int) -> int}]`, `[{%s: func(int) -> int}]`, `p[0].%s`},
+		} {
+			t.Run(label+"/"+tc.domain, func(t *testing.T) {
+				field := label
+				if label == "f?" {
+					field = "f"
+				}
+				domain, packet := fmt.Sprintf(tc.domain, label), fmt.Sprintf(tc.packet, label)
+				required := label == "f" || label == "_f"
+				if required {
+					packet = strings.ReplaceAll(packet, "func(int) -> int", "func(x: int) -> int: x")
+				}
+				source := fmt.Sprintf("f: func(p: %s) -> int: %s(0)\nout: f(%s)", domain, fmt.Sprintf(tc.path, field), packet)
+				v := semanticValue(t, source)
+				if err := v.Validate(); err != nil {
+					t.Fatal(err)
+				}
+				if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); (err == nil) != required {
+					t.Fatalf("executable callback=%v: %v", required, err)
+				}
+				if required {
+					semanticJSON(t, v, "out", "0")
+				} else if err := v.LookupPath(cue.ParsePath("out")).Validate(cue.Concrete(true)); err == nil {
+					t.Fatal("a predicate supplied a callback implementation")
+				}
+			})
 		}
 	}
 }
