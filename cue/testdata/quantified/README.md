@@ -13,7 +13,7 @@ adding a semantic case.
   assertions remain in [quantified_test.go](../../quantified_test.go) because
   these tests exercise Go API operations and object identity.
 - [Generated semantic preservation checks](../../quantified_semantics_test.go):
-  the latest audit regressions, independent finite membership and quantifier
+  semantic regressions, independent finite membership and quantifier
   models, and transformations involving scopes, export, refinement and opacity.
 - [Packet-domain model](../../../internal/core/adt/packet_domain_test.go):
   exhaustive comparison of symbolic protocol intersections against independent
@@ -116,7 +116,7 @@ Function contract checks use the same `concrete` demand as all other values.
 There is no separate proof option. The [certification](certification/) cases
 exercise the supported proof rules through ordinary concrete validation.
 
-Audit regressions cover retained universal obligations after selection and
+Semantic regressions cover retained universal obligations after selection and
 source export, captured callbacks, partial closures, completed open protocols,
 and opaque operation proofs. The opaque boundary cases exercise union transport
 and omission defaults; the escape cases also refine optional fields, patterns,
@@ -127,7 +127,7 @@ The [quantified fragment fixture](certification/quantified_fragment.txtar) recor
 both supported universal checks and the general Boolean predicates that remain
 residual. Successful concrete calls alone are not certification assertions.
 
-The following regressions cover the additional semantic audit findings:
+These regressions check membership, bounds, and lexical preservation:
 
 | Obligation | Regression |
 | --- | --- |
@@ -141,21 +141,21 @@ The following regressions cover the additional semantic audit findings:
 | Residual quantifier export retains lexical substitutions | [quantifier_export](api/quantifier_export.txtar) |
 | Subtype binders admit unary bodies | [bound_unary_body](finite_witnesses/bound_unary_body.txtar), plus parser and formatter fixtures |
 
-The implementation audit also has a regression for each reproduced defect:
+These regressions check sealing, certification, runtime identity, and export:
 
-| Finding | Regression |
+| Obligation | Regression |
 | --- | --- |
-| 1. Existential membership preserves shape, presence, and closedness | [membership_shape](covariant_existentials/membership_shape.txtar), [API refinement](api/membership_refinement.txtar) |
-| 2. Sealing retains every interface conjunct, independent of order | [interface_conjunctions](seal_generativity/interface_conjunctions.txtar) |
-| 3. Builtin contracts require independent universal proofs | [builtin_contracts](certification/builtin_contracts.txtar) |
-| 4. Builtin capability guards preserve calls, labels, and defaults | [builtin_contracts](certification/builtin_contracts.txtar) |
-| 5. Opaque representations retain private function proof obligations | [opaque_representations](certification/opaque_representations.txtar) |
-| 6. Composite witnesses denote exact eventual singletons | [composite_singletons](certification/composite_singletons.txtar), [API refinement](api/membership_refinement.txtar) |
-| 7. Capture identity is independent of attached contracts | [captured_contracts](closure_identity/captured_contracts.txtar) |
-| 8. Distinct closures at one code origin can form a finite call chain | [finite_chain](closure_identity/finite_chain.txtar), [generative recursion](recursion_requires_descent/generative_chain.txtar) |
-| 9. Evaluated source export preserves attached builtin contracts | [builtin_export](api/builtin_export.txtar) |
-| 10. All export modes preserve opaque boundaries | [opaque_export](api/opaque_export.txtar), [exporter fixtures](../../../internal/core/export/testdata/quantified/) |
-| 11. Explicit type selection uses retained universal clauses | [attached_clauses](instantiation/attached_clauses.txtar), [selected_export](api/selected_export.txtar) |
+| Existential membership preserves shape, presence, and closedness | [membership_shape](covariant_existentials/membership_shape.txtar), [API refinement](api/membership_refinement.txtar) |
+| Sealing retains every interface conjunct, independent of order | [interface_conjunctions](seal_generativity/interface_conjunctions.txtar) |
+| Builtin contracts require independent universal proofs | [builtin_contracts](certification/builtin_contracts.txtar) |
+| Builtin capability guards preserve calls, labels, and defaults | [builtin_contracts](certification/builtin_contracts.txtar) |
+| Opaque representations retain private function proof obligations | [opaque_representations](certification/opaque_representations.txtar) |
+| Composite witnesses denote exact eventual singletons | [composite_singletons](certification/composite_singletons.txtar), [API refinement](api/membership_refinement.txtar) |
+| Capture identity is independent of attached contracts | [captured_contracts](closure_identity/captured_contracts.txtar) |
+| Distinct closures at one code origin can form a finite call chain | [finite_chain](closure_identity/finite_chain.txtar), [generative recursion](recursion_requires_descent/generative_chain.txtar) |
+| Evaluated source export preserves attached builtin contracts | [builtin_export](api/builtin_export.txtar) |
+| All export modes preserve opaque boundaries | [opaque_export](api/opaque_export.txtar), [exporter fixtures](../../../internal/core/export/testdata/quantified/) |
+| Explicit type selection uses retained universal clauses | [attached_clauses](instantiation/attached_clauses.txtar), [selected_export](api/selected_export.txtar) |
 
 Further regressions cover [ordinary open-record transport](opaque_composite_transport/open_records.txtar),
 [erased type-parameter formation](api/erasure.txtar), and
@@ -164,8 +164,7 @@ The [profile boundaries](certification/profile_boundaries.txtar) fixture records
 the remaining unsupported package eliminations and effect/foreign proofs;
 these limitations must not become successful certification.
 
-The subsequent [audit](../../../doc/quantified-cue-audit.md) has additional
-regressions for every reproduced defect:
+Further regressions cover call protocols, identity, and bounded evaluation:
 
 | Obligation | Regression |
 | --- | --- |
@@ -182,8 +181,7 @@ The small Go API tables exercise refinements and export/reimport in fresh
 scopes. Resource tests generate large binder products and check residual
 semantics, without relying on timing thresholds.
 
-The [follow-up audit](../../../doc/quantified-cue-audit-followup.md) composes
-these features and records further regressions:
+The following regressions check interactions between these features:
 
 | Obligation | Regression |
 | --- | --- |
@@ -201,8 +199,7 @@ selections after recompilation and check unsupported mixed graphs through the
 typed incomplete-export API. Negative opacity cases distinguish a free outer
 dependency from a legal private witness bound by an independent inner seal.
 
-The [current audit and repair record](../../../doc/quantified-cue-audit-current.md)
-adds these regressions:
+Additional regressions cover inference, transport, and retained obligations:
 
 | Obligation | Regression |
 | --- | --- |
@@ -221,11 +218,11 @@ corpus. No test compares fixtures with the proposal document.
 
 ## Larger oracles and fuzzing
 
-The [oracle guide](../../../doc/quantified-cue-oracles.md) describes independent
+The [oracle guide](../../../doc/oracle.md) describes independent
 models, their exact coverage, preservation transformations, residual judgments,
 seeded generation, and failure shrinking. The default suite stays small;
 `tools/test-quantified-oracles.sh extended` runs larger exhaustive universes
-and four native fuzz targets. A weekly workflow runs the same command.
+and five native fuzz targets. A weekly workflow runs the same command.
 
 ## Running the tests
 

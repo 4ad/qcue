@@ -160,10 +160,10 @@ possible interaction of the extension.
 
 ## Boundary preservation model
 
-`quantified_boundaries_test.go` covers the later boundary audit and the
-predicate/witness and scope defects found during its implementation. It checks
-runtime equality through nesting, original-packet admission, sorted seals,
-constructive existential elimination, and complete callback intersections.
+[quantified_boundaries_test.go](../cue/quantified_boundaries_test.go) checks
+predicate and witness preservation, scope, runtime equality through nesting,
+original-packet admission, sorted seals, constructive existential elimination,
+and complete callback intersections.
 Positive controls accompany rejected cases; a finite identity-function model
 computes overload coverage and result inclusion from sets of scalars.
 

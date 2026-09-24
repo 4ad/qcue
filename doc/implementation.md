@@ -2,9 +2,9 @@
 
 This implementation supports fragments of profiles **S_H** (predicative
 higher-rank quantification) and **A** (opaque existential packages) in
-[the proposal](quantified-cue.tex). The `quantified` experiment is **enabled by
-default** for CUE language version `v0.18.0` and later, including standalone files
-and Go API calls with no pinned language version.
+[the proposal](paper.pdf) ([LaTeX source](paper.tex)). The `quantified` experiment
+is **enabled by default** for CUE language version `v0.18.0` and later, including
+standalone files and Go API calls with no pinned language version.
 
 Build and install from this checkout:
 
@@ -382,11 +382,9 @@ telescope or restart a consumed binder.
 
 ## Implementation map and regression coverage
 
-[The semantic preservation design](quantified-cue-semantics-redesign.md)
-describes the judgment boundaries, their representations and independent finite
-models. [The boundary implementation audit](quantified-cue-boundaries.md) records
-the subsequent consolidation, regressions, and final verification. The original audit reports are historical descriptions of their stated
-revisions.
+[The oracle guide](oracle.md) documents independent finite models and semantic
+preservation checks. The implementation and its regression coverage are
+organized as follows:
 
 - `cue/ast`, `cue/parser`, and `cue/format` define lexical syntax and its round
   trips. `internal/core/compile` records binder identity and runtime captures.

@@ -6,9 +6,12 @@ version v0.18.0 and later. Build with `go install ./cmd/cue`; the resulting
 `cue` executable can directly replace an upstream `cue` binary.
 Run `cue version` for the supported language version and extension profiles.
 
-See [the implementation guide](doc/quantified-cue-implementation.md) and
+See [the implementation guide](doc/implementation.md) and
 [the quantified test index](cue/testdata/quantified/README.md) for examples and
-topic-organized txtar fixtures.
+topic-organized txtar fixtures. The [proposal](doc/paper.pdf)
+([LaTeX source](doc/paper.tex)) describes the language design, and
+[the oracle guide](doc/oracle.md) documents independent semantic checks and
+fuzzing.
 
 <!--
  Copyright 2018 The CUE Authors
