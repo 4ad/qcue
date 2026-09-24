@@ -16,6 +16,7 @@ package subsume
 
 import (
 	"maps"
+	"slices"
 
 	"cuelang.org/go/internal/core/adt"
 )
@@ -45,7 +46,8 @@ func (p *certifier) enter() func() {
 func newCertifier(ctx *adt.OpContext) *certifier {
 	return &certifier{ctx: ctx,
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope),
-		completed: make(map[proofKey][]*adt.FuncValue), remaining: 10000}
+		projections: make(map[*adt.Vertex]map[adt.Feature]adt.Value),
+		completed:   make(map[proofKey][]*adt.FuncValue), remaining: 10000}
 }
 
 // Reuse the current proof context when validating captured composites.
@@ -74,9 +76,13 @@ type certifier struct {
 	active     []*adt.FuncValue
 	hypotheses map[*adt.FuncValue]bool
 	scopes     map[*adt.Environment]*proofScope
-	completed  map[proofKey][]*adt.FuncValue
-	attempts   []*proofAttempt
-	remaining  int
+	// Constructed composites retain their synthesized members, including
+	// callback hypothesis identity. Re-evaluating a schema approximation
+	// must not replace the evidence attached to a projected runtime value.
+	projections map[*adt.Vertex]map[adt.Feature]adt.Value
+	completed   map[proofKey][]*adt.FuncValue
+	attempts    []*proofAttempt
+	remaining   int
 }
 
 type proofKey struct {
@@ -175,7 +181,7 @@ func (p *certifier) captured(v adt.Value) adt.Value {
 }
 
 func (p *certifier) implementation(f *adt.FuncValue) bool {
-	clauses := append([]adt.FuncType{{Fn: f.Fn, Env: f.Env}}, f.Types...)
+	clauses := f.Obligations()
 	for _, target := range clauses {
 		if !p.function(f, target) {
 			return false
@@ -422,6 +428,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		if !ok {
 			return nil
 		}
+		if fields := p.projections[v]; fields != nil {
+			return fields[x.Sel]
+		}
 		field := v.LookupRaw(x.Sel)
 		if field == nil || (field.ArcType != adt.ArcMember && field.ArcType != adt.ArcRequired) {
 			return nil
@@ -439,6 +448,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		i, err := n.X.Int64()
 		if err != nil || i < 0 {
 			return nil
+		}
+		if fields := p.projections[v]; fields != nil {
+			return fields[adt.MakeIntLabel(adt.IntLabel, i)]
 		}
 		for a := range v.Elems() {
 			if i == 0 {
@@ -510,6 +522,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			// though their symbolic values describe many possible packets.
 			out := v.ToDataSingle()
 			out.ClosedNonRecursive = true
+			p.projections[out] = scope.values
 			return out
 		}
 		return v
@@ -548,7 +561,15 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				out.Elems = append(out.Elems, &adt.Ellipsis{Value: proofUnion(elements)})
 			}
 		}
-		return p.schema(nil, out)
+		result := p.schema(nil, out)
+		if v, ok := result.(*adt.Vertex); ok && !variable {
+			fields := make(map[adt.Feature]adt.Value)
+			for i, value := range elements {
+				fields[adt.MakeIntLabel(adt.IntLabel, int64(i))] = value
+			}
+			p.projections[v] = fields
+		}
+		return result
 	case *adt.Interpolation:
 		for _, part := range x.Parts {
 			v := p.expr(env, part)
@@ -743,33 +764,92 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 		return nil
 	}
 	sources := []adt.FuncType{source}
+	results := sources
 	if f, ok := callee.(*adt.FuncValue); ok {
 		if p.hypotheses[f] {
 			p.useHypothesis(f)
 		} else if !p.implementation(f) {
 			return nil
 		}
-		if boundary, ok := f.Fn.Body.(*adt.OpaqueCall); ok && !f.IsPartial() {
-			sources = nil
-			for _, alternative := range boundary.ProofAlternatives() {
-				sources = append(sources, adt.FuncType{Fn: alternative.Fn, Env: alternative.Env})
-			}
+	}
+	function, _ := callee.(*adt.FuncValue)
+	return p.callPackets(target, sources, results, function, 0)
+}
+
+// Finite disjunctions describe alternative packets, not an argument that must
+// belong to one clause uniformly. Split them under the proof's work budget,
+// prove every packet family, and join the guaranteed results. This makes
+// overload coverage independent of intersection order.
+func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.FuncType, function *adt.FuncValue, start int) adt.Value {
+	if !p.step() {
+		return nil
+	}
+	for i := start; i < len(target.Fn.Params); i++ {
+		union, ok := adt.Unwrap(target.Fn.Params[i].Value.(adt.Value)).(*adt.Disjunction)
+		if !ok {
+			continue
 		}
+		var alternatives []adt.Value
+		for _, branch := range union.Values {
+			packet := *target.Fn
+			packet.Params = slices.Clone(packet.Params)
+			packet.Params[i].Value = branch
+			result := p.callPackets(adt.FuncType{Fn: &packet, Env: target.Env}, sources, results, function, i+1)
+			if result == nil {
+				return nil
+			}
+			alternatives = append(alternatives, result)
+		}
+		return proofUnion(alternatives)
+	}
+	if function != nil {
+		sources = function.CallClausesFor(p.ctx, target)
+		results = function.ResultClausesFor(p.ctx, target)
 	}
 	s := &subsumer{ctx: p.ctx}
-	for _, source := range sources {
+	admit := func(source adt.FuncType) (adt.FuncType, bool) {
 		if len(adt.FunctionTypeParameters(source)) != 0 {
 			var b *adt.Bottom
 			source, b = adt.InstantiateFunctionType(p.ctx, source, target)
 			if b != nil {
-				continue
+				return source, false
 			}
 		}
 		noResult := *source.Fn
 		noResult.Ret = nil
-		if s.capabilitySignature(target, adt.FuncType{Fn: &noResult, Env: source.Env}) {
-			return p.schema(source.Env, source.Fn.Ret)
+		return source, s.capabilitySignature(target, adt.FuncType{Fn: &noResult, Env: source.Env})
+	}
+	admitted := false
+	var consequences []adt.Value
+	seen := make(map[adt.FuncType]bool)
+	for _, source := range sources {
+		seen[source] = true
+		if source, ok := admit(source); ok {
+			admitted = true
+			if result := p.schema(source.Env, source.Fn.Ret); result != nil {
+				consequences = append(consequences, result)
+			}
 		}
+	}
+	if !admitted {
+		return nil
+	}
+	for _, source := range results {
+		if seen[source] {
+			continue
+		}
+		seen[source] = true
+		if source, ok := admit(source); ok {
+			if result := p.schema(source.Env, source.Fn.Ret); result != nil {
+				consequences = append(consequences, result)
+			}
+		}
+	}
+	if len(consequences) == 1 {
+		return consequences[0]
+	}
+	if len(consequences) > 1 {
+		return p.schema(nil, &adt.Conjunction{Values: consequences})
 	}
 	return nil
 }

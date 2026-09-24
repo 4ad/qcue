@@ -58,7 +58,7 @@ func (f *FuncValue) abstractCall(c *OpContext, call *CallExpr, state Flags) Valu
 		return pending
 	}
 	conjuncts := []Conjunct{MakeRootConjunct(nil, pending)}
-	for _, t := range f.selectionAndOriginalClauses() {
+	admit := func(t FuncType) *packetAdmission {
 		// Binding determines protocol slots only. Admission must examine
 		// the original packet, without executing a synthetic function or
 		// conjoining parameter predicates into an activation.
@@ -69,11 +69,32 @@ func (f *FuncValue) abstractCall(c *OpContext, call *CallExpr, state Flags) Valu
 		if unused == nil && bindErr == nil {
 			admitted, _ = (callPacket{args: args}).admit(c, t, false)
 		}
-		if err := c.PopState(saved); err != nil || admitted == nil {
-			continue
+		if err := c.PopState(saved); err != nil {
+			return nil
 		}
+		return admitted
+	}
+	propagate := func(admitted *packetAdmission) {
 		if t := admitted.clause; t.Fn.Ret != nil {
 			conjuncts = append(conjuncts, MakeRootConjunct(t.Env, t.Fn.Ret))
+		}
+	}
+	covered := false
+	seen := make(map[FuncType]bool)
+	for _, clause := range f.CallClauses(c) {
+		seen[clause] = true
+		if admitted := admit(clause); admitted != nil {
+			covered = true
+			propagate(admitted)
+		}
+	}
+	if covered {
+		for _, clause := range f.ResultClauses(c) {
+			if !seen[clause] {
+				if admitted := admit(clause); admitted != nil {
+					propagate(admitted)
+				}
+			}
 		}
 	}
 	result := c.newInlineVertex(nil, nil, conjuncts...)

@@ -35,7 +35,7 @@ func (s *subsumer) capabilityValues(a, b *adt.FuncValue) bool {
 		}
 		return true
 	}
-	targets := append([]adt.FuncType{{Fn: a.Fn, Env: a.Env}}, a.Types...)
+	targets := a.Obligations()
 	if s.certifier != nil && !adt.IsFuncType(b) {
 		if !s.certifier.implementation(b) {
 			return false
@@ -47,15 +47,9 @@ func (s *subsumer) capabilityValues(a, b *adt.FuncValue) bool {
 		}
 		return true
 	}
-	sources := append([]adt.FuncType{{Fn: b.Fn, Env: b.Env}}, b.Types...)
-	if b.IsPartial() {
-		// The remaining implementation protocol is known. Its old clauses
-		// describe full packets and cannot be read as residual signatures.
-		sources = []adt.FuncType{{Fn: b.ResidualSignature(), Env: b.Env}}
-	}
 	for _, target := range targets {
 		proved := false
-		for _, source := range sources {
+		for _, source := range b.CallClausesFor(s.ctx, target) {
 			if s.capabilitySignature(target, source) {
 				proved = true
 				break

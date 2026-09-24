@@ -89,3 +89,13 @@ will be recorded as the work proceeds.
   Existing sealed packages retain their original witness. Regressions cover
   certified clients on ordinary records, nested data, refinements, shared
   projections, and copied subjects. Core/public API suites pass.
+- Call contracts expose obligations, available call clauses, and guarded
+  result clauses separately. Certification and abstract application use this
+  interface, including intersections, selected views, partial coordinates,
+  and inference from saved plus remaining arguments. Finite union packets
+  are checked branch by branch under the proof budget. Constructed proof
+  records/lists preserve projected callback evidence instead of relying on
+  the identity of re-evaluated schema approximations. A finite identity model
+  checks overload coverage and result inclusion against execution; additional
+  tests cover clause order, nesting, partial application, and rejected
+  attempts to manufacture evidence or reopen selected domains.

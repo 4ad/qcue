@@ -279,3 +279,113 @@ out: use({x: null})
 		t.Fatal("certified an ambiguous constructive witness transport")
 	}
 }
+
+func TestQuantifiedBoundaryCallContracts(t *testing.T) {
+	for _, intersection := range []string{
+		`(func(int) -> int) & (func(string) -> string)`,
+		`(func(string) -> string) & (func(int) -> int)`,
+	} {
+		for _, body := range []string{`g("x")`, `{h: g}.h("x")`, `[g][0]("x")`} {
+			v := semanticValue(t, `
+f: func(g: `+intersection+`) -> string: `+body+`
+id: func(x: _) -> _: x
+out: f(id)
+`)
+			if err := v.Validate(cue.Concrete(true)); err != nil {
+				t.Fatalf("%s / %s: %v", intersection, body, err)
+			}
+			semanticJSON(t, v, "out", `"x"`)
+		}
+	}
+	// Coverage and consequences are separate: both overlapping clauses
+	// constrain the result even if the first alone is too weak to prove it.
+	for _, intersection := range []string{
+		`(func(int) -> int) & (func(int) -> 0)`,
+		`(func(int) -> 0) & (func(int) -> int)`,
+	} {
+		v := semanticValue(t, `
+f: func(g: `+intersection+`) -> 0: g(7)
+zero: func(x: int) -> 0: 0
+out: f(zero)
+`)
+		if err := v.Validate(cue.Concrete(true)); err != nil {
+			t.Fatal(err)
+		}
+		semanticJSON(t, v, "out", "0")
+	}
+	// Original universal obligations must not reopen a selected view's
+	// executable domain. Identity erasure does not supply this admission.
+	v := semanticValue(t, `
+id(A): func(x: A) -> A: x
+bad: func() -> string: id[int]("x")
+`)
+	if err := v.Validate(cue.Concrete(true)); err == nil {
+		t.Fatal("universal obligation reopened a selected call domain")
+	}
+	v = semanticValue(t, `
+#F: func(int) -> int
+bad: func(g: #F) -> int: {h: #F}.h(0)
+`)
+	if err := v.Validate(cue.Concrete(true)); err == nil {
+		t.Fatal("constructing a schema manufactured a callback hypothesis")
+	}
+	v = semanticValue(t, `
+base: func(x: int, y: int|string) -> (int|string): y
+partial: base(0, ...) & (func(string) -> string)
+f: func() -> string: partial("x")
+out: f()
+`)
+	if err := v.Validate(cue.Concrete(true)); err != nil {
+		t.Fatal(err)
+	}
+	semanticJSON(t, v, "out", `"x"`)
+	for _, instance := range []string{"generic", "generic[int|string]"} {
+		v := semanticValue(t, `
+generic(A): func(x: A, y: A) -> A: y
+partial: `+instance+`(0, ...)
+f: func() -> (int|string): partial("x")
+out: f()
+`)
+		if err := v.Validate(cue.Concrete(true)); err != nil {
+			t.Fatalf("%s: %v", instance, err)
+		}
+		semanticJSON(t, v, "out", `"x"`)
+	}
+}
+
+// The finite model is identity on {0,1}. Its output guarantee on a domain D
+// is exactly D, regardless of how its singleton clauses are ordered. Check
+// both proof and execution against set inclusion rather than another CUE
+// expression or the implementation's clause enumeration.
+func TestQuantifiedBoundaryOverloadCoverage(t *testing.T) {
+	predicate := func(set int) string {
+		return []string{"_|_", "0", "1", "0|1"}[set]
+	}
+	for domain := 1; domain < 4; domain++ {
+		for result := 1; result < 4; result++ {
+			for _, contract := range []string{
+				`(func(0) -> 0) & (func(1) -> 1)`,
+				`(func(1) -> 1) & (func(0) -> 0)`,
+			} {
+				source := fmt.Sprintf(`
+f: func(g: %s, x: %s) -> (%s): g(x)
+id: func(x: int) -> int: x
+`, contract, predicate(domain), predicate(result))
+				v := semanticValue(t, source)
+				want := domain & ^result == 0
+				if err := v.Validate(cue.Concrete(true)); (err == nil) != want {
+					t.Fatalf("D=%s R=%s, valid=%v: %v", predicate(domain), predicate(result), want, err)
+				}
+				if want {
+					for value := 0; value < 2; value++ {
+						if domain&(1<<value) == 0 {
+							continue
+						}
+						run := semanticValue(t, source+fmt.Sprintf("\nout: f(id, %d)", value))
+						semanticJSON(t, run, "out", fmt.Sprint(value))
+					}
+				}
+			}
+		}
+	}
+}
