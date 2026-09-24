@@ -1,0 +1,54 @@
+# Both formatters accept the quantified syntax at the module's language
+# version, preserve comments, and leave the program's result unchanged.
+exec cue export input.cue -e out --out json
+cmp stdout result.json
+
+env CUE_EXPERIMENT=formatv2=1
+cp input.cue v2.cue
+! exec cue fmt --check v2.cue
+exec cue fmt v2.cue
+exec cue fmt --check v2.cue
+grep '// erased type' v2.cue
+grep '// private witness' v2.cue
+exec cue export v2.cue -e out --out json
+cmp stdout result.json
+
+env CUE_EXPERIMENT=formatv2=0
+cp input.cue v1.cue
+! exec cue fmt --check v1.cue
+exec cue fmt v1.cue
+exec cue fmt --check v1.cue
+grep '// erased type' v1.cue
+grep '// private witness' v1.cue
+exec cue export v1.cue -e out --out json
+cmp stdout result.json
+
+-- cue.mod/module.cue --
+module: "example.com/quantified"
+language: version: "v0.18.0"
+-- input.cue --
+package test
+
+Box(A)={value:A}
+id(
+    A, // erased type
+):func(x:A)->A:x
+local:func<A>(x:A)->A:x
+#Counter: {
+    exists State
+    zero:State
+    read:func(State)->int
+}
+counter:seal #Counter with (
+    State=int, // private witness
+) {zero:0,read:func(x:int)->int:x}
+opened:open counter as (State,C) {value:C.read(C.zero)}
+bridge:extern func(bytes)->int !decode
+item:Box(string)&{value:"ok"}
+out:[id[int](3),opened.value,local[string](item.value)]
+-- result.json --
+[
+    3,
+    0,
+    "ok"
+]
