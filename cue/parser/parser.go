@@ -327,6 +327,11 @@ func decNestLevel(p *parser) {
 
 // Advance to the next
 func (p *parser) next0() {
+	if err := p.cfg.contextErr(); err != nil {
+		p.errors = errors.Promote(err, "")
+		p.panicking = true
+		panic("parsing canceled")
+	}
 	// Because of one-token look-ahead, print the previous token
 	// when tracing as it provides a more readable output. The
 	// very first token (!p.pos.IsValid()) is not initialized

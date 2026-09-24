@@ -17,12 +17,14 @@
 package parser
 
 import (
+	"context"
 	"fmt"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/cueexperiment"
 	"cuelang.org/go/internal/cueversion"
 	"cuelang.org/go/internal/mod/semver"
@@ -45,6 +47,10 @@ var _ Option = Config{}
 //
 // Config is comparable.
 type Config struct {
+	// A pointer keeps Config comparable even for contexts with non-comparable
+	// dynamic types. Config is also used as a syntax cache key by the loader.
+	context *context.Context
+
 	// valid is set by NewConfig and is used to check
 	// that a Config has been created correctly.
 	valid bool
@@ -97,6 +103,23 @@ type optionFunc func(cfg *Config)
 
 func (f optionFunc) apply(cfg *Config) {
 	f(cfg)
+}
+
+// WithContext configures cancellation and deadlines for parsing. The context
+// must not be nil. Cancellation errors can be identified with errors.Is.
+// Reading from an io.Reader must return before cancellation can be observed.
+func WithContext(ctx context.Context) Option {
+	if ctx == nil {
+		panic("parser: nil context")
+	}
+	return optionFunc(func(cfg *Config) { cfg.context = &ctx })
+}
+
+func (cfg Config) contextErr() error {
+	if cfg.context == nil {
+		return nil
+	}
+	return internal.ContextError(*cfg.context)
 }
 
 // A Mode value is a set of flags (or 0).
@@ -190,6 +213,11 @@ func FileOffset(pos int) Option {
 // are returned via a ErrorList which is sorted by file position.
 func ParseFile(filename string, src any, mode ...Option) (f *ast.File, err error) {
 
+	// Check before reading, including when the source is an io.Reader.
+	cfg := NewConfig(mode...)
+	if err := cfg.contextErr(); err != nil {
+		return nil, err
+	}
 	// get source
 	text, err := source.ReadAll(filename, src)
 	if err != nil {
@@ -212,10 +240,13 @@ func ParseFile(filename string, src any, mode ...Option) (f *ast.File, err error
 		}
 
 		err = errors.Sanitize(pp.errors)
+		if cancelErr := cfg.contextErr(); cancelErr != nil {
+			err = cancelErr
+		}
 	}()
 
 	// parse source
-	pp.init(filename, text, mode)
+	pp.init(filename, text, []Option{cfg})
 	f = pp.parseFile()
 	if f == nil {
 		return nil, pp.errors
@@ -234,6 +265,11 @@ func ParseFile(filename string, src any, mode ...Option) (f *ast.File, err error
 // be a valid CUE (type or value) expression. Specifically, fset must not
 // be nil.
 func ParseExpr(filename string, src any, mode ...Option) (_ ast.Expr, err error) {
+	// Check before reading, including when the source is an io.Reader.
+	cfg := NewConfig(mode...)
+	if err := cfg.contextErr(); err != nil {
+		return nil, err
+	}
 	// get source
 	text, err := source.ReadAll(filename, src)
 	if err != nil {
@@ -246,10 +282,13 @@ func ParseExpr(filename string, src any, mode ...Option) (_ ast.Expr, err error)
 			_ = recover()
 		}
 		err = errors.Sanitize(p.errors)
+		if cancelErr := cfg.contextErr(); cancelErr != nil {
+			err = cancelErr
+		}
 	}()
 
 	// parse expr
-	p.init(filename, text, mode)
+	p.init(filename, text, []Option{cfg})
 	// We don't have a file with experiment attributes, but we still want to apply
 	// the default experiment values given the configured language version.
 	exp, expErr := cueexperiment.NewFile(p.cfg.Version)

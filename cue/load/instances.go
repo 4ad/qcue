@@ -27,6 +27,7 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/parser"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/filetypes"
 	"cuelang.org/go/internal/mod/modimports"
 	"cuelang.org/go/internal/mod/modload"
@@ -67,12 +68,12 @@ func InstancesContext(ctx context.Context, args []string, c *Config) (instances 
 		c = &Config{}
 	}
 
-	if err := ctx.Err(); err != nil {
+	if err := internal.ContextError(ctx); err != nil {
 		return []*build.Instance{c.newErrInstance(err)}
 	}
 	// Cancellation takes precedence over partial results and incidental errors.
 	defer func() {
-		if err := ctx.Err(); err != nil {
+		if err := internal.ContextError(ctx); err != nil {
 			instances = []*build.Instance{c.newErrInstance(err)}
 		}
 	}()
@@ -81,13 +82,13 @@ func InstancesContext(ctx context.Context, args []string, c *Config) (instances 
 	c = &copy
 	parse := c.ParseFile
 	c.ParseFile = func(name string, src interface{}, cfg parser.Config) (*ast.File, error) {
-		if err := ctx.Err(); err != nil {
+		if err := internal.ContextError(ctx); err != nil {
 			return nil, err
 		}
 		if parse != nil {
-			return parse(name, src, cfg)
+			return parse(name, src, cfg.Apply(parser.WithContext(ctx)))
 		}
-		return parser.ParseFile(name, src, cfg)
+		return parser.ParseFile(name, src, cfg, parser.WithContext(ctx))
 	}
 	newC, err := c.complete()
 	if err != nil {
