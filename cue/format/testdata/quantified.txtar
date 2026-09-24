@@ -47,6 +47,79 @@ p: forall (A in Type(1): number) [...A]
 p: forall (A: number) >=0
 q: exists (A: number) -1
 r: (forall(x: 1)) + 1
+-- multiline.input --
+Box(
+    A,
+    B: A,
+) = {left:A,right:B}
+f: forall (
+    A in Type(1): number,
+    B: A,
+) func(A)->B
+p: seal #Pair with (
+    A = int,
+    B = string,
+) {left:1,right:"x"}
+r: open p as (
+    A,
+    P) {out:P.left}
+-- binder_comments.input --
+f: forall (
+    // first binder
+    A in Type(1): number, // after first binder
+    B: A, // after last binder
+) func(A)->B
+Box(
+    // alias binder
+    A,
+    B: A, // last alias binder
+) = {value:B}
+g: func<
+    // generic binder
+    A: number, // last generic binder
+>(A)->A
+-- bound_comments.input --
+f: forall (A in Type(1):
+    // bound
+    number, B: A) func(A)->B
+g: exists (A: // bound token
+    number) {value:A}
+-- witness_comments.input --
+p: seal #Pair with (
+    // first witness
+    A = int, // after first witness
+    B = // witness bind token
+    string, // after last witness
+) {left:1,right:"x"}
+r: open p as (
+    // representation
+    A,
+    // interface
+    P) {out:P.left}
+-- nested_comments.input --
+f: forall ( // binder list
+    A: { // bound record
+        value: int // bound field
+    },
+    B in Type( // universe call
+        1): // subtype bound
+        A, // binder end
+) func(A)->B
+p: seal #Box with ( // witness list
+    A = { // witness record
+        value: int // witness field
+    },
+) {value:{value:1}}
+q: open p as (A, // opened representation
+    P) {value:P.value}
+-- prefix_comments.input --
+module(A): {
+    // private representation
+    exists State
+    // initial value
+    zero: State
+    read: func(State)->A
+}
 -- out/format/syntax01.golden --
 bridge: extern func(int) -> int !bridge
 -- out/format/syntax02.golden --
@@ -82,3 +155,81 @@ p: forall (A in Type(1): number) [...A]
 p: forall (A: number) >=0
 q: exists (A: number) -1
 r: (forall(x: 1)) + 1
+-- out/format/multiline.golden --
+Box(
+	A,
+	B: A,
+) = {left: A, right: B}
+f: forall (
+	A in Type(1): number,
+	B: A,
+) func(A) -> B
+p: seal #Pair with (
+	A = int,
+	B = string,
+) {left: 1, right: "x"}
+r: open p as (
+	A,
+	P) {out: P.left}
+-- out/format/binder_comments.golden --
+f: forall (
+	// first binder
+	A in Type(1): number, // after first binder
+	B: A,                 // after last binder
+) func(A) -> B
+Box(
+	// alias binder
+	A,
+	B: A, // last alias binder
+) = {value: B}
+g: forall (
+	// generic binder
+	A: number, // last generic binder
+) func(A) -> A
+-- out/format/bound_comments.golden --
+f: forall (
+	// bound
+	A in Type(1): number, B: A,
+) func(A) -> B
+g: exists (A: number, // bound token
+) {value: A}
+-- out/format/witness_comments.golden --
+p: seal #Pair with (
+	// first witness
+	A = int,    // after first witness
+	B = string, // witness bind token
+	// after last witness
+) {left: 1, right: "x"}
+r: open p as (
+	// representation
+	A,
+	// interface
+	P) {out: P.left}
+-- out/format/nested_comments.golden --
+f: forall (
+	// binder list
+	A: { // bound record
+		value: int // bound field
+	},
+	B in Type( // universe call
+		1,
+	): A, // subtype bound
+	// binder end
+) func(A) -> B
+p: seal #Box with (
+	// witness list
+	A = { // witness record
+		value: int // witness field
+	},
+) {value: {value: 1}}
+q: open p as (A, // opened representation
+	P) {value: P.value}
+-- out/format/prefix_comments.golden --
+module: forall (A) exists (
+	// private representation
+	State,
+) {
+	// initial value
+	zero: State
+	read: func(State) -> A
+}

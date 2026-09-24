@@ -554,9 +554,9 @@ func (f *formatter) decl(decl ast.Decl) {
 
 	case *ast.ParametricAlias:
 		f.expr(n.Name)
-		f.print(token.LPAREN)
+		f.print(n.Lparen, token.LPAREN, noblank, indent)
 		f.typeParams(n.Params, 1)
-		f.print(token.RPAREN, blank, token.BIND, blank)
+		f.print(unindent, trailcomma, noblank, n.Rparen, token.RPAREN, blank, n.Equal, token.BIND, blank)
 		f.expr(n.Body)
 		f.print(declcomma)
 
@@ -816,28 +816,38 @@ func (f *formatter) exprRaw(expr ast.Expr, prec1, depth int) {
 		f.after(nil)
 
 	case *ast.SealExpr:
-		f.print("seal", blank)
+		f.print(x.Seal, "seal", blank)
 		f.expr0(x.Interface, depth)
-		f.print(blank, "with", blank, token.LPAREN)
-		for i, w := range x.Witnesses {
-			if i > 0 {
-				f.print(token.COMMA, blank)
-			}
+		f.print(blank, x.With, "with", blank, x.Lparen, token.LPAREN, noblank, indent)
+		f.before(nil)
+		for _, w := range x.Witnesses {
+			f.before(w)
+			comments := f.current.cg
+			f.current.cg = nil
+			f.funcParamDocComments(w.Expr)
 			f.expr0(w.Ident, depth)
-			f.print(blank, token.BIND, blank)
-			f.expr0(w.Expr, depth)
+			f.print(blank, w.Equal, token.BIND, blank)
+			f.before(nil)
+			f.exprRaw(w.Expr, token.LowestPrec, depth)
+			f.after(nil)
+			f.print(comma, blank)
+			f.bindingComments(comments)
+			f.after(w)
 		}
-		f.print(token.RPAREN, blank)
+		f.after(nil)
+		f.print(unindent, trailcomma, noblank, x.Rparen, token.RPAREN, blank)
 		f.expr0(x.Body, depth)
 
 	case *ast.OpenExpr:
-		f.print("open", blank)
+		f.print(x.Open, "open", blank)
 		f.expr0(x.Value, depth)
-		f.print(blank, "as", blank, token.LPAREN)
-		f.expr0(x.Type, depth)
+		f.print(blank, x.As, "as", blank, x.Lparen, token.LPAREN, noblank, indent)
+		f.before(x.Type)
+		f.exprRaw(x.Type, token.LowestPrec, depth)
 		f.print(token.COMMA, blank)
+		f.after(x.Type)
 		f.expr0(x.View, depth)
-		f.print(token.RPAREN, blank)
+		f.print(unindent, noblank, x.Rparen, token.RPAREN, blank)
 		f.expr0(x.Body, depth)
 
 	case *ast.Quantifier:
@@ -849,9 +859,9 @@ func (f *formatter) exprRaw(expr ast.Expr, prec1, depth int) {
 		if x.Exists {
 			word = "exists"
 		}
-		f.print(word, blank, token.LPAREN)
+		f.print(word, blank, x.Lparen, token.LPAREN, noblank, indent)
 		f.typeParams(x.Params, depth)
-		f.print(token.RPAREN, blank)
+		f.print(unindent, trailcomma, noblank, x.Rparen, token.RPAREN, blank)
 		f.expr0(x.Body, depth)
 		if parens {
 			f.print(token.RPAREN, nooverride)
@@ -1373,20 +1383,38 @@ func isTop(e ast.Expr) bool {
 }
 
 func (f *formatter) typeParams(params []*ast.TypeParam, depth int) {
-	for i, p := range params {
-		if i > 0 {
-			f.print(token.COMMA, blank)
-		}
+	f.before(nil)
+	for _, p := range params {
 		f.before(p)
+		comments := f.current.cg
+		f.current.cg = nil
+		f.funcParamDocComments(p.Sort)
+		f.funcParamDocComments(p.Bound)
 		f.expr0(p.Name, depth)
 		if p.Sort != nil {
-			f.print(blank, token.IN, blank)
-			f.expr0(p.Sort, depth)
+			f.print(blank, p.In, token.IN, blank)
+			f.before(nil)
+			f.exprRaw(p.Sort, token.LowestPrec, depth)
+			f.after(nil)
 		}
 		if p.Bound != nil {
-			f.print(token.COLON, blank)
-			f.expr0(p.Bound, depth)
+			f.print(p.Colon, token.COLON, blank)
+			f.before(nil)
+			f.exprRaw(p.Bound, token.LowestPrec, depth)
+			f.after(nil)
 		}
+		f.print(comma, blank)
+		f.bindingComments(comments)
 		f.after(p)
+	}
+	f.after(nil)
+}
+
+// bindingComments prints comments moved past a binder's comma without
+// inserting a section break between groups. Re-parsing may split a comment
+// after ':' or '=' from one at the end of the binder into separate groups.
+func (f *formatter) bindingComments(comments []*ast.CommentGroup) {
+	for _, cg := range comments {
+		f.printComment(cg)
 	}
 }

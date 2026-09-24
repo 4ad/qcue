@@ -1617,12 +1617,10 @@ func (p *parser) parseFunc() (expr ast.Expr) {
 	var generic *ast.Quantifier
 	if p.quantifiedEnabled() && p.tok == token.LSS {
 		generic = &ast.Quantifier{Quantifier: fun}
-		generic.Lparen = p.expect(token.LSS)
 		saved := p.angleParamLevel
 		p.angleParamLevel = p.exprLev + 1
-		generic.Params = p.parseTypeParams(token.GTR)
+		generic.Lparen, generic.Params, generic.Rparen = p.parseTypeParams(token.LSS, token.GTR)
 		p.angleParamLevel = saved
-		generic.Rparen = p.expectClosing(token.GTR, "function type parameters")
 	}
 	lparen := p.expect(token.LPAREN)
 	params, ellipsis := p.parseFuncParams()

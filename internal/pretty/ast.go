@@ -1073,21 +1073,27 @@ func (c *converter) exprCore(x ast.Expr) doc {
 		if x.Exists {
 			word = "exists"
 		}
-		return cats(stringLit(word+" "), c.typeParams(x.Params), spaceLit, c.expr(x.Body))
+		return cats(stringLit(word+" "), c.typeParams(x, x.Lparen, x.Rparen, x.Params), spaceLit, c.expr(x.Body))
 
 	case *ast.SealExpr:
-		parts := []doc{stringLit("seal "), c.expr(x.Interface), stringLit(" with (")}
-		for i, w := range x.Witnesses {
-			if i > 0 {
-				parts = append(parts, stringLit(", "))
-			}
-			parts = append(parts, c.expr(w.Ident), equalsSpaceLit, c.expr(w.Expr))
+		items := make([]bindingDoc, 0, len(x.Witnesses))
+		for _, w := range x.Witnesses {
+			items = append(items, bindingDoc{
+				node:     w,
+				body:     cats(c.exprCore(w.Ident), equalsSpaceLit, c.exprCore(w.Expr)),
+				comments: bindingComments(w, w.Ident, w.Expr),
+			})
 		}
-		return cats(append(parts, stringLit(") "), c.expr(x.Body))...)
+		return cats(stringLit("seal "), c.expr(x.Interface), stringLit(" with "),
+			c.bindingList(x, x.Lparen, x.Rparen, items, true), spaceLit, c.expr(x.Body))
 
 	case *ast.OpenExpr:
-		return cats(stringLit("open "), c.expr(x.Value), stringLit(" as ("),
-			c.expr(x.Type), stringLit(", "), c.expr(x.View), stringLit(") "), c.expr(x.Body))
+		items := []bindingDoc{
+			{node: x.Type, body: c.exprCore(x.Type), comments: classifyComments(x.Type)},
+			{node: x.View, body: c.exprCore(x.View), comments: classifyComments(x.View)},
+		}
+		return cats(stringLit("open "), c.expr(x.Value), stringLit(" as "),
+			c.bindingList(x, x.Lparen, x.Rparen, items, false), spaceLit, c.expr(x.Body))
 
 	case *ast.Alias:
 		// In expression position (including inside pattern labels
@@ -1570,6 +1576,9 @@ func (c *converter) computeBracketedPolicy(b bracketedLayout) bracketedPolicy {
 	}
 	openBreaks := b.lineHeader || b.hasInterior || leadRel >= token.Newline || forceOpen
 	forceClose := openBreaks || b.closerRel >= token.Newline
+	if b.allowsTrailingComma && forceClose && !hugLast {
+		wantTrailingComma = true
+	}
 	return bracketedPolicy{
 		hugFirst:          hugFirst,
 		hugLast:           hugLast,
@@ -3113,20 +3122,7 @@ func funcParamLeadingRelPos(p *ast.FuncParam, slots commentSlots) token.RelPos {
 // other comment follows it. The interior comments of a bracketed
 // expression stay inside it (see [nodeManagesInteriorComments]).
 func funcParamComments(p *ast.FuncParam) commentSlots {
-	slots := classifyComments(p)
-	for _, e := range []ast.Expr{p.Value, p.Default} {
-		if e == nil {
-			continue
-		}
-		es := classifyComments(e)
-		slots.doc = append(slots.doc, es.doc...)
-		if !nodeManagesInteriorComments(e) {
-			slots.prefix = append(slots.prefix, es.prefix...)
-			slots.suffix = append(slots.suffix, es.suffix...)
-		}
-		slots.trailing = append(slots.trailing, es.trailing...)
-	}
-	return slots
+	return bindingComments(p, p.Value, p.Default)
 }
 
 // isLineComment reports whether cg sits on the same line as the token it
@@ -3272,7 +3268,7 @@ func (c *converter) decl(d ast.Decl) doc {
 		return c.field(x)
 
 	case *ast.ParametricAlias:
-		return cats(c.expr(x.Name), c.typeParams(x.Params), equalsSpaceLit, c.expr(x.Body))
+		return cats(c.expr(x.Name), c.typeParams(x, x.Lparen, x.Rparen, x.Params), equalsSpaceLit, c.expr(x.Body))
 
 	case *ast.Alias:
 		return cats(stringLit(x.Ident.Name), equalsSpaceLit, c.expr(x.Expr))
@@ -3944,7 +3940,8 @@ func wrapEligibility(n ast.Node) (eligible, authored bool) {
 		return true, x.Lbrace.IsValid()
 	case *ast.ListLit:
 		return true, x.Lbrack.IsValid()
-	case *ast.File, *ast.Func, *ast.CallExpr, *ast.BinaryExpr, *ast.IndexExpr:
+	case *ast.File, *ast.Func, *ast.CallExpr, *ast.BinaryExpr, *ast.IndexExpr,
+		*ast.Quantifier, *ast.ParametricAlias, *ast.SealExpr, *ast.OpenExpr:
 		return true, true
 	}
 	return false, false
@@ -4924,20 +4921,120 @@ func nodeType[T ast.Node](n ast.Node) bool {
 	return ok
 }
 
-func (c *converter) typeParams(params []*ast.TypeParam) doc {
-	parts := []doc{lParenLit}
-	for i, p := range params {
-		if i > 0 {
-			parts = append(parts, stringLit(", "))
-		}
-		item := c.expr(p.Name)
+func (c *converter) typeParams(n ast.Node, lparen, rparen token.Pos, params []*ast.TypeParam) doc {
+	items := make([]bindingDoc, 0, len(params))
+	for _, p := range params {
+		item := c.exprCore(p.Name)
 		if p.Sort != nil {
-			item = cats(item, stringLit(" in "), c.expr(p.Sort))
+			item = cats(item, stringLit(" in "), c.exprCore(p.Sort))
 		}
 		if p.Bound != nil {
-			item = cats(item, stringLit(": "), c.expr(p.Bound))
+			item = cats(item, colonLit, spaceLit, c.exprCore(p.Bound))
 		}
-		parts = append(parts, c.withComments(p, item))
+		items = append(items, bindingDoc{p, item, bindingComments(p, p.Name, p.Sort, p.Bound)})
 	}
-	return cats(append(parts, rParenLit)...)
+	return c.bindingList(n, lparen, rparen, items, true)
+}
+
+// bindingDoc keeps a binder's comments outside its core syntax, so commas
+// precede trailing comments and comments after ':' or '=' cannot split it.
+type bindingDoc struct {
+	node     ast.Node
+	body     doc
+	comments commentSlots
+}
+
+func bindingComments(n ast.Node, exprs ...ast.Expr) commentSlots {
+	slots := classifyComments(n)
+	for _, e := range exprs {
+		if e == nil {
+			continue
+		}
+		es := classifyComments(e)
+		slots.doc = append(slots.doc, es.doc...)
+		if !nodeManagesInteriorComments(e) {
+			slots.prefix = append(slots.prefix, es.prefix...)
+			slots.suffix = append(slots.suffix, es.suffix...)
+		}
+		slots.trailing = append(slots.trailing, es.trailing...)
+	}
+	return slots
+}
+
+// bindingList formats quantifier parameters, seal witnesses, and the names
+// bound by open. Open requires its closing parenthesis beside the last name;
+// the other lists accept a trailing comma and can close on a separate line.
+func (c *converter) bindingList(n ast.Node, lparen, rparen token.Pos, items []bindingDoc, trailingComma bool) doc {
+	if len(items) == 0 {
+		return stringLit("()")
+	}
+	var rows []row
+	soft := lineBreakOrSpace
+	anyDoc, anyPost := false, false
+	for i, item := range items {
+		slots := item.comments
+		anyDoc = anyDoc || len(slots.doc) > 0
+		anyPost = anyPost || len(slots.nonDoc()) > 0
+		var comma doc
+		if i < len(items)-1 {
+			comma = commaLit
+		} else if trailingComma {
+			comma = commaWhenBroken
+		}
+		var trailing doc
+		var post []*ast.CommentGroup
+		for _, cg := range slots.nonDoc() {
+			if isLineComment(cg) && trailing == nil {
+				trailing = c.commentGroup(cg)
+			} else {
+				post = append(post, cg)
+			}
+		}
+		cells := []doc{cat(item.body, comma)}
+		if trailing != nil {
+			cells = append(cells, trailing)
+		}
+		leading := item.node.Pos().RelPos()
+		if len(slots.doc) > 0 {
+			leading = slots.doc[0].Pos().RelPos()
+		}
+		r := row{
+			docComment: c.docCommentBlock(slots.doc, item.node.Pos().RelPos()),
+			cells:      cells,
+			hasComment: slots.any(),
+		}
+		if i > 0 {
+			r.sep = relBreakOr(leading, soft)
+		}
+		rows = append(rows, r)
+		rows = append(rows, c.postCommentRows(post)...)
+		soft = lineBreakOrSpace
+		if trailing != nil || len(post) > 0 {
+			soft = lineBreakHard
+		}
+	}
+	closerRel := rparen.RelPos()
+	if anyPost && closerRel < token.Newline {
+		closerRel = token.Newline
+	}
+	layout := bracketedLayout{
+		node:                n,
+		open:                lParenLit,
+		close:               rParenLit,
+		openerRel:           lparen.RelPos(),
+		closerRel:           closerRel,
+		firstElem:           items[0].node,
+		lastElem:            items[len(items)-1].node,
+		numElems:            len(items),
+		anyDoc:              anyDoc,
+		anyPost:             anyPost,
+		forceOpenBreak:      len(items[0].comments.doc) > 0,
+		allowsTrailingComma: trailingComma,
+		inner:               table(rows),
+	}
+	policy := c.computeBracketedPolicy(layout)
+	if !trailingComma {
+		policy.hugLast = true
+	}
+	return c.applyBracketed(layout, policy)
 }

@@ -143,9 +143,12 @@ func (p *parser) parseTypeParam() (param *ast.TypeParam) {
 	return param
 }
 
-func (p *parser) parseTypeParams(end token.Token) (params []*ast.TypeParam) {
+// Keep the delimiters inside the comment list so comments after the opener
+// and before the closer attach to parameters, not the surrounding expression.
+func (p *parser) parseTypeParams(start, end token.Token) (lparen token.Pos, params []*ast.TypeParam, rparen token.Pos) {
 	p.openList()
 	defer p.closeList()
+	lparen = p.expect(start)
 	for p.tok != end && p.tok != token.EOF {
 		params = append(params, p.parseTypeParam())
 		if p.tok != token.COMMA {
@@ -156,7 +159,8 @@ func (p *parser) parseTypeParams(end token.Token) (params []*ast.TypeParam) {
 	if len(params) == 0 {
 		p.errf(p.pos, "quantifier requires at least one parameter")
 	}
-	return params
+	rparen = p.expectClosing(end, "type parameter list")
+	return lparen, params, rparen
 }
 
 func (p *parser) parseQuantifier() (expr ast.Expr) {
@@ -168,9 +172,7 @@ func (p *parser) parseQuantifier() (expr ast.Expr) {
 	}
 	p.next()
 	if p.tok == token.LPAREN {
-		q.Lparen = p.expect(token.LPAREN)
-		q.Params = p.parseTypeParams(token.RPAREN)
-		q.Rparen = p.expectClosing(token.RPAREN, "quantifier parameter list")
+		q.Lparen, q.Params, q.Rparen = p.parseTypeParams(token.LPAREN, token.RPAREN)
 	} else {
 		q.Params = []*ast.TypeParam{{Name: p.parseIdentDecl()}}
 	}
@@ -221,9 +223,7 @@ func (p *parser) quantifiedFieldAhead() bool {
 func (p *parser) parseQuantifiedField() ast.Decl {
 	name := p.parseIdentDecl()
 	q := &ast.Quantifier{Quantifier: name.Pos()}
-	q.Lparen = p.expect(token.LPAREN)
-	q.Params = p.parseTypeParams(token.RPAREN)
-	q.Rparen = p.expectClosing(token.RPAREN, "quantified field")
+	q.Lparen, q.Params, q.Rparen = p.parseTypeParams(token.LPAREN, token.RPAREN)
 	if p.tok == token.BIND {
 		a := &ast.ParametricAlias{
 			Name: name, Lparen: q.Lparen, Params: q.Params, Rparen: q.Rparen,
@@ -250,14 +250,19 @@ func (p *parser) expectContextual(word string) token.Pos {
 	return pos
 }
 
-func (p *parser) parseSeal() ast.Expr {
+func (p *parser) parseSeal() (expr ast.Expr) {
+	c := p.openComments()
+	defer func() { c.closeNode(p, expr) }()
 	s := &ast.SealExpr{Seal: p.expectContextual("seal")}
 	s.Interface = p.parseRHS()
 	s.With = p.expectContextual("with")
+	p.openList()
 	s.Lparen = p.expect(token.LPAREN)
 	for p.tok != token.RPAREN && p.tok != token.EOF {
+		c := p.openComments()
 		w := &ast.Alias{Ident: p.parseIdentDecl(), Equal: p.expect(token.BIND)}
 		w.Expr = p.parseRHS()
+		c.closeNode(p, w)
 		s.Witnesses = append(s.Witnesses, w)
 		if p.tok != token.COMMA {
 			break
@@ -265,19 +270,24 @@ func (p *parser) parseSeal() ast.Expr {
 		p.next()
 	}
 	s.Rparen = p.expectClosing(token.RPAREN, "seal witnesses")
+	p.closeList()
 	s.Body = p.parseStruct()
 	return s
 }
 
-func (p *parser) parseOpen() ast.Expr {
+func (p *parser) parseOpen() (expr ast.Expr) {
+	c := p.openComments()
+	defer func() { c.closeNode(p, expr) }()
 	o := &ast.OpenExpr{Open: p.expectContextual("open")}
 	o.Value = p.parseRHS()
 	o.As = p.expectContextual("as")
+	p.openList()
 	o.Lparen = p.expect(token.LPAREN)
 	o.Type = p.parseIdentDecl()
 	p.expect(token.COMMA)
 	o.View = p.parseIdentDecl()
 	o.Rparen = p.expectClosing(token.RPAREN, "opened type and view")
+	p.closeList()
 	o.Body = p.parseStruct()
 	return o
 }
@@ -291,9 +301,7 @@ func (p *parser) parseBlockPrefix() (prefix []*ast.Quantifier, first ast.Decl) {
 		q := &ast.Quantifier{Quantifier: p.pos, Exists: p.lit == "exists"}
 		p.next()
 		if p.tok == token.LPAREN {
-			q.Lparen = p.expect(token.LPAREN)
-			q.Params = p.parseTypeParams(token.RPAREN)
-			q.Rparen = p.expectClosing(token.RPAREN, "block quantifier")
+			q.Lparen, q.Params, q.Rparen = p.parseTypeParams(token.LPAREN, token.RPAREN)
 		} else {
 			q.Params = []*ast.TypeParam{p.parseTypeParam()}
 		}
