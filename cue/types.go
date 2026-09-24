@@ -245,7 +245,8 @@ type hiddenIterator = Iterator
 // any other field. If evaluation is canceled, Next returns false and Err
 // reports the cancellation.
 func (i *Iterator) Next() (ok bool) {
-	if i.err != nil {
+	if i.err != nil || i.p >= len(i.arcs)+len(i.patterns) {
+		i.cur = Value{}
 		return false
 	}
 	if b := i.ctx.Cancelled(); b != nil {
@@ -261,9 +262,6 @@ func (i *Iterator) Next() (ok bool) {
 		}
 	}()
 	switch {
-	case i.p >= len(i.arcs)+len(i.patterns):
-		i.cur = Value{}
-		return false
 	case i.p < len(i.patterns):
 		i.isPattern = true
 		i.arcType = adt.ArcNotPresent

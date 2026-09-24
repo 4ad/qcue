@@ -311,3 +311,20 @@ func TestContextCancellationCallbacks(t *testing.T) {
 		t.Fatalf("Encode: %v", err)
 	}
 }
+
+func TestContextCancellationAfterIteration(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	v := cuecontext.New(cuecontext.WithContext(ctx)).CompileString(`[1]`)
+	iter, err := v.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !iter.Next() || iter.Next() || iter.Err() != nil {
+		t.Fatal("iteration did not finish normally")
+	}
+	cancel()
+	if iter.Next() || iter.Err() != nil {
+		t.Fatal("cancellation changed an exhausted iterator")
+	}
+}
