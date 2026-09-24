@@ -211,6 +211,13 @@ func isSafeToFlushCyclic(x Elem) bool {
 //		return v.unifyC(c, needs, mode, true)
 //	}
 func (v *Vertex) unify(c *OpContext, flags Flags) bool {
+	if b := c.Cancelled(); b != nil {
+		if v.status != finalized {
+			v.BaseValue = b
+			v.status = finalized
+		}
+		return true
+	}
 	needs := flags.condition
 	mode := flags.mode
 	checkTypos := flags.checkTypos

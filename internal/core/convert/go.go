@@ -259,6 +259,9 @@ func isNil(x reflect.Value) bool {
 }
 
 func fromGoValue(ctx *adt.OpContext, nilIsTop bool, val reflect.Value) (result adt.Value) {
+	if b := ctx.Cancelled(); b != nil {
+		return b
+	}
 	src := ctx.Source()
 	if !val.IsValid() { // untyped nil, or dereferencing a nil pointer/interface
 		if nilIsTop {
@@ -345,8 +348,11 @@ func fromGoValue(ctx *adt.OpContext, nilIsTop bool, val reflect.Value) (result a
 		if err != nil {
 			return ctx.AddErr(errors.Promote(err, "json.Marshaler"))
 		}
-		expr, err := parser.ParseExpr("json", b)
+		expr, err := parser.ParseExpr("json", b, parser.WithContext(ctx.Context()))
 		if err != nil {
+			if b := ctx.Cancelled(); b != nil {
+				return b
+			}
 			panic(err) // cannot happen
 		}
 		// Simplify like the json encoding package, e.g. rendering
@@ -423,6 +429,9 @@ func fromGoValue(ctx *adt.OpContext, nilIsTop bool, val reflect.Value) (result a
 		}
 
 		for i := range typ.NumField() {
+			if b := ctx.Cancelled(); b != nil {
+				return b
+			}
 			sf := typ.Field(i)
 			if sf.PkgPath != "" {
 				continue
@@ -489,6 +498,9 @@ func fromGoValue(ctx *adt.OpContext, nilIsTop bool, val reflect.Value) (result a
 			// Note that we don't use [reflect.Value.Seq2]; see the note below for [reflect.Array].
 			iter := val.MapRange()
 			for iter.Next() {
+				if b := ctx.Cancelled(); b != nil {
+					return b
+				}
 				k, val := iter.Key(), iter.Value()
 				sub := fromGoValue(ctx, nilIsTop, val)
 				// mimic behavior of encoding/json: report error of unsupported type.
@@ -540,6 +552,9 @@ func fromGoValue(ctx *adt.OpContext, nilIsTop bool, val reflect.Value) (result a
 		// We can't use [reflect.Value.Seq] either, as that's just the indices.
 		// See the upstream bug report: https://go.dev/issue/76357
 		for i := range numElems {
+			if b := ctx.Cancelled(); b != nil {
+				return b
+			}
 			val := val.Index(i)
 			x := fromGoValue(ctx, nilIsTop, val)
 			if x == nil {

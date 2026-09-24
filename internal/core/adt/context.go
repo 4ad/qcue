@@ -15,6 +15,7 @@
 package adt
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -133,6 +134,10 @@ func (c *OpContext) IsValidator() bool {
 // corresponding call to [OpContext.PopState], causing the original
 // errors and vertex to be restored.
 type OpContext struct {
+	goContext context.Context
+	done      <-chan struct{}
+	cancelled *Bottom
+
 	Runtime
 	format          func(Runtime, Node) string
 	inclusionChecks map[inclusionCheck]bool
@@ -849,6 +854,9 @@ func (c *OpContext) evalState(v Expr, state Flags) (result Value) {
 }
 
 func (c *OpContext) evalStateCI(v Expr, state Flags) (result Value, ci CloseInfo) {
+	if b := c.Cancelled(); b != nil {
+		return b, c.ci
+	}
 	savedSrc := c.src
 	c.src = v.Source()
 	err := c.errs

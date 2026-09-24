@@ -107,6 +107,9 @@ func (p *certifier) useHypothesis(f *adt.FuncValue) {
 }
 
 func (p *certifier) step() bool {
+	if p.ctx.Cancelled() != nil {
+		return false
+	}
 	if p.remaining == 0 {
 		return false
 	}

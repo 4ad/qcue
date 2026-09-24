@@ -323,6 +323,9 @@ func (q *Quantified) evaluateFinite(c *OpContext) Value {
 	}
 	var expand func(*Environment, int) Value
 	expand = func(env *Environment, i int) Value {
+		if b := c.Cancelled(); b != nil {
+			return b
+		}
 		if budget.remaining == 0 || budget.exhausted {
 			budget.exhausted = true
 			return nil

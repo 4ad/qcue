@@ -437,6 +437,10 @@ func (n *nodeContext) crossProduct(dst, cross []*nodeContext, dn *envDisjunct, m
 		initArcs(n.ctx, p.node)
 
 		for j, d := range dn.disjuncts {
+			if b := n.ctx.Cancelled(); b != nil {
+				n.addBottom(b)
+				return dst
+			}
 			ID.node.nextDisjunct(j, len(dn.disjuncts), d.expr)
 
 			c := MakeConjunct(dn.env, d.expr, dn.cloneID)

@@ -57,6 +57,9 @@ func Validate(ctx *OpContext, v *Vertex, cfg *ValidateConfig) *Bottom {
 	}
 	x := validator{ValidateConfig: *cfg, ctx: ctx}
 	x.validate(v)
+	if b := ctx.Cancelled(); b != nil {
+		return b
+	}
 	return x.err
 }
 
@@ -141,6 +144,10 @@ func (v *validator) add(b *Bottom) {
 }
 
 func (v *validator) validate(x *Vertex) {
+	if b := v.ctx.Cancelled(); b != nil {
+		v.err = b
+		return
+	}
 	defer v.ctx.PopArcAndLabel(v.ctx.PushArcAndLabel(x))
 
 	y := x

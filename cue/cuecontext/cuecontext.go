@@ -18,6 +18,7 @@
 package cuecontext
 
 import (
+	"context"
 	"fmt"
 
 	"cuelang.org/go/cue"
@@ -50,6 +51,26 @@ func New(options ...Option) *cue.Context {
 		o.apply(r)
 	}
 	return (*cue.Context)(r)
+}
+
+// WithContext associates ctx with the lifetime of the CUE context and values
+// created from it. Cancellation and deadlines interrupt parsing, compilation,
+// evaluation, and validation. Errors can be identified with errors.Is using
+// context.Canceled, context.DeadlineExceeded, or the cancellation cause.
+//
+// The context must not be nil. Once canceled, create a new CUE context for
+// further work. Already computed values may still be inspected, but operations
+// that evaluate or validate them report cancellation. When combining values,
+// the receiving value's context controls the operation.
+//
+// Cancellation is cooperative: a blocking Go callback or an individual builtin
+// must return before it can be observed. No evaluation goroutine is left running
+// after an API call returns. Without this option, context.Background is used.
+func WithContext(ctx context.Context) Option {
+	if ctx == nil {
+		panic("cuecontext: nil context")
+	}
+	return Option{func(r *runtime.Runtime) { r.SetContext(ctx) }}
 }
 
 // Deprecated: use [Injection] instead.

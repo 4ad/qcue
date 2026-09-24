@@ -22,6 +22,9 @@ import (
 )
 
 func (s *subsumer) values(a, b adt.Value) (result bool) {
+	if s.ctx.Cancelled() != nil {
+		return false
+	}
 	defer func() {
 		if !result && s.gt == nil && s.lt == nil {
 			s.gt = a

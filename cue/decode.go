@@ -48,7 +48,17 @@ import (
 // If x contains a [Value], that part of x will be set to the value
 // at the corresponding part of v. This allows decoding values
 // that aren't entirely concrete into a Go type.
-func (v Value) Decode(x any) error {
+func (v Value) Decode(x any) (err error) {
+	if v.idx != nil {
+		if err := v.idx.ContextErr(); err != nil {
+			return err
+		}
+		defer func() {
+			if cancelErr := v.idx.ContextErr(); cancelErr != nil {
+				err = cancelErr
+			}
+		}()
+	}
 	var d decoder
 	w := reflect.ValueOf(x)
 	if w.Kind() != reflect.Pointer || w.IsNil() {

@@ -176,6 +176,10 @@ func (c *OpContext) yield(
 }
 
 func (s *compState) yield(env *Environment) (ok bool) {
+	if b := s.ctx.Cancelled(); b != nil {
+		s.ctx.AddBottom(b)
+		return false
+	}
 	c := s.ctx
 	if s.i >= len(s.comp.Clauses) {
 		s.f(env)

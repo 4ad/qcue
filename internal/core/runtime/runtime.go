@@ -15,6 +15,7 @@
 package runtime
 
 import (
+	"context"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
@@ -25,6 +26,8 @@ import (
 
 // A Runtime maintains data structures for indexing and reuse for evaluation.
 type Runtime struct {
+	ctx context.Context
+
 	index *index
 
 	loaded map[*build.Instance]interface{}
@@ -38,11 +41,31 @@ type Runtime struct {
 	flags cuedebug.Config
 }
 
+// Context returns the Go context controlling this runtime's work.
+func (r *Runtime) Context() context.Context {
+	if r.ctx == nil {
+		return context.Background()
+	}
+	return r.ctx
+}
+
+// SetContext must be called before the runtime is used.
+func (r *Runtime) SetContext(ctx context.Context) {
+	if ctx == nil {
+		panic("cue: nil context")
+	}
+	r.ctx = ctx
+}
+
+// ContextErr reports cancellation, including a distinct cancellation cause.
+func (r *Runtime) ContextErr() error { return internal.ContextError(r.ctx) }
+
 func (r *Runtime) Settings() (internal.EvaluatorVersion, cuedebug.Config) {
 	return r.version, r.flags
 }
 
 func (r *Runtime) ConfigureOpCtx(ctx *adt.OpContext) {
+	ctx.SetContext(r.Context())
 	ctx.Version = r.version
 	ctx.Config = r.flags
 	ctx.ProveInclusion = subsume.ProveInclusion

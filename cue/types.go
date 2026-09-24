@@ -194,6 +194,11 @@ func (e *marshalError) Error() string {
 	return fmt.Sprintf("cue: marshal error: %v", e.err)
 }
 
+// Preserve external causes without exposing CUE's internal diagnostic wrappers
+// through As, which would change how callers classify ordinary value errors.
+func (e *marshalError) Is(target error) bool       { return errors.Is(e.err, target) }
+func (e *marshalError) As(target interface{}) bool { return errors.As(errors.Unwrap(e.err), target) }
+
 func (e *marshalError) Bottom() *adt.Bottom          { return e.b }
 func (e *marshalError) Path() []string               { return e.err.Path() }
 func (e *marshalError) Msg() (string, []interface{}) { return e.err.Msg() }
@@ -217,6 +222,7 @@ func unwrapJSONError(err error) errors.Error {
 
 // An Iterator iterates over values.
 type Iterator struct {
+	err       error
 	val       Value
 	idx       *runtime.Runtime
 	ctx       *adt.OpContext
@@ -236,8 +242,24 @@ type hiddenIterator = Iterator
 // It must be called before the first call to [Iterator.Value] or [Iterator.Selector].
 //
 // Note that pattern constraints will be produced by the iterator before
-// any other field.
-func (i *Iterator) Next() bool {
+// any other field. If evaluation is canceled, Next returns false and Err
+// reports the cancellation.
+func (i *Iterator) Next() (ok bool) {
+	if i.err != nil {
+		return false
+	}
+	if b := i.ctx.Cancelled(); b != nil {
+		i.err = i.val.toErr(b)
+		i.cur = Value{}
+		return false
+	}
+	defer func() {
+		if b := i.ctx.Cancelled(); b != nil {
+			i.err = i.val.toErr(b)
+			i.cur = Value{}
+			ok = false
+		}
+	}()
 	switch {
 	case i.p >= len(i.arcs)+len(i.patterns):
 		i.cur = Value{}
@@ -264,6 +286,11 @@ func (i *Iterator) Next() bool {
 		return true
 	}
 }
+
+// Err reports a cancellation that stopped iteration. It returns nil when
+// iteration ended normally. Errors in individual values are reported by
+// [Value.Err], rather than by Err.
+func (i *Iterator) Err() error { return i.err }
 
 // Value returns the current value in the list.
 // It will panic if [Iterator.Next] advanced past the last entry.
@@ -346,6 +373,9 @@ func listAppendJSON(b []byte, l *Iterator) ([]byte, error) {
 			b = append(b, ',')
 		}
 	}
+	if err := l.Err(); err != nil {
+		return nil, err
+	}
 	b = append(b, ']')
 	return b, nil
 }
@@ -360,8 +390,11 @@ func (v Value) getNum(k adt.Kind) (*adt.Num, errors.Error) {
 	if err := v.checkKind(ctx, k); err != nil {
 		return nil, v.toErr(err)
 	}
-	n, _ := v.eval(ctx).(*adt.Num)
-	return n, nil
+	x := v.eval(ctx)
+	if b, ok := x.(*adt.Bottom); ok {
+		return nil, v.toErr(b)
+	}
+	return x.(*adt.Num), nil
 }
 
 // MantExp breaks x into its mantissa and exponent components and returns the
@@ -648,6 +681,9 @@ func newVertexRoot(idx *runtime.Runtime, ctx *adt.OpContext, x *adt.Vertex) Valu
 		// This is indicative of an zero Value. In some cases this is called
 		// with an error value.
 		x.Finalize(ctx)
+		if b := ctx.Cancelled(); b != nil {
+			x = adt.ToVertex(b)
+		}
 	} else {
 		x.ForceDone()
 	}
@@ -783,6 +819,9 @@ func (v Value) Default() (Value, bool) {
 	if v.v == nil {
 		return v, false
 	}
+	if err := v.idx.ContextErr(); err != nil {
+		return newErrValue(v, &adt.Bottom{Err: errors.Promote(err, "")}), false
+	}
 
 	x := v.v.DerefValue()
 	d := x.Default()
@@ -837,6 +876,9 @@ func (v Value) MarshalJSON() (b []byte, err error) {
 }
 
 func (v Value) appendJSON(ctx *adt.OpContext, b []byte) ([]byte, error) {
+	if err := ctx.Cancelled(); err != nil {
+		return nil, v.toErr(err)
+	}
 	v, _ = v.Default()
 	if v.v == nil {
 		return append(b, "null"...), nil
@@ -1314,7 +1356,11 @@ func (v Value) Bool() (bool, error) {
 	if err := v.checkKind(ctx, adt.BoolKind); err != nil {
 		return false, v.toErr(err)
 	}
-	return v.eval(ctx).(*adt.Bool).B, nil
+	x := v.eval(ctx)
+	if b, ok := x.(*adt.Bottom); ok {
+		return false, v.toErr(b)
+	}
+	return x.(*adt.Bool).B, nil
 }
 
 // String returns the string value if v is a string or an error otherwise.
@@ -1329,7 +1375,11 @@ func (v Value) String() (string, error) {
 	if err := v.checkKind(ctx, adt.StringKind); err != nil {
 		return "", v.toErr(err)
 	}
-	return v.eval(ctx).(*adt.String).Str, nil
+	x := v.eval(ctx)
+	if b, ok := x.(*adt.Bottom); ok {
+		return "", v.toErr(b)
+	}
+	return x.(*adt.String).Str, nil
 }
 
 // Bytes returns a byte slice if v represents a list of bytes or an error
@@ -1382,6 +1432,9 @@ func (v Value) structValData(ctx *adt.OpContext) (structValue, *adt.Bottom) {
 
 // structVal returns an structVal or an error if v is not a struct.
 func (v Value) structValOpts(ctx *adt.OpContext, o options) (s structValue, err *adt.Bottom) {
+	if b := ctx.Cancelled(); b != nil {
+		return structValue{}, b
+	}
 	orig := v
 	v, _ = v.Default()
 

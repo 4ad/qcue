@@ -132,12 +132,23 @@ func (c *Context) parseOptions(options []BuildOption) (cfg runtime.Config) {
 // The returned value will represent an error, accessible through [Value.Err],
 // if any error occurred.
 func (c *Context) BuildInstance(i *build.Instance, options ...BuildOption) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	cfg := c.parseOptions(options)
 	v, err := c.runtime().Build(&cfg, i)
 	if err != nil {
 		return c.makeError(err)
 	}
 	return c.make(v)
+}
+
+func (c *Context) cancelledValue(err error) Value {
+	b := &adt.Bottom{Err: errors.Promote(err, "")}
+	node := &adt.Vertex{BaseValue: b}
+	node.ForceDone()
+	node.AddConjunct(adt.MakeRootConjunct(nil, b))
+	return makeValue(c.runtime(), node, nil)
 }
 
 func (c *Context) makeError(err errors.Error) Value {
@@ -149,11 +160,23 @@ func (c *Context) makeError(err errors.Error) Value {
 }
 
 // BuildInstances creates a [Value] for each of the given [*build.Instance]s and reports
-// the combined errors or nil if there were no errors.
-func (c *Context) BuildInstances(instances []*build.Instance) ([]Value, error) {
+// the combined errors or nil if there were no errors. If the context is
+// canceled, it returns the values built so far and the cancellation error.
+func (c *Context) BuildInstances(instances []*build.Instance) (values []Value, err error) {
+	if err := c.runtime().ContextErr(); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cancelErr := c.runtime().ContextErr(); cancelErr != nil {
+			err = cancelErr
+		}
+	}()
 	var errs errors.Error
 	var a []Value
 	for _, b := range instances {
+		if err := c.runtime().ContextErr(); err != nil {
+			return a, err
+		}
 		v, err := c.runtime().Build(nil, b)
 		if err != nil {
 			errs = errors.Append(errs, err)
@@ -170,6 +193,9 @@ func (c *Context) BuildInstances(instances []*build.Instance) ([]Value, error) {
 // The returned value will represent an error, accessible through [Value.Err],
 // if any error occurred.
 func (c *Context) BuildFile(f *ast.File, options ...BuildOption) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	cfg := c.parseOptions(options)
 	return c.compile(c.runtime().CompileFile(&cfg, f))
 }
@@ -186,6 +212,9 @@ func (c *Context) compile(v *adt.Vertex, p *build.Instance) Value {
 // The returned value will represent an error, accessible through [Value.Err],
 // if any error occurred.
 func (c *Context) BuildExpr(x ast.Expr, options ...BuildOption) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	r := c.runtime()
 	cfg := c.parseOptions(options)
 
@@ -229,6 +258,9 @@ const anonymousPkg = "_"
 // The returned value will represent an error, accessible through [Value.Err],
 // if any error occurred.
 func (c *Context) CompileString(src string, options ...BuildOption) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	cfg := c.parseOptions(options)
 	return c.compile(c.runtime().Compile(&cfg, src))
 }
@@ -238,6 +270,9 @@ func (c *Context) CompileString(src string, options ...BuildOption) Value {
 // The returned value will represent an error, accessible through [Value.Err],
 // if any error occurred.
 func (c *Context) CompileBytes(b []byte, options ...BuildOption) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	cfg := c.parseOptions(options)
 	return c.compile(c.runtime().Compile(&cfg, b))
 }
@@ -256,6 +291,9 @@ func (c *Context) CompileBytes(b []byte, options ...BuildOption) Value {
 // }
 
 func (c *Context) make(v *adt.Vertex) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	opCtx := newContext(c.runtime())
 	// TODO: this is currently needed to ensure that node is properly recognized
 	// as evaluated. Not dereferencing nodes, however, will have the benefit of
@@ -379,6 +417,9 @@ func NilIsAny(isAny bool) EncodeOption {
 // encode such a value results in the returned value being an error, accessible
 // through the Err method.
 func (c *Context) Encode(x any, option ...EncodeOption) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	switch v := x.(type) {
 	case adt.Value:
 		return newValueRoot(c.runtime(), c.ctx(), v)
@@ -399,6 +440,9 @@ func (c *Context) Encode(x any, option ...EncodeOption) Value {
 // The returned value will represent an error, accessible through [Value.Err],
 // if any error occurred.
 func (c *Context) EncodeType(x any, option ...EncodeOption) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	switch v := x.(type) {
 	case *adt.Vertex:
 		return c.make(v)
@@ -416,6 +460,9 @@ func (c *Context) EncodeType(x any, option ...EncodeOption) Value {
 //
 // All Values must be created by c.
 func (c *Context) NewList(v ...Value) Value {
+	if err := c.runtime().ContextErr(); err != nil {
+		return c.cancelledValue(err)
+	}
 	a := make([]adt.Value, len(v))
 	for i, x := range v {
 		a[i] = x.v
@@ -477,10 +524,16 @@ func str(c *adt.OpContext, v adt.Node) string {
 //
 // Deprecated: use [adt.OpContext.value].
 func (v Value) eval(ctx *adt.OpContext) adt.Value {
+	if b := ctx.Cancelled(); b != nil {
+		return b
+	}
 	if v.v == nil {
 		panic("undefined value")
 	}
 	x := manifest(ctx, v.v)
+	if b := ctx.Cancelled(); b != nil {
+		return b
+	}
 	return x.Value()
 }
 

@@ -21,6 +21,7 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/stats"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/compile"
@@ -39,6 +40,14 @@ type Config struct {
 // Build builds b and all its transitive dependencies, insofar they have not
 // been build yet.
 func (x *Runtime) Build(cfg *Config, b *build.Instance) (v *adt.Vertex, errs errors.Error) {
+	if err := x.ContextErr(); err != nil {
+		return nil, errors.Promote(err, "")
+	}
+	defer func() {
+		if err := x.ContextErr(); err != nil {
+			v, errs = nil, errors.Promote(err, "")
+		}
+	}()
 	if err := b.Complete(); err != nil {
 		return nil, b.Err
 	}
@@ -75,7 +84,13 @@ func (x *Runtime) Build(cfg *Config, b *build.Instance) (v *adt.Vertex, errs err
 	v, err := compile.Instance(cc, x, b)
 	errs = errors.Append(errs, err)
 
+	if err := x.ContextErr(); err != nil {
+		return nil, errors.Promote(err, "")
+	}
 	errs = errors.Append(errs, x.InjectImplementations(b, v))
+	if err := x.ContextErr(); err != nil {
+		return nil, errors.Promote(err, "")
+	}
 
 	if errs != nil {
 		v = adt.ToVertex(&adt.Bottom{Err: errs})
@@ -88,7 +103,9 @@ func (x *Runtime) Build(cfg *Config, b *build.Instance) (v *adt.Vertex, errs err
 }
 
 func (r *Runtime) Compile(cfg *Config, source interface{}) (*adt.Vertex, *build.Instance) {
-	ctx := build.NewContext()
+	ctx := build.NewContext(build.ParseFile(func(name string, src interface{}, cfg parser.Config) (*ast.File, error) {
+		return parser.ParseFile(name, src, cfg, parser.WithContext(r.Context()))
+	}))
 	var filename string
 	if cfg != nil && cfg.Filename != "" {
 		filename = cfg.Filename
@@ -97,12 +114,17 @@ func (r *Runtime) Compile(cfg *Config, source interface{}) (*adt.Vertex, *build.
 	if err := p.AddFile(filename, source); err != nil {
 		return nil, p
 	}
-	v, _ := r.Build(cfg, p)
+	v, err := r.Build(cfg, p)
+	if err != nil {
+		p.Err = err
+	}
 	return v, p
 }
 
 func (r *Runtime) CompileFile(cfg *Config, file *ast.File) (*adt.Vertex, *build.Instance) {
-	ctx := build.NewContext()
+	ctx := build.NewContext(build.ParseFile(func(name string, src interface{}, cfg parser.Config) (*ast.File, error) {
+		return parser.ParseFile(name, src, cfg, parser.WithContext(r.Context()))
+	}))
 	filename := file.Filename
 	if cfg != nil && cfg.Filename != "" {
 		filename = cfg.Filename
@@ -113,7 +135,10 @@ func (r *Runtime) CompileFile(cfg *Config, file *ast.File) (*adt.Vertex, *build.
 		return nil, p
 	}
 	p.PkgName = file.PackageName()
-	v, _ := r.Build(cfg, p)
+	v, err := r.Build(cfg, p)
+	if err != nil {
+		p.Err = err
+	}
 	return v, p
 }
 

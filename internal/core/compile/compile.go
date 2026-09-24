@@ -96,6 +96,7 @@ func Expr(cfg *Config, r adt.Runtime, pkgPath string, x ast.Expr) (adt.Conjunct,
 func newCompiler(cfg *Config, inst *build.Instance, r adt.Runtime) *compiler {
 	c := &compiler{
 		inst:  inst,
+		ctx:   adt.NewContext(r, nil),
 		index: r,
 	}
 	if cfg != nil {
@@ -106,6 +107,7 @@ func newCompiler(cfg *Config, inst *build.Instance, r adt.Runtime) *compiler {
 }
 
 type compiler struct {
+	ctx *adt.OpContext
 	Config
 
 	// inst holds the build instance within which the current
@@ -826,6 +828,10 @@ func (c *compiler) markAlias(d ast.Decl) {
 }
 
 func (c *compiler) decl(d ast.Decl) adt.Decl {
+	if b := c.ctx.Cancelled(); b != nil {
+		c.errs = b.Err
+		return b
+	}
 	switch x := d.(type) {
 	case *ast.ParametricAlias:
 		c.aliasTemplate(x, len(c.stack)-1)
@@ -1328,6 +1334,10 @@ func (c *compiler) checkFuncParamMarks(i int, p *ast.FuncParam, param *adt.FuncP
 }
 
 func (c *compiler) expr(expr ast.Expr) adt.Expr {
+	if b := c.ctx.Cancelled(); b != nil {
+		c.errs = b.Err
+		return b
+	}
 	switch n := expr.(type) {
 	case nil:
 		return nil

@@ -98,7 +98,12 @@ func (p *certifier) proveInclusion(ctx *adt.OpContext, bound, argument adt.Value
 	return s.values(bound, argument)
 }
 
-func (p *Profile) Value(ctx *adt.OpContext, a, b adt.Value) errors.Error {
+func (p *Profile) Value(ctx *adt.OpContext, a, b adt.Value) (err errors.Error) {
+	defer func() {
+		if b := ctx.Cancelled(); b != nil {
+			err = b.Err
+		}
+	}()
 	s := subsumer{ctx: ctx, Profile: *p}
 	if !s.values(a, b) {
 		return s.getError()

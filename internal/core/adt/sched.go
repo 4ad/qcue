@@ -1168,7 +1168,11 @@ func runTask(t *task, mode runMode) {
 	// A task may have recorded an error on a previous try. Clear it.
 	t.err = nil
 
-	t.run.f(ctx, t, mode)
+	if b := ctx.Cancelled(); b != nil {
+		ctx.AddBottom(b)
+	} else {
+		t.run.f(ctx, t, mode)
+	}
 
 	// Clear context error so that it does not leak into deferred tasks.
 	errs := ctx.Err()
