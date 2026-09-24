@@ -1738,12 +1738,12 @@ issue4006: {
       namespace: string
       output: 〈0;let jsonPatch#4〉.output
       let jsonPatch#4 = (〈1;#JSONPatch〉 & {
-        let base#7 = (〈2;#Resource〉 & {})
-        let withMsg#8 = (〈0;let base#7〉 & {
+        let base#5 = (〈2;#Resource〉 & {})
+        let withMsg#6 = (〈0;let base#5〉 & {
           someMsg: "foo"
         })
         namespace: 〈1;namespace〉
-        patch: 〈0;let withMsg#8〉.patches
+        patch: 〈0;let withMsg#6〉.patches
       })
     }
     out: (〈0;#Main〉 & {

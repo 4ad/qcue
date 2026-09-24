@@ -45,7 +45,7 @@ func runVersion(cmd *Command, args []string) error {
 	fmt.Fprintf(w, "cue version %s\n\n", cueversion.ModuleVersion())
 	fmt.Fprintf(w, "CUE language version %s\n\n", cueversion.LanguageVersion())
 	fmt.Fprintln(w, "Quantified CUE extensions: S_H (higher-rank quantifiers), A (opaque packages)")
-	fmt.Fprintln(w, "quantified: enabled by default for CUE v0.18.0 and later")
+	fmt.Fprintln(w, "quantified: enabled by default for all CUE language versions")
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Go version %s\n", runtime.Version())
 	for _, s := range bi.Settings {

@@ -1349,7 +1349,7 @@ bar: 2
 		{
 			desc:    "function types",
 			version: "v0.17.0",
-			in: `
+			in: `@experiment(functions=false,quantified=false)
 			f0: func(): int
 			f1: func(int): int
 			f2: func(int, string): int
@@ -1358,7 +1358,7 @@ bar: 2
 			f5: func(int, int): func(bool, bool): bool
 			f6: func(func(bool, bool): bool, func(string, string): string): func(int, func(int, string): int): func(int, string): int
 		`,
-			out: "f0: func() -> int, f1: func(int) -> int, f2: func(int, string) -> int, f3: func({a: int, b: string}) -> bool, f4: func(bool, func(int, string) -> int) -> string, f5: func(int, int) -> func(bool, bool) -> bool, f6: func(func(bool, bool) -> bool, func(string, string) -> string) -> func(int, func(int, string) -> int) -> func(int, string) -> int",
+			out: "@experiment(functions=false,quantified=false), f0: func() -> int, f1: func(int) -> int, f2: func(int, string) -> int, f3: func({a: int, b: string}) -> bool, f4: func(bool, func(int, string) -> int) -> string, f5: func(int, int) -> func(bool, bool) -> bool, f6: func(func(bool, bool) -> bool, func(string, string) -> string) -> func(int, func(int, string) -> int) -> func(int, string) -> int",
 		},
 		{
 			desc: "functions experiment",
@@ -1488,12 +1488,12 @@ bar: 2
 			out: "@experiment(functions,quantified=false), f: func(\"a-b\") -> int: 1\na parameter name must be an identifier",
 		},
 		{
-			desc:    "func literal experiment missing",
+			desc:    "func literal experiment disabled",
 			version: "v0.17.0",
-			in: `
+			in: `@experiment(functions=false,quantified=false)
 			sum: func(a: int, b: int) -> int: a + b
 			`,
-			out: "sum: func(a: int, b: int) -> int: a+b\nfunction syntax requires @experiment(functions)",
+			out: "@experiment(functions=false,quantified=false), sum: func(a: int, b: int) -> int: a+b\nfunction syntax requires @experiment(functions)",
 		},
 		{
 			desc: "func identifier call without experiment",
@@ -1522,19 +1522,19 @@ bar: 2
 		{
 			desc:    "arrow scans as subtraction without experiment",
 			version: "v0.17.0",
-			in: `
+			in: `@experiment(functions=false,quantified=false)
 			a: 3->2
 			`,
 			// Parses as the binary expression 3 - (>2).
-			out: "a: 3->2",
+			out: "@experiment(functions=false,quantified=false), a: 3->2",
 		},
 		{
-			desc:    "labeled call experiment missing",
+			desc:    "labeled call experiment disabled",
 			version: "v0.17.0",
-			in: `
+			in: `@experiment(functions=false,quantified=false)
 			x: f(a: 1)
 			`,
-			out: "x: f(a: 1)\nlabeled arguments require @experiment(functions)",
+			out: "@experiment(functions=false,quantified=false), x: f(a: 1)\nlabeled arguments require @experiment(functions)",
 		},
 		{
 			desc: "definition as argument label",
@@ -1553,10 +1553,10 @@ bar: 2
 		{
 			desc:    "partial application without experiment",
 			version: "v0.17.0",
-			in: `
+			in: `@experiment(functions=false,quantified=false)
 			x: add(1, ...)
 			`,
-			out: "x: add(1, ...)\npartial application requires @experiment(functions)",
+			out: "@experiment(functions=false,quantified=false), x: add(1, ...)\npartial application requires @experiment(functions)",
 		},
 		{
 			desc: "positional argument after labeled argument",
@@ -1769,17 +1769,17 @@ func TestFunctionOrderingErrors(t *testing.T) {
 	}
 }
 
-// TestArrowWithoutExperiment verifies that without the functions experiment
+// TestArrowWithoutExperiment verifies that with functions explicitly disabled,
 // "->" scans as two tokens, so that 3->2 parses as the binary expression
 // 3 - (>2), as it did before the experiment was introduced.
 func TestArrowWithoutExperiment(t *testing.T) {
-	f, err := ParseFile("input", "a: 3->2", AllErrors, Version("v0.17.0"))
+	f, err := ParseFile("input", "@experiment(functions=false,quantified=false)\na: 3->2", AllErrors, Version("v0.17.0"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	field, ok := f.Decls[0].(*ast.Field)
+	field, ok := f.Decls[1].(*ast.Field)
 	if !ok {
-		t.Fatalf("got %T, expected *ast.Field", f.Decls[0])
+		t.Fatalf("got %T, expected *ast.Field", f.Decls[1])
 	}
 	bin, ok := field.Value.(*ast.BinaryExpr)
 	if !ok {

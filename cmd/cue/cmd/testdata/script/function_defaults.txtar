@@ -1,0 +1,53 @@
+# Standalone files accept functions and generic shorthand without attributes.
+exec cue eval fold.cue
+stdout 'sum:.*6'
+exec cue eval explicit.cue -e sum
+cmp stdout six
+
+# A module pinned to an older language version must behave the same way,
+# including when evaluating an absolute path outside that module.
+cd oldmodule
+exec cue eval $WORK/fold.cue
+stdout 'sum:.*6'
+exec cue eval $WORK/explicit.cue -e sum
+cmp stdout $WORK/six
+exec cue eval $WORK/fold.cue -e 'fold(plus, 10, [4, 5])'
+cmp stdout $WORK/nineteen
+
+# Definitions exported under the older version remain usable there.
+exec cue def $WORK/fold.cue
+cp stdout rebuilt.cue
+exec cue eval rebuilt.cue -e 'fold(plus, 10, [4, 5])'
+cmp stdout $WORK/nineteen
+
+# Opting out of quantified semantics alone still leaves functions enabled.
+exec cue eval native.cue -e out
+cmp stdout $WORK/six
+
+-- fold.cue --
+fold(A, B): func(step: func(B, A) -> B, seed: B, xs: [...A]) -> B: {
+	if len(xs) == 0 {out: seed}
+	if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}
+}.out
+plus: func(x: int, y: int) -> int: x + y
+sum: fold(plus, 0, [1, 2, 3])
+-- explicit.cue --
+@experiment(functions,quantified)
+fold(A, B): func(step: func(B, A) -> B, seed: B, xs: [...A]) -> B: {
+	if len(xs) == 0 {out: seed}
+	if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}
+}.out
+plus: func(x: int, y: int) -> int: x + y
+sum: fold(plus, 0, [1, 2, 3])
+-- oldmodule/cue.mod/module.cue --
+module: "test.example/defaults"
+language: version: "v0.16.0"
+-- oldmodule/native.cue --
+@experiment(quantified=false)
+add: func(x: int, y: int = 2) -> int: x + y
+partial: add(x: 4, ...)
+out: partial()
+-- six --
+6
+-- nineteen --
+19

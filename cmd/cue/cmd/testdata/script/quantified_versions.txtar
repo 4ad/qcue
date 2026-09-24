@@ -1,7 +1,11 @@
-# Defaults follow the module's language version. Upgrading activates
-# quantifiers without modifying the program or adding an attribute.
-! exec cue export main.cue -e out
-stderr 'requires @experiment\(quantified\)'
+# Quantifiers remain enabled when changing the module's language version,
+# without modifying the program or adding an attribute.
+exec cue export main.cue -e out
+stdout '^3$'
+
+exec cue mod edit --language-version v0.16.0
+exec cue export main.cue -e out
+stdout '^3$'
 
 exec cue mod edit --language-version v0.18.0
 exec cue export main.cue -e out

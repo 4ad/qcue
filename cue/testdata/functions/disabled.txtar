@@ -1,5 +1,5 @@
 -- in.cue --
-@experiment(quantified=false)
+@experiment(functions=false,quantified=false)
 func: len
 out: func("foo") @test(eq, 3)
 

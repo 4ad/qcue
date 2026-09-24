@@ -32,6 +32,48 @@ type testFile struct {
 	Exp15 bool `experiment:"preview:v0.15.0"`
 }
 
+func TestForkDefaults(t *testing.T) {
+	for _, version := range []string{"", "v0.0.0", "v0.9.0", "v0.16.0", "v0.17.0", "v0.18.0"} {
+		t.Run(version, func(t *testing.T) {
+			for _, tc := range []struct {
+				experiments string
+				functions   bool
+				quantified  bool
+			}{
+				{"", true, true},
+				{"functions", true, true},
+				{"quantified", true, true},
+				{"functions,quantified", true, true},
+				{"quantified=false", true, false},
+				{"functions=false", false, true},
+				{"functions=false,quantified=false", false, false},
+			} {
+				t.Run(tc.experiments, func(t *testing.T) {
+					f, err := NewFile(version, tc.experiments)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if f.Functions != tc.functions || f.Quantified != tc.quantified {
+						t.Fatalf("functions = %v, quantified = %v; want %v, %v",
+							f.Functions, f.Quantified, tc.functions, tc.quantified)
+					}
+					if f.LanguageVersion() != version {
+						t.Fatalf("language version = %q; want %q", f.LanguageVersion(), version)
+					}
+					if tc.experiments == "" && len(f.Experiments()) != 0 {
+						t.Fatalf("defaults recorded as explicit experiments: %v", f.Experiments())
+					}
+				})
+			}
+			for _, name := range []string{"functions", "quantified"} {
+				if !IsPreview(name, version) {
+					t.Errorf("%s is unavailable", name)
+				}
+			}
+		})
+	}
+}
+
 func TestIsAvailable(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -3,8 +3,8 @@
 This implementation supports fragments of profiles **S_H** (predicative
 higher-rank quantification) and **A** (opaque existential packages) in
 [the proposal](paper.pdf) ([LaTeX source](paper.tex)). The `quantified` experiment
-is **enabled by default** for CUE language version `v0.18.0` and later, including
-standalone files and Go API calls with no pinned language version.
+is **enabled by default at every language version** in this fork, including
+modules pinned to older versions, standalone files, and Go API calls.
 
 Build and install from this checkout:
 
@@ -21,9 +21,11 @@ extensions, and default activation. The CLI library keeps the import path
 The experiment includes function syntax and the proposal's capability semantics.
 The explicit `@experiment(quantified)` attribute remains accepted but is not
 required. To use the previous experimental function semantics in a file, write
-`@experiment(functions,quantified=false)`; `@experiment(quantified=false)` alone
-opts out of the quantifier extension. Modules pinned to earlier language
-versions retain their earlier defaults.
+`@experiment(quantified=false)`. Function syntax is also enabled by default at
+every language version, and explicit `@experiment(functions)` and
+`@experiment(quantified)` attributes remain accepted in older modules.
+To opt out of both extensions, use
+`@experiment(functions=false,quantified=false)`.
 
 General value-dependent binders and the dependent profile **D** are out of scope.
 Finite literal value ranges, such as `exists (n in 1 | 2)`, are supported as finite
@@ -33,9 +35,8 @@ Exhaustion retains the complete scoped predicate and leaves validation
 incomplete; it never publishes a truncated union or intersection. Constant
 literal bodies avoid the product after checking the ranges for emptiness.
 
-For a new module, use
-`cue mod init --language-version v0.18.0 example.com/quantified`. For an existing
-module, set its language version with `cue mod edit --language-version v0.18.0`.
+For a new module, use `cue mod init example.com/quantified`. Existing modules
+can use these extensions without changing their language version.
 
 ## Quantifiers and type application
 

@@ -528,10 +528,10 @@ out: f()
 	}
 }
 
-func TestNativeFunctionsRequireExperiment(t *testing.T) {
+func TestNativeFunctionsExplicitlyDisabled(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(`
-@experiment(quantified=false)
+@experiment(functions=false,quantified=false)
 sum: func(a: int, b: int) -> int: a + b
 `)
 	err := v.Err()
@@ -540,6 +540,47 @@ sum: func(a: int, b: int) -> int: a + b
 	}
 	if got := err.Error(); !strings.Contains(got, "function syntax requires @experiment(functions)") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestFunctionDefaultsLanguageVersions(t *testing.T) {
+	const source = `
+fold(A, B): func(step: func(B, A) -> B, seed: B, xs: [...A]) -> B: {
+	if len(xs) == 0 {out: seed}
+	if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}
+}.out
+plus: func(x: int, y: int) -> int: x + y
+sum: fold(plus, 0, [1, 2, 3])
+`
+	for _, version := range []string{"", "v0.9.0", "v0.16.0", "v0.17.0", "v0.18.0"} {
+		t.Run(version, func(t *testing.T) {
+			for _, attribute := range []string{"", "@experiment(functions)", "@experiment(quantified)"} {
+				t.Run(attribute, func(t *testing.T) {
+					f, err := parser.ParseFile("input.cue", attribute+"\n"+source, parser.Version(version))
+					if err != nil {
+						t.Fatal(err)
+					}
+					v := cuecontext.New().BuildFile(f)
+					if err := v.Err(); err != nil {
+						t.Fatal(err)
+					}
+					got, err := v.LookupPath(cue.ParsePath("sum")).Int64()
+					if err != nil || got != 6 {
+						t.Fatalf("sum = %d, %v; want 6", got, err)
+					}
+				})
+			}
+			// Expressions have no file attributes, so they must also inherit
+			// the fork defaults when a language version is supplied.
+			x, err := parser.ParseExpr("input.cue", `(func(x: int) -> int: x + 1)(2)`, parser.Version(version))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := cuecontext.New().BuildExpr(x).Int64()
+			if err != nil || got != 3 {
+				t.Fatalf("expression = %d, %v; want 3", got, err)
+			}
+		})
 	}
 }
 
@@ -583,7 +624,7 @@ out: sum(1, b: 2)
 func TestFuncIdentifierWithoutFunctionsExperiment(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(`
-@experiment(quantified=false)
+@experiment(functions=false,quantified=false)
 func: len
 out: func("foo")
 `)

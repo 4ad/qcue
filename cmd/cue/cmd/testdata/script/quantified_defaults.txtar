@@ -2,10 +2,11 @@ exec cue version
 stdout '^cue version '
 stdout '^CUE language version v0.18.0$'
 stdout 'S_H \(higher-rank quantifiers\), A \(opaque packages\)'
-stdout '^quantified: enabled by default'
+stdout '^quantified: enabled by default for all CUE language versions$'
 
 exec cue help experiments
-stdout 'quantified \(preview: v0.18.0, default: v0.18.0\)'
+stdout 'functions \(preview: v0.0.0, default: v0.0.0\)'
+stdout 'quantified \(preview: v0.0.0, default: v0.0.0\)'
 exec cue completion bash
 stdout '__start_cue'
 ! stdout '__start_qcue'

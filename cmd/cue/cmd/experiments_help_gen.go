@@ -49,7 +49,8 @@ Experiments in the default stage can be disabled for a file:
 
 	@experiment(quantified=false)
 
-The quantified extension is enabled by default from CUE v0.18.0. It implements
+Functions and the quantified extension are enabled by default at every CUE
+language version in this fork. The quantified extension implements
 S_H (higher-rank quantifiers) and A (opaque existential packages). To use the
 previous function experiment's semantics, use:
 
@@ -59,6 +60,19 @@ The behavior of per-file experiments tracks the language version declared in the
 or if none exists, the language version reported by "cue version".
 
 Available per-file experiments:
+
+  functions (preview: v0.0.0, default: v0.0.0)
+    functions enables function signatures and native CUE function bodies.
+    This fork makes them available and enables them by default at every
+    language version. Explicit opt-outs remain supported.
+    Proposal: https://cuelang.org/issue/4484
+
+  quantified (preview: v0.0.0, default: v0.0.0)
+    quantified enables predicative higher-rank quantifiers and opaque
+    existential modules, including the capability semantics of functions.
+    Like functions, it is available and enabled by default at every language
+    version in this fork, with explicit opt-outs supported.
+    See doc/paper.tex, profiles S_H and A.
 
   structcmp (preview: v0.14.0, stable: v0.15.0)
     structcmp enables comparison of structs. This also defines the ==
@@ -98,16 +112,6 @@ Available per-file experiments:
     This matches the behavior documented in the CUE spec ("The right operand
     is evaluated conditionally") and is consistent with all mainstream
     languages.
-
-  functions (preview: v0.18.0)
-    functions enables experimental function signatures and native CUE
-    function bodies.
-    Proposal: https://cuelang.org/issue/4484
-
-  quantified (preview: v0.18.0, default: v0.18.0)
-    quantified enables predicative higher-rank quantifiers and opaque
-    existential modules, including the capability semantics of functions.
-    See doc/paper.tex, profiles S_H and A.
 
 
 ## Global Experiments

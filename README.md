@@ -12,7 +12,7 @@ allowing abstract data types and modules to be passed as values.
 The implementation supports fragments of the proposal's predicative
 higher-rank profile (`S_H`) and abstraction profile (`A`). The proposal also
 describes features outside these implemented fragments. Quantifiers are
-enabled by default for CUE language version `v0.18.0` and later.
+enabled by default for every CUE language version in this fork.
 
 This repository contains the language implementation, the `cue` command, and
 the Go API under the existing `cuelang.org/go` module path.

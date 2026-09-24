@@ -102,16 +102,19 @@ type File struct {
 	// languages.
 	ShortCircuit bool `experiment:"preview:v0.17.0"`
 
-	// Functions enables experimental function signatures and native CUE
-	// function bodies.
+	// Functions enables function signatures and native CUE function bodies.
+	// This fork makes them available and enables them by default at every
+	// language version. Explicit opt-outs remain supported.
 	//
 	// Proposal: https://cuelang.org/issue/4484
-	Functions bool `experiment:"preview:v0.18.0"`
+	Functions bool `experiment:"preview:v0.0.0,default:v0.0.0"`
 
 	// Quantified enables predicative higher-rank quantifiers and opaque
 	// existential modules, including the capability semantics of functions.
+	// Like functions, it is available and enabled by default at every language
+	// version in this fork, with explicit opt-outs supported.
 	// See doc/paper.tex, profiles S_H and A.
-	Quantified bool `experiment:"preview:v0.18.0,default:v0.18.0"`
+	Quantified bool `experiment:"preview:v0.0.0,default:v0.0.0"`
 }
 
 // LanguageVersion returns the language version of the file or "" if no language

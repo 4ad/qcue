@@ -72,8 +72,9 @@ func main() {
 		if exp.IsGlobal {
 			globalExperiments = append(globalExperiments, exp)
 		} else {
-			// Filter file experiments from v0.14.0 onwards to skip testing fields
-			if semver.Compare(exp.Preview, "v0.14.0") >= 0 {
+			// Skip testing fields by name: fork defaults can apply to every
+			// language version, including versions before these test flags.
+			if exp.FieldName != "Testing" && exp.FieldName != "Accepted_" {
 				fileExperiments = append(fileExperiments, exp)
 			}
 		}
@@ -311,7 +312,8 @@ Experiments in the default stage can be disabled for a file:
 
 	@experiment(quantified=false)
 
-The quantified extension is enabled by default from CUE v0.18.0. It implements
+Functions and the quantified extension are enabled by default at every CUE
+language version in this fork. The quantified extension implements
 S_H (higher-rank quantifiers) and A (opaque existential packages). To use the
 previous function experiment's semantics, use:
 
