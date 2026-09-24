@@ -230,6 +230,7 @@ type OpContext struct {
 	// See [FuncValue.call] and [funcCallResult].
 	funcCallResults     map[funcCallResultKey][]funcCallResult
 	sealedViews         map[sealKey]*Vertex
+	dataWitnessViews    map[dataWitnessKey]*Vertex
 	activeFunctionCalls []functionActivation
 	checkingClosures    map[closureComparison]bool
 

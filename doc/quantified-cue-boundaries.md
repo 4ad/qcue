@@ -81,3 +81,11 @@ will be recorded as the work proceeds.
   Mixed finite-value/type seals preserve value witnesses as values and create
   carriers only for type witnesses. Tests vary telescope order and valid,
   out-of-range, wrong-kind, and incomplete witnesses; core/API suites pass.
+- Covariant existential membership now constructs an `existentialDataWitness`.
+  Opening uses that same construction for admitted transparent records and
+  retains a shared subject's witness across repeated elimination and copying.
+  Proof-level opening checks that this construction has a total public
+  transport; ambiguous union transport remains an explicit proof obligation.
+  Existing sealed packages retain their original witness. Regressions cover
+  certified clients on ordinary records, nested data, refinements, shared
+  projections, and copied subjects. Core/public API suites pass.

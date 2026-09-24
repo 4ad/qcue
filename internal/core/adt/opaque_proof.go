@@ -18,6 +18,8 @@ package adt
 // carrier. It exposes its interface hypotheses, never a representation or
 // an executable package witness. Extra interface constraints may be omitted:
 // proving the body for this wider view is sufficient for every refinement.
+// Runtime members carry either an explicit seal or the constructive data
+// witness used by Existential.validate and openDataWitness.
 func (o *PackageOpen) ProofView(c *OpContext, value Value) (*OpaqueType, Value) {
 	if value == nil {
 		return nil, nil
@@ -30,13 +32,29 @@ func (o *PackageOpen) ProofView(c *OpContext, value Value) (*OpaqueType, Value) 
 	if param.Bound != nil || param.ValueRange != nil {
 		return nil, nil
 	}
-	p := &sealedPackage{interfaceType: e}
-	typ := &OpaqueType{carrier: &opaqueCarrier{owner: p, parameter: param, level: param.Level}}
+	p := &sealedPackage{interfaceType: e, carriers: make(map[*TypeParameter]*opaqueCarrier)}
+	carrier := &opaqueCarrier{owner: p, parameter: param, level: param.Level}
+	p.carriers[param] = carrier
+	typ := &OpaqueType{carrier: carrier}
 	env := quantifiedEnvironment(c, e, map[*TypeParameter]Value{param: typ})
 	view := c.newInlineVertex(nil, nil, MakeRootConjunct(env, e.Template.Body))
 	view.Finalize(c)
 	if view.Bottom() != nil {
 		return nil, nil
+	}
+	if covariantData(e.Template.Body) {
+		// This domain also admits transparent records. Their membership
+		// rule must construct a witness whose view is executable for all
+		// admitted inputs, not just for a successful trial value. Ambiguous
+		// union transports cannot justify an elimination theorem.
+		witness, b := e.dataWitness(c)
+		if b != nil {
+			return nil, nil
+		}
+		carrier.representation = witness.arguments[param]
+		if !p.planTransport(c, scopedPredicate{expr: view}, true).total {
+			return nil, nil
+		}
 	}
 	return typ, view
 }

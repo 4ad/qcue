@@ -87,35 +87,8 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 			return e.validateWitness(c, quantifiedEnvironment(c, e, args), value)
 		}
 	}
-	if covariantData(e.Template.Body) {
-		// For a covariant data predicate and a covariant upper-bounded
-		// telescope, the existential join is attained at the largest
-		// admissible types. Keep the template for explicit sealing: its
-		// logical simplification does not erase an abstraction boundary.
-		for _, param := range e.Template.Params {
-			if param.ValueRange != nil || !covariantData(param.Bound) {
-				return e.unresolved(c)
-			}
-		}
-		env := quantifiedEnvironment(c, e, nil)
-		for _, param := range e.Template.Params {
-			var bound Value = &Top{}
-			if param.Bound != nil {
-				var complete bool
-				bound, complete = c.Evaluate(env, param.Bound)
-				if !complete {
-					return e.unresolved(c)
-				}
-			}
-			if param.ExplicitLevel {
-				level, known := universeOf(c, bound, make(map[Expr]bool))
-				if !known || level > param.Level {
-					return e.unresolved(c)
-				}
-			}
-			env = instantiateEnvironment(env, map[*TypeParameter]Value{param: bound})
-		}
-		return e.validateWitness(c, env, value)
+	if witness, b := e.dataWitness(c); b == nil {
+		return e.validateWitness(c, witness.env, value)
 	}
 	return e.unresolved(c)
 }
@@ -712,10 +685,17 @@ func (*PackageOpen) elemNode()          {}
 func (o *PackageOpen) evaluate(c *OpContext, state Flags) Value {
 	v, _ := c.Evaluate(c.Env(0), o.Value)
 	view, ok := v.(*Vertex)
-	if !ok || view.DerefValue().sealed == nil {
+	if !ok {
 		return &Bottom{Src: o.Src, Code: IncompleteError, Err: c.Newf("package witness is not available for opening")}
 	}
 	view = view.DerefValue()
+	if view.sealed == nil {
+		var b *Bottom
+		view, b = openDataWitness(c, view)
+		if b != nil {
+			return b
+		}
+	}
 	p := view.sealed
 	if len(p.carriers) != 1 {
 		return &Bottom{Src: o.Src, Code: IncompleteError,

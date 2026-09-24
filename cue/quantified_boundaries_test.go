@@ -227,3 +227,55 @@ out: (open p as (A, P) {r: P.value}).r
 		}
 	}
 }
+
+// Every concrete input admitted by a certified existential client must have
+// an executable elimination. Covariant membership supplies a constructive
+// witness even when the input did not come from an explicit seal.
+func TestQuantifiedBoundaryExistentialElimination(t *testing.T) {
+	for _, subject := range []string{`{x: 1}`, `{x: "s"}`, `{x: {nested: [1,2]}}`, `{x: 1, extra: true}`} {
+		for _, input := range []string{subject, "#M & " + subject} {
+			t.Run(input, func(t *testing.T) {
+				v := semanticValue(t, `
+#M: exists A {x: A}
+use: func(p: #M) -> int: (open p as (A, P) {result: 0}).result
+out: use(`+input+`)
+`)
+				if err := v.Validate(cue.Concrete(true)); err != nil {
+					t.Fatal(err)
+				}
+				semanticJSON(t, v, "out", "0")
+			})
+		}
+	}
+	v := semanticValue(t, `
+#M: exists A {x: A, y: A}
+p: #M & {x: 1, y: 1}
+q: #M & {x: 1, y: 2}
+out: [(open p as (A, P) {r: P.x == P.y}).r,
+      (open q as (A, Q) {r: Q.x == Q.y}).r]
+`)
+	if err := v.Validate(cue.Concrete(true)); err != nil {
+		t.Fatal(err)
+	}
+	semanticJSON(t, v, "out", `[true,false]`)
+	v = semanticValue(t, `
+#M: exists A {x: A}
+p: #M & {x: 1}
+copy: p
+out: (open p as (A, P) {
+    r: (open copy as (B, Q) {v: P.x == Q.x}).v
+}).r
+`)
+	semanticJSON(t, v, "out", "true")
+	// Covariant membership alone is insufficient if constructing its public
+	// view requires an ambiguous union transport. Certification must retain
+	// that obligation instead of promising an executable sealed witness.
+	v = semanticValue(t, `
+#M: exists A {x: A|null}
+use: func(p: #M) -> int: (open p as (A, P) {result: 0}).result
+out: use({x: null})
+`)
+	if err := v.Validate(cue.Concrete(true)); err == nil {
+		t.Fatal("certified an ambiguous constructive witness transport")
+	}
+}
