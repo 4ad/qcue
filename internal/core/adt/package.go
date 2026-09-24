@@ -732,6 +732,8 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 	}
 	seen[value] = true
 	switch v := value.(type) {
+	case *TransportConstraint:
+		return abstractEscapes(c, v.target, owner, seen)
 	case *OpaqueValue:
 		return v.carrier.owner == owner
 	case *OpaqueType:
@@ -757,6 +759,12 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 			return true
 		}
 		v.Finalize(c)
+		for conjunct := range v.LeafConjuncts() {
+			if constraint, ok := conjunct.Expr().(*TransportConstraint); ok &&
+				abstractEscapes(c, constraint, owner, seen) {
+				return true
+			}
+		}
 		for _, a := range v.Arcs {
 			if !a.Label.IsLet() && abstractEscapes(c, a, owner, seen) {
 				return true

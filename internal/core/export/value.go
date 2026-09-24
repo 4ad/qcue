@@ -238,6 +238,8 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 
 	case *adt.AbstractResult:
 		result = e.quantifiedExportError("cannot export an unresolved function execution")
+	case *adt.TransportConstraint:
+		result = e.quantifiedExportError("transported predicates require an interface codec for export")
 
 	case *adt.OpaqueType, *adt.OpaqueValue:
 		result = e.quantifiedExportError("opaque values require an interface codec for export")

@@ -165,6 +165,112 @@ out: (open p as (A, P) {r: P.id(`+tc.subject+`) & `+tc.refinement+`}).r
 	}
 }
 
+// A changing abstract field must not weaken constraints on the containing
+// record. Both accepted and rejected refinements are specified independently
+// of transport, then tested through direct and higher-order crossings.
+func TestQuantifiedBoundaryCompositeConstraints(t *testing.T) {
+	for _, tc := range []struct{ subject, good, bad string }{
+		{`{v: P.zero, x?: int}`, `{x: 1}`, `{x: "bad"}`},
+		{`close({v: P.zero})`, `{}`, `{x: 1}`},
+		{`{v: P.zero, [=~"^extra"]: int}`, `{extra: 1}`, `{extra: "bad"}`},
+		{`{v: P.zero, nested: {x?: int}}`, `{nested: {x: 1}}`, `{nested: {x: "bad"}}`},
+		{`{v: P.zero, _x?: int}`, `{_x: 1}`, `{_x: "bad"}`},
+	} {
+		for _, operation := range []string{`P.echo`, `P.callback(func(x: {v: A}) -> {v: A}: x)`} {
+			for _, valid := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/valid=%v", tc.subject, operation, valid), func(t *testing.T) {
+					refinement := tc.bad
+					if valid {
+						refinement = tc.good
+					}
+					source := `
+#M: exists A {
+ zero: A
+ read: func(A) -> int
+ echo: func({v: A}) -> {v: A}
+ callback: func(func({v: A}) -> {v: A}) -> func({v: A}) -> {v: A}
+}
+p: seal #M with (A = int) {
+ zero: 7
+ read: func(x: int) -> int: x
+ echo: func(x: {v: int}) -> {v: int}: x
+ callback: func(f: func({v: int}) -> {v: int}) -> func({v: int}) -> {v: int}: f
+}
+delta: {}
+out: (open p as (A, P) {
+ let q = ` + operation + `(` + tc.subject + `) & delta
+ r: (func(x: {v: A}) -> int: P.read(x.v))(q)
+}).r
+`
+					original := semanticValue(t, source)
+					for _, v := range []cue.Value{
+						semanticValue(t, source+"\ndelta: "+refinement),
+						original.FillPath(cue.ParsePath("delta"), original.Context().CompileString(refinement)),
+					} {
+						if err := v.Validate(); (err == nil) != valid {
+							t.Fatalf("valid=%v: %v", valid, err)
+						}
+						if valid {
+							if err := v.Validate(cue.Concrete(true)); err != nil {
+								t.Fatal(err)
+							}
+							semanticJSON(t, v, "out", "7")
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+// Definitions and absent optional fields are predicates, not demanded runtime
+// witnesses. Their restrictions must survive projection as well as refinement
+// of the enclosing transported record.
+func TestQuantifiedBoundaryTransportPredicates(t *testing.T) {
+	for _, tc := range []struct{ public, private, subject, refinement, observe string }{
+		{`{v: A, x?: A}`, `{v: int, x?: int}`, `{v: P.zero, x?: P.zero}`, `{x: %s}`, `q.x`},
+		{`{v: A, #T: A}`, `{v: int, #T: int}`, `{v: P.zero, #T: P.zero}`, `{}`, `q.#T & %s`},
+		{`{v: A, #T: {x: A}}`, `{v: int, #T: {x: int}}`, `{v: P.zero, #T: {x: P.zero}}`, `{}`, `(q.#T & {x: %s}).x`},
+	} {
+		for _, valid := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/valid=%v", tc.public, valid), func(t *testing.T) {
+				value := `P.one`
+				if valid {
+					value = `P.zero`
+				}
+				refinement, observe := tc.refinement, tc.observe
+				if refinement != `{}` {
+					refinement = fmt.Sprintf(refinement, value)
+				} else {
+					observe = fmt.Sprintf(observe, value)
+				}
+				v := semanticValue(t, fmt.Sprintf(`
+#M: exists A {zero: A, one: A, read: func(A) -> int, echo: func(%s) -> %s}
+p: seal #M with (A = int) {
+ zero: 7
+ one: 8
+ read: func(x: int) -> int: x
+ echo: func(x: %s) -> %s: x
+}
+out: (open p as (A, P) {
+ let q = P.echo(%s) & %s
+ r: P.read(%s)
+}).r
+`, tc.public, tc.public, tc.private, tc.private, tc.subject, refinement, observe))
+				if err := v.Validate(); (err == nil) != valid {
+					t.Fatalf("valid=%v: %v", valid, err)
+				}
+				if valid {
+					if err := v.Validate(cue.Concrete(true)); err != nil {
+						t.Fatal(err)
+					}
+					semanticJSON(t, v, "out", "7")
+				}
+			})
+		}
+	}
+}
+
 func TestQuantifiedBoundaryScopedTransport(t *testing.T) {
 	for _, tc := range []struct{ public, private, value, access string }{
 		{`[...(A|null)]`, `[...int]`, `[7]`, `[0]`},

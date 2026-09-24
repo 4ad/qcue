@@ -26,6 +26,10 @@ func (p *sealedPackage) privatePredicate(c *OpContext, value Value, active map[V
 	active[value] = true
 	defer delete(active, value)
 	switch v := Unwrap(value).(type) {
+	case *TransportConstraint:
+		if v.plan.owner == p && v.plan.outward {
+			return v.source, nil
+		}
 	case *OpaqueType:
 		if v.carrier.owner == p {
 			return v.carrier.representation, nil

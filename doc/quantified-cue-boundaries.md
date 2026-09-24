@@ -72,9 +72,16 @@ will be recorded as the work proceeds.
   The separate AST executor and totality walker have been removed. Ordinary
   identity branches retain the original graph; list unions and inward
   definitions use the resolved scoped schema. New regressions and existing
-  opaque transport tests pass with the full core/public API suite. Preservation
-  of latent constraints through non-identity composite plans remains work in
-  progress; this stage is not a claim of complete transport preservation.
+  opaque transport tests pass with the full core/public API suite. Nonidentity
+  composite plans now retain an inverse-image predicate over the original
+  graph, so later refinements recheck closedness, patterns, and correlations.
+  Definitions and absent optional fields retain transported predicates,
+  including narrower constraints observed by projection. Inverse checking
+  recovers an original callable descriptor rather than substituting the
+  narrower protocol of an inverse adapter. New positive/negative matrices
+  cover direct and callback transport, source and API refinement, and nested
+  definition projection; the full core/public API suite passes. The final
+  preservation and boundary audit remains pending.
 - `TypeParameter.checkWitness` is shared by type application and sealing.
   It dispatches by the declared binder sort, checks value-range membership
   or type-universe/bound inclusion, and retains unknown formation obligations.

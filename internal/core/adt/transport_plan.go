@@ -230,6 +230,10 @@ func (plan *transportPlan) fieldSchema(c *OpContext, label Feature) *Vertex {
 }
 
 func (plan *transportPlan) apply(c *OpContext, value Value, project bool, export *publicExport) Value {
+	return plan.transform(c, value, project, export, true)
+}
+
+func (plan *transportPlan) transform(c *OpContext, value Value, project bool, export *publicExport, retain bool) Value {
 	if b, ok := Unwrap(value).(*Bottom); ok {
 		return b
 	}
@@ -256,11 +260,25 @@ func (plan *transportPlan) apply(c *OpContext, value Value, project bool, export
 		}
 		return &OpaqueValue{carrier: plan.carrier, private: value}
 	case transportCallable:
+		if !retain {
+			// The inverse checking operand recovers the original supplied
+			// descriptor, including its wider protocol. An inverse adapter
+			// exposes only the interface protocol and cannot be substituted
+			// for that descriptor. Contracts acquired by the transported
+			// value remain on the actual value and are validated there.
+			if f, ok := Unwrap(value).(*FuncValue); ok && !f.IsPartial() {
+				if boundary, ok := f.Fn.Body.(*OpaqueCall); ok && boundary.owner == plan.owner && boundary.outward != plan.outward {
+					if sameTransportInterface(c, boundary, &OpaqueCall{clauses: plan.function.selectionAndOriginalClauses()}) {
+						return boundary.private
+					}
+				}
+			}
+		}
 		return plan.owner.transportFunction(c, plan.function, value, plan.outward, export.canonical())
 	case transportChoice:
-		return plan.applyChoice(c, value, project, export)
+		return plan.applyChoice(c, value, project, export, retain)
 	case transportComposite:
-		return plan.applyComposite(c, value, project, export)
+		return plan.applyComposite(c, value, project, export, retain)
 	case transportExistential:
 		if plan.total {
 			return value
@@ -269,7 +287,7 @@ func (plan *transportPlan) apply(c *OpContext, value Value, project bool, export
 	return &Bottom{Code: IncompleteError, Err: c.Newf("opaque transport schema remains unresolved")}
 }
 
-func (plan *transportPlan) applyChoice(c *OpContext, value Value, project bool, export *publicExport) Value {
+func (plan *transportPlan) applyChoice(c *OpContext, value Value, project bool, export *publicExport, retain bool) Value {
 	var result Value
 	unknown := false
 	for i, branch := range plan.branches {
@@ -285,7 +303,7 @@ func (plan *transportPlan) applyChoice(c *OpContext, value Value, project bool, 
 			unknown = true
 			continue
 		}
-		x := branch.apply(c, value, project, export)
+		x := branch.transform(c, value, project, export, retain)
 		if _, failed := Unwrap(x).(*Bottom); failed || !concreteCapture(c, x) {
 			unknown = true
 			continue
@@ -304,7 +322,7 @@ func (plan *transportPlan) applyChoice(c *OpContext, value Value, project bool, 
 	return result
 }
 
-func (plan *transportPlan) applyComposite(c *OpContext, value Value, project bool, export *publicExport) Value {
+func (plan *transportPlan) applyComposite(c *OpContext, value Value, project bool, export *publicExport, retain bool) Value {
 	v, ok := value.(*Vertex)
 	if !ok {
 		return c.NewErrf("interface requires a composite value")
@@ -315,10 +333,13 @@ func (plan *transportPlan) applyComposite(c *OpContext, value Value, project boo
 	if typ.IsList() {
 		out := &ListLit{}
 		for a := range v.Elems() {
-			out.Elems = append(out.Elems, plan.field(c, a.Label).apply(c, a, false, export.field(a.Label)))
+			out.Elems = append(out.Elems, plan.field(c, a.Label).transform(c, a, false, export.field(a.Label), retain))
 		}
 		result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, out))
 		result.Finalize(c)
+		if retain && !project {
+			return plan.retain(c, value, result)
+		}
 		return result
 	}
 	out := &StructLit{}
@@ -327,26 +348,29 @@ func (plan *transportPlan) applyComposite(c *OpContext, value Value, project boo
 			continue
 		}
 		if field.Label.IsDef() {
-			var predicate Value = field
-			if !plan.outward {
-				var b *Bottom
-				predicate, b = plan.owner.privatePredicate(c, field, make(map[Value]bool))
-				if b != nil {
-					return b
-				}
+			var source Value
+			if original := v.LookupRaw(field.Label); original != nil && !project {
+				source = original
 			}
+			predicate := plan.field(c, field.Label).predicate(c, source)
 			out.Decls = append(out.Decls, &Field{Label: field.Label, ArcType: field.ArcType, Value: predicate})
 			continue
 		}
 		a := v.LookupRaw(field.Label)
 		if a == nil || a.ArcType != ArcMember {
 			if field.ArcType == ArcOptional {
+				var source Value
+				if a != nil && !project {
+					source = a
+				}
+				out.Decls = append(out.Decls, &Field{Label: field.Label, ArcType: ArcOptional,
+					Value: plan.field(c, field.Label).predicate(c, source)})
 				continue
 			}
 			return c.NewErrf("missing interface field %s", field.Label.SelectorString(c))
 		}
 		out.Decls = append(out.Decls, &Field{Label: field.Label,
-			Value: plan.field(c, field.Label).apply(c, a, false, export.field(field.Label))})
+			Value: plan.field(c, field.Label).transform(c, a, false, export.field(field.Label), retain)})
 	}
 	for _, a := range v.Arcs {
 		if a.Label.IsLet() || typ.LookupRaw(a.Label) != nil {
@@ -368,9 +392,12 @@ func (plan *transportPlan) applyComposite(c *OpContext, value Value, project boo
 			continue
 		}
 		out.Decls = append(out.Decls, &Field{Label: a.Label,
-			Value: plan.field(c, a.Label).apply(c, a, false, export.field(a.Label))})
+			Value: plan.field(c, a.Label).transform(c, a, false, export.field(a.Label), retain)})
 	}
 	result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, out))
 	result.Finalize(c)
+	if retain && !project {
+		return plan.retain(c, value, result)
+	}
 	return result
 }

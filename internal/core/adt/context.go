@@ -231,6 +231,7 @@ type OpContext struct {
 	funcCallResults     map[funcCallResultKey][]funcCallResult
 	sealedViews         map[sealKey]*Vertex
 	dataWitnessViews    map[dataWitnessKey]*Vertex
+	transportChecks     map[*TransportConstraint]bool
 	activeFunctionCalls []functionActivation
 	checkingClosures    map[closureComparison]bool
 

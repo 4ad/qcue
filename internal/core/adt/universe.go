@@ -50,6 +50,8 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		return ok
 	}
 	switch v := v.(type) {
+	case *TransportConstraint:
+		return universeOf(c, v.target, seen)
 	case *RigidType:
 		return v.Param.Level, true
 	case *OpaqueType:
@@ -188,6 +190,12 @@ func typeExpressionLevel(c *OpContext, env *Environment, x Expr, seen map[Expr]b
 		}
 		add(x.Body)
 	case *StructLit:
+		// Compiled field references count the literal's lexical frame.
+		// Keep it even when formation recursively inspects predicates;
+		// walking just the AST under its parent scope misbinds references.
+		scope := c.newInlineVertex(nil, nil, MakeRootConjunct(env, x))
+		scope.Finalize(c)
+		env = &Environment{Up: env, Vertex: scope}
 		for _, d := range x.Decls {
 			switch d := d.(type) {
 			case *Field:
@@ -201,6 +209,9 @@ func typeExpressionLevel(c *OpContext, env *Environment, x Expr, seen map[Expr]b
 			}
 		}
 	case *ListLit:
+		scope := c.newInlineVertex(nil, nil, MakeRootConjunct(env, x))
+		scope.Finalize(c)
+		env = &Environment{Up: env, Vertex: scope}
 		for _, e := range x.Elems {
 			if rest, ok := e.(*Ellipsis); ok {
 				add(rest.Value)
@@ -255,6 +266,8 @@ func universeOccurs(c *OpContext, param *TypeParameter, value Value, seen map[Va
 		return false
 	}
 	switch v := value.(type) {
+	case *TransportConstraint:
+		return universeOccurs(c, param, v.target, seen)
 	case *WitnessType:
 		return universeOccurs(c, param, v.Upper, seen)
 	case *FuncValue:
