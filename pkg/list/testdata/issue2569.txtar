@@ -1,0 +1,56 @@
+# An open list may still gain elements, so calls which do arithmetic
+# over its elements are incomplete rather than failing or concrete.
+#
+# https://cuelang.org/issue/2569
+
+-- in.cue --
+import "list"
+
+open: {
+	xs: [...int]
+	max:     list.Max(xs)
+	min:     list.Min(xs)
+	avg:     list.Avg(xs)
+	sum:     list.Sum(xs)
+	product: list.Product(xs)
+}
+openNonEmpty: {
+	xs: [1, 2, ...int]
+	max:     list.Max(xs)
+	min:     list.Min(xs)
+	avg:     list.Avg(xs)
+	sum:     list.Sum(xs)
+	product: list.Product(xs)
+}
+closed: {
+	xs: []
+	max: list.Max(xs)
+}
+-- out/list-v3 --
+Errors:
+closed.max: error in call to list.Max: empty list:
+    ./in.cue:21:7
+
+Result:
+import "list"
+
+open: {
+	xs:      [...int]
+	max:     list.Max(xs)
+	min:     list.Min(xs)
+	avg:     list.Avg(xs)
+	sum:     list.Sum(xs)
+	product: list.Product(xs)
+}
+openNonEmpty: {
+	xs:      [1, 2, ...int]
+	max:     list.Max(xs)
+	min:     list.Min(xs)
+	avg:     list.Avg(xs)
+	sum:     list.Sum(xs)
+	product: list.Product(xs)
+}
+closed: {
+	xs:  []
+	max: _|_ // closed.max: error in call to list.Max: empty list
+}

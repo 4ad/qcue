@@ -1,0 +1,18 @@
+# This tests the OpenAPI "float" and "double" number formats.
+
+#version: openapi
+
+-- schema.yaml --
+components:
+  schemas:
+    Double:
+        type: number
+        format: double
+    Float:
+        type: number
+        format: float
+
+-- out/decode/extract --
+#Double: float64
+
+#Float: float32

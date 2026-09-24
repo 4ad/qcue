@@ -287,12 +287,20 @@ func TestConvert(t *testing.T) {
 }`,
 	}, {
 		struct {
-			A int `json:"" yaml:"" protobuf:"aa"`
-			B int `yaml:"cc" json:"bb" protobuf:"aa"`
-		}{3, 4},
+			A int    `json:"" yaml:"aa" protobuf:"bytes,1,opt,name=aa"`
+			B int    `yaml:"cc" json:"bb" protobuf:"bytes,2,opt,name=aa"`
+			C string `json:",omitempty" protobuf:"bytes,3,opt,name=foo"`
+			D int    `yaml:"dd" protobuf:"varint,4,opt,name=foo"`
+			E int    `protobuf:"varint,5,opt,name=ee,proto3"`
+			F int    `protobuf:"fixed64,6,opt"`
+		}{3, 4, "hello", 5, 6, 7},
 		`(struct){
-  aa: (int){ 3 }
+  A: (int){ 3 }
   bb: (int){ 4 }
+  C: (string){ "hello" }
+  dd: (int){ 5 }
+  ee: (int){ 6 }
+  F: (int){ 7 }
 }`,
 	}, {
 		&struct{ A int }{3}, `(struct){
@@ -424,6 +432,15 @@ func TestConvertType(t *testing.T) {
   A?: (int){ &(>=-9223372036854775808, <=9223372036854775807, int) }
   B?: (int){ &(>=-9223372036854775808, <=9223372036854775807, int) }
   c?: (int){ &(>=-9223372036854775808, <=9223372036854775807, int) }
+}`,
+	}, {
+		goTyp: struct {
+			A string `json:",omitempty" protobuf:"bytes,1,opt,name=foo"`
+			B int    `protobuf:"varint,2,opt,name=bb"`
+		}{},
+		want: `(struct){
+  A?: (string){ string }
+  bb: (int){ &(>=-9223372036854775808, <=9223372036854775807, int) }
 }`,
 	}, {
 		goTyp: struct {

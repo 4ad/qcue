@@ -11,6 +11,9 @@ t07?: <10
 t08?: <=10
 t09?: >"foo" // Not supported
 t10?: <"bar" // Not supported
+t11?: int64
+t12?: uint64
+t13?: <1.00000000000000000001
 -- datatest/tests.cue --
 package datatest
 
@@ -70,6 +73,25 @@ errorNotLessEqual: {
 	error: true
 }
 
+// Bounds are kept exact rather than rounded to a float64.
+okExactBounds: data: {
+	t11: 9223372036854775807
+	t12: 18446744073709551615
+}
+okExactDecimalBound: data: t13: 1
+errorAboveInt64: {
+	data: t11: 9223372036854775808
+	error: true
+}
+errorBelowInt64: {
+	data: t11: -9223372036854775809
+	error: true
+}
+errorAboveUint64: {
+	data: t12: 18446744073709551616
+	error: true
+}
+
 -- out/generate-v3/schema --
 {
 	$schema: "https://json-schema.org/draft/2020-12/schema"
@@ -103,6 +125,20 @@ errorNotLessEqual: {
 		}
 		t09: type: "string"
 		t10: type: "string"
+		t11: {
+			type:    "integer"
+			maximum: 9223372036854775807
+			minimum: -9223372036854775808
+		}
+		t12: {
+			type:    "integer"
+			maximum: 18446744073709551615
+			minimum: 0
+		}
+		t13: {
+			type:             "number"
+			exclusiveMaximum: 1.00000000000000000001
+		}
 	}
 }
 -- out/generate-v3/ok --
@@ -141,3 +177,17 @@ errorUnequal.data.t03: conflicting values 1 and 2:
     1:185
 -- out/generate-v3/ok1 --
 -- out/generate-v3/ok2 --
+-- out/generate-v3/errorAboveInt64 --
+errorAboveInt64.data.t11: invalid value 9223372036854775808 (out of bound <=9223372036854775807):
+    1:458
+    ./datatest/tests.cue:66:13
+-- out/generate-v3/errorAboveUint64 --
+errorAboveUint64.data.t12: invalid value 18446744073709551616 (out of bound <=18446744073709551615):
+    1:544
+    ./datatest/tests.cue:74:13
+-- out/generate-v3/errorBelowInt64 --
+errorBelowInt64.data.t11: invalid value -9223372036854775809 (out of bound >=-9223372036854775808):
+    1:488
+    ./datatest/tests.cue:70:13
+-- out/generate-v3/okExactBounds --
+-- out/generate-v3/okExactDecimalBound --

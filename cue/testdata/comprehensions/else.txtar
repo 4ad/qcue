@@ -137,6 +137,47 @@ outerScope: {
 	@test(eq, {fallbackField: 10})
 }
 
+// The fallback body is evaluated outside the comprehension's clauses, so a
+// reference in it names the field of the struct holding the comprehension,
+// not one the clauses bring into scope.
+tryBindFallbackScope: {
+	shadowed: 1
+	inner: {
+		shadowed: 2
+		try x = missing? { fromTry: x } else { fromFallback: shadowed }
+		@test(eq, {shadowed: 2, fromFallback: 2})
+	}
+}
+
+// The number of try bindings a comprehension declares does not affect the
+// scope of its fallback body.
+tryTwoBindsFallbackScope: {
+	shadowed: 1
+	inner: {
+		shadowed: 2
+		try x = missing? try y = missing? { fromTry: x + y } fallback { fromFallback: shadowed }
+		@test(eq, {shadowed: 2, fromFallback: 2})
+	}
+}
+
+// A fallback body directly inside a top-level field, with two bindings to
+// skip, leaves no scope to spare above it.
+tryTwoBindsPastRoot: {
+	shadowed: 1
+	try x = missing? try y = missing? { fromTry: x + y } fallback { fromFallback: shadowed }
+	@test(eq, {shadowed: 1, fromFallback: 1})
+}
+
+// The struct form declares no binding; covered for contrast.
+tryStructFallbackScope: {
+	shadowed: 1
+	inner: {
+		shadowed: 2
+		try { fromTry: missing? } else { fromFallback: shadowed }
+		@test(eq, {shadowed: 2, fromFallback: 2})
+	}
+}
+
 // if-else: nested body fields - else yields once
 ifNestedBody: {
 	if false { a: b: 1 } else { c: 2 }
