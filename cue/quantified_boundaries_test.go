@@ -202,3 +202,28 @@ out: (open p as (A, P) {r: P.f({#T: A, value: P.zero})}).r
 	}
 	semanticJSON(t, v, "out", "7")
 }
+
+func TestQuantifiedBoundarySealWitnessSort(t *testing.T) {
+	for _, tc := range []struct {
+		witness string
+		valid   bool
+	}{
+		{"1", true}, {"2", true}, {"7", false}, {`"bad"`, false}, {"int", false},
+	} {
+		for _, prefix := range []string{"n in 1|2, A", "A, n in 1|2"} {
+			t.Run(prefix+"/"+tc.witness, func(t *testing.T) {
+				v := semanticValue(t, fmt.Sprintf(`
+#M: exists (%s) {value: n, zero: A}
+p: seal #M with (n = %s, A = string) {value: %s, zero: "zero"}
+out: (open p as (A, P) {r: P.value}).r
+`, prefix, tc.witness, tc.witness))
+				if err := v.Validate(cue.Concrete(true)); (err == nil) != tc.valid {
+					t.Fatalf("witness valid=%v: %v", tc.valid, err)
+				}
+				if tc.valid {
+					semanticJSON(t, v, "out", tc.witness)
+				}
+			})
+		}
+	}
+}

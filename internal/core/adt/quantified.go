@@ -594,29 +594,8 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 			if v == nil {
 				continue
 			}
-			if p.ValueRange != nil {
-				switch capabilityMember(c, e, p.ValueRange, v) {
-				case proofRefuted:
-					return nil, c.NewErrf("value argument %s is outside the range of %s", v, p.Src.Name.Name)
-				case proofUnknown:
-					return nil, &Bottom{Src: p.Src, Code: IncompleteError,
-						Err: c.Newf("unresolved value argument range for %s", p.Src.Name.Name)}
-				}
-				continue
-			}
-			if b := checkTypeUniverse(c, p, v); b != nil {
+			if b := p.checkWitness(c, e, v); b != nil {
 				return nil, b
-			}
-			if p.Bound == nil {
-				continue
-			}
-			bound, _ := c.Evaluate(e, p.Bound)
-			switch typeArgumentFits(c, bound, v) {
-			case proofRefuted:
-				return nil, c.NewErrf("type argument %s does not satisfy bound of %s", v, p.Src.Name.Name)
-			case proofUnknown:
-				return nil, &Bottom{Src: p.Src, Code: IncompleteError,
-					Err: c.Newf("unresolved type argument bound for %s", p.Src.Name.Name)}
 			}
 		}
 	}

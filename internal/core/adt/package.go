@@ -71,7 +71,10 @@ func (e *Existential) validate(c *OpContext, value Value) *Bottom {
 			// Check this instance using the package's existing shared public
 			// witness, rather than forgetting the new environment or choosing
 			// an unrelated representation for each field.
-			args := make(map[*TypeParameter]Value, len(p.carriers))
+			args := make(map[*TypeParameter]Value)
+			if p.publicEnv != nil {
+				args = maps.Clone(p.publicEnv.types.arguments)
+			}
 			for param, carrier := range p.carriers {
 				args[param] = &OpaqueType{carrier: carrier}
 				if p.implementation != nil && v == p.implementation.DerefValue() {
@@ -341,7 +344,7 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 	}
 	q := e.Template
 	if len(s.Names) != len(q.Params) {
-		return c.NewErrf("seal requires one witness for each representation type")
+		return c.NewErrf("seal requires one witness for each interface binder")
 	}
 	p := &sealedPackage{interfaceType: e,
 		carriers: make(map[*TypeParameter]*opaqueCarrier)}
@@ -359,8 +362,15 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 		if v == nil {
 			return nil
 		}
-		if b := checkTypeUniverse(c, param, v); b != nil {
+		if b := param.checkWitness(c, quantifiedEnvironment(c, e, maps.Clone(private)), v); b != nil {
 			return b
+		}
+		if param.ValueRange != nil {
+			// A finite value witness has its declared observable sort. It
+			// is not a representation type and cannot acquire an opaque
+			// carrier merely because it shares a telescope with one.
+			private[param], public[param] = v, v
+			continue
 		}
 		level, _ := universeOf(c, v, make(map[Expr]bool)) // checked above
 		carrier := &opaqueCarrier{owner: p, parameter: param, representation: v,

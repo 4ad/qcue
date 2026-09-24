@@ -75,3 +75,9 @@ will be recorded as the work proceeds.
   opaque transport tests pass with the full core/public API suite. Preservation
   of latent constraints through non-identity composite plans remains work in
   progress; this stage is not a claim of complete transport preservation.
+- `TypeParameter.checkWitness` is shared by type application and sealing.
+  It dispatches by the declared binder sort, checks value-range membership
+  or type-universe/bound inclusion, and retains unknown formation obligations.
+  Mixed finite-value/type seals preserve value witnesses as values and create
+  carriers only for type witnesses. Tests vary telescope order and valid,
+  out-of-range, wrong-kind, and incomplete witnesses; core/API suites pass.
