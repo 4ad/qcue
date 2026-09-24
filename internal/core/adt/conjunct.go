@@ -392,6 +392,15 @@ func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo
 		}
 		n.node.sealed = arc.sealed
 		n.node.sealedOpened = n.node.sealedOpened || arc.sealedOpened
+		if !arc.sealedOpened && arc.isFinal() {
+			// Copy a constructed package's public view, not its generative
+			// source conjuncts. Replaying those in a refinement's lexical
+			// environment would construct a fresh seal and conflict with the
+			// identity just retained above. A snapshot preserves optional
+			// fields and patterns as well as the concrete exported members.
+			n.insertValueConjunct(c.Env, &evaluatedSubject{arc}, closeInfo)
+			return
+		}
 	}
 	// A function call reference carries its payload on the reference itself:
 	// the anchor arc it resolves to exists only to give the structural cycle
