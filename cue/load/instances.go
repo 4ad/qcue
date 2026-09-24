@@ -44,6 +44,21 @@ import (
 // instance, but errors that occur loading dependencies are recorded in these
 // dependencies.
 func Instances(args []string, c *Config) []*build.Instance {
+	return InstancesContext(context.Background(), args, c)
+}
+
+// InstancesContext is like [Instances], but uses ctx to cancel package loading
+// and module downloads. Cancellation is reported in the returned instances'
+// Err fields, and can be identified with [errors.Is].
+//
+// The context must not be nil. File system operations and user-supplied parsing
+// functions must return before cancellation can be observed.
+//
+// [errors.Is]: https://pkg.go.dev/errors#Is
+func InstancesContext(ctx context.Context, args []string, c *Config) (instances []*build.Instance) {
+	if ctx == nil {
+		panic("load: nil context")
+	}
 	if len(args) == 0 {
 		args = []string{"."}
 	}
@@ -52,7 +67,28 @@ func Instances(args []string, c *Config) []*build.Instance {
 		c = &Config{}
 	}
 
-	ctx := context.TODO()
+	if err := ctx.Err(); err != nil {
+		return []*build.Instance{c.newErrInstance(err)}
+	}
+	// Cancellation takes precedence over partial results and incidental errors.
+	defer func() {
+		if err := ctx.Err(); err != nil {
+			instances = []*build.Instance{c.newErrInstance(err)}
+		}
+	}()
+	// Keep the caller's configuration reusable with another context.
+	copy := *c
+	c = &copy
+	parse := c.ParseFile
+	c.ParseFile = func(name string, src interface{}, cfg parser.Config) (*ast.File, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if parse != nil {
+			return parse(name, src, cfg)
+		}
+		return parser.ParseFile(name, src, cfg)
+	}
 	newC, err := c.complete()
 	if err != nil {
 		return []*build.Instance{c.newErrInstance(err)}
@@ -150,6 +186,7 @@ func Instances(args []string, c *Config) []*build.Instance {
 		}
 	}
 	l := newLoader(c, tg, pkgs)
+	l.ctx = ctx
 
 	if c.Context == nil {
 		opts := []build.Option{

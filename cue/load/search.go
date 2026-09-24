@@ -209,6 +209,10 @@ func (l *loader) matchPackagesInFS(pattern, pkgName string) *match {
 	pkgDir := pkgpath.Join([]string{root, modDir}, c.pathOS)
 
 	_ = c.fileSystem.walk(root, func(path string, entry fs.DirEntry, err errors.Error) errors.Error {
+		if err := l.ctx.Err(); err != nil {
+			m.Err = errors.Promote(err, "load")
+			return m.Err
+		}
 		if err != nil || !entry.IsDir() {
 			return nil
 		}
@@ -282,6 +286,9 @@ func (l *loader) importPaths(patterns []string) []*match {
 func (l *loader) importPathsQuiet(patterns []string) []*match {
 	var out []*match
 	for _, a := range cleanPatterns(patterns, l.cfg.pathOS) {
+		if err := l.ctx.Err(); err != nil {
+			return append(out, &match{Pattern: a, Err: errors.Promote(err, "load")})
+		}
 		if isMetaPackage(a) {
 			out = append(out, l.matchPackages(a, l.cfg.Package))
 			continue

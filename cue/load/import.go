@@ -56,6 +56,10 @@ import (
 //	_       anonymous files (which may be marked with _)
 //	*       all packages
 func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
+	if err := l.ctx.Err(); err != nil {
+		p.ReportError(errors.Promote(err, "load"))
+		return []*build.Instance{p}
+	}
 	retErr := func(errs errors.Error) []*build.Instance {
 		// XXX: move this loop to ReportError
 		for _, err := range errors.Errors(errs) {
@@ -239,6 +243,9 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 }
 
 func (l *loader) scanDir(dir string) cachedDirFiles {
+	if err := l.ctx.Err(); err != nil {
+		return cachedDirFiles{err: errors.Promote(err, "load")}
+	}
 	files, err := l.cfg.fileSystem.readDir(dir)
 	if err != nil {
 		return cachedDirFiles{

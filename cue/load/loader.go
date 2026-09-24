@@ -21,6 +21,7 @@ package load
 
 import (
 	"cmp"
+	"context"
 
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
@@ -31,6 +32,7 @@ import (
 )
 
 type loader struct {
+	ctx          context.Context
 	cfg          *Config
 	tagger       *tagger
 	stk          importStack
@@ -52,6 +54,7 @@ type cachedDirFiles struct {
 
 func newLoader(c *Config, tg *tagger, pkgs *modpkgload.Packages) *loader {
 	return &loader{
+		ctx:                 context.Background(),
 		cfg:                 c,
 		tagger:              tg,
 		pkgs:                pkgs,
@@ -132,6 +135,10 @@ func (l *loader) cueFilesPackage(files []*build.File) *build.Instance {
 // addFiles populates p.Files by reading CUE syntax from p.BuildFiles.
 func (l *loader) addFiles(p *build.Instance) {
 	for _, bf := range p.BuildFiles {
+		if err := l.ctx.Err(); err != nil {
+			p.ReportError(errors.Promote(err, "load"))
+			return
+		}
 		f, err := l.cfg.fileSystem.getCUESyntax(bf, l.cfg.parserConfigFor(p))
 		if err != nil {
 			p.ReportError(errors.Promote(err, "load"))
