@@ -1,0 +1,34 @@
+# Evaluated configurations and selected recursive functions must round trip.
+# Recompute a fresh result to ensure the exported body and captures survive.
+
+exec cue eval in.cue
+! stdout 'export incomplete'
+stdout 'sum:.*6'
+cp stdout evaluated.cue
+exec cue eval evaluated.cue -e 'fold(plus, 10, [4, 5])'
+cmp stdout want
+
+exec cue def in.cue
+! stdout 'export incomplete'
+cp stdout defined.cue
+exec cue eval defined.cue -e 'fold(plus, 10, [4, 5])'
+cmp stdout want
+
+exec cue eval in.cue -e '{renamed: fold}'
+! stdout 'export incomplete'
+cp stdout selected.cue
+exec cue eval selected.cue -e 'renamed(func(x: int, y: int) -> int: x + y, 10, [4, 5])'
+cmp stdout want
+
+-- cue.mod/module.cue --
+module: "recursive.test"
+language: version: "v0.18.0"
+-- in.cue --
+fold(A, B): func(step: func(B, A) -> B, seed: B, xs: [...A]) -> B: {
+	if len(xs) == 0 {out: seed}
+	if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}
+}.out
+plus: func(x: int, y: int) -> int: x + y
+sum:  fold(plus, 0, [1, 2, 3])
+-- want --
+19
