@@ -45,3 +45,15 @@ of successful execution are different judgments over that carrier.
 This document is a work plan, not a claim that these requirements have been
 implemented or verified. Implementation evidence and remaining limitations
 will be recorded as the work proceeds.
+
+## Implementation evidence
+
+- Runtime observations now share `compareRuntimeValues`: data equality uses
+  the ordinary visible-field policy, while opaque inhabitants and captures
+  retain hidden runtime fields. Definitions remain predicates. Recursive or
+  incomplete comparisons remain unknown. `Equal` remains constraint-graph
+  equality and is not used for callable leaves of runtime observations.
+  `TestQuantifiedBoundaryRuntimeEquality` exercises origin, captures, saved
+  packets, redundant contracts, erased selections, builtins, and nesting;
+  `TestQuantifiedBoundaryOpaqueEquality` checks the same opaque comparison
+  directly and through containers. `go test ./cue ./internal/core/...` passes.

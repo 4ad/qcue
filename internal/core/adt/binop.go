@@ -75,12 +75,7 @@ func BinOp(c *OpContext, node Node, op Op, left, right Value) Value {
 		return err
 	}
 	if _, ok := Unwrap(left).(*OpaqueValue); ok && (op == EqualOp || op == NotEqualOp) {
-		result := runtimeValueIdentity(c, left, right)
-		if result == proofUnknown {
-			return &Bottom{Code: IncompleteError, Err: c.Newf("abstract value equality remains unresolved")}
-		}
-		equal := result == proofEstablished
-		return c.NewBool(op == EqualOp && equal || op == NotEqualOp && !equal)
+		return runtimeEquality(c, left, right, op)
 	}
 
 	switch op {
@@ -110,11 +105,11 @@ func BinOp(c *OpContext, node Node, op Op, left, right Value) Value {
 			return cmpTonode(c, op, bytes.Compare(c.bytesValue(left, op), c.bytesValue(right, op)))
 
 		case leftKind == ListKind:
-			return c.NewBool(Equal(c, left, right, RegularOnly|IgnoreOptional))
+			return runtimeEquality(c, left, right, op)
 
 		case !p.Experiment().StructCmp:
 		case leftKind == StructKind:
-			return c.NewBool(Equal(c, left, right, RegularOnly|IgnoreOptional))
+			return runtimeEquality(c, left, right, op)
 		}
 
 	case NotEqualOp:
@@ -144,11 +139,11 @@ func BinOp(c *OpContext, node Node, op Op, left, right Value) Value {
 			return cmpTonode(c, op, bytes.Compare(c.bytesValue(left, op), c.bytesValue(right, op)))
 
 		case leftKind == ListKind:
-			return c.NewBool(!Equal(c, left, right, RegularOnly|IgnoreOptional))
+			return runtimeEquality(c, left, right, op)
 
 		case !p.Experiment().StructCmp:
 		case leftKind == StructKind:
-			return c.NewBool(!Equal(c, left, right, RegularOnly|IgnoreOptional))
+			return runtimeEquality(c, left, right, op)
 		}
 
 	case LessThanOp, LessEqualOp, GreaterEqualOp, GreaterThanOp:
