@@ -422,6 +422,21 @@ func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
 		x := &ast.IndexExpr{X: &ast.ParenExpr{X: e.quantifiedFuncValue(subject)}, Index: e.predicateValue(argument)}
 		return e.withFuncTypes(x, extra)
 	}
+	if projection, extra := f.SelectedProjection(); projection != nil {
+		return e.withFuncTypes(e.expr(nil, projection), extra)
+	}
+	if views, extra := f.CallViews(); len(views) != 0 {
+		var x ast.Expr
+		for _, view := range views {
+			y := &ast.ParenExpr{X: e.quantifiedFuncValue(view)}
+			if x == nil {
+				x = y
+			} else {
+				x = &ast.BinaryExpr{X: x, Op: token.AND, Y: y}
+			}
+		}
+		return e.withFuncTypes(x, extra)
+	}
 	head := adt.FuncType{Fn: f.Fn, Env: f.Env}
 	origin := head
 	var types []adt.FuncType

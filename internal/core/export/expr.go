@@ -74,6 +74,11 @@ func (e *exporter) expr(env *adt.Environment, v adt.Elem) (result ast.Expr) {
 		return nil
 
 	case *adt.Vertex:
+		if f, ok := adt.Unwrap(x).(*adt.FuncValue); ok {
+			if projection, _ := f.SelectedProjection(); projection != nil {
+				return e.quantifiedFuncValue(f)
+			}
+		}
 		if subject, argument := x.SubjectSelection(); subject != nil {
 			return e.subjectSelectionExpr(subject, argument)
 		}

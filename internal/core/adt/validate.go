@@ -15,6 +15,12 @@
 package adt
 
 type ValidateConfig struct {
+	// Runtime checks a supplied packet or captured runtime environment. Hidden
+	// fields are observable components of it, and must discharge concreteness
+	// and callable obligations just like regular fields. Definitions retain
+	// their schema interpretation. The default policy is host CUE validation.
+	Runtime bool
+
 	// Concrete, if true, requires that all values be concrete.
 	Concrete bool
 
@@ -104,7 +110,10 @@ func (v *validator) validatePackage(p *sealedPackage) {
 		v.packages = make(map[*sealedPackage]bool)
 	}
 	v.packages[p] = true
+	saved := v.Runtime
+	v.Runtime = true
 	v.validate(p.implementation)
+	v.Runtime = saved
 }
 
 func (v *validator) addPositions(err *ValueError) {
@@ -253,7 +262,7 @@ func (v *validator) validate(x *Vertex) {
 		if !v.AllErrors && v.err != nil {
 			break
 		}
-		if a.Label.IsRegular() {
+		if a.Label.IsRegular() || v.Runtime && !a.Label.IsDef() {
 			v.validate(a)
 		} else {
 			v.inDefinition++

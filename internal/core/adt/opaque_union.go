@@ -21,7 +21,7 @@ import "maps"
 // that branch and could expose the representation through another union arm.
 // If overlapping branches transport the value differently, the untagged
 // interface does not determine a unique observation; keep it incomplete.
-func (p *sealedPackage) transportUnion(c *OpContext, union *Disjunction, value Value, outward bool) Value {
+func (p *sealedPackage) transportUnion(c *OpContext, union *Disjunction, value Value, outward, project bool, export *publicExport) Value {
 	if union.Kind()&^(NullKind|BoolKind|NumberKind|StringKind|BytesKind) == 0 {
 		// Every branch uses identity transport. Preserve the disjunction
 		// and its preferences instead of demanding a unique branch and
@@ -50,7 +50,7 @@ func (p *sealedPackage) transportUnion(c *OpContext, union *Disjunction, value V
 		}
 		// Keep the branch predicate on the candidate. In particular a
 		// compatible closure descriptor does not prove its arrow contract.
-		x := p.transportResolved(c, branch, candidate, outward)
+		x := p.transportResolvedExport(c, branch, candidate, outward, project, export)
 		if _, ok := Unwrap(x).(*Bottom); ok {
 			unknown = true
 			continue

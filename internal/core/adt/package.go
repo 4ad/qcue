@@ -189,14 +189,8 @@ func sameTypeEnvironment(c *OpContext, a, b *Environment) bool {
 }
 
 func (e *Existential) validateWitness(c *OpContext, env *Environment, value Value) *Bottom {
-	subject := value
-	if vertex, ok := value.(*Vertex); ok {
-		// Membership concerns the data witness, not another evaluation of
-		// this validator. Other obligations remain on the original vertex.
-		subject = vertex.ToDataAll(c)
-	}
-	v := c.newInlineVertex(nil, nil, MakeRootConjunct(env, e.Template.Body), MakeRootConjunct(nil, subject))
-	v.Finalize(c)
+	m := checkMembership(c, value, scopedPredicate{env, e.Template.Body})
+	v := m.meet
 	if b := v.Bottom(); b != nil {
 		// This child belongs to the private membership check. Report it at
 		// the validator boundary so recursive validation cannot skip it.
@@ -204,18 +198,19 @@ func (e *Existential) validateWitness(c *OpContext, env *Environment, value Valu
 		copy.ChildError, copy.HasRecursive = false, false
 		return &copy
 	}
-	if !sameCapabilityShape(c, subject, v) {
+	if !m.preservesShape(c) {
 		if impossibleWitnessShape(c, value, v) {
 			return c.NewErrf("existential witness requires a field forbidden by the supplied value")
 		}
 		return e.unresolved(c)
 	}
-	cfg := &ValidateConfig{Concrete: true, Final: true}
+	cfg := &ValidateConfig{Concrete: true, Final: true, Runtime: true}
 	if !covariantData(e.Template.Body) {
 		// Conjoining an arrow is not evidence that the existing operation
 		// satisfies it. Keep the membership obligation pending until its
 		// conformance can be established independently.
 		cfg.CheckFunction = func(*OpContext, *FuncValue) *Bottom { return e.unresolved(c) }
+		cfg.CheckBuiltin = func(*OpContext, *Builtin) *Bottom { return e.unresolved(c) }
 	}
 	return Validate(c, v, cfg)
 }
@@ -230,7 +225,7 @@ func impossibleWitnessShape(c *OpContext, before, after Value) bool {
 		return false
 	}
 	for _, field := range b.Arcs {
-		if !field.Label.IsRegular() || field.ArcType == ArcOptional {
+		if field.Label.IsLet() || field.ArcType == ArcOptional {
 			continue
 		}
 		original := a.LookupRaw(field.Label)
@@ -397,7 +392,7 @@ func (s *PackageSeal) evaluate(c *OpContext, state Flags) Value {
 		return b
 	}
 	p.publicSchema = schema
-	view := p.transportResolvedMode(c, schema, implementation, true, true)
+	view := p.transportResolvedExport(c, schema, implementation, true, true, publicExportGraph(c, schema))
 	if v, ok := view.(*Vertex); ok {
 		v.sealed = p
 		if c.sealedViews == nil {
@@ -574,7 +569,7 @@ func (p *sealedPackage) transport(c *OpContext, env *Environment, schema Expr, v
 		result.Finalize(c)
 		return result
 	case *Function:
-		return p.transportFunction(c, &FuncValue{Fn: x, Env: env}, value, outward)
+		return p.transportFunction(c, &FuncValue{Fn: x, Env: env}, value, outward, nil)
 	case *ListLit:
 		v, ok := value.(*Vertex)
 		if !ok || !v.IsList() {
@@ -630,11 +625,15 @@ func (p *sealedPackage) transportResolved(c *OpContext, schema, value Value, out
 }
 
 func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value, outward, project bool) Value {
+	return p.transportResolvedExport(c, schema, value, outward, project, nil)
+}
+
+func (p *sealedPackage) transportResolvedExport(c *OpContext, schema, value Value, outward, project bool, export *publicExport) Value {
 	if b, ok := Unwrap(value).(*Bottom); ok {
 		return b
 	}
 	if union, ok := Unwrap(schema).(*Disjunction); ok {
-		return p.transportUnion(c, union, value, outward)
+		return p.transportUnion(c, union, value, outward, project, export)
 	}
 	if carrier := opaqueTypeOf(schema); carrier != nil && carrier.owner == p {
 		if !outward {
@@ -652,7 +651,7 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 		return packageValue
 	}
 	if f, ok := Unwrap(schema).(*FuncValue); ok {
-		return p.transportFunction(c, f, value, outward)
+		return p.transportFunction(c, f, value, outward, export.canonical())
 	}
 	typ, ok := schema.(*Vertex)
 	if !ok || typ.Kind()&(StructKind|ListKind) == 0 {
@@ -675,7 +674,7 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 				typ.MatchAndInsert(c, element)
 				element.Finalize(c)
 			}
-			out.Elems = append(out.Elems, p.transportResolved(c, element, a, outward))
+			out.Elems = append(out.Elems, p.transportResolvedExport(c, element, a, outward, false, export.field(a.Label)))
 		}
 		result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, out))
 		result.Finalize(c)
@@ -700,7 +699,7 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 			return c.NewErrf("missing interface field %s", field.Label.SelectorString(c))
 		}
 		out.Decls = append(out.Decls, &Field{Label: field.Label,
-			Value: p.transportResolved(c, field, a, outward)})
+			Value: p.transportResolvedExport(c, field, a, outward, false, export.field(field.Label))})
 	}
 	for _, a := range v.Arcs {
 		if a.ArcType != ArcMember || a.Label.IsLet() || typ.LookupRaw(a.Label) != nil {
@@ -726,7 +725,7 @@ func (p *sealedPackage) transportResolvedMode(c *OpContext, schema, value Value,
 		}
 		field.Finalize(c)
 		out.Decls = append(out.Decls, &Field{Label: a.Label,
-			Value: p.transportResolved(c, field, a, outward)})
+			Value: p.transportResolvedExport(c, field, a, outward, false, export.field(a.Label))})
 	}
 	result := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, out))
 	result.Finalize(c)
@@ -767,6 +766,7 @@ func (p *sealedPackage) transportPackage(c *OpContext, env *Environment, schema 
 // OpaqueCall is an authorized adapter. Traversals intentionally cannot visit
 // its private implementation or capture environment.
 type opaqueAdapter struct {
+	export  *publicExport
 	schema  *Function
 	types   []FuncType
 	env     *Environment
@@ -776,6 +776,7 @@ type opaqueAdapter struct {
 }
 
 type OpaqueCall struct {
+	export    *publicExport
 	owner     *sealedPackage
 	private   *FuncValue
 	signature *Function

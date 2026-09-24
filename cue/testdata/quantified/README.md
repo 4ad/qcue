@@ -12,6 +12,12 @@ adding a semantic case.
   declaration ordering, source export, and closure completeness. Their Go
   assertions remain in [quantified_test.go](../../quantified_test.go) because
   these tests exercise Go API operations and object identity.
+- [Generated semantic preservation checks](../../quantified_semantics_test.go):
+  the latest audit regressions, independent finite membership and quantifier
+  models, and transformations involving scopes, export, refinement and opacity.
+- [Packet-domain model](../../../internal/core/adt/packet_domain_test.go):
+  exhaustive comparison of symbolic protocol intersections against independent
+  concrete packet admission in a finite vocabulary.
 
 ## Semantic topics
 
@@ -212,6 +218,14 @@ adds these regressions:
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Syntax-only cases and malformed syntax belong in the parser
 corpus. No test compares fixtures with the proposal document.
+
+## Larger oracles and fuzzing
+
+The [oracle guide](../../../doc/quantified-cue-oracles.md) describes independent
+models, their exact coverage, preservation transformations, residual judgments,
+seeded generation, and failure shrinking. The default suite stays small;
+`tools/test-quantified-oracles.sh extended` runs larger exhaustive universes
+and four native fuzz targets. A weekly workflow runs the same command.
 
 ## Running the tests
 

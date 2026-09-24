@@ -47,15 +47,24 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 	if a.Fn != b.Fn {
 		x, xok := a.Fn.Body.(*OpaqueCall)
 		y, yok := b.Fn.Body.(*OpaqueCall)
-		if !xok || !yok || x.owner != y.owner || x.outward != y.outward ||
-			(x.origin() != y.origin() && x.signature != y.signature) {
+		if !xok || !yok || x.owner != y.owner || x.outward != y.outward {
 			return proofRefuted
 		}
-		// Adapter allocation is not a new public code identity. Its
-		// descriptor consists of the boundary and the wrapped closure.
-		result = closureIdentity(c, x.private, y.private)
-		if result == proofRefuted {
-			return result
+		if x.export != nil || y.export != nil {
+			if x.export != y.export {
+				return proofRefuted
+			}
+		} else {
+			// Higher-order transports carry supplied closure identity.
+			// Declared public exports instead use their interface graph;
+			// private code origins and sharing are unobservable there.
+			if x.origin() != y.origin() && x.signature != y.signature {
+				return proofRefuted
+			}
+			result = closureIdentity(c, x.private, y.private)
+			if result == proofRefuted {
+				return result
+			}
 		}
 	}
 	compare := func(x Expr, xe *Environment, y Expr, ye *Environment) {
@@ -234,6 +243,12 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 	}
 	m := *a
 	m.Types = mergeFuncTypes(a.Types, b.Types)
+	if a.Fn == b.Fn && a.frontier != nil && b.frontier != nil &&
+		(a.Env != b.Env || len(a.callViews) != 0 || len(b.callViews) != 0) {
+		m.frontier = mergeFuncTypes(a.frontier, b.frontier)
+		m.callViews = mergeCallViews(a, b)
+		m.selection, m.projection = nil, nil
+	}
 	if a.Fn != b.Fn || a.Env != b.Env {
 		// Erased identity does not make distinct signature views
 		// interchangeable. In particular an instantiated view must

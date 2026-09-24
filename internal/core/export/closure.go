@@ -99,7 +99,7 @@ func (e *exporter) predicateValue(v adt.Value) ast.Expr {
 	e.cfg = &profile
 	defer func() { e.cfg = saved }()
 	if v, ok := v.(*adt.Vertex); ok {
-		if v.Kind()&(adt.StructKind|adt.ListKind) == 0 && len(v.Arcs) == 0 {
+		if v.Kind()&(adt.StructKind|adt.ListKind) == 0 && len(v.Arcs) == 0 && !v.HasSubjectSchemes() {
 			// Evaluated scalar predicates already carry their resolved
 			// bounds. Reusing their source could reintroduce a free name.
 			return e.value(v.Value())

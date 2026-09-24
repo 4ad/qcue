@@ -74,6 +74,10 @@ certifying one selected instance cannot certify an invalid generic body.
 Selection also considers universal clauses attached to a separately supplied
 implementation. Each selection consumes one binder of the selected clauses;
 the implementation's original call protocol and universal obligations remain.
+Conjoining distinct checked views of the same closure retains their admitted
+call domains: `id[int] & id[string]` supports both instances in either order.
+The body runs once, and every applicable view's result obligation is checked.
+This does not weaken the explicit argument check on `id[int]` alone.
 Calls with empty containers or unused binders can infer the empty predicate,
 provided the selected instance admits every supplied argument.
 Inference keeps lower and upper constraints separate, reverses variance at
@@ -116,6 +120,9 @@ requires independent conformance evidence from the original argument.
 Completing a call also checks the actual packet's callable membership
 obligations before returning or caching its result. Ignoring a callback, or
 calling it on one successful input, cannot discharge its universal contract.
+These checks include hidden runtime fields in packets, captured records and
+package implementations. Host schema validation of undemanded definitions and
+absent optional fields remains separate from runtime conformance.
 
 Builtins obey the same rule. Their package declarations define their original
 protocol; adding a client contract cannot install a default or rename a slot.
@@ -334,15 +341,25 @@ Opened type names remain lexical export dependencies even though they are
 erased from runtime captures. Neither source nor final export may emit a free
 abstract name or silently acquire a binding from the destination scope.
 
-Evaluated source export also retains quantified record and list introductions,
+Evaluated source export also retains quantified scalar, record and list introductions,
 their selected telescopes, refinements, and shared copies. New type selections
 after recompilation preserve the original selection interface. A graph that
 exports both a composite introduction and a separate method from that same
 introduction currently reports incomplete export: emitting independent code
 origins would change closure identity. Incompatible lexical origins that would
 require the same unsupported code projection are also rejected explicitly.
+Projected methods from selected records and fixed lists retain their remaining
+method telescope through export and reimport, including separately supplied
+implementations. Original universal clauses remain proof obligations and cannot
+restart a consumed binder. Scalar normalization and graph deduplication likewise
+retain the introduction's universe and selection information.
 
 ## Implementation map and regression coverage
+
+[The semantic preservation design](quantified-cue-semantics-redesign.md)
+describes the judgment boundaries, their representations and independent finite
+models. The original audit reports are historical descriptions of their stated
+revisions.
 
 - `cue/ast`, `cue/parser`, and `cue/format` define lexical syntax and its round
   trips. `internal/core/compile` records binder identity and runtime captures.

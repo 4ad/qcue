@@ -162,12 +162,10 @@ func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
 	}
 	body := universalDataMinimum(c, q.Body, params)
 	v, _ := c.Evaluate(env, body)
-	if vertex, ok := v.(*Vertex); ok && vertex.Kind()&(StructKind|ListKind) != 0 {
-		if !slices.ContainsFunc(vertex.schemes, func(s subjectScheme) bool { return s.origin == env }) {
-			vertex.schemes = append(vertex.schemes, subjectScheme{origin: env, env: env})
-		}
+	if v == nil {
+		return nil
 	}
-	return v
+	return retainSubjectIntroduction(c, v, env)
 }
 
 // Re-evaluation of one lexical introduction must not create another
@@ -208,6 +206,16 @@ func universalDataMinimum(c *OpContext, x Expr, params map[*TypeParameter]bool) 
 					f := *field
 					f.Value = universalDataMinimum(c, f.Value, params)
 					copy.Decls[i] = &f
+				}
+			}
+			return &copy
+		}
+		if list, ok := x.(*ListLit); ok {
+			copy := *list
+			copy.Elems = slices.Clone(list.Elems)
+			for i, elem := range copy.Elems {
+				if value, ok := elem.(Expr); ok {
+					copy.Elems[i] = universalDataMinimum(c, value, params).(Elem)
 				}
 			}
 			return &copy
@@ -306,6 +314,13 @@ func (q *Quantified) evaluateFinite(c *OpContext) Value {
 	for _, p := range q.Params {
 		independent = independent && fixedCapabilityExpr(p.ValueRange)
 	}
+	// Only immutable finite assignments may justify dropping an equivalent
+	// branch. Ordinary captured witnesses can acquire later constraints.
+	immutable := true
+	for _, ref := range q.References {
+		r, ok := ref.(*TypeReference)
+		immutable = immutable && ok && r.Param.ValueRange != nil
+	}
 	var expand func(*Environment, int) Value
 	expand = func(env *Environment, i int) Value {
 		if budget.remaining == 0 || budget.exhausted {
@@ -315,6 +330,13 @@ func (q *Quantified) evaluateFinite(c *OpContext) Value {
 		budget.remaining--
 		if i == len(q.Params) {
 			v, _ := c.Evaluate(env, q.Body)
+			if vertex, ok := v.(*Vertex); ok {
+				// Discharge this finite assignment before forming the meet
+				// or join. Otherwise nested forall/exists prefixes create a
+				// Cartesian product of still-pending, already decidable
+				// branches, whose distinct scopes correctly prevent sharing.
+				vertex.Finalize(c)
+			}
 			return v
 		}
 		p := q.Params[i]
@@ -346,6 +368,7 @@ func (q *Quantified) evaluateFinite(c *OpContext) Value {
 			candidates = candidates[:1]
 		}
 		values := make([]Value, 0, len(candidates))
+		var refuted *Bottom
 		for _, v := range candidates {
 			args := maps.Clone(env.types.arguments)
 			args[p] = v
@@ -356,9 +379,26 @@ func (q *Quantified) evaluateFinite(c *OpContext) Value {
 			if value == nil || budget.exhausted {
 				return nil
 			}
+			if b, ok := Unwrap(value).(*Bottom); ok && !b.IsIncomplete() {
+				if !q.Src.Exists {
+					return b
+				}
+				refuted = CombineErrors(q.Source(), refuted, b)
+				continue
+			}
+			if immutable && finiteGroundData(c, value, make(map[Value]bool)) &&
+				slices.ContainsFunc(values, func(previous Value) bool {
+					return finiteGroundData(c, previous, make(map[Value]bool)) &&
+						Equal(c, previous, value, CheckStructural)
+				}) {
+				continue
+			}
 			values = append(values, value)
 		}
 		if q.Src.Exists {
+			if len(values) == 0 && refuted != nil {
+				return refuted
+			}
 			return &Disjunction{Values: values}
 		}
 		return &Conjunction{Values: values}
@@ -369,7 +409,44 @@ func (q *Quantified) evaluateFinite(c *OpContext) Value {
 	if budget.exhausted {
 		return q.finiteResidual(outer)
 	}
+	if !q.Src.Exists && value != nil {
+		return retainSubjectIntroduction(c, value, env)
+	}
 	return value
+}
+
+// finiteGroundData admits fully evaluated data trees only. Optional fields,
+// patterns, callable values and retained introductions are predicates whose
+// equal approximations do not justify branch deduplication.
+func finiteGroundData(c *OpContext, value Value, seen map[Value]bool) bool {
+	if value == nil || seen[value] {
+		return false
+	}
+	seen[value] = true
+	defer delete(seen, value)
+	if v, ok := value.(*Vertex); ok {
+		v.Finalize(c)
+		if v.Bottom() != nil || v.HasSubjectSchemes() || v.sealed != nil ||
+			v.PatternConstraints != nil || !IsConcrete(v) ||
+			v.Kind() == ListKind && !v.IsClosedList() ||
+			Validate(c, v, &ValidateConfig{Concrete: true, Final: true, Runtime: true}) != nil {
+			return false
+		}
+		for _, a := range v.Arcs {
+			if a.Label.IsLet() || a.ArcType != ArcMember || !finiteGroundData(c, a, seen) {
+				return false
+			}
+		}
+		if v.Kind() == StructKind || v.Kind() == ListKind {
+			return true
+		}
+		value = Unwrap(v)
+	}
+	switch value.(type) {
+	case *Null, *Bool, *Num, *String, *Bytes:
+		return true
+	}
+	return false
 }
 
 // Universals commute with conjunction and fixed record projections, but
@@ -384,6 +461,14 @@ func distributableUniversal(x Expr) bool {
 		return true
 	case *BinaryExpr:
 		return x.Op == AndOp && distributableUniversal(x.X) && distributableUniversal(x.Y)
+	case *ListLit:
+		for _, elem := range x.Elems {
+			value, ok := elem.(Expr)
+			if !ok || !distributableUniversal(value) {
+				return false
+			}
+		}
+		return true
 	case *StructLit:
 		for _, d := range x.Decls {
 			f, ok := d.(*Field)
@@ -543,8 +628,28 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 type functionSelection struct {
 	subject  *FuncValue
 	argument Value
-	clauses  []FuncType
 	types    []FuncType // obligations already entailed by this selection
+}
+
+// SelectedProjection exposes the source of a method specialized by selecting
+// its containing record or list. Its remaining telescope is not recoverable
+// from the unordered set of retained proof obligations alone.
+type functionProjection struct {
+	expr  Expr
+	types []FuncType
+}
+
+func (f *FuncValue) SelectedProjection() (Expr, []FuncType) {
+	if f.projection == nil {
+		return nil, nil
+	}
+	var extra []FuncType
+	for _, t := range f.Types {
+		if !slices.Contains(f.projection.types, t) {
+			extra = append(extra, t)
+		}
+	}
+	return f.projection.expr, extra
 }
 
 // TypeSelection exposes the retained elimination for faithful source export.
@@ -561,8 +666,8 @@ func (f *FuncValue) TypeSelection() (subject *FuncValue, argument Value, extra [
 }
 
 func (f *FuncValue) selectionClauses() []FuncType {
-	if f.selection != nil {
-		return f.selection.clauses
+	if f.frontier != nil {
+		return f.frontier
 	}
 	return f.selectionAndOriginalClauses()
 }
@@ -585,6 +690,8 @@ func (f *FuncValue) hasTypeSelection() bool {
 
 func (f *FuncValue) selectType(c *OpContext, argument Value) (*FuncValue, *Bottom) {
 	copy := *f
+	copy.projection = nil
+	copy.frontier = []FuncType{}
 	selected := &functionSelection{subject: f, argument: argument}
 	var err *Bottom
 	for _, t := range f.selectionClauses() {
@@ -604,17 +711,25 @@ func (f *FuncValue) selectType(c *OpContext, argument Value) (*FuncValue, *Botto
 		}
 		view := t
 		view.Env = inst.Env
-		selected.clauses = append(selected.clauses, view)
+		copy.frontier = append(copy.frontier, view)
 		if t.Fn == f.Fn && t.Env == f.Env {
 			copy.Env = inst.Env
 		}
 	}
-	if len(selected.clauses) == 0 {
+	if len(copy.frontier) == 0 {
 		return nil, err
 	}
 	copy.selection = selected
+	if len(f.callViews) != 0 {
+		copy.callViews = nil
+		for _, view := range f.callViews {
+			if selected, b := view.selectType(c, argument); b == nil && selected != nil {
+				copy.callViews = append(copy.callViews, selected)
+			}
+		}
+	}
 	copy.Types = mergeFuncTypes(f.Types, []FuncType{{Fn: f.Fn, Env: f.Env}})
-	copy.Types = mergeFuncTypes(copy.Types, selected.clauses)
+	copy.Types = mergeFuncTypes(copy.Types, copy.frontier)
 	selected.types = copy.Types
 	return &copy, nil
 }

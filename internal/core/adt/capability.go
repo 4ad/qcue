@@ -110,45 +110,12 @@ func capabilityMember(c *OpContext, env *Environment, constraint Expr, value Val
 	if constraint == nil {
 		return proofEstablished
 	}
-	// Compatibility with an upper approximation is not membership of its
-	// witness. For example, int & 1 succeeds, but an unknown integer need
-	// not be 1. This procedure establishes guards only on complete packets.
+	// Do not evaluate a speculative meet on an incomplete supplied packet.
 	if !concreteCapture(c, value) {
 		return proofUnknown
 	}
-	v := c.newInlineVertex(nil, nil,
-		MakeRootConjunct(env, constraint), MakeRootConjunct(env, value))
-	v.Finalize(c)
-	if b := v.Bottom(); b != nil {
-		if !b.IsIncomplete() {
-			return proofRefuted
-		}
-		return proofUnknown
-	}
-	// Meeting a record predicate can materialize fields that were absent
-	// from the supplied packet. That establishes compatibility, not
-	// membership of the original value. Keep its exact data shape, at every
-	// depth, when deciding the guard.
-	if !sameCapabilityShape(c, value, v) {
-		return proofRefuted
-	}
-	if b := Validate(c, v, &ValidateConfig{Concrete: true, Final: true}); b != nil {
-		if !b.IsIncomplete() {
-			return proofRefuted
-		}
-		return proofUnknown
-	}
-	// A meet can attach an arrow to a closure without proving it. Check
-	// callable domains against the original candidate, never against the
-	// enriched descriptor produced above. Inclusion descends into records
-	// and lists and uses independent implementation proofs for callables.
-	if capabilityHasCallable(value, make(map[Value]bool)) {
-		bound, complete := c.Evaluate(env, constraint)
-		if !complete || !c.provesInclusion(bound, value) {
-			return proofUnknown
-		}
-	}
-	return proofEstablished
+	m := checkMembership(c, value, scopedPredicate{env, constraint})
+	return m.packetMembership(c)
 }
 
 func capabilityHasCallable(v Value, seen map[Value]bool) bool {
@@ -167,27 +134,6 @@ func capabilityHasCallable(v Value, seen map[Value]bool) bool {
 		}
 	}
 	return false
-}
-
-func sameCapabilityShape(c *OpContext, before, after Value) bool {
-	a, aok := Unwrap(before).(*Vertex)
-	b, bok := Unwrap(after).(*Vertex)
-	if !aok || !bok {
-		return true // Scalar conflicts are handled by the meet itself.
-	}
-	a.Finalize(c)
-	b.Finalize(c)
-	for _, field := range b.Arcs {
-		if !field.Label.IsRegular() || field.ArcType == ArcOptional {
-			continue
-		}
-		original := a.LookupRaw(field.Label)
-		if original == nil || original.ArcType != ArcMember ||
-			!sameCapabilityShape(c, original, field) {
-			return false
-		}
-	}
-	return true
 }
 
 // capabilityPackets searches a bounded, deterministic vocabulary. Its results

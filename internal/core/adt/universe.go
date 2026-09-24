@@ -76,15 +76,18 @@ func universeOf(c *OpContext, v Value, seen map[Expr]bool) (int, bool) {
 		return typeExpressionLevel(c, v.Env, v.Template, seen)
 	case *Vertex:
 		v.Finalize(c)
-		if x := Unwrap(v); x != v {
-			return universeOf(c, x, seen)
-		}
 		for _, s := range v.schemes {
-			n, ok := environmentUniverse(c, s.env, seen)
-			level = max(level, n)
-			if !ok {
-				return level, false
+			for _, env := range []*Environment{s.origin, s.env} {
+				n, ok := environmentUniverse(c, env, seen)
+				level = max(level, n)
+				if !ok {
+					return level, false
+				}
 			}
+		}
+		if x := Unwrap(v); x != v {
+			known := add(x)
+			return level, known
 		}
 		for _, a := range v.Arcs {
 			if !a.Label.IsLet() && !add(a) {
@@ -234,7 +237,24 @@ func universeOccurs(c *OpContext, param *TypeParameter, value Value, seen map[Va
 		return false
 	}
 	seen[value] = true
-	switch v := Unwrap(value).(type) {
+	if v, ok := value.(*Vertex); ok {
+		v.Finalize(c)
+		for _, s := range v.schemes {
+			if environmentOccurs(c, param, s.origin, seen) || environmentOccurs(c, param, s.env, seen) {
+				return true
+			}
+		}
+		if base := Unwrap(v); base != v {
+			return universeOccurs(c, param, base, seen)
+		}
+		for _, a := range v.Arcs {
+			if universeOccurs(c, param, a, seen) {
+				return true
+			}
+		}
+		return false
+	}
+	switch v := value.(type) {
 	case *WitnessType:
 		return universeOccurs(c, param, v.Upper, seen)
 	case *FuncValue:
@@ -247,18 +267,6 @@ func universeOccurs(c *OpContext, param *TypeParameter, value Value, seen map[Va
 		return environmentOccurs(c, param, v.Env, seen)
 	case *Existential:
 		return environmentOccurs(c, param, v.Env, seen)
-	case *Vertex:
-		v.Finalize(c)
-		for _, s := range v.schemes {
-			if environmentOccurs(c, param, s.env, seen) {
-				return true
-			}
-		}
-		for _, a := range v.Arcs {
-			if universeOccurs(c, param, a, seen) {
-				return true
-			}
-		}
 	case *Conjunction:
 		for _, x := range v.Values {
 			if universeOccurs(c, param, x, seen) {

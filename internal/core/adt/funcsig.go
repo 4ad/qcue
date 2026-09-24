@@ -1299,7 +1299,10 @@ func equalFuncTypes(a, b []FuncType) bool {
 // bound the same arguments and consist of the same functions and types,
 // regardless of the order in which these were unified.
 func equalFuncValues(c *OpContext, x, y *FuncValue) bool {
-	if (x.selection != nil || y.selection != nil) &&
+	if !equalCallViews(x.callViews, y.callViews) {
+		return false
+	}
+	if (x.frontier != nil || y.frontier != nil) &&
 		!equalFuncTypes(x.selectionClauses(), y.selectionClauses()) {
 		return false
 	}

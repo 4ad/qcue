@@ -814,20 +814,31 @@ func appendDisjunct(ctx *OpContext, a []*nodeContext, x *nodeContext) []*nodeCon
 }
 
 // equalTasks reports whether the unfinished tasks in x and y are equal based on
-// their expression value. Clearly, this is O(n^2). In our testing repo the
-// maximum number of tasks is 101, although usually the number is much smaller.
+// their scoped expression. Equal syntax in different environments is not the
+// same pending computation: in particular, finite quantifier assignments may
+// have opposite results for the same body. Clearly, this is O(n^2). In our
+// testing repo the maximum number of tasks is 101, usually much smaller.
 // If this becomes a bottleneck, could make the task list stack based and keep
 // separate queues ready and processed tasks. An unequal number of ready tasks
 // would automatically mean inequality, and by sorting the lists we could
 // achieve O(n log n) complexity.
 func equalTasks(x, y *nodeContext) bool {
+	same := func(a, b *task) bool {
+		if a.x != b.x {
+			return false
+		}
+		if a.env == b.env {
+			return true
+		}
+		return a.env != nil && b.env != nil && a.env.Equal(x.ctx, b.env)
+	}
 inner1:
 	for _, t := range x.tasks {
 		if t.state != taskREADY {
 			continue
 		}
 		for _, tt := range y.tasks {
-			if t.x == tt.x {
+			if same(t, tt) {
 				continue inner1
 			}
 		}
@@ -840,7 +851,7 @@ inner2:
 			continue
 		}
 		for _, tt := range x.tasks {
-			if t.x == tt.x {
+			if same(t, tt) {
 				continue inner2
 			}
 		}

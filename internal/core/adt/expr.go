@@ -1656,10 +1656,24 @@ type FuncValue struct {
 	Env   *Environment
 	Types []FuncType
 
-	// selection tracks the remaining telescopes independently of retained
-	// universal proof obligations. Otherwise a second index could select
-	// the first binder of an original clause all over again.
+	// frontier contains the clauses available to the next type elimination.
+	// It is independent of Types (all proof obligations) and selection (the
+	// source expression for one explicit elimination). A projected method
+	// can have a frontier without having been explicitly indexed itself.
+	// nil means that no prefix has been consumed; an empty slice means that
+	// no clause remains selectable.
+	frontier []FuncType
+
+	// callViews retains checked instance views of the same closure when
+	// conjunction combines distinct explicit selections. It is independent
+	// of the original universal obligations in Types.
+	callViews []*FuncValue
+
+	// selection preserves the source expression of an explicit elimination.
 	selection *functionSelection
+	// projection preserves the path through a selected composite subject.
+	// It is provenance for export, not an additional proof obligation.
+	projection *functionProjection
 
 	// args holds arguments bound by partial application, indexed by parameter;
 	// a nil expr marks an unbound parameter. When any entry is set this is a
@@ -2204,6 +2218,7 @@ type funcCallResult struct {
 	types      []FuncType
 	args       []funcArg
 	identities []*FuncValue
+	views      []*FuncValue
 	result     Value
 }
 
@@ -2214,6 +2229,7 @@ func (r *funcCallResult) matches(c *OpContext, x *FuncValue) bool {
 		(r.env == x.Env || r.env.Equal(c, x.Env)) &&
 		equalFuncTypes(r.types, x.Types) &&
 		equalFuncArgs(r.args, x.args) &&
+		equalCallViews(r.views, x.callViews) &&
 		slices.Equal(r.identities, x.identities)
 }
 
@@ -2373,7 +2389,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 				}
 				c.funcCallResults[resultKey] = append(c.funcCallResults[resultKey],
 					funcCallResult{fn: x.Fn, env: x.Env, types: x.Types, args: x.args,
-						identities: x.identities, result: result})
+						identities: x.identities, views: x.callViews, result: result})
 			}
 		}
 		return x.checkResultScopes(c, result)
@@ -2392,7 +2408,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		if unused != nil {
 			return unused
 		}
-		if x.Fn.Quantified {
+		if x.Fn.Quantified && len(x.callViews) == 0 {
 			for i, arg := range bindings {
 				if arg.expr == nil || x.Fn.Params[i].Value == nil {
 					continue
@@ -2407,7 +2423,16 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			}
 		}
 		return &FuncValue{Src: x.Src, Fn: x.Fn, Env: x.Env, Types: x.Types,
-			args: bindings, identities: x.identities, scopes: x.scopes, selection: x.selection}
+			args: bindings, identities: x.identities, scopes: x.scopes,
+			selection: x.selection, frontier: x.frontier, projection: x.projection,
+			callViews: x.callViews}
+	}
+	if len(x.callViews) != 0 {
+		view, b := x.admittedCallView(c, bindings)
+		if b != nil {
+			return b
+		}
+		x = view
 	}
 	if len(typeParameters(x.Env)) != 0 {
 		inst, b := x.inferInstance(c, bindings)
@@ -2459,7 +2484,9 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		// without this evidence continue to use the host cycle discipline.
 		anchor = c.newInlineVertex(nil, nil)
 	}
-	ref := c.funcCallRef(call, anchor, callee)
+	payload := *callee
+	payload.Types = x.Types
+	ref := c.funcCallRef(call, anchor, &payload)
 
 	arcs := make([]*Vertex, 0, len(x.Fn.Params))
 	for i, p := range x.Fn.Params {
@@ -2589,7 +2616,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			// Constraints can leave obligations below the argument root.
 			// An unused record argument must not hide a required field or
 			// an unresolved singleton witness in one of its children.
-			if b := Validate(c, a, &ValidateConfig{Final: true, ReportIncomplete: true}); b != nil {
+			if b := Validate(c, a, &ValidateConfig{Final: true, Runtime: true, ReportIncomplete: true}); b != nil {
 				return b
 			}
 			if capabilityHasCallable(a, make(map[Value]bool)) {
@@ -2600,7 +2627,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 				if c.CheckFunction == nil || c.CheckBuiltin == nil {
 					return &Bottom{Code: IncompleteError, Err: c.Newf("argument conformance remains unproved")}
 				}
-				if b := Validate(c, a, &ValidateConfig{Concrete: true, Final: true,
+				if b := Validate(c, a, &ValidateConfig{Concrete: true, Final: true, Runtime: true,
 					CheckFunction: c.CheckFunction, CheckBuiltin: c.CheckBuiltin}); b != nil {
 					return b
 				}
@@ -2630,7 +2657,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		}
 		c.funcCallResults[resultKey] = append(c.funcCallResults[resultKey],
 			funcCallResult{fn: callee.Fn, env: callee.Env, types: callee.Types, args: callee.args,
-				identities: callee.identities, result: completed})
+				identities: callee.identities, views: callee.callViews, result: completed})
 	}
 
 	return x.checkResultScopes(c, completed)

@@ -16,25 +16,25 @@ package adt
 
 import "slices"
 
-func (p *sealedPackage) transportFunction(c *OpContext, schema *FuncValue, value Value, outward bool) Value {
+func (p *sealedPackage) transportFunction(c *OpContext, schema *FuncValue, value Value, outward bool, export *publicExport) Value {
 	f, ok := Unwrap(value).(*FuncValue)
 	if !ok {
 		return c.NewErrf("interface requires a function implementation")
 	}
 	for _, a := range p.operations {
-		if a.schema == schema.Fn && a.env == schema.Env && a.outward == outward &&
+		if a.export == export && a.schema == schema.Fn && a.env == schema.Env && a.outward == outward &&
 			equalFuncTypes(a.types, schema.Types) && equalFuncTypes(a.target.Types, f.Types) &&
 			closureIdentity(c, a.target, f) == proofEstablished {
 			return a.value
 		}
 	}
-	s := &OpaqueCall{owner: p, private: f, signature: schema.Fn, env: schema.Env, outward: outward,
+	s := &OpaqueCall{owner: p, export: export, private: f, signature: schema.Fn, env: schema.Env, outward: outward,
 		clauses: schema.selectionAndOriginalClauses(), dispatch: len(schema.Types) != 0}
 	adapter := s.adapter()
 	for _, t := range schema.Types {
 		adapter.Types = append(adapter.Types, s.advertised(t))
 	}
-	p.operations = append(p.operations, opaqueAdapter{schema: schema.Fn, types: schema.Types,
+	p.operations = append(p.operations, opaqueAdapter{export: export, schema: schema.Fn, types: schema.Types,
 		env: schema.Env, target: f, outward: outward, value: adapter})
 	return adapter
 }
@@ -90,7 +90,7 @@ func (s *OpaqueCall) publicEnvironment(public, selected *Environment) *Environme
 }
 
 func (s *OpaqueCall) clause(t FuncType) *OpaqueCall {
-	return &OpaqueCall{owner: s.owner, private: s.private, signature: t.Fn,
+	return &OpaqueCall{owner: s.owner, export: s.export, private: s.private, signature: t.Fn,
 		env: t.Env, outward: s.outward, root: s.origin()}
 }
 
@@ -128,8 +128,8 @@ func (s *OpaqueCall) callOverload(c *OpContext, f *FuncValue, call *CallExpr, st
 		if t.Fn == s.signature {
 			t.Env = s.publicEnvironment(t.Env, f.Env)
 		}
-		if f.selection != nil {
-			for _, selected := range f.selection.clauses {
+		if f.frontier != nil {
+			for _, selected := range f.frontier {
 				matches := selected.Fn == t.Fn
 				if view, ok := selected.Fn.Body.(*OpaqueCall); ok {
 					matches = matches || view.origin() == s.origin() && view.signature == t.Fn
@@ -216,6 +216,7 @@ func (s *OpaqueCall) callOverload(c *OpContext, f *FuncValue, call *CallExpr, st
 	}
 	chosen.view.identities, chosen.view.scopes = f.identities, f.scopes
 	chosen.view.selection = f.selection
+	chosen.view.frontier = f.frontier
 	if call.Partial {
 		chosen.view.args = chosen.bindings
 		chosen.view.Fn.Body.(*OpaqueCall).dispatch = true
@@ -254,41 +255,37 @@ func (s *OpaqueCall) coherent(c *OpContext) bool {
 
 func (s *OpaqueCall) coherentPair(c *OpContext, a, b FuncType) bool {
 	da, db := s.advertised(a), s.advertised(b)
-	matches := matchFuncParams(a.Fn, b.Fn, false)
-	for i, j := range matches {
-		p := a.Fn.Params[i]
-		if j < 0 {
-			if !b.Fn.Open && p.ArcType != ArcOptional && p.Default == nil {
-				return true // The closed second row excludes this required slot.
-			}
-			continue
-		}
-		q := b.Fn.Params[j]
-		if p.Value == nil || q.Value == nil {
-			continue
-		}
-		if p.ArcType == ArcOptional || p.Default != nil {
-			if q.ArcType == ArcOptional || q.Default != nil {
-				continue // Both clauses also admit omission.
-			}
-		}
-		meet := c.newInlineVertex(nil, nil, MakeRootConjunct(da.Env, p.Value), MakeRootConjunct(db.Env, q.Value))
-		meet.Finalize(c)
-		if bottom := meet.Bottom(); bottom != nil && !bottom.IsIncomplete() {
-			return true
-		}
+	shapes, complete := intersectPacketDomains(a.Fn, b.Fn)
+	if !complete {
+		return false
 	}
-	for j, q := range b.Fn.Params {
-		if !slices.Contains(matches, j) && !a.Fn.Open && q.ArcType != ArcOptional && q.Default == nil {
-			return true
+shapeLoop:
+	for _, shape := range shapes {
+		var overlapping []packetSlot
+		for _, slot := range shape.slots {
+			p, q := a.Fn.Params[slot.a], b.Fn.Params[slot.b]
+			if p.Value != nil && q.Value != nil {
+				meet := c.newInlineVertex(nil, nil, MakeRootConjunct(da.Env, p.Value), MakeRootConjunct(db.Env, q.Value))
+				meet.Finalize(c)
+				if bottom := meet.Bottom(); bottom != nil && !bottom.IsIncomplete() {
+					if slot.optional {
+						continue // This slot can only be omitted in a common packet.
+					}
+					continue shapeLoop // This entire shape family is empty.
+				}
+			}
+			overlapping = append(overlapping, slot)
 		}
-	}
-	for i, j := range matches {
-		if j >= 0 && !s.sameTransport(c, a.Env, a.Fn.Params[i].Value, b.Env, b.Fn.Params[j].Value) {
+		for _, slot := range overlapping {
+			if !s.sameTransport(c, a.Env, a.Fn.Params[slot.a].Value, b.Env, b.Fn.Params[slot.b].Value) {
+				return false
+			}
+		}
+		if !s.sameTransport(c, a.Env, a.Fn.Ret, b.Env, b.Fn.Ret) {
 			return false
 		}
 	}
-	return s.sameTransport(c, a.Env, a.Fn.Ret, b.Env, b.Fn.Ret)
+	return true
 }
 
 func (s *OpaqueCall) sameTransport(c *OpContext, ae *Environment, a Expr, be *Environment, b Expr) bool {

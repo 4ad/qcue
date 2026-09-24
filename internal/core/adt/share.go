@@ -140,6 +140,9 @@ func (n *nodeContext) shareIfPossible(c Conjunct, arc *Vertex, id CloseInfo) boo
 	if !n.ctx.Sharing {
 		return false
 	}
+	if !sameSubjectSchemes(n.ctx, n.node.schemes, arc.schemes) {
+		return false
+	}
 
 	// We disallow sharing for any Arcs, even pending ones, to be defensive.
 	// CUE currently does not always unwind sharing properly in the precense of

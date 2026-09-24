@@ -119,7 +119,8 @@ type Environment struct {
 
 // Equal reports whether e and f refer to the same node.
 func (e *Environment) Equal(ctx *OpContext, f *Environment) bool {
-	return e.Up == f.Up && e.types == f.types && e.DerefVertex(ctx) == f.DerefVertex(ctx)
+	return e.Up == f.Up && e.types == f.types && e.DynamicLabel == f.DynamicLabel &&
+		e.DerefVertex(ctx) == f.DerefVertex(ctx)
 }
 
 type cacheKey struct {
@@ -167,7 +168,7 @@ type Vertex struct {
 	sealed       *sealedPackage
 	sealedOpened bool
 
-	// schemes retain universal introductions on a composite subject. Type
+	// schemes retain universal introductions independently of runtime kind. Type
 	// selection changes its view, while the original value graph is shared.
 	schemes []subjectScheme
 	// A selected view retains its elimination for source export. Replaying
@@ -309,7 +310,7 @@ type Vertex struct {
 func (v *Vertex) IsOpaquePackage() bool { return v.DerefValue().sealed != nil }
 
 // HasSubjectSchemes reports type introductions that remain observable by
-// selecting a composite value. Serializing only its fields loses them.
+// selecting a subject. Serializing only its evaluated data loses them.
 func (v *Vertex) HasSubjectSchemes() bool { return len(v.DerefValue().schemes) != 0 }
 
 func deref(v *Vertex) *Vertex {

@@ -1,0 +1,62 @@
+name: Quantified CUE oracles
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Optional reproducible integer seed (decimal or 0x hexadecimal)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quantified-oracles-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fast:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: tools/test-quantified-oracles.sh fast
+
+  extended:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CUE_QUANTIFIED_ORACLE_SEED: ${{ inputs.seed || github.run_number }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Exhaustive models and fuzzing
+        shell: bash
+        run: tools/test-quantified-oracles.sh extended 2>&1 | tee quantified-oracle.log
+      - name: Preserve results and minimized failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quantified-oracle-results
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            quantified-oracle.log
+            cue/testdata/fuzz/FuzzQuantified*/**
+            internal/core/adt/testdata/fuzz/FuzzQuantified*/**

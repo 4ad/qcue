@@ -164,7 +164,7 @@ func (p *certifier) captured(v adt.Value) adt.Value {
 	}
 	if vertex, ok := v.(*adt.Vertex); ok {
 		if adt.Validate(p.ctx, vertex, &adt.ValidateConfig{
-			Concrete: true, CheckFunction: p.validateFunction, CheckBuiltin: ValidateBuiltin,
+			Concrete: true, Runtime: true, CheckFunction: p.validateFunction, CheckBuiltin: ValidateBuiltin,
 		}) != nil {
 			return nil
 		}

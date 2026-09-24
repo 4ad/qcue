@@ -581,6 +581,10 @@ var NoShareSentinel = &Bottom{
 
 func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInfo) {
 	ctx := n.ctx
+	subject, snapshot := v.(*evaluatedSubject)
+	if snapshot {
+		v = subject.Vertex
+	}
 
 	switch x := v.(type) {
 	case *Vertex:
@@ -602,12 +606,21 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 			n.updateNodeType(StructKind, x, id)
 		}
 
-		if !x.IsData() {
+		if !snapshot && !x.IsData() {
 			n.updateCyclicStatus(id)
 
 			c := MakeConjunct(env, x, id)
 			n.scheduleVertexConjuncts(c, x, id)
 			return
+		}
+		if snapshot && x.PatternConstraints != nil {
+			for _, p := range x.PatternConstraints.Pairs {
+				for conjunct := range p.Constraint.LeafConjuncts() {
+					ci := id
+					ci.setOptional(n)
+					n.insertPattern(p.Pattern, MakeConjunct(conjunct.Env, conjunct.Elem(), ci))
+				}
+			}
 		}
 
 		// TODO: evaluate value?
@@ -625,7 +638,7 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 
 		case *StructMarker:
 			for _, a := range x.Arcs {
-				if a.ArcType != ArcMember {
+				if a.Label.IsLet() || !snapshot && a.ArcType != ArcMember {
 					continue
 				}
 				// TODO(errors): report error when this is a regular field.
