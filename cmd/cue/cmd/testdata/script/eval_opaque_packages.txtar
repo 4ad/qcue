@@ -1,0 +1,86 @@
+# CUE output retains implementations, shared seals, and public operations.
+# Fresh calls and refinements exercise the rebuilt program's behavior.
+
+exec cue eval in.cue
+! stdout 'export incomplete'
+stdout 'seal'
+stdout 'zero:.*0'
+stdout 'result:.*1'
+cp stdout evaluated.cue
+exec cue eval evaluated.cue -e '(operation & (open same as (S, P) {f: P.alias}).f)(41)'
+cmp stdout want
+exec cue eval evaluated.cue -e '(open (counter & {extra: 42}) as (S, P) {r: P.extra}).r'
+cmp stdout want
+
+exec cue def in.cue
+! stdout 'export incomplete'
+stdout 'seal'
+cp stdout defined.cue
+exec cue eval defined.cue -e '(operation & (open same as (S, P) {f: P.alias}).f)(41)'
+cmp stdout want
+
+exec cue eval in.cue -e '{renamed: counter}'
+! stdout 'export incomplete'
+cp stdout selected.cue
+exec cue eval selected.cue -e '(open renamed as (S, P) {r: P.inc(41)}).r'
+cmp stdout want
+
+exec cue def in.cue -e '{renamed: operation}'
+! stdout 'export incomplete'
+cp stdout operation.cue
+exec cue eval operation.cue -e 'renamed(41)'
+cmp stdout want
+
+! exec cue eval evaluated.cue -e 'counter & fresh'
+stderr 'conflicting opaque package identities'
+! exec cue eval evaluated.cue -e '(operation & (open fresh as (S, P) {f: P.inc}).f)(41)'
+stderr 'conflicting function identities'
+
+# Imports used only by the private implementation must survive source output.
+exec cue eval imports.cue
+! stdout 'export incomplete'
+cp stdout imports-evaluated.cue
+exec cue eval imports-evaluated.cue -e '(open box as (A, P) {r: P.get()}).r'
+stdout '"CUE"'
+exec cue def imports.cue
+! stdout 'export incomplete'
+cp stdout imports-defined.cue
+exec cue eval imports-defined.cue -e '(open box as (A, P) {r: P.get()}).r'
+stdout '"CUE"'
+
+-- cue.mod/module.cue --
+module: "opaque.test"
+language: version: "v0.18.0"
+-- in.cue --
+#Counter: exists S {
+	zero: S
+	next: func(S) -> S
+	read: func(S) -> int
+	inc: func(int) -> int
+	alias: inc
+}
+increment: func(x: int) -> int: x + 1
+counter: seal #Counter with (S = int) {
+	zero: 0
+	next: increment
+	read: func(x: int) -> int: x
+	inc: increment
+	alias: increment
+}
+same: counter
+fresh: seal #Counter with (S = int) {
+	zero: 0
+	next: increment
+	read: func(x: int) -> int: x
+	inc: increment
+	alias: increment
+}
+operation: (open counter as (S, P) {f: P.inc}).f
+result: (open counter as (S, P) {r: P.read(P.next(P.zero))}).r
+-- imports.cue --
+import s "strings"
+
+#I: exists A {get: func() -> string}
+box: seal #I with (A = int) {get: func() -> string: s.ToUpper("cue")}
+-- want --
+42
