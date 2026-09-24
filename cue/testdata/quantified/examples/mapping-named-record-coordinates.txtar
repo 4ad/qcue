@@ -2,12 +2,11 @@
 @test(json, {"x":"2","y":"3"}, at="p")
 
 text: func(x: int) -> string: "\(x)"
-mapPoint:
-	forall (A, B) func(g: func(A) -> B, p: {x: A, y: A}) -> {
-		x: B
-		y: B
-	}: {
-		x: g(p.x)
-		y: g(p.y)
-	}
+mapPoint(A, B): func(g: func(A) -> B, p: {x: A, y: A}) -> {
+	x: B
+	y: B
+}: {
+	x: g(p.x)
+	y: g(p.y)
+}
 p: mapPoint(text, {x: 2, y: 3}) // {x: "2", y: "3"}

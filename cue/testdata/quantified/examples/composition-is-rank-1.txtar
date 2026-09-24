@@ -1,10 +1,9 @@
 -- in.cue --
 @test(json, "5", at="answer")
 
-text: func(x: int) -> string: "\(x)"
-inc:  func(x: int) -> int: x + 1
-compose:
-	forall (A, B, C) func(g: func(B) -> C, f: func(A) -> B) -> func(A) -> C: func(x: A) -> C: g(f(x))
+text:             func(x: int) -> string: "\(x)"
+inc:              func(x: int) -> int: x + 1
+compose(A, B, C): func(g: func(B) -> C, f: func(A) -> B) -> func(A) -> C: func(x: A) -> C: g(f(x))
 
 pipeline: compose(text, inc)
 answer:   pipeline(4) // "5"

@@ -2,8 +2,7 @@
 @test(validate, conflict, at="bad")
 @test(json, [7,"seven"], at="ok")
 
-id:
-	forall (A) func(x: A) -> A: x
+id(A): func(x: A) -> A: x
 useBoth: func(p: forall (A) func(A) -> A) -> [int, string]: [
 	p(7),
 	p("seven"),

@@ -1,6 +1,5 @@
 -- in.cue --
 @test(validate, conflict, at="r")
 
-f:
-	forall (A) func(A) -> A
-r: f(3) & string
+f(A): func(A) -> A
+r:    f(3) & string

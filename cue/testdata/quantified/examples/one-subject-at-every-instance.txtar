@@ -3,11 +3,8 @@
 @test(validate, conflict, at="impossible")
 @test(validate, conflict, at="impossibleRecord")
 
-empty:
-	forall (A) [...A] // []
-impossible:
-	forall (A) A // _|_
-impossibleRecord:
-	forall (n in 0 | 1) {
-		value: n // one field cannot be both 0 and 1
-	}
+empty(A):      [...A] // []
+impossible(A): A      // _|_
+impossibleRecord(n in 0 | 1): {
+	value: n // one field cannot be both 0 and 1
+}

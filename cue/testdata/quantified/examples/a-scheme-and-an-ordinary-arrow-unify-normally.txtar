@@ -2,10 +2,8 @@
 @test(validate, conflict, at="bad")
 @test(validate, at="id")
 
-id:
-	forall (A) func(A) -> A
-id: func(int) -> int // redundant instance
+id(A): func(A) -> A
+id:    func(int) -> int // redundant instance
 
-bad:
-	forall (A) func(A) -> A
-bad: func(int) -> bool // _|_: int and bool are disjoint
+bad(A): func(A) -> A
+bad:    func(int) -> bool // _|_: int and bool are disjoint

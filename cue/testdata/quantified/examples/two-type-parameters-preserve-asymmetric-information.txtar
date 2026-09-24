@@ -1,6 +1,5 @@
 -- in.cue --
 @test(json, ["seven",7], at="s")
 
-swap:
-	forall (A, B) func(p: [A, B]) -> [B, A]: [p[1], p[0]]
-s: swap([7, "seven"]) // ["seven", 7]
+swap(A, B): func(p: [A, B]) -> [B, A]: [p[1], p[0]]
+s:          swap([7, "seven"]) // ["seven", 7]

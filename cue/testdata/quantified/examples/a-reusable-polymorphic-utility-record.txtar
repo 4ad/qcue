@@ -1,11 +1,10 @@
 -- in.cue --
 @test(json, {"value":"payload"}, at="wrapped")
 
-utilities:
-	forall (A) {
-		id:   func(x: A) -> A: x
-		wrap: func(x: A) -> {value: A}: {value: x}
-	}
+utilities(A): {
+	id:   func(x: A) -> A: x
+	wrap: func(x: A) -> {value: A}: {value: x}
+}
 utilities: {name: "core"}
 
 wrapped: utilities.wrap("payload") // {value: "payload"}

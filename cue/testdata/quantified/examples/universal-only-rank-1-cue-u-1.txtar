@@ -1,9 +1,6 @@
 -- in.cue --
 @test(validate, at="id")
 
-id:
-	forall (A) func(A) -> A
-compose:
-	forall (A, B, C) func(func(B) -> C, func(A) -> B) -> func(A) -> C
-map:
-	forall (A, B) func(func(A) -> B, [...A]) -> [...B]
+id(A):            func(A) -> A
+compose(A, B, C): func(func(B) -> C, func(A) -> B) -> func(A) -> C
+map(A, B):        func(func(A) -> B, [...A]) -> [...B]

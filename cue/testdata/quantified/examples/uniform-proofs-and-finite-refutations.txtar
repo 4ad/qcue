@@ -2,7 +2,5 @@
 @test(validate, conflict, at="bad")
 @test(validate, at="id")
 
-id:
-	forall (A) func(x: A) -> A: x // one structural proof
-bad:
-	forall (A) func(x: A) -> A: 0 // refuted at A = 1, x = 1
+id(A):  func(x: A) -> A: x // one structural proof
+bad(A): func(x: A) -> A: 0 // refuted at A = 1, x = 1

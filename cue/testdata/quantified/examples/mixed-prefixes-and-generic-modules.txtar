@@ -1,8 +1,8 @@
 -- in.cue --
 @test(validate, at="module")
 
-module:
-	forall (A) exists (State) {
+module(A):
+	exists (State) {
 		empty: State
 		push:  func(A, State) -> State
 	}

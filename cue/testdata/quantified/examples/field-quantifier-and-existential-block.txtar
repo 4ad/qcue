@@ -3,8 +3,8 @@
 
 U: _
 W: _
-x:
-	forall (V: W) exists (T: U) {
+x(V: W):
+	exists (T: U) {
 		value:     T
 		transform: func(V) -> V
 	}

@@ -1,8 +1,7 @@
 -- in.cue --
 @test(validate, at="r")
 
-r:
-	forall (A) {
-		id:   func(A) -> A
-		wrap: func(A) -> {value: A}
-	}
+r(A): {
+	id:   func(A) -> A
+	wrap: func(A) -> {value: A}
+}

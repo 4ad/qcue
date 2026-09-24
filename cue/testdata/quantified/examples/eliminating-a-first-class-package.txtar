@@ -13,8 +13,7 @@ q: seal #Showable with (A = string) {
 	value: "hello"
 	show:  func(x: string) -> string: x
 }
-items: [p, q]
-map:
-	forall (A, B) func(g: func(A) -> B, xs: [...A]) -> [...B]: [for x in xs {g(x)}]
-describe: func(p: #Showable) -> string: (open p as (A, P) {out: P.show(P.value)}).out
-text:     map(describe, items) // ["7", "hello"]
+items:     [p, q]
+map(A, B): func(g: func(A) -> B, xs: [...A]) -> [...B]: [for x in xs {g(x)}]
+describe:  func(p: #Showable) -> string: (open p as (A, P) {out: P.show(P.value)}).out
+text:      map(describe, items) // ["7", "hello"]
