@@ -132,7 +132,10 @@ func capturedFunction(c *OpContext, outer, inner *FuncValue) bool {
 func recursiveArgument(c *OpContext, value Value) Value {
 	if v, ok := value.(*Vertex); ok {
 		v.Finalize(c)
-		if v.Bottom() != nil {
+		if v.Bottom() != nil || v.HasSubjectSchemes() || v.IsOpaquePackage() {
+			// A ground approximation is not the entire subject. Type
+			// introductions and sealing remain observable after a call,
+			// including when nested inside a ground list.
 			return nil
 		}
 	}

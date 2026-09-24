@@ -91,9 +91,92 @@ func (plan *transportPlan) retain(c *OpContext, source, result Value) Value {
 		return b
 	}
 	constraint := &TransportConstraint{plan: plan, source: source, target: target}
-	out := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, result), MakeRootConjunct(nil, constraint))
+	conjuncts := []Conjunct{MakeRootConjunct(nil, result), MakeRootConjunct(nil, constraint)}
+	if patterns := plan.identityPatterns(c, source); patterns != nil {
+		// Keep observable predicates on fields where transport is the
+		// identity. The inverse-image check retains their denotation but
+		// cannot by itself expose their lexical dependencies to scope and
+		// universe checking, or instantiate their label aliases later.
+		conjuncts = append(conjuncts, MakeRootConjunct(nil, membershipOperand(patterns)))
+	}
+	out := c.newInlineVertex(nil, nil, conjuncts...)
 	out.Finalize(c)
 	return out
+}
+
+// identityPatterns retains each source pattern outside the fields and
+// patterns whose plans change representation. Constraints within the changed
+// region are checked by the inverse-image predicate. This partition uses the
+// same compiled child plans as execution, not a second schema interpretation.
+func (plan *transportPlan) identityPatterns(c *OpContext, source Value) *Vertex {
+	v, ok := Unwrap(source).(*Vertex)
+	if !ok || plan.kind != transportComposite || v.IsList() || v.PatternConstraints == nil {
+		return nil
+	}
+	var changed []Value
+	for _, field := range plan.schema.(*Vertex).Arcs {
+		if field.Label.IsRegular() && !plan.fields[field.Label].identity {
+			changed = append(changed, field.Label.ToValue(c))
+		}
+	}
+	if pc := plan.schema.(*Vertex).PatternConstraints; pc != nil {
+		for _, pair := range pc.Pairs {
+			if !plan.owner.compileTransport(c, pair.Constraint, plan.outward, make(map[Value]bool)).identity {
+				changed = append(changed, pair.Pattern)
+			}
+		}
+	}
+	patterns := &Constraints{}
+sourcePattern:
+	for _, pair := range v.PatternConstraints.Pairs {
+		terms := []Value{pair.Pattern}
+		for _, excluded := range changed {
+			if c.provesInclusion(excluded, pair.Pattern) {
+				continue sourcePattern
+			}
+			if label, ok := Unwrap(excluded).(*String); ok {
+				terms = append(terms, &BoundValue{Op: NotEqualOp, Value: label})
+			} else {
+				terms = append(terms, &TransportPatternExclusion{pattern: excluded})
+			}
+		}
+		pair.Pattern = &Conjunction{Values: terms}
+		patterns.Pairs = append(patterns.Pairs, pair)
+	}
+	if len(patterns.Pairs) == 0 {
+		return nil
+	}
+	return &Vertex{BaseValue: &StructMarker{}, PatternConstraints: patterns}
+}
+
+// TransportPatternExclusion is the complement of a schema's field-label
+// predicate, used only to partition retained patterns. It is queried on a
+// concrete field label; an unresolved match never establishes its complement.
+type TransportPatternExclusion struct{ pattern Value }
+
+func (x *TransportPatternExclusion) Source() ast.Node         { return x.pattern.Source() }
+func (*TransportPatternExclusion) node()                      {}
+func (*TransportPatternExclusion) expr()                      {}
+func (*TransportPatternExclusion) declNode()                  {}
+func (*TransportPatternExclusion) elemNode()                  {}
+func (*TransportPatternExclusion) Kind() Kind                 { return StringKind }
+func (*TransportPatternExclusion) Concreteness() Concreteness { return Constraint }
+
+func (x *TransportPatternExclusion) validate(c *OpContext, value Value) *Bottom {
+	// The supplied label already carries this exclusion. Replaying its
+	// root validators would ask the very same question recursively.
+	check := c.newInlineVertex(nil, nil, MakeRootConjunct(nil, x.pattern), MakeRootConjunct(nil, membershipOperand(value)))
+	check.Finalize(c)
+	if b := check.Bottom(); b != nil {
+		if b.IsIncomplete() {
+			return b
+		}
+		return nil
+	}
+	if !IsConcrete(check) {
+		return &Bottom{Code: IncompleteError, Err: c.Newf("transport pattern match remains unresolved")}
+	}
+	return c.NewErrf("field is covered by a changing transport")
 }
 
 // predicate transports a schema occurrence, such as a definition or an absent

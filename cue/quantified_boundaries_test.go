@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 )
 
 // Erasure is a congruence for runtime observations: putting two inhabitants
@@ -174,6 +175,7 @@ func TestQuantifiedBoundaryCompositeConstraints(t *testing.T) {
 		{`{v: P.zero, x?: int}`, `{x: 1}`, `{x: "bad"}`},
 		{`close({v: P.zero})`, `{}`, `{x: 1}`},
 		{`{v: P.zero, [=~"^extra"]: int}`, `{extra: 1}`, `{extra: "bad"}`},
+		{`{v: P.zero, [=~"^extra"]~(Key,_): Key}`, `{extra: "extra"}`, `{extra: "bad"}`},
 		{`{v: P.zero, nested: {x?: int}}`, `{nested: {x: 1}}`, `{nested: {x: "bad"}}`},
 		{`{v: P.zero, _x?: int}`, `{_x: 1}`, `{_x: "bad"}`},
 	} {
@@ -530,6 +532,217 @@ func TestQuantifiedBoundaryCallbackEvidence(t *testing.T) {
 					t.Fatal("a predicate supplied a callback implementation")
 				}
 			})
+		}
+	}
+}
+
+// This small independent model defines admissibility using only a finite
+// scalar set, field presence, and a closed-row bit. No evaluator result,
+// transport plan, or inferred contract is used to calculate the answer.
+func checkQuantifiedTransportModel(t testing.TB, domain, selection, flags uint8) {
+	t.Helper()
+	mask := 1 + domain%3
+	field := int(selection%4) - 1 // -1 is absence; 2 is outside both scalar sets.
+	closed, pattern, callback, extra := flags&1 != 0, flags&2 != 0, flags&4 != 0, flags&8 != 0
+	valid := (field < 0 || mask&(1<<field) != 0) && !(closed && extra)
+	predicate := []string{"0", "1", "0|1"}[mask-1]
+	constraint := "x?: " + predicate
+	if pattern {
+		constraint = `[=~"^x$"]: ` + predicate
+	}
+	subject := "{v: P.zero, " + constraint + "}"
+	if closed {
+		subject = "close(" + subject + ")"
+	}
+	var fields []string
+	if field >= 0 {
+		fields = append(fields, fmt.Sprintf("x: %d", field))
+	}
+	if extra {
+		fields = append(fields, "extra: 9")
+	}
+	refinement := "{" + strings.Join(fields, ",") + "}"
+	shape, private, path := "{v: A}", "{v: int}", "x.v"
+	switch (flags >> 4) % 3 {
+	case 1:
+		shape, private, path = "{inner: "+shape+"}", "{inner: "+private+"}", "x.inner.v"
+		subject, refinement = "{inner: "+subject+"}", "{inner: "+refinement+"}"
+	case 2:
+		shape, private, path = "["+shape+"]", "["+private+"]", "x[0].v"
+		subject, refinement = "["+subject+"]", "["+refinement+"]"
+	}
+	operation := "P.echo"
+	if callback {
+		operation = fmt.Sprintf("P.callback(func(x: %s) -> %s: x)", shape, shape)
+	}
+	source := fmt.Sprintf(`
+#M: exists A {
+ zero: A
+ read: func(A) -> int
+ echo: func(%[1]s) -> %[1]s
+ callback: func(func(%[1]s) -> %[1]s) -> func(%[1]s) -> %[1]s
+}
+p: seal #M with (A = int) {
+ zero: 7
+ read: func(x: int) -> int: x
+ echo: func(x: %[2]s) -> %[2]s: x
+ callback: func(f: func(%[2]s) -> %[2]s) -> func(%[2]s) -> %[2]s: f
+}
+out: (open p as (A, P) {
+ let q = %[3]s(%[4]s) & %[5]s
+ r: (func(x: %[1]s) -> int: P.read(%[6]s))(q)
+}).r
+`, shape, private, operation, subject, refinement, path)
+	v := cuecontext.New().CompileString("@experiment(quantified)\n" + source)
+	if err := v.LookupPath(cue.ParsePath("p")).Validate(cue.Concrete(true)); err != nil {
+		t.Fatalf("transport operation uncertified: %v\n%s", err, source)
+	}
+	if err := v.Validate(); (err == nil) != valid {
+		t.Fatalf("model valid=%v mask=%d field=%d flags=%d: %v\n%s", valid, mask, field, flags, err, source)
+	}
+	if valid {
+		n, err := v.LookupPath(cue.ParsePath("out")).Int64()
+		if err != nil || n != 7 {
+			t.Fatalf("model-admitted input did not execute: %d %v\n%s", n, err, source)
+		}
+	}
+}
+
+func TestQuantifiedBoundaryTransportModel(t *testing.T) {
+	for domain := range uint8(3) {
+		for selection := range uint8(4) {
+			for flags := range uint8(48) {
+				checkQuantifiedTransportModel(t, domain, selection, flags)
+			}
+		}
+	}
+	t.Log("checked 576 independently specified transport/refinement cases")
+}
+
+func FuzzQuantifiedTransportBoundary(f *testing.F) {
+	for _, seed := range [][3]uint8{{0, 0, 0}, {1, 1, 15}, {2, 2, 31}, {0, 3, 47}} {
+		f.Add(seed[0], seed[1], seed[2])
+	}
+	f.Fuzz(func(t *testing.T, domain, selection, flags uint8) {
+		checkQuantifiedTransportModel(t, domain, selection, flags)
+	})
+}
+
+// Retaining denotation is not enough: an unmapped pattern's free abstract
+// dependency must remain visible to scope checking after callback transport.
+func TestQuantifiedBoundaryTransportPatternScope(t *testing.T) {
+	for _, wrapper := range []string{`%s`, `{inner: %s}`, `[%s]`} {
+		for _, predicate := range []string{`int`, `A`} {
+			for _, callback := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/callback=%v", wrapper, predicate, callback), func(t *testing.T) {
+					shape := fmt.Sprintf(wrapper, `{f: func(int) -> int}`)
+					subject := fmt.Sprintf(wrapper, `{f: func(x: int) -> int: x, [=~"^extra"]: `+predicate+`}`)
+					operation := `P.echo`
+					if callback {
+						operation = fmt.Sprintf(`P.callback(func(x: %s) -> %s: x)`, shape, shape)
+					}
+					v := semanticValue(t, fmt.Sprintf(`
+#M: exists A {
+ echo: func(%[1]s) -> %[1]s
+ callback: func(func(%[1]s) -> %[1]s) -> func(%[1]s) -> %[1]s
+}
+p: seal #M with (A = int) {
+ echo: func(x: %[1]s) -> %[1]s: x
+ callback: func(f: func(%[1]s) -> %[1]s) -> func(%[1]s) -> %[1]s: f
+}
+out: (open p as (A, P) {r: %[2]s(%[3]s)}).r
+`, shape, operation, subject))
+					if err := v.Validate(); (err != nil) != (predicate == "A") {
+						t.Fatalf("predicate=%s: %v", predicate, err)
+					}
+					if predicate == "int" {
+						if err := v.Validate(cue.Concrete(true)); err != nil {
+							t.Fatal(err)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestQuantifiedBoundaryTransportPatternPartition(t *testing.T) {
+	for _, label := range []string{"a", "b"} {
+		for _, valid := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/valid=%v", label, valid), func(t *testing.T) {
+				value := "P.one"
+				if valid {
+					value = "P.zero"
+				}
+				v := semanticValue(t, fmt.Sprintf(`
+#M: exists A {
+ zero: A
+ one: A
+ read: func(A) -> int
+ echo: func({a: A, [=~"^a"]: A}) -> {a: A, [=~"^a"]: A}
+}
+p: seal #M with (A = int) {
+ zero: 7
+ one: 8
+ read: func(x: int) -> int: x
+ echo: func(x: {a: int, [=~"^a"]: int}) -> {a: int, [=~"^a"]: int}: x
+}
+out: (open p as (A, P) {
+ let q = P.echo({a: P.zero, [=~"^[ab]$"]: P.zero}) & {%s: %s}
+ r: (func(x: {a: A}) -> int: P.read(x.a))(q)
+}).r
+`, label, value))
+				if err := v.Validate(); (err == nil) != valid {
+					t.Fatalf("valid=%v: %v", valid, err)
+				}
+				if valid {
+					if err := v.Validate(cue.Concrete(true)); err != nil {
+						t.Fatal(err)
+					}
+					semanticJSON(t, v, "out", "7")
+				}
+			})
+		}
+	}
+}
+
+// Memoizing a successful call may detach ground data from its activation, but
+// cannot erase a subject's remaining type-selection or formation obligations.
+func TestQuantifiedBoundaryCallSubjectPreservation(t *testing.T) {
+	for _, subject := range []string{"1", "[1]", "{v: 1}"} {
+		for _, wrap := range []string{"%s", "[%s]"} {
+			for _, opaque := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/opaque=%v", subject, wrap, opaque), func(t *testing.T) {
+					call := "id(" + fmt.Sprintf(wrap, "c") + ")"
+					if opaque {
+						call = "(open p as (Z, P) {r: P.id(" + fmt.Sprintf(wrap, "c") + ")}).r"
+					}
+					selectSubject := "copied"
+					if wrap != "%s" {
+						selectSubject += "[0]"
+					}
+					v := semanticValue(t, fmt.Sprintf(`
+c(A in Type(0)): %s
+id: func(x: _) -> _: x
+#M: exists Z {id: func(_) -> _}
+p: seal #M with (Z = int) {id: func(x: _) -> _: x}
+copied: %s
+selected: %s[int]
+bad: %s[forall (X in Type(0)) func(X) -> X]
+consumed: %s[int][bool]
+`, subject, call, selectSubject, selectSubject, selectSubject))
+					for _, path := range []string{"copied", "selected"} {
+						if err := v.LookupPath(cue.ParsePath(path)).Validate(cue.Concrete(true)); err != nil {
+							t.Fatalf("%s: %v", path, err)
+						}
+					}
+					for _, path := range []string{"bad", "consumed"} {
+						if err := v.LookupPath(cue.ParsePath(path)).Validate(); err == nil {
+							t.Fatalf("%s lost a formation/elimination constraint", path)
+						}
+					}
+				})
+			}
 		}
 	}
 }
