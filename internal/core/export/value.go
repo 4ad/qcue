@@ -574,7 +574,7 @@ func (e *exporter) quantifierSrc(q *adt.Quantified, env *adt.Environment) ast.Ex
 		if !complete || value == nil {
 			return e.quantifiedExportError("quantifier dependency %s is unresolved", id.Name)
 		}
-		if runtimeRefs[id.Node] && !e.exportableCapture(value, make(map[adt.Value]bool)) {
+		if runtimeRefs[id.Node] && !e.exportableCapture(value) {
 			return e.quantifiedExportError("quantifier capture %s cannot be exported independently", id.Name)
 		}
 		refs[id.Node] = value
@@ -659,11 +659,27 @@ func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	return e.functionOriginValue(t)
 }
 
-func (e *exporter) exportableCapture(value adt.Value, seen map[adt.Value]bool) bool {
-	if value == nil || seen[value] {
+func (e *exporter) exportableCapture(value adt.Value) bool {
+	return e.checkCapture(value, make(map[adt.Value]int), make(map[adt.FuncType]bool), 1)
+}
+
+func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functions map[adt.FuncType]bool, depth int) bool {
+	if value == nil {
 		return false
 	}
-	seen[value] = true
+	// Recursion through a closure is a finite environment graph, unlike an
+	// unresolved data cycle. Check every other capture before accepting the
+	// graph; encountering a back-reference must not conceal incomplete data.
+	if f, ok := adt.Unwrap(value).(*adt.FuncValue); ok && !f.IsPartial() &&
+		functions[adt.FuncType{Fn: f.Fn, Env: f.Env}] {
+		return true
+	}
+	if previous := seen[value]; previous != 0 {
+		// A record or list may refer back through a closure, but an edge
+		// through data alone does not establish a concrete captured value.
+		return depth > previous
+	}
+	seen[value] = depth
 	defer delete(seen, value)
 	if value.Kind()&adt.OpaqueKind != 0 {
 		return false
@@ -679,12 +695,12 @@ func (e *exporter) exportableCapture(value adt.Value, seen map[adt.Value]bool) b
 				// printing its spelling in the destination package.
 				return false
 			}
-			if a.ArcType == adt.ArcMember && !a.Label.IsLet() && !e.exportableCapture(a, seen) {
+			if a.ArcType == adt.ArcMember && !a.Label.IsLet() && !e.checkCapture(a, seen, functions, depth) {
 				return false
 			}
 		}
 		if unwrapped := adt.Unwrap(v); unwrapped != v {
-			return e.exportableCapture(unwrapped, seen)
+			return e.checkCapture(unwrapped, seen, functions, depth)
 		}
 		return true
 	}
@@ -695,9 +711,12 @@ func (e *exporter) exportableCapture(value adt.Value, seen map[adt.Value]bool) b
 		if _, opaque := f.Fn.Body.(*adt.OpaqueCall); opaque {
 			return false
 		}
+		key := adt.FuncType{Fn: f.Fn, Env: f.Env}
+		functions[key] = true
+		defer delete(functions, key)
 		for _, ref := range f.Fn.Captures {
 			v, complete := e.ctx.Evaluate(f.Env, ref)
-			if !complete || !e.exportableCapture(v, seen) {
+			if !complete || !e.checkCapture(v, seen, functions, depth+1) {
 				return false
 			}
 		}

@@ -26,6 +26,7 @@ import (
 	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/internal/core/export"
@@ -414,7 +415,11 @@ result: out()
 }
 
 func TestQuantifiedClosureExport(t *testing.T) {
-	for _, name := range []string{"captures", "factory", "literals", "records", "predicates", "generic", "nested_generic", "bounds", "hygiene", "callables", "chain"} {
+	for _, name := range []string{
+		"captures", "factory", "literals", "records", "predicates", "generic",
+		"nested_generic", "bounds", "hygiene", "callables", "chain",
+		"recursive", "self", "mutual", "recursive_factory", "recursive_record", "self_return", "open_capture",
+	} {
 		for _, mode := range []string{"source", "final", "expression", "value"} {
 			t.Run(name+"/"+mode, func(t *testing.T) {
 				ctx := cuecontext.New()
@@ -427,7 +432,7 @@ func TestQuantifiedClosureExport(t *testing.T) {
 					if got, err := v.LookupPath(cue.ParsePath("good")).MarshalJSON(); err != nil || string(got) != want {
 						t.Fatalf("source %s: got %s, %v; want %s", src, got, err, want)
 					}
-					if err := v.LookupPath(cue.ParsePath("bad")).Validate(); err == nil || !strings.Contains(err.Error(), "conflicting function identities") {
+					if err := v.LookupPath(cue.ParsePath("bad")).Validate(); err == nil || !strings.Contains(errors.Details(err, nil), "conflicting function identities") {
 						t.Fatalf("source %s: distinct descriptors did not conflict: %v", src, err)
 					}
 				}
@@ -460,10 +465,59 @@ func TestQuantifiedClosureExport(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				source := "r: " + string(text)
 				if mode == "expression" {
-					verify("root: " + string(text) + "\nr: root.r")
-				} else {
-					verify("r: " + string(text))
+					source = "root: " + string(text) + "\nr: root.r"
+				}
+				verify(source)
+				// Generated environment bindings are ordinary CUE too. Export
+				// them again to catch lost sharing or dependencies on the first
+				// input's lexical scope.
+				rebuilt := ctx.CompileString(source).LookupPath(cue.ParsePath("r"))
+				text, err = format.Node(rebuilt.Syntax(options...))
+				if err != nil {
+					t.Fatal(err)
+				}
+				verify("r: " + string(text))
+			})
+		}
+	}
+}
+
+func TestQuantifiedStandaloneRecursiveExport(t *testing.T) {
+	for _, tc := range []struct{ name, path, call, want string }{
+		{"recursive", "r.all", `renamed(func(x: int, y: int) -> int: x + y, 10, [4, 5])`, "19"},
+		{"self", "r.first", `renamed([4, 5])`, "9"},
+		{"mutual", "r.first", `renamed([1, 2, 3])`, "4"},
+		{"recursive_factory", "r.factory", `renamed(3)([1, 2])`, "9"},
+		{"recursive_record", "r.method", `renamed([1, 2, 3])`, "13"},
+	} {
+		for _, mode := range []string{"source", "final", "value"} {
+			t.Run(tc.name+"/"+mode, func(t *testing.T) {
+				ctx := cuecontext.New()
+				v := ctx.CompileString(quantifiedAPIText(t, "closure_export", tc.name+".cue"))
+				v = v.LookupPath(cue.ParsePath(tc.path))
+				var node ast.Node
+				switch mode {
+				case "source":
+					node = v.Syntax()
+				case "final":
+					node = v.Syntax(cue.Final())
+				case "value":
+					r, x := value.ToInternal(v)
+					var err error
+					node, err = export.Value(r, "", x)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				src, err := format.Node(node)
+				if err != nil {
+					t.Fatal(err)
+				}
+				v = ctx.CompileString("renamed: " + string(src) + "\nout: " + tc.call)
+				if got, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON(); err != nil || string(got) != tc.want {
+					t.Fatalf("export=%s: got %s, %v; want %s", src, got, err, tc.want)
 				}
 			})
 		}

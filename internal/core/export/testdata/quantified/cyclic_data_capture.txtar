@@ -1,0 +1,8 @@
+// Cycles through data alone are not recursive closure environments.
+#incomplete
+
+-- in.cue --
+x: {next: x.next}
+out: func() -> _: x
+-- out/export --
+captured value x cannot be exported independently

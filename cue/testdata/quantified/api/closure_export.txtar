@@ -100,9 +100,109 @@ bad:  r.a & r.c
 1
 -- hygiene.cue --
 mk: func(CUECapture: int) -> func(int) -> int: func(CUECode: int) -> int: CUECapture + CUECode
-r:  {CUECode: 9, CUECapture: 9, CUEType: 9, a: mk(1), b: mk(1), c: mk(2)}
+r: {
+	CUECode: 9, CUECapture: 9, CUEType: 9
+	CUEFunction: 9, CUEEnvironment: 9, CUEClosure: 9
+	#CUEClosures: {x: 9}
+	a: mk(1), b: mk(1), c: mk(2)
+}
 -- hygiene-check.cue --
 good: (r.a & r.b)(2)
 bad:  r.a & r.c
 -- hygiene-want.json --
 3
+
+-- recursive.cue --
+fold(A, B): func(step: func(B, A) -> B, seed: B, xs: [...A]) -> B: {
+	if len(xs) == 0 {out: seed}
+	if len(xs) > 0 {out: fold(step, step(seed, xs[0]), xs[1:])}
+}.out
+plus: func(x: int, y: int) -> int: x + y
+other(A, B): func(step: func(B, A) -> B, seed: B, xs: [...A]) -> B: seed
+r: {all: fold, selected: fold[int][int], add: plus, different: other}
+-- recursive-check.cue --
+good: [r.all(r.add, 0, [1, 2, 3]), r.selected(r.add, 0, [4, 5]), (r.all & r.selected)(r.add, 1, [2, 3])]
+bad:  r.all & r.different
+-- recursive-want.json --
+[6,9,6]
+
+-- self.cue --
+f: func(xs: [...int]) -> int: {
+	if len(xs) == 0 {out: 0}
+	if len(xs) > 0 {out: f(xs[1:]) + xs[0]}
+}.out
+other: func(xs: [...int]) -> int: 0
+r: {first: f, second: f, different: other}
+-- self-check.cue --
+good: (r.first & r.second)([1, 2, 3])
+bad:  r.first & r.different
+-- self-want.json --
+6
+
+-- mutual.cue --
+f: func(xs: [...int]) -> int: {
+	if len(xs) == 0 {out: 0}
+	if len(xs) > 0 {out: g(xs[1:]) + 1}
+}.out
+g: func(xs: [...int]) -> int: {
+	if len(xs) == 0 {out: 0}
+	if len(xs) > 0 {out: f(xs[1:]) + 2}
+}.out
+r: {first: f, second: g, copy: f}
+-- mutual-check.cue --
+good: [(r.first & r.copy)([1, 2, 3]), r.second([1, 2, 3])]
+bad:  r.first & r.second
+-- mutual-want.json --
+[4,5]
+
+-- recursive_factory.cue --
+mk: func(n: int) -> _: {
+	f: func(xs: [...int]) -> int: {
+		if len(xs) == 0 {out: n}
+		if len(xs) > 0 {out: f(xs[1:]) + n}
+	}.out
+}.f
+r: {factory: mk, a: mk(1), b: mk(2)}
+-- recursive_factory-check.cue --
+good: [r.a([1, 2]), r.b([1, 2]), r.factory(3)([1, 2])]
+bad:  r.a & r.b
+-- recursive_factory-want.json --
+[3,6,9]
+
+-- recursive_record.cue --
+state: {
+	n: 7
+	f: func(xs: [...int]) -> int: {
+		if len(xs) == 0 {out: state.n}
+		if len(xs) > 0 {out: state.f(xs[1:]) + xs[0]}
+	}.out
+}
+other: func(xs: [...int]) -> int: 0
+r: {record: state, method: state.f, different: other}
+-- recursive_record-check.cue --
+good: (r.record.f & r.method)([1, 2, 3])
+bad:  r.method & r.different
+-- recursive_record-want.json --
+13
+
+-- self_return.cue --
+f: func(xs: [...int]) -> _: {
+	if len(xs) == 0 {out: f}
+	if len(xs) > 0 {out: 1}
+}.out
+other: func(xs: [...int]) -> _: 0
+r: {self: f, different: other}
+-- self_return-check.cue --
+good: (r.self([]) & r.self)([1])
+bad:  r.self & r.different
+-- self_return-want.json --
+1
+
+-- open_capture.cue --
+mk: func(x: _) -> _: func() -> _: x & {extra: 2}
+r: {f: mk({n: 1}), other: func() -> _: {}}
+-- open_capture-check.cue --
+good: r.f().extra
+bad:  r.f & r.other
+-- open_capture-want.json --
+2

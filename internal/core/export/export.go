@@ -193,6 +193,7 @@ func Expr(r adt.Runtime, pkgID string, n adt.Expr) (ast.Expr, errors.Error) {
 // It does not resolve references that point outside the given expression.
 func (p *Profile) Expr(r adt.Runtime, pkgID string, n adt.Expr) (ast.Expr, errors.Error) {
 	e := newExporter(p, r, pkgID, nil)
+	e.markUsedFeatures(n)
 
 	x := e.expr(nil, n)
 	return e.withOriginDecls(x), e.errs
@@ -342,8 +343,9 @@ type exporter struct {
 	// For resolving references.
 	stack []frame
 
-	inDefinition int // for close() wrapping.
-	inExpression int // for inlining decisions.
+	inDefinition      int  // for close() wrapping.
+	inExpression      int  // for inlining decisions.
+	inCompositeScheme bool // Preserve methods' ambient quantifier scopes.
 
 	// hidden label handling
 	pkgID string
@@ -369,6 +371,7 @@ type exporter struct {
 	letAlias          map[*ast.LetClause]*ast.LetClause
 	references        map[*adt.Vertex]*referenceInfo
 	functionOrigins   map[*adt.Function]*functionOrigin
+	closures          *closureGraph
 	quantifierOrigins map[quantifierOriginKey]*ast.LetClause
 	quantifierCode    map[*adt.Function]quantifierOriginKey
 	originDecls       []ast.Decl

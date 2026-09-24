@@ -17,18 +17,70 @@ package export
 import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
+	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/walk"
 )
 
-// Each code literal is emitted once. Predicate dependencies are arguments of
-// an abbreviation, while runtime captures are arguments of a closure factory.
-// Reusing the factory preserves code identity without conflating environments.
+// Each code literal is emitted once, inside an environment record template.
+// Predicate dependencies are arguments of an abbreviation; runtime captures
+// are fields supplied by unification. Unlike a factory call, instantiating a
+// record does not demand the captures before constructing the closure. This
+// lets recursive environments refer back to their closures.
 type functionOrigin struct {
-	decl       ast.Decl
-	name       string
-	predicates []adt.Expr
-	captures   []adt.Expr
+	decl         *ast.ParametricAlias
+	name         string
+	predicates   []adt.Expr
+	captures     []adt.Expr
+	captureNames []string
+	result       string
+	environment  string
+}
+
+// closureGraph names runtime environments independently of code origins.
+// Its fields may refer to each other, including through captured records.
+// References within the graph use field names: referring to the enclosing
+// binding would introduce a recursive reference to the whole graph instead.
+type closureGraph struct {
+	decl      *ast.Field
+	fields    *ast.StructLit
+	depth     int
+	functions map[adt.FuncType]*ast.Field
+	values    map[*adt.Vertex]*ast.Field
+}
+
+func (e *exporter) graph() *closureGraph {
+	if e.closures == nil {
+		fields := &ast.StructLit{}
+		// A let is an abbreviation and may reconstruct the record at each
+		// use. A definition provides stable bindings, so references to the
+		// same recursive closure also retain the same environment identity.
+		decl := &ast.Field{Label: ast.NewIdent(e.uniqueAlias("#CUEClosures")), Value: fields}
+		e.closures = &closureGraph{decl: decl, fields: fields,
+			functions: make(map[adt.FuncType]*ast.Field), values: make(map[*adt.Vertex]*ast.Field)}
+		e.originDecls = append(e.originDecls, decl)
+	}
+	return e.closures
+}
+
+func (e *exporter) closureField() *ast.Field {
+	g := e.graph()
+	f := &ast.Field{Label: ast.NewIdent(e.uniqueAlias("CUEClosure")), Value: &ast.ParenExpr{}}
+	g.fields.Elts = append(g.fields.Elts, f)
+	return f
+}
+
+func (e *exporter) closureReference(f *ast.Field) ast.Expr {
+	g := e.graph()
+	name := f.Label.(*ast.Ident).Name
+	if g.depth > 0 {
+		id := ast.NewIdent(name)
+		id.Node = f.Value
+		return id
+	}
+	id := ast.NewIdent(g.decl.Label.(*ast.Ident).Name)
+	id.Node = g.decl.Value
+	return ast.NewSel(id, name)
 }
 
 // Expression-only APIs must carry the declarations inside their returned
@@ -56,6 +108,12 @@ func referenceKey(x adt.Expr) ast.Node {
 func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 	params := adt.FunctionTypeParameters(t)
 	origin := e.functionOrigin(t.Fn, params)
+	g := e.graph()
+	if f := g.functions[t]; f != nil {
+		return e.closureReference(f)
+	}
+	f := e.closureField()
+	g.functions[t] = f
 	args := adt.FunctionTypeArguments(t)
 	value := func(ref adt.Expr, runtime bool) ast.Expr {
 		if r, ok := ref.(*adt.TypeReference); ok {
@@ -64,7 +122,7 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 			}
 		}
 		v, complete := e.ctx.Evaluate(t.Env, ref)
-		if !complete || v == nil || (runtime && !e.exportableCapture(v, make(map[adt.Value]bool))) {
+		if !complete || v == nil || (runtime && !e.exportableCapture(v)) {
 			id := ref.Source().(*ast.Ident)
 			return e.quantifiedExportError("captured value %s cannot be exported independently", id.Name)
 		}
@@ -73,7 +131,10 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 		}
 		return e.predicateValue(v)
 	}
-	return e.originApplication(origin, value)
+	g.depth++
+	f.Value.(*ast.ParenExpr).X = e.originApplication(origin, value)
+	g.depth--
+	return e.closureReference(f)
 }
 
 // Runtime environments contain all fields observable by the code, including
@@ -86,6 +147,29 @@ func (e *exporter) runtimeCaptureValue(v adt.Value) ast.Expr {
 	profile.ShowDefinitions = true
 	e.cfg = &profile
 	defer func() { e.cfg = saved }()
+	if v, ok := v.(*adt.Vertex); ok {
+		if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok {
+			return e.value(f)
+		}
+		if v.Kind()&(adt.StructKind|adt.ListKind) != 0 {
+			g := e.graph()
+			if f := g.values[v]; f != nil {
+				return e.closureReference(f)
+			}
+			f := e.closureField()
+			g.values[v] = f
+			g.depth++
+			// This value is emitted in the graph, outside the current output
+			// scope. In particular it may be an ancestor of that scope; the
+			// ordinary vertex stack must not replace it with top as a cycle.
+			saved := e.stack
+			e.stack = nil
+			f.Value.(*ast.ParenExpr).X = e.value(v)
+			e.stack = saved
+			g.depth--
+			return e.closureReference(f)
+		}
+	}
 	return e.value(v)
 }
 
@@ -126,22 +210,31 @@ func (e *exporter) predicateValue(v adt.Value) ast.Expr {
 func (e *exporter) originApplication(o *functionOrigin, value func(adt.Expr, bool) ast.Expr) ast.Expr {
 	id := ast.NewIdent(o.name)
 	id.Node = o.decl
-	var x ast.Expr = id
-	if len(o.predicates) > 0 {
-		call := ast.NewCall(x)
+	call := ast.NewCall(id)
+	if len(o.predicates) == 0 {
+		call.Args = append(call.Args, ast.NewIdent("_"))
+	} else {
 		for _, ref := range o.predicates {
 			call.Args = append(call.Args, value(ref, false))
 		}
-		x = call
 	}
+	var x ast.Expr = call
 	if len(o.captures) > 0 {
-		call := ast.NewCall(x)
-		for _, ref := range o.captures {
-			call.Args = append(call.Args, value(ref, true))
+		captures := &ast.StructLit{}
+		for i, ref := range o.captures {
+			captures.Elts = append(captures.Elts, &ast.Field{
+				Label: ast.NewIdent(o.captureNames[i]), Value: value(ref, true),
+			})
 		}
-		x = call
+		// Give the environment a field before projecting its function. An
+		// inline conjunction followed immediately by a selector has no stable
+		// vertex for recursive captures, notably inside a factory's body.
+		x = &ast.StructLit{Elts: []ast.Decl{
+			&ast.Field{Label: ast.NewIdent(o.environment), Value: ast.NewBinExpr(token.AND, x, captures)},
+			&ast.Field{Label: ast.NewIdent(o.result), Value: ast.NewSel(ast.NewIdent(o.environment), o.result)},
+		}}
 	}
-	return x
+	return ast.NewSel(x, o.result)
 }
 
 func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter) *functionOrigin {
@@ -169,7 +262,10 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 	for _, p := range params {
 		ast.Walk(p.Src, reserve, nil)
 	}
-	o := &functionOrigin{name: e.uniqueAlias("CUECode"), captures: fn.Captures}
+	o := &functionOrigin{
+		name: e.uniqueAlias("CUECode"), captures: fn.Captures,
+		result: e.uniqueAlias("CUEFunction"), environment: e.uniqueAlias("CUEEnvironment"),
+	}
 	e.functionOrigins[fn] = o
 	own := make(map[ast.Node]bool)
 	for _, p := range params {
@@ -198,19 +294,22 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		names[referenceKey(ref)] = name
 		aliasParams = append(aliasParams, &ast.TypeParam{Name: ast.NewIdent(name)})
 	}
-	var captureParams []*ast.FuncParam
+	if len(aliasParams) == 0 {
+		// This is a lexical template, not an incomplete captured runtime
+		// record. CUE requires at least one alias parameter; an unused
+		// predicate keeps that distinction on subsequent source exports.
+		aliasParams = append(aliasParams, &ast.TypeParam{Name: ast.NewIdent(e.uniqueAlias("CUEType"))})
+	}
+	environment := &ast.StructLit{}
 	for _, ref := range o.captures {
 		name := e.uniqueAlias("CUECapture")
 		names[referenceKey(ref)] = name
-		captureParams = append(captureParams, &ast.FuncParam{Label: ast.NewIdent(name), Value: ast.NewIdent("_")})
+		o.captureNames = append(o.captureNames, name)
+		environment.Elts = append(environment.Elts, &ast.Field{Label: ast.NewIdent(name), Value: ast.NewIdent("_")})
 	}
 	// Allocate the declaration before descending so every reference links to
 	// the same node, including references from nested code origins.
-	if len(aliasParams) > 0 {
-		o.decl = &ast.ParametricAlias{Name: ast.NewIdent(o.name), Params: aliasParams}
-	} else {
-		o.decl = &ast.LetClause{Ident: ast.NewIdent(o.name)}
-	}
+	o.decl = &ast.ParametricAlias{Name: ast.NewIdent(o.name), Params: aliasParams}
 	e.originNames[o.name] = o.decl
 
 	type nestedFunction struct {
@@ -286,16 +385,9 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		}
 		return true
 	}, nil).(ast.Expr)
-	if len(captureParams) > 0 {
-		body = &ast.Func{Params: captureParams, Ret: ast.NewIdent("_"), Body: body}
-	}
-	body = e.funcExprSrc(body, "quantified")
-	switch d := o.decl.(type) {
-	case *ast.ParametricAlias:
-		d.Body = body
-	case *ast.LetClause:
-		d.Expr = body
-	}
+	environment.Elts = append(environment.Elts, &ast.Field{Label: ast.NewIdent(o.result), Value: body})
+	body = e.funcExprSrc(environment, "quantified")
+	o.decl.Body = body
 	e.originDecls = append(e.originDecls, o.decl)
 	return o
 }
@@ -314,6 +406,12 @@ func cloneFunctionSource(src ast.Expr, replacements map[ast.Node]ast.Expr) ast.E
 	ast.Walk(copied, func(n ast.Node) bool {
 		if replacement := replacements[originals[i]]; replacement != nil {
 			byCopy[n] = replacement
+		}
+		// A reference to the enclosing field may resolve to the literal
+		// itself. Clone treats that node as local, but closure conversion
+		// must still substitute the field's runtime capture below.
+		if id, ok := originals[i].(*ast.Ident); ok && id.Node == src {
+			n.(*ast.Ident).Node = id.Node
 		}
 		i++
 		return true

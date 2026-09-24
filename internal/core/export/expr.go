@@ -112,6 +112,22 @@ func (e *exporter) expr(env *adt.Environment, v adt.Elem) (result ast.Expr) {
 // unified. All other conjuncts are added verbatim.
 
 func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct, orig ...adt.Conjunct) (expr ast.Expr) {
+	if src != nil {
+		if src.HasSubjectSchemes() {
+			// A composite introduction supplies its methods' outer binders.
+			// Export their source conjuncts in that scope, without turning the
+			// inherited clauses into independent function quantifiers.
+			saved := x.inCompositeScheme
+			x.inCompositeScheme = true
+			defer func() { x.inCompositeScheme = saved }()
+		}
+		if f, ok := adt.Unwrap(src).(*adt.FuncValue); ok && f.Fn.Quantified && !x.inCompositeScheme {
+			// Keep a closure and its evaluated environment together. Exporting
+			// the conjuncts separately could emit an uninstantiated template
+			// before its capture fields have been supplied by unification.
+			return x.value(f)
+		}
+	}
 
 	e := conjuncts{
 		exporter: x,

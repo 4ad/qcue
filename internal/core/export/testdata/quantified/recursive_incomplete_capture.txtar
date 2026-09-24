@@ -1,0 +1,12 @@
+// A recursive back-reference must not hide another unresolved capture.
+#incomplete
+
+-- in.cue --
+x: int
+out: func(xs: [...int]) -> int: {
+	if len(xs) > 0 {result: out(xs[1:])}
+	if len(xs) == 0 {result: x}
+}.result
+-- out/export --
+captured value out cannot be exported independently
+captured value x cannot be exported independently
