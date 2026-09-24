@@ -222,7 +222,7 @@ func (p *parser) quantifiedFieldAhead() bool {
 
 func (p *parser) parseQuantifiedField() ast.Decl {
 	name := p.parseIdentDecl()
-	q := &ast.Quantifier{Quantifier: name.Pos()}
+	q := &ast.Quantifier{Quantifier: name.Pos(), Shorthand: true}
 	q.Lparen, q.Params, q.Rparen = p.parseTypeParams(token.LPAREN, token.RPAREN)
 	if p.tok == token.BIND {
 		a := &ast.ParametricAlias{

@@ -324,6 +324,22 @@ func IsDefinition(label ast.Label) bool {
 	return false
 }
 
+// FieldQuantifier returns the universal that can be printed as f(A): Body.
+// Fall back to explicit syntax if an AST transformation has added field
+// features that the shorthand grammar cannot express, or quantifier comments
+// that have no corresponding node in the shorthand syntax.
+func FieldQuantifier(f *ast.Field) *ast.Quantifier {
+	q, ok := f.Value.(*ast.Quantifier)
+	if !ok || !q.Shorthand || q.Exists || len(ast.Comments(q)) > 0 ||
+		f.Constraint != token.ILLEGAL || f.Alias != nil {
+		return nil
+	}
+	if _, ok := f.Label.(*ast.Ident); !ok {
+		return nil
+	}
+	return q
+}
+
 func IsRegularField(f *ast.Field) bool {
 	var ident *ast.Ident
 	switch x := f.Label.(type) {

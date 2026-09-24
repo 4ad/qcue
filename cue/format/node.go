@@ -444,6 +444,13 @@ func (f *formatter) decl(decl ast.Decl) {
 	case *ast.Field:
 		// Format label without constraint (we'll add constraint after alias)
 		f.label(n.Label, token.ILLEGAL)
+		value := n.Value
+		if q := internal.FieldQuantifier(n); q != nil {
+			f.print(q.Lparen, token.LPAREN, noblank, indent)
+			f.typeParams(q.Params, 1)
+			f.print(unindent, trailcomma, noblank, q.Rparen, token.RPAREN)
+			value = q.Body
+		}
 
 		// Format postfix alias if present
 		if a := n.Alias; a != nil {
@@ -489,7 +496,7 @@ func (f *formatter) decl(decl ast.Decl) {
 			return
 		}
 
-		nextFF := f.nextNeedsFormfeed(n.Value)
+		nextFF := f.nextNeedsFormfeed(value)
 		tab := vtab
 		if nextFF || f.prevLbraceOnLine {
 			tab = blank
@@ -497,13 +504,13 @@ func (f *formatter) decl(decl ast.Decl) {
 
 		f.print(tab)
 
-		if n.Value != nil {
-			switch n.Value.(type) {
+		if value != nil {
+			switch value.(type) {
 			case *ast.ListLit, *ast.StructLit:
-				f.expr(n.Value)
+				f.expr(value)
 			default:
 				f.print(indent)
-				f.expr(n.Value)
+				f.expr(value)
 				f.markUnindentLine()
 			}
 		} else {

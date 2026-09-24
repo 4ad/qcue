@@ -120,6 +120,21 @@ module(A): {
     zero: State
     read: func(State)->A
 }
+-- shorthand_comments.input --
+// identity
+id(
+    // first binder
+    A in Type(1): number, // bound
+    B: A, // dependent binder
+): // body follows
+    func(x:B)->B:x @example()
+
+module(A): {
+    get(B: A): func(B)->A
+}
+empty(A): [...A]
+explicit: forall (A) func(A)->A
+nested(A): func(A)->(forall B func(B)->A)
 -- out/format/syntax01.golden --
 bridge: extern func(int) -> int !bridge
 -- out/format/syntax02.golden --
@@ -131,16 +146,17 @@ Box(A, B: A) = {left: A, right: B}
 -- out/format/syntax05.golden --
 f: forall (A: number, B) func(A) -> B
 -- out/format/syntax06.golden --
-module: forall (A) exists (State) {
-	empty: State
-	push:  func(A, State) -> State
-}
+module(A):
+	exists (State) {
+		empty: State
+		push:  func(A, State) -> State
+	}
 -- out/format/syntax07.golden --
 p: seal #Counter with (State = int & >=0) {zero: 0}
 -- out/format/syntax08.golden --
 r: (open p as (A, P) {out: P.read(P.zero)}).out
 -- out/format/syntax09.golden --
-id: forall (A) func(x: A) -> A: x
+id(A): func(x: A) -> A: x
 -- out/format/syntax10.golden --
 use: func(p: forall (A) func(A) -> A) -> [int, string]
 -- out/format/syntax11.golden --
@@ -225,11 +241,27 @@ p: seal #Box with (
 q: open p as (A, // opened representation
 	P) {value: P.value}
 -- out/format/prefix_comments.golden --
-module: forall (A) exists (
-	// private representation
-	State,
-) {
-	// initial value
-	zero: State
-	read: func(State) -> A
+module(A):
+	exists (
+		// private representation
+		State,
+	) {
+		// initial value
+		zero: State
+		read: func(State) -> A
+	}
+-- out/format/shorthand_comments.golden --
+// identity
+id(
+	// first binder
+	A in Type(1): number, // bound
+	B: A,                 // dependent binder
+):
+	func(x: B) -> B: x @example() // body follows
+
+module(A): {
+	get(B: A): func(B) -> A
 }
+empty(A):  [...A]
+explicit:  forall (A) func(A) -> A
+nested(A): func(A) -> (forall (B) func(B) -> A)

@@ -54,6 +54,11 @@ type Quantifier struct {
 	Rparen     token.Pos
 	Body       Expr
 
+	// Shorthand records a field declaration written as f(A): Body.
+	// It affects source formatting only; the binding semantics are the same
+	// as f: forall (A) Body. Outside a field, it prints as an explicit forall.
+	Shorthand bool
+
 	comments
 	expr
 }

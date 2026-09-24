@@ -9,6 +9,7 @@ cp input.cue v2.cue
 exec cue fmt v2.cue
 exec cue fmt --check v2.cue
 grep '// erased type' v2.cue
+grep '^id\(' v2.cue
 grep '// private witness' v2.cue
 exec cue export v2.cue -e out --out json
 cmp stdout result.json
@@ -19,6 +20,7 @@ cp input.cue v1.cue
 exec cue fmt v1.cue
 exec cue fmt --check v1.cue
 grep '// erased type' v1.cue
+grep '^id\(' v1.cue
 grep '// private witness' v1.cue
 exec cue export v1.cue -e out --out json
 cmp stdout result.json
