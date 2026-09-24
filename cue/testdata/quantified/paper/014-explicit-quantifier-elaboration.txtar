@@ -1,0 +1,12 @@
+// Paper example 014: Explicit quantifier elaboration
+
+#noformat
+#paper: 14
+#mode: evaluation
+
+-- paper.cue.txt --
+map: forall (A, B) func(func(A) -> B, [...A]) -> [...B]
+-- in.cue --
+@test(validate, at="map")
+
+map: forall (A, B) func(func(A) -> B, [...A]) -> [...B]

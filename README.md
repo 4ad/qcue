@@ -21,6 +21,8 @@ the Go API under the existing `cuelang.org/go` module path.
   design and formal semantics.
 - [Implementation guide](doc/implementation.md): supported features, checking
   limits, installation, and usage.
+- [Paper examples](cue/testdata/quantified/paper/README.md): every listing
+  reproduced verbatim, with tests and documented implementation limits.
 - [Quantified test index](cue/testdata/quantified/README.md): executable examples
   and regression coverage.
 - [Oracle guide](doc/oracle.md): independent semantic models and fuzzing.

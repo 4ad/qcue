@@ -1,0 +1,13 @@
+// Paper example 007: Binder scope across a union
+
+#noformat
+#paper: 7
+#mode: evaluation
+#inlinetest:exclude Not an executable S_H/A example; see TestQuantifiedPaperIndex.
+#skip
+Dependent profile D (out of scope).
+
+-- paper.cue.txt --
+a: forall (n in 0 | 1) (n | (1 - n))  // 0 | 1
+b: (forall (n in 0 | 1) n) |
+   (forall (n in 0 | 1) (1 - n))      // _|_

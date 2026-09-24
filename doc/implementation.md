@@ -48,6 +48,8 @@ out: [id(3), id[string]("hello")]
 
 `id(A): ...`, `id: forall A ...`, and `id: func<A>(...) -> ...` introduce lexical
 universal binders. `forall` and `exists` can occur inside signatures and records.
+Prefer the declaration shorthand `id(A): ...` in examples and ordinary code;
+explicit quantifiers remain useful for nested expressions and elaborations.
 Quantifier blocks at the beginning of a record bind the rest of that record.
 Binder names may be shadowed; identity follows their declarations, not spelling.
 
@@ -405,8 +407,12 @@ organized as follows:
 - [The quantified test index](../cue/testdata/quantified/README.md) links every
   layer's txtar fixtures and explains their assertions. Semantic cases run in
   the ordinary evaluator corpus under `cue/testdata/quantified/`.
-- [The examples](../cue/testdata/quantified/examples/) are standalone regression
-  tests, initially copied from the proposal and maintained independently.
+- [The paper examples](../cue/testdata/quantified/paper/README.md) reproduce all
+  101 listings verbatim. An index test guards against missing or changed
+  listings, and executable cases run in the ordinary evaluator corpus.
+  Syntax templates and unimplemented profiles have explicit coverage notes.
+- [Additional examples](../cue/testdata/quantified/examples/) are standalone
+  regression tests.
   Intentional errors and specification-only examples assert their errors or
   residual status. Syntax-only cases live in the parser corpus.
 - Additional txtar fixtures cover refinement, universes, opacity, identity,

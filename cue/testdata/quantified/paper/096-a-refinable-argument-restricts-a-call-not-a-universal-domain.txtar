@@ -1,0 +1,20 @@
+// Paper example 096: A refinable argument restricts a call, not a universal domain
+
+#noformat
+#paper: 96
+#mode: evaluation
+
+-- paper.cue.txt --
+x: number
+f: func(x) -> string
+f: func(n: int) -> string: "ok"
+
+x: int
+-- in.cue --
+@test(validate, at="f")
+
+x: number
+f: func(x) -> string
+f: func(n: int) -> string: "ok"
+
+x: int

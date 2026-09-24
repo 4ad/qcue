@@ -1,0 +1,28 @@
+// Paper example 039: An intersection of domain-specific guarantees
+
+#noformat
+#paper: 39
+#mode: evaluation
+
+-- paper.cue.txt --
+classify: func(x: int) -> ("negative" | "nonnegative"): {
+    if x < 0  {out: "negative"}
+    if x >= 0 {out: "nonnegative"}
+}.out
+classify: (func(int & <0) -> "negative") &
+          (func(int & >=0) -> "nonnegative")
+
+c: classify(-3)              // "negative"
+-- in.cue --
+@test(json, ["negative","nonnegative"], at="probe")
+
+classify: func(x: int) -> ("negative" | "nonnegative"): {
+    if x < 0  {out: "negative"}
+    if x >= 0 {out: "nonnegative"}
+}.out
+classify: (func(int & <0) -> "negative") &
+          (func(int & >=0) -> "nonnegative")
+
+c: classify(-3)              // "negative"
+
+probe: [classify(-3), classify(2)]

@@ -1,0 +1,18 @@
+// Paper example 054: Combining result descriptions explicitly
+
+#noformat
+#paper: 54
+#mode: evaluation
+
+-- paper.cue.txt --
+left:  func(x: int) -> {a: int}: {a: x}
+right: func(x: int) -> {b: int}: {b: x}
+both: func(x: int) -> {a: int, b: int}: left(x) & right(x)
+r: both(3)                  // {a: 3, b: 3}
+-- in.cue --
+@test(json, {"a":3,"b":3}, at="r")
+
+left:  func(x: int) -> {a: int}: {a: x}
+right: func(x: int) -> {b: int}: {b: x}
+both: func(x: int) -> {a: int, b: int}: left(x) & right(x)
+r: both(3)                  // {a: 3, b: 3}

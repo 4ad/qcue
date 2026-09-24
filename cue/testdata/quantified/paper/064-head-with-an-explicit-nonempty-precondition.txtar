@@ -1,0 +1,13 @@
+// Paper example 064: Head with an explicit nonempty precondition
+
+#noformat
+#paper: 64
+#mode: evaluation
+#inlinetest:exclude Not an executable S_H/A example; see TestQuantifiedPaperIndex.
+#skip
+Dependent profile D (out of scope).
+
+-- paper.cue.txt --
+head(A, n in int & >=1): func(xs: Vec(A, n)) -> A: xs[0]
+first: head([4, 5])         // 4
+bad: head([])               // no admissible instance

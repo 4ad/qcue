@@ -1,0 +1,20 @@
+// Paper example 077: A shared hidden representation
+
+#noformat
+#paper: 77
+#mode: evaluation
+
+-- paper.cue.txt --
+#Counter: exists State {
+    zero: State
+    next: func(State) -> State
+    read: func(State) -> (int & >=0)
+}
+-- in.cue --
+@test(validate, at="#Counter")
+
+#Counter: exists State {
+    zero: State
+    next: func(State) -> State
+    read: func(State) -> (int & >=0)
+}

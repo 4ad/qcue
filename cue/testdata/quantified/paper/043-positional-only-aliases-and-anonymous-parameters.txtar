@@ -1,0 +1,20 @@
+// Paper example 043: Positional-only aliases and anonymous parameters
+
+#noformat
+#paper: 43
+#mode: compile-error
+#error: positional argument after labeled argument
+
+-- paper.cue.txt --
+scale: func(_~value: int, _: int) -> int: value * 2
+x: scale(5, 99)             // 10
+bad: scale(value: 5, 99)     // invalid label/order
+-- in.cue --
+@test(json, 10, at="x")
+
+scale: func(_~value: int, _: int) -> int: value * 2
+x: scale(5, 99)             // 10
+-- invalid.cue.txt --
+scale: func(_~value: int, _: int) -> int: value * 2
+x: scale(5, 99)             // 10
+bad: scale(value: 5, 99)     // invalid label/order

@@ -1,0 +1,14 @@
+// Paper example 053: Equal source, unequal captures
+
+#noformat
+#paper: 53
+#mode: evaluation
+
+-- paper.cue.txt --
+d: [for v in [1, 2] {func(y: int) -> int: y + v}]
+e: d[0] & d[1]             // _|_: captures differ
+-- in.cue --
+@test(validate, conflict, at="e")
+
+d: [for v in [1, 2] {func(y: int) -> int: y + v}]
+e: d[0] & d[1]             // _|_: captures differ

@@ -1,0 +1,18 @@
+// Paper example 044: Hidden labels and attributes
+
+#noformat
+#paper: 44
+#mode: evaluation
+
+-- paper.cue.txt --
+package internal
+measure: func(_value: int @go(Int), unit!: string) -> int: _value
+inside: measure(_value: 7, unit: "ms")
+// Another package can use the positional slot, not the hidden label.
+-- in.cue --
+@test(json, 7, at="inside")
+
+package internal
+measure: func(_value: int @go(Int), unit!: string) -> int: _value
+inside: measure(_value: 7, unit: "ms")
+// Another package can use the positional slot, not the hidden label.

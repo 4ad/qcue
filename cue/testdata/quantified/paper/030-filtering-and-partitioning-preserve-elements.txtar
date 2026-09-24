@@ -1,0 +1,37 @@
+// Paper example 030: Filtering and partitioning preserve elements
+
+#noformat
+#paper: 30
+#mode: evaluation
+
+-- paper.cue.txt --
+filter(A): func(p: func(A) -> bool, xs: [...A]) -> [...A]: [
+    for x in xs if p(x) {x}
+]
+partition(A): func(p: func(A) -> bool, xs: [...A]) -> {
+    yes: [...A]
+    no:  [...A]
+}: {
+    yes: [for x in xs if p(x) {x}]
+    no:  [for x in xs if !p(x) {x}]
+}
+positive: func(x: int) -> bool: x > 0
+kept: filter(positive, [-2, 0, 4]) // [4]
+-- in.cue --
+@test(json, [4], at="kept")
+@test(json, {"yes":[4],"no":[-2,0]}, at="probe")
+
+filter(A): func(p: func(A) -> bool, xs: [...A]) -> [...A]: [
+    for x in xs if p(x) {x}
+]
+partition(A): func(p: func(A) -> bool, xs: [...A]) -> {
+    yes: [...A]
+    no:  [...A]
+}: {
+    yes: [for x in xs if p(x) {x}]
+    no:  [for x in xs if !p(x) {x}]
+}
+positive: func(x: int) -> bool: x > 0
+kept: filter(positive, [-2, 0, 4]) // [4]
+
+probe: partition(positive, [-2, 0, 4])

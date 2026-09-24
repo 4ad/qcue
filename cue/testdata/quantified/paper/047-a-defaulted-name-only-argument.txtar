@@ -1,0 +1,19 @@
+// Paper example 047: A defaulted name-only argument
+
+#noformat
+#paper: 47
+#mode: evaluation
+
+-- paper.cue.txt --
+render: func(text: string, suffix!: string = "!") -> string:
+    text + suffix
+x: render("hello")                 // "hello!"
+y: render("hello", suffix: "?")   // "hello?"
+-- in.cue --
+@test(json, "hello!", at="x")
+@test(json, "hello?", at="y")
+
+render: func(text: string, suffix!: string = "!") -> string:
+    text + suffix
+x: render("hello")                 // "hello!"
+y: render("hello", suffix: "?")   // "hello?"

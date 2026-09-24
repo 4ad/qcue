@@ -1,0 +1,23 @@
+// Paper example 036: A nested universal result
+
+#noformat
+#paper: 36
+#mode: evaluation
+
+-- paper.cue.txt --
+constant(A): func(x: A) -> (forall B func(B) -> A):
+    func(_) -> A: x
+
+seven: constant(7)
+a: seven("ignored")          // 7
+b: seven(true)               // 7
+-- in.cue --
+@test(json, 7, at="a")
+@test(json, 7, at="b")
+
+constant(A): func(x: A) -> (forall B func(B) -> A):
+    func(_) -> A: x
+
+seven: constant(7)
+a: seven("ignored")          // 7
+b: seven(true)               // 7

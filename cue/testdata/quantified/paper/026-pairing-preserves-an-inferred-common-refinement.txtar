@@ -1,0 +1,17 @@
+// Paper example 026: Pairing preserves an inferred common refinement
+
+#noformat
+#paper: 26
+#mode: evaluation
+
+-- paper.cue.txt --
+pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]
+p: pair[int & >=1](2, 5)       // [2, 5]
+q: pair(1, 2.5)                // [1, 2.5]
+-- in.cue --
+@test(json, [2,5], at="p")
+@test(json, [1,2.5], at="q")
+
+pair(A: number): func(x: A, y: A) -> [A, A]: [x, y]
+p: pair[int & >=1](2, 5)       // [2, 5]
+q: pair(1, 2.5)                // [1, 2.5]

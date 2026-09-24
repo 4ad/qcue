@@ -1,0 +1,23 @@
+// Paper example 100: Restricting public calls across files
+
+#noformat
+#paper: 100
+#mode: evaluation
+
+-- paper.cue.txt --
+raw: func(x: number) -> string: "\(x)"
+call: {arg: number, result: raw(arg)}
+call: {arg: int, result: string}
+
+ok:  (call & {arg: 7}).result   // "7"
+bad: (call & {arg: 1.5}).result // _|_
+-- in.cue --
+@test(validate, conflict, at="bad")
+@test(json, "7", at="ok")
+
+raw: func(x: number) -> string: "\(x)"
+call: {arg: number, result: raw(arg)}
+call: {arg: int, result: string}
+
+ok:  (call & {arg: 7}).result   // "7"
+bad: (call & {arg: 1.5}).result // _|_

@@ -1,0 +1,12 @@
+// Paper example 013: Quantified field declarations
+
+#noformat
+#paper: 13
+#mode: evaluation
+
+-- paper.cue.txt --
+map(A, B): func(func(A) -> B, [...A]) -> [...B]
+-- in.cue --
+@test(validate, at="map")
+
+map(A, B): func(func(A) -> B, [...A]) -> [...B]

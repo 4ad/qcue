@@ -1,0 +1,27 @@
+// Paper example 098: Incremental algorithm
+
+#noformat
+#paper: 98
+#mode: evaluation
+#inlinetest:exclude Not an executable S_H/A example; see TestQuantifiedPaperIndex.
+#skip
+Implementation pseudocode, not CUE source.
+
+-- paper.cue.txt --
+refine(state, declarations, demands, resources):
+    elaborate_and_conjoin(state, declarations)
+    enqueue_new_dependencies(state, demands)
+    while an enabled task has an available resource ticket:
+        task = choose_task_deterministically(state)
+        result = local_kernel(task, state)
+        match result:
+            equivalent_rewrite(replacement, proof):
+                verify(proof); install_preserving_scopes(replacement)
+            consequence(fact, proof):
+                verify(proof); conjoin_and_record(fact, proof)
+            refutation(guard, proof):
+                verify(proof); exclude_guarded_case(guard, proof)
+            blocked(dependencies):
+                retain_and_watch(task, dependencies)
+        enqueue_tasks_whose_inputs_gained_information(state)
+    return state_with_all_residuals_and_certificates(state)

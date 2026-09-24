@@ -1,0 +1,15 @@
+// Paper example 088: An empty arithmetic relation retained as hypotheses
+
+#noformat
+#paper: 88
+#mode: evaluation
+
+-- paper.cue.txt --
+a: int & b * 5
+b: a - 1
+-- in.cue --
+@test(validate, concrete, incomplete, at="a")
+@test(validate, concrete, incomplete, at="b")
+
+a: int & b * 5
+b: a - 1

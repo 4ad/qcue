@@ -1,0 +1,20 @@
+// Paper example 005: Two bounds do not become one upper bound
+
+#noformat
+#paper: 5
+#mode: evaluation
+
+-- paper.cue.txt --
+choose(A: int):    func(A, A) -> A
+choose(A: string): func(A, A) -> A
+
+// The stronger declaration also covers mixed unions:
+stronger(A: int | string): func(A, A) -> A
+-- in.cue --
+@test(validate, at="choose")
+
+choose(A: int):    func(A, A) -> A
+choose(A: string): func(A, A) -> A
+
+// The stronger declaration also covers mixed unions:
+stronger(A: int | string): func(A, A) -> A

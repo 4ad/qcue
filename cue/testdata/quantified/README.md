@@ -5,9 +5,11 @@ expectations live in txtar archives, grouped by topic. The ordinary CUE evaluato
 runner discovers this directory automatically; no Go table needs updating when
 adding a semantic case.
 
-- [Examples](examples/): standalone programs with explicit expectations,
-  including expected errors and incomplete specifications. Examples initially
-  copied from the proposal evolve independently of its text and numbering.
+- [Paper examples](paper/): all 101 listings reproduced verbatim, in paper
+  order, with executable assertions, syntax checks, and documented limits.
+  `TestQuantifiedPaperIndex` checks every listing against `doc/paper.tex`.
+- [Additional examples](examples/): standalone programs with explicit
+  expectations, including expected errors and incomplete specifications.
 - [API fixtures](api/): programs for refinement with `Unify` and `FillPath`,
   declaration ordering, source export, and closure completeness. Their Go
   assertions remain in [quantified_test.go](../../quantified_test.go) because
@@ -82,7 +84,11 @@ The retained package path `cmd/cue/cmd` is the CLI library. Its executable is
 Most archives need no introductory description. When a note explains a
 non-obvious expectation, write it as a `//` comment before the first section.
 Keep runner directives on their own `#` lines, and format executable CUE inputs
-with the CUE formatter.
+with the CUE formatter. Prefer declaration shorthand such as `id(A): ...` to
+`id: forall A ...`; use explicit quantifiers where the syntax is being taught
+or a nested expression needs them. Paper archives carry `#noformat`: preserve
+their listings exactly, including whitespace and comments. Put supporting
+declarations and assertions in `in.cue`, outside the verbatim listing.
 
 Each evaluator archive has an `in.cue` section. File-level assertions use `at=`
 to select the value without changing the program's lexical scopes:
@@ -214,7 +220,8 @@ Additional regressions cover inference, transport, and retained obligations:
 
 API fixtures carry `#skip` only for the evaluator runner; their Go API tests
 load them directly. Syntax-only cases and malformed syntax belong in the parser
-corpus. No test compares fixtures with the proposal document.
+corpus. The paper index additionally checks its two syntax templates and the
+deliberately malformed call, while preserving all out-of-scope listings.
 
 ## Larger oracles and fuzzing
 

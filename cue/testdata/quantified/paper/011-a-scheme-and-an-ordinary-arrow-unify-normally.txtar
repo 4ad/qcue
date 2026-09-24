@@ -1,0 +1,21 @@
+// Paper example 011: A scheme and an ordinary arrow unify normally
+
+#noformat
+#paper: 11
+#mode: evaluation
+
+-- paper.cue.txt --
+id(A): func(A) -> A
+id:    func(int) -> int       // redundant instance
+
+bad(A): func(A) -> A
+bad:    func(int) -> bool     // _|_: int and bool are disjoint
+-- in.cue --
+@test(validate, conflict, at="bad")
+@test(validate, at="id")
+
+id(A): func(A) -> A
+id:    func(int) -> int       // redundant instance
+
+bad(A): func(A) -> A
+bad:    func(int) -> bool     // _|_: int and bool are disjoint

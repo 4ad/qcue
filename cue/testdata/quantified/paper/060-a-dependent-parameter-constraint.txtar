@@ -1,0 +1,17 @@
+// Paper example 060: A dependent parameter constraint
+
+#noformat
+#paper: 60
+#mode: evaluation
+#inlinetest:exclude Not an executable S_H/A example; see TestQuantifiedPaperIndex.
+#skip
+Dependent profile D (out of scope).
+
+-- paper.cue.txt --
+interval: func(lo: int, hi: int & >=lo) -> {
+    low: lo
+    high: hi
+}: {low: lo, high: hi}
+
+ok: interval(3, 7)          // {low: 3, high: 7}
+bad: interval(7, 3)         // domain contradiction
