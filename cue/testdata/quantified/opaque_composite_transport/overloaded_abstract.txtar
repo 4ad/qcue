@@ -5,7 +5,7 @@
 @test(validate, concrete, at="p")
 @test(json, [0, "text"], at="out")
 @test(validate, blocked, at="incoherent")
-@test(validate, concrete, incomplete, at="badCall")
+@test(validate, blocked, at="badCall")
 
 #M: exists A {zero: A, f: (func(A) -> A) & (func(string) -> string), read: func(A) -> int}
 p: seal #M with (A = int) {

@@ -259,7 +259,13 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 		// Erased identity does not make distinct signature views
 		// interchangeable. In particular an instantiated view must
 		// retain the universal clause supplied by its other conjunct.
-		m.Types = mergeFuncTypes(m.Types, []FuncType{{Fn: b.Fn, Env: b.Env}})
+		t := FuncType{Fn: b.Fn, Env: b.Env}
+		if b.IsPartial() {
+			// Fn and Env reconstruct an unsaved descriptor. Preserve the
+			// actual bound arguments when that reconstruction is insufficient.
+			t.inhabitant = b
+		}
+		m.Types = mergeFuncTypes(m.Types, []FuncType{t})
 	}
 	m.scopes = slices.Clone(a.scopes)
 	for _, p := range b.scopes {

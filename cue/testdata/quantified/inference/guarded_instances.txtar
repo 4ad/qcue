@@ -1,13 +1,15 @@
 // A failed inferred candidate cannot exclude a universal capability. An
 // applicable clause still constrains the result; unsupported inference must
-// remain incomplete. A separately proved impossible bound may exclude it.
+// remain blocked. Every attached universal still requires a body proof,
+// even when this particular call is outside its domain.
 
 -- in.cue --
 @test(validate, conflict, at="callbackGuard")
 @test(validate, conflict, at="dependentGuard")
 @test(validate, conflict, at="builtinGuard")
-@test(validate, concrete, incomplete, at="unknownGuard")
-@test(json, 0, at="excluded")
+@test(validate, blocked, at="unknownGuard")
+@test(validate, blocked, at="excluded")
+@test(json, 1, at="validExcluded")
 
 cb: func(x: number) -> int: 1
 callbackGuard: ((func(cb: _) -> int: {v: 0}.v) &
@@ -18,4 +20,8 @@ builtinGuard: (len & (forall (A: int) func([...func(A) -> int]) -> 0))([cb, cb])
 unknownGuard: ((func(x: _) -> int: {v: 0}.v) &
 	(forall (A: int) func(A | string) -> 1))(2)
 excluded: ((func(x: _) -> int: {v: 0}.v) &
+	(forall (A: int) func(A) -> 1))("outside")
+
+// An independently proved implementation can execute outside the extra guard.
+validExcluded: ((func(x: _) -> int: {v: 1}.v) &
 	(forall (A: int) func(A) -> 1))("outside")

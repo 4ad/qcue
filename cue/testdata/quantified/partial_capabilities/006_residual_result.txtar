@@ -1,7 +1,14 @@
 -- in.cue --
-@test(json, 3, at="out")
+@test(validate, blocked, at="out")
+@test(json, 3, at="exactOut")
 
 add: func(x: int, y: int) -> int: x + y
 p:   add(1, ...)
 p:   func(int) -> 3
 out: p(2)
+
+// One successful packet does not establish the original universal contract.
+// The singleton residual domain does establish this result.
+exact: add(1, ...)
+exact: func(2) -> 3
+exactOut: exact(2)

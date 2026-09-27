@@ -8,7 +8,7 @@
 @test(json, [2, "x", 2, "x", 2, 2.5, "nested", "list", "callback", "partial"], at="out")
 @test(validate, conflict, at="outside")
 @test(validate, conflict, at="badCall")
-@test(validate, concrete, incomplete, at="unknownGuard")
+@test(validate, blocked, at="unknownGuard")
 
 #M: exists A {
 	f: (func(int) -> int) & (func(string) -> string)

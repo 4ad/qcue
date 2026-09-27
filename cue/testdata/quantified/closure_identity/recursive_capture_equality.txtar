@@ -1,8 +1,8 @@
-// Comparing captures that refer back to the closures being compared must
-// retain an unresolved equality obligation instead of overflowing the stack.
+// A self capture is a closure, so this body cannot establish its string
+// result. Static checking blocks the call before cyclic identity observation.
 
 -- in.cue --
-@test(validate, concrete, incomplete, at="out")
+@test(validate, blocked, at="out")
 
 #P:     exists (A) {value: A}
 p:      seal #P with (A = int) {value: 42}

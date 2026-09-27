@@ -91,11 +91,23 @@ func (p *sealedPackage) compileTransport(c *OpContext, value Value, outward bool
 	if value == nil || active[value] {
 		return plan
 	}
+	if b := bottom(value); b != nil {
+		// An empty element predicate admits no value to transport. This
+		// includes the tail of [..._|_], whose sole list value is []. A
+		// blocked judgment or unresolved data is not evidence of emptiness.
+		if !b.IsIncomplete() {
+			plan.kind, plan.total, plan.identity = transportIdentityValue, true, true
+		}
+		return plan
+	}
 	active[value] = true
 	defer delete(active, value)
 	if v, ok := value.(*Vertex); ok {
 		v.Finalize(c)
-		if v.Bottom() != nil {
+		if b := v.Bottom(); b != nil {
+			if !b.IsIncomplete() {
+				plan.kind, plan.total, plan.identity = transportIdentityValue, true, true
+			}
 			return plan
 		}
 		value = v.DerefValue()

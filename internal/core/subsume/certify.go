@@ -417,6 +417,20 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	if !p.step() || f.Fn.Body == nil || len(p.active) >= 256 {
 		return false
 	}
+	if target.Fn.Body != nil && target.Fn != f.Fn {
+		// A concrete identity conjunct carries its own source contract.
+		// Opposite opaque transports can preserve that descriptor while
+		// exposing a narrower adapter protocol. Prove the unchanged source
+		// body only after independently establishing descriptor identity;
+		// an attached bodyless annotation cannot supply this evidence.
+		original := target.Inhabitant()
+		if original == nil {
+			original = &adt.FuncValue{Fn: target.Fn, Src: target.Fn.Src, Env: target.Env}
+		}
+		if same, known := adt.SameFunctionInstance(p.ctx, f, original); same && known {
+			return p.function(original, target)
+		}
+	}
 	if p.recursing(f) {
 		return p.recursiveContracts(f, []adt.FuncType{target})
 	}
@@ -675,6 +689,10 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.schema(nil, &adt.BoundExpr{Src: x.Src, Op: x.Op, Expr: v})
 	case *adt.Builtin:
 		return x
+	case *adt.LabelReference:
+		// A lexical label capture is supplied by its field declaration.
+		// An unmaterialized pattern label still has the string kind.
+		return p.schema(env, x)
 	case *adt.ImportReference:
 		// Imported declarations provide the same conditional hypotheses as
 		// named captures. Supplied implementations retain their own proofs;

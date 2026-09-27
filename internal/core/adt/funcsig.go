@@ -86,6 +86,10 @@ import (
 type FuncType struct {
 	Fn  *Function
 	Env *Environment
+	// An identity conjunct retains the supplied operational descriptor,
+	// including saved arguments. Its full source contract is independent
+	// of partial, which instead locates a newly attached residual contract.
+	inhabitant *FuncValue
 
 	// partial records the binding mask at the time a capability was
 	// attached. Its packet addresses the then-remaining parameters;
@@ -96,6 +100,10 @@ type FuncType struct {
 // Partial returns the binding snapshot for a contract attached to a partial
 // closure. A nil snapshot means that the contract describes full packets.
 func (t FuncType) Partial() *FuncValue { return t.partial }
+
+// Inhabitant returns the source descriptor of a concrete identity conjunct.
+// It does not establish identity or conformance; both require separate proofs.
+func (t FuncType) Inhabitant() *FuncValue { return t.inhabitant }
 
 // BoundArgument returns a slot's lexical binding, or a nil expression if the
 // slot remains unbound. The conformance checker uses the same immutable
