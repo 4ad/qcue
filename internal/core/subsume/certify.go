@@ -49,6 +49,7 @@ func newCertifier(ctx *adt.OpContext) *certifier {
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope),
 		projections:  make(map[*adt.Vertex]map[adt.Feature]adt.Value),
 		constructors: make(map[*adt.Vertex]adt.Expr),
+		records:      make(map[proofRecordKey]*proofRecord),
 		completed:    make(map[proofKey][]*adt.FuncValue), remaining: 10000}
 }
 
@@ -96,6 +97,7 @@ type certifier struct {
 	// their synthesized types. Source meets combine those descriptions;
 	// a typing inventory is not an explicit close constraint.
 	constructors map[*adt.Vertex]adt.Expr
+	records      map[proofRecordKey]*proofRecord
 	completed    map[proofKey][]*adt.FuncValue
 	attempts     []*proofAttempt
 	remaining    int
@@ -655,11 +657,8 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				if len(bindings) == 1 {
 					e = bindings[0].env
 				}
-				switch literal := field.(type) {
-				case *adt.Function:
-					function = &adt.FuncValue{Fn: literal, Src: literal.Src, Env: e}
-				case *adt.Quantified:
-					function, _ = adt.Unwrap(p.schema(e, literal)).(*adt.FuncValue)
+				if len(bindings) <= 1 {
+					function = p.functionBinding(proofBinding{e, field}, make(map[proofBinding]bool))
 				}
 				if len(bindings) > 1 {
 					v = p.bindingMeet(bindings)
@@ -669,7 +668,14 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 					// hypothesis. Failed bodies remove the temporary binding.
 					scope.values[x.Label] = function
 					if p.implementation(function) {
-						v = function
+						// A projected implementation still has to check all the
+						// source terms in its containing record expression.
+						switch field.(type) {
+						case *adt.Function, *adt.Quantified:
+							v = function
+						default:
+							v = p.expr(e, field)
+						}
 					}
 				} else {
 					v = p.expr(e, field)
@@ -759,6 +765,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		return result
 	case *adt.StructLit:
+		if value, handled := p.recordMeet([]proofBinding{{env, x}}); handled {
+			return value
+		}
 		e := p.frame(env, make(map[adt.Feature]adt.Value))
 		if len(x.Decls) == 1 {
 			if embedded, ok := x.Decls[0].(adt.Expr); ok {
@@ -901,7 +910,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return nil
 	case *adt.BinaryExpr:
 		if x.Op == adt.AndOp {
-			if value, handled := p.recordMeet([]proofBinding{{env, x.X}, {env, x.Y}}); handled {
+			if value, handled := p.recordMeet([]proofBinding{{env, x}}); handled {
 				return value
 			}
 		}

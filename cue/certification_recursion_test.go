@@ -48,6 +48,12 @@ h:func(x:int)->int:g(x)
 		{"local_generic", `f:func()->(forall A func(A)->A):{
 g(A):func(x:A)->A:g(x)
 }.g`, true},
+		{"projected", `f:func()->(func(int)->int):{
+g:{impl:func(x:int)->int:g(x)}.impl
+}.g`, true},
+		{"nested_projection", `f:func()->(func(int)->int):{
+g:{r:{impl:func(x:int)->int:g(x)}}.r.impl
+}.g`, true},
 		{"mutual", `f: func(x: int) -> int: g(x)
 g: func(x: int) -> int: f(x)`, true},
 		{"generic", `f(A): func(x: A) -> A: f(x)`, true},
@@ -67,6 +73,14 @@ g:func(x:int)->int:h(x)
 h:func(x:int)->int:{again:g(x),bad:x+"bad"}.again
 }.g`, false},
 		{"local_data_cycle", `f:func()->int:{x:y,y:x}.x`, false},
+		{"projected_bad_argument", `f:func()->(func(int)->int):{
+g:{impl:func(x:int)->int:g("bad")}.impl
+}.g`, false},
+		{"projected_bad_sibling", `f:func(n:int)->(func(int)->int):{
+g:{impl:func(x:int)->int:g(x)
+bad:n+"bad"}.impl
+}.g`, false},
+		{"projected_data_cycle", `f:func()->int:{g:{v:g}.v}.g`, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			v := cuecontext.New().CompileString(tt.source)

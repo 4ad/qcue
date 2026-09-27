@@ -134,6 +134,12 @@ f:func()->int:r.a`, `f()`, `3`},
 f:func(r:N(int))->(func()->int):func()->int:r.a`, `f({a:3})()`, `3`},
 		{"generic", `f(A):func(x:A)->(func()->A):func()->A:x`, `f(3)()`, `3`},
 		{"nested_generic", `f(A):func(x:A)->(forall B func(B)->A):forall B func(y:B)->A:x`, `f(3)[string]("s")`, `3`},
+		{"recursive_factory", `f:func(n:int)->_:{
+sum:func(xs:[...int])->int:{
+if len(xs)==0 {out:n}
+if len(xs)>0 {out:sum(xs[1:])+xs[0]}
+}.out
+}.sum`, `f(3)([1,2])`, `6`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := cuecontext.New()
