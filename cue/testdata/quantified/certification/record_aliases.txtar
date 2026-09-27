@@ -1,0 +1,17 @@
+// Lexical type abbreviations do not add required fields to a record type.
+// Their uses still constrain the corresponding fields, including nested ones.
+
+-- in.cue --
+@test(json, [3, 4, 5, 6], at="out")
+@test(validate, blocked, at="wrong")
+@test(validate, blocked, at="missing")
+@test(validate, blocked, at="wrongNested")
+
+get: func(r: {let N = int, a: N}) -> int: r.a
+nested: func(r: {let N = int, v: {a: N}}) -> int: r.v.a
+closed: func(r: close({a: int})) -> int: r.a
+out: [get({a: 3}), get({let N = string, a: 4, extra: N}),
+	nested({v: {a: 5}}), closed({let N = int, a: N & 6})]
+wrong: get({a: "three"})
+missing: get({})
+wrongNested: nested({v: {a: "five"}})

@@ -103,7 +103,10 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 
 	for _, a := range x.Arcs {
 		f := a.Label
-		if s.Final && !f.IsRegular() {
+		// Let bindings belong to the lexical environment, not the record's
+		// field inventory. Their constraints are already used by references
+		// in the actual fields and need not be repeated by an argument.
+		if f.IsLet() || s.Final && !f.IsRegular() {
 			continue
 		}
 
@@ -171,7 +174,7 @@ outer:
 	for _, b := range y.Arcs {
 		f := b.Label
 
-		if s.Final && !f.IsRegular() {
+		if f.IsLet() || s.Final && !f.IsRegular() {
 			continue
 		}
 
