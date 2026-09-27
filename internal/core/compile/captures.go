@@ -15,6 +15,8 @@
 package compile
 
 import (
+	"maps"
+
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/walk"
@@ -27,6 +29,57 @@ import (
 // scopes from their environment offsets.
 func (c *compiler) functionCaptures(src *ast.Func, fn *adt.Function) []adt.Expr {
 	return c.freeReferences(src, fn, true)
+}
+
+// Keep declared capture constraints for closure conversion, including fields
+// introduced by an earlier export. Do not recompile implementation literals:
+// they need stable code origins, and a recursive capture may name the literal
+// currently being compiled. The ordinary reference already preserves those
+// implementations independently of this optional typing metadata.
+func (c *compiler) captureType(ref adt.Expr) adt.Expr {
+	id, ok := ref.Source().(*ast.Ident)
+	if !ok {
+		return nil
+	}
+	var source ast.Expr
+	switch node := id.Node.(type) {
+	case *ast.FuncParam:
+		source = node.Value
+	case ast.Expr:
+		switch id.Scope.(type) {
+		case *ast.StructLit, *ast.File:
+			source = node
+		}
+	}
+	if source == nil {
+		return nil
+	}
+	implementation := false
+	ast.Walk(source, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.Func:
+			implementation = implementation || n.Body != nil
+		case *ast.Quantifier:
+			// Recompiling a telescope would give already compiled literals
+			// different binder identities. Keep its existing dependency.
+			implementation = true
+		case *ast.OpenExpr, *ast.SealExpr, *ast.Comprehension:
+			implementation = true
+		case *ast.CallExpr:
+			id, ok := n.Fun.(*ast.Ident)
+			if !ok {
+				implementation = true
+			} else if _, alias := id.Node.(*ast.ParametricAlias); !alias &&
+				!(id.Node == nil && (id.Name == "close" || id.Name == "__closeAll")) {
+				implementation = true
+			}
+		}
+		return !implementation
+	}, nil)
+	if implementation {
+		return nil
+	}
+	return c.typeExpr(source)
 }
 
 // freeReferences compiles free references in the surrounding scope. Runtime
@@ -77,6 +130,18 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 			return false
 		case *adt.Function:
 			saved := typePosition
+			if !runtimeOnly {
+				typePosition = true
+				for _, typ := range x.CaptureTypes {
+					savedLocal := local
+					local = maps.Clone(local)
+					if typ != nil && typ.Source() != nil {
+						ast.Walk(typ.Source(), func(n ast.Node) bool { local[n] = true; return true }, nil)
+					}
+					w.Elem(typ)
+					local = savedLocal
+				}
+			}
 			for _, p := range x.Params {
 				typePosition = true
 				w.Elem(p.Value)

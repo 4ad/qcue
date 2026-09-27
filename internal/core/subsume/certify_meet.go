@@ -16,6 +16,58 @@ package subsume
 
 import "cuelang.org/go/internal/core/adt"
 
+// A declared local field remains refinable by other record conjuncts. Its
+// initializer's exact constructor inventory therefore cannot become a
+// capture invariant. Retain its declared fields and callable evidence, but
+// not the synthetic closedness used for a direct constructor result.
+func (p *certifier) bindingDescription(value adt.Value) adt.Value {
+	if value == nil || !p.step() {
+		return nil
+	}
+	switch x := value.(type) {
+	case *adt.Disjunction:
+		out := *x
+		out.Values = nil
+		for _, branch := range x.Values {
+			v := p.bindingDescription(branch)
+			if v == nil {
+				return nil
+			}
+			out.Values = append(out.Values, v)
+		}
+		return &out
+	case *adt.Conjunction:
+		out := &adt.Conjunction{}
+		for _, term := range x.Values {
+			v := p.bindingDescription(term)
+			if v == nil {
+				return nil
+			}
+			out.Values = append(out.Values, v)
+		}
+		return out
+	}
+	v, ok := value.(*adt.Vertex)
+	if !ok {
+		return value
+	}
+	result := value
+	if p.constructors[v] != nil {
+		result = p.sourceDescription(v)
+	}
+	if out, ok := result.(*adt.Vertex); ok && p.projections[v] != nil {
+		fields := make(map[adt.Feature]adt.Value)
+		for label, field := range p.projections[v] {
+			fields[label] = p.bindingDescription(field)
+			if fields[label] == nil {
+				return nil
+			}
+		}
+		p.projections[out] = fields
+	}
+	return result
+}
+
 // Source unification combines constructor descriptions before assigning the
 // result a static field inventory. Exact inventories used for width and
 // presence proofs must not make {a: 1} & {b: true} an empty computation.

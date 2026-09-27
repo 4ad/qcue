@@ -58,6 +58,7 @@ func (s *OpaqueCall) adapter() *FuncValue {
 		}
 	}
 	fn.Captures = nil
+	fn.CaptureTypes = nil
 	fn.Body = s
 	return &FuncValue{Src: fn.Src, Fn: &fn, Env: s.advertised(FuncType{Env: s.env}).Env}
 }

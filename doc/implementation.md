@@ -436,6 +436,14 @@ implementations. Observe ordinary data through public operations before exportin
 JSON. Source export preserves supported generic functions and concrete captures.
 Shared function literals are emitted once, with separate arguments for erased
 predicates and runtime captures, so recompilation preserves closure identity.
+Declared parameter and field constraints are retained as erased metadata and
+emitted on capture fields when that syntax respects erasure. Lexical aliases
+and local type fields retain their scopes through repeated export. Refinable
+local captures expose their declared open descriptions to body checking;
+their initial constructor inventories cannot prove data closedness after
+another record conjunct adds fields. Generic data captures that would put an
+arbitrary predicate into executable field syntax still use the prior encoding;
+preserving their strict certificates requires a further export rule.
 Finite concrete capture graphs may contain other implemented functions.
 Runtime captures retain hidden fields observable by the code, including fields
 inside records and lists. A hidden label from another package that cannot be

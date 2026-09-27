@@ -610,6 +610,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		if scope := p.scopes[e]; scope != nil {
 			if v := scope.values[x.Label]; v != nil {
+				if scope.fields[x.Label] != nil {
+					return p.bindingDescription(v)
+				}
 				return v
 			}
 			if scope.active[x.Label] {
@@ -638,7 +641,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				}
 				delete(scope.active, x.Label)
 				scope.values[x.Label] = v
-				return v
+				return p.bindingDescription(v)
 			}
 			return nil
 		}

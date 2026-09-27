@@ -1447,6 +1447,12 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 				c.checkFunctionErasure(fn)
 			}
 			fn.Captures = c.functionCaptures(n, fn)
+			if fn.Body != nil {
+				fn.CaptureTypes = make([]adt.Expr, len(fn.Captures))
+				for i, capture := range fn.Captures {
+					fn.CaptureTypes[i] = c.captureType(capture)
+				}
+			}
 			fn.References = c.freeReferences(n, fn, false)
 			if c.functionLiterals == nil {
 				c.functionLiterals = make(map[*ast.Func]functionLiteral)

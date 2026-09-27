@@ -51,6 +51,10 @@ if true {r:{b:true}}
 		`f:func(r:{a:int})->close({a:int,b:true}):r&{b:true}`,
 		`f:func()->string:{if true {r:{a:1}}
 if true {r:{b:true}}}`,
+		`f:func()->(func()->close({a:int})):({
+capture:{a:1}
+get:func()->close({a:int}):capture
+}&{capture:{b:true}}).get`,
 	} {
 		v := cuecontext.New().CompileString(source)
 		f := v.LookupPath(cue.ParsePath("f"))

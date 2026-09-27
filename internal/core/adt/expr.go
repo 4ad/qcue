@@ -1622,6 +1622,10 @@ type Function struct {
 	// fields that the function never uses do not contribute to its identity.
 	Quantified bool
 	Captures   []Expr
+	// CaptureTypes retains declared capture constraints for closure
+	// conversion. Entries without a reusable declaration type are nil.
+	// These are erased checking dependencies, not runtime captures.
+	CaptureTypes []Expr
 	// References also includes erased free predicates needed to reconstruct
 	// the code at a different lexical position during source export.
 	References []Expr

@@ -304,11 +304,14 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		aliasParams = append(aliasParams, &ast.TypeParam{Name: ast.NewIdent(e.uniqueAlias("CUEType"))})
 	}
 	environment := &ast.StructLit{}
+	var captureFields []*ast.Field
 	for _, ref := range o.captures {
 		name := e.uniqueAlias("CUECapture")
 		names[referenceKey(ref)] = name
 		o.captureNames = append(o.captureNames, name)
-		environment.Elts = append(environment.Elts, &ast.Field{Label: ast.NewIdent(name), Value: ast.NewIdent("_")})
+		field := &ast.Field{Label: ast.NewIdent(name), Value: ast.NewIdent("_")}
+		captureFields = append(captureFields, field)
+		environment.Elts = append(environment.Elts, field)
 	}
 	// Allocate the declaration before descending so every reference links to
 	// the same node, including references from nested code origins.
@@ -362,6 +365,9 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		return true
 	}
 	w.Elem(fn)
+	for _, typ := range fn.CaptureTypes {
+		w.Elem(typ)
+	}
 	// Clone first, but remember which copies correspond to nested literals.
 	replacements := make(map[ast.Node]ast.Expr)
 	for _, n := range nested {
@@ -369,6 +375,13 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		replacements[n.src] = e.originApplication(no, func(ref adt.Expr, _ bool) ast.Expr {
 			return ast.Clone(ref.Source().(*ast.Ident))
 		})
+	}
+	for i, typ := range fn.CaptureTypes {
+		if typ != nil && captureTypeErases(typ) {
+			if src, ok := typ.Source().(ast.Expr); ok {
+				captureFields[i].Value = cloneFunctionSource(src, replacements)
+			}
+		}
 	}
 	body := cloneFunctionSource(fn.Src, replacements)
 	if len(params) > 0 {
@@ -378,7 +391,8 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		}
 		body = q
 	}
-	body = e.withLexicalAliases(body, replacements, names)
+	environment.Elts = append(environment.Elts, &ast.Field{Label: ast.NewIdent(o.result), Value: body})
+	body = e.withLexicalAliases(environment, replacements, names)
 	body = astutil.Apply(body, func(c astutil.Cursor) bool {
 		if id, ok := c.Node().(*ast.Ident); ok {
 			if name := names[id.Node]; name != "" {
@@ -388,8 +402,7 @@ func (e *exporter) functionOrigin(fn *adt.Function, params []*adt.TypeParameter)
 		}
 		return true
 	}, nil).(ast.Expr)
-	environment.Elts = append(environment.Elts, &ast.Field{Label: ast.NewIdent(o.result), Value: body})
-	body = e.funcExprSrc(environment, "quantified")
+	body = e.funcExprSrc(body, "quantified")
 	o.decl.Body = body
 	e.originDecls = append(e.originDecls, o.decl)
 	return o
@@ -478,5 +491,47 @@ func (e *exporter) withLexicalAliases(body ast.Expr, replacements map[ast.Node]a
 	if len(decls) == 0 {
 		return body
 	}
+	if record, ok := body.(*ast.StructLit); ok {
+		// Capture fields and their lexical aliases must remain in the
+		// same scope: an extra embedding would hide the fields from lets.
+		record.Elts = append(record.Elts, decls...)
+		return record
+	}
 	return &ast.StructLit{Elts: append([]ast.Decl{&ast.EmbedDecl{Expr: body}}, decls...)}
+}
+
+// A capture declaration is inside the executable environment constructor.
+// Preserve its parameter type only when doing so does not introduce erased
+// type variables as runtime constraints. Function annotations are erased;
+// a bare arbitrary predicate in a data field is not. Generic data captures
+// require an encoding with their types in annotation positions instead.
+func captureTypeErases(expr adt.Expr) bool {
+	ok := true
+	seen := make(map[adt.Node]bool)
+	var w walk.Visitor
+	w.Before = func(node adt.Node) bool {
+		if node == nil || seen[node] || !ok {
+			return false
+		}
+		seen[node] = true
+		switch x := node.(type) {
+		case *adt.Function:
+			return false
+		case *adt.AliasApplication:
+			// Local alias parameters stand for these arguments. Inspecting
+			// the unexpanded formals would reject ground substitutions.
+			for _, argument := range x.Args {
+				w.Elem(argument)
+			}
+			for _, ref := range x.Template.References {
+				w.Elem(ref)
+			}
+			return false
+		case *adt.TypeReference:
+			ok = x.Param.ValueRange != nil
+		}
+		return ok
+	}
+	w.Elem(expr)
+	return ok
 }

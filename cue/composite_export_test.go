@@ -119,3 +119,56 @@ func TestQuantifiedCompositeSelectionAcrossContexts(t *testing.T) {
 		v = v.FillPath(cue.ParsePath("extra"), 1)
 	}
 }
+
+// Captured declarations must survive repeated source conversion with enough
+// type information to check the generated implementations independently.
+func TestQuantifiedCaptureTypeExport(t *testing.T) {
+	for _, tt := range []struct{ name, source, call, want string }{
+		{"integer", `f:func(x:int)->(func(int)->int):func(y:int)->int:x+y`, `f(3)(2)`, `5`},
+		{"record", `f:func(r:{a:int})->(func()->int):func()->int:r.a`, `f({a:3,b:true})()`, `3`},
+		{"local_type_field", `f:func(r:{let N=int
+a:N})->(func()->int):func()->int:r.a`, `f({a:3})()`, `3`},
+		{"named_capture", `r:{a:3}
+f:func()->int:r.a`, `f()`, `3`},
+		{"alias", `N(A)={a:A}
+f:func(r:N(int))->(func()->int):func()->int:r.a`, `f({a:3})()`, `3`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := cuecontext.New()
+			source := tt.source
+			for round := 0; round < 3; round++ {
+				root := ctx.CompileString(source + "\nout: " + tt.call)
+				f := root.LookupPath(cue.ParsePath("f"))
+				if err := f.Validate(cue.Concrete(true)); err != nil {
+					t.Fatalf("round %d: %v\n%s", round, err, source)
+				}
+				semanticJSON(t, root, "out", tt.want)
+				text, err := format.Node(f.Syntax())
+				if err != nil {
+					t.Fatal(err)
+				}
+				source = "f: " + string(text)
+			}
+		})
+	}
+}
+
+func TestQuantifiedCaptureExportPreservesOpenness(t *testing.T) {
+	ctx := cuecontext.New()
+	source := `f:func(r:{a:int})->(func()->close({a:int})):func()->close({a:int}):r`
+	for round := 0; round < 3; round++ {
+		root := ctx.CompileString(source)
+		f := root.LookupPath(cue.ParsePath("f"))
+		if !f.Exists() {
+			t.Fatalf("invalid export: %v\n%s", root.Err(), source)
+		}
+		if err := f.Validate(cue.Concrete(true)); err == nil {
+			t.Fatalf("round %d: an open capture acquired a closed type\n%s", round, source)
+		}
+		text, err := format.Node(f.Syntax())
+		if err != nil {
+			t.Fatal(err)
+		}
+		source = "f: " + string(text)
+	}
+}
