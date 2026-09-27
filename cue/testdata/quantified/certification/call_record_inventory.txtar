@@ -1,0 +1,17 @@
+// Nested constructors retain exact field inventories for closed interfaces.
+// Definition constraints are not runtime fields; hidden fields still are.
+
+-- in.cue --
+@test(json, [3, 4, 5], at="out")
+@test(validate, blocked, at="extra")
+@test(validate, blocked, at="wrongHidden")
+@test(validate, blocked, at="missingHidden")
+
+#Closed: {r: {a: int}}
+read: func(x: #Closed) -> int: x.r.a
+hidden: func(x: {_v: int}) -> int: x._v
+metadata(A): func(x: {#T: A, v: int}) -> int: x.v
+out: [read({r: {a: 3}}), hidden({_v: 4}), metadata[1]({#T: _, v: 5})]
+extra: read({r: {a: 3, b: 4}})
+wrongHidden: hidden({_v: "four"})
+missingHidden: hidden({})

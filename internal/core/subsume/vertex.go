@@ -106,7 +106,9 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		// Let bindings belong to the lexical environment, not the record's
 		// field inventory. Their constraints are already used by references
 		// in the actual fields and need not be repeated by an argument.
-		if f.IsLet() || s.Final && !f.IsRegular() {
+		// Definitions likewise constrain schemas, not the supplied data's
+		// membership. Hidden runtime fields retain their ordinary checks.
+		if f.IsLet() || final && f.IsDef() || s.Final && !f.IsRegular() {
 			continue
 		}
 
@@ -174,7 +176,7 @@ outer:
 	for _, b := range y.Arcs {
 		f := b.Label
 
-		if f.IsLet() || s.Final && !f.IsRegular() {
+		if f.IsLet() || final && f.IsDef() || s.Final && !f.IsRegular() {
 			continue
 		}
 

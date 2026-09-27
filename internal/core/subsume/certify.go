@@ -188,7 +188,7 @@ func (p *certifier) includes(want, got adt.Value) bool {
 		return false
 	}
 	if _, ok := adt.Unwrap(want).(*adt.WitnessType); ok {
-		got = p.singletonEvidence(got)
+		got = p.constructorEvidence(got)
 		if got == nil {
 			return false
 		}
@@ -199,9 +199,9 @@ func (p *certifier) includes(want, got adt.Value) bool {
 
 // Normalizing a structural predicate can forget the exact construction
 // inventories of its nested fields. Recover those checked member descriptions
-// for singleton proofs, without closing an arbitrary input record or a local
+// for packet and singleton proofs, without closing an arbitrary input record or a local
 // binding whose context deliberately permits refinement.
-func (p *certifier) singletonEvidence(value adt.Value) adt.Value {
+func (p *certifier) constructorEvidence(value adt.Value) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -217,12 +217,21 @@ func (p *certifier) singletonEvidence(value adt.Value) adt.Value {
 			out.Arcs = append(out.Arcs, field)
 			continue
 		}
-		member = p.singletonEvidence(member)
+		member = p.constructorEvidence(member)
 		if member == nil {
 			return nil
 		}
-		arc := field.ToDataSingle()
-		arc.BaseValue, arc.Arcs = member, nil
+		var arc *adt.Vertex
+		if vertex, ok := member.(*adt.Vertex); ok {
+			// Keep the member's arcs on the field itself. A BaseValue-only
+			// wrapper would hide its fields from structural inclusion.
+			copy := *vertex
+			copy.Label, copy.ArcType = field.Label, field.ArcType
+			arc = &copy
+		} else {
+			arc = field.ToDataSingle()
+			arc.BaseValue, arc.Arcs = member, nil
+		}
 		out.Arcs = append(out.Arcs, arc)
 	}
 	return out
@@ -1562,7 +1571,7 @@ func (p *certifier) apply(env *adt.Environment, callee adt.Value, call *adt.Call
 	packet := &adt.Function{}
 	args := make([]adt.Value, len(call.Args))
 	for i, arg := range call.Args {
-		args[i] = p.expr(env, arg)
+		args[i] = p.constructorEvidence(p.expr(env, arg))
 		if args[i] == nil {
 			return nil
 		}
