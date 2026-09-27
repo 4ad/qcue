@@ -16,6 +16,14 @@ package adt
 
 import "slices"
 
+// ExplicitClauses returns the source description accumulated for this
+// subject, in its original declaration scopes. Type selection, inference,
+// composite projection, and partial application preserve these clauses;
+// only another explicit declaration adds one. The returned slice is borrowed
+// and must not be modified. It is independent of executable call frontiers
+// and of the additional consequences retained by Obligations.
+func (f *FuncValue) ExplicitClauses() []FuncType { return f.explicit }
+
 // Obligations returns every scoped contract retained by this inhabitant.
 // These are proof obligations, not permissions to execute a selected view.
 // In particular an erased universal remains an obligation after selection

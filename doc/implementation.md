@@ -132,6 +132,11 @@ of its caller. This service is separate from the current evaluator checks;
 its diagnostics are not CUE values and cannot act as semantic bottom.
 The service shares the 10,000-step proof budget and blocks on exhaustion.
 An independent finite Boolean oracle covers all triples of Boolean arrows.
+Function descriptors retain explicit declaration clauses in their original
+scopes, separately from selected call views and inferred obligations. Direct
+selection, partial application, and composite projection preserve that source
+description. An additional annotation contributes a new explicit clause;
+expanding a parametric alias also retains its supplied specialization.
 
 Conjoining function contracts retains every guarded capability clause. An
 implementation keeps its original labels, defaults, omitted-argument behavior,

@@ -38,6 +38,7 @@ func mergeCapabilities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
 		a, b = b, a
 	}
 	m := *a
+	m.explicit = mergeFuncTypes(a.explicit, b.explicit)
 	incoming := append([]FuncType{{Fn: b.Fn, Env: b.Env}}, b.Types...)
 	if a.IsPartial() {
 		for i := range incoming {

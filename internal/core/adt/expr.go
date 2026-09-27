@@ -1656,6 +1656,12 @@ type FuncValue struct {
 	Env   *Environment
 	Types []FuncType
 
+	// explicit retains source declaration clauses in their introduction
+	// scopes. Unlike Types and frontier, it acquires no inferred or selected
+	// instances. Relevant consistency checks the accumulated source root,
+	// not an empty result type derived from a valid generic declaration.
+	explicit []FuncType
+
 	// frontier contains the clauses available to the next type elimination.
 	// It is independent of Types (all proof obligations) and selection (the
 	// source expression for one explicit elimination). A projected method
@@ -1717,6 +1723,9 @@ func (x *Function) evaluate(c *OpContext, state Flags) Value {
 		Src: x.Src,
 		Fn:  x,
 		Env: env,
+	}
+	if x.Quantified {
+		f.explicit = []FuncType{{Fn: x, Env: env}}
 	}
 	if x.Quantified && x.Body != nil && len(typeParameters(env)) != 0 {
 		if b := refuteGenericFunction(c, f); b != nil {
@@ -2433,10 +2442,9 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 				}
 			}
 		}
-		return &FuncValue{Src: x.Src, Fn: x.Fn, Env: x.Env, Types: x.Types,
-			args: bindings, identities: x.identities, scopes: x.scopes,
-			selection: x.selection, frontier: x.frontier, projection: x.projection,
-			callViews: x.callViews}
+		copy := *x
+		copy.args = bindings
+		return &copy
 	}
 	if len(x.callViews) != 0 {
 		view, b := x.admittedCallView(c, bindings)

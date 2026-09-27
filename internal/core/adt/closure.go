@@ -242,6 +242,7 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 		return nil, c.NewErrf("conflicting function identities")
 	}
 	m := *a
+	m.explicit = mergeFuncTypes(a.explicit, b.explicit)
 	m.Types = mergeFuncTypes(a.Types, b.Types)
 	if a.Fn == b.Fn && a.frontier != nil && b.frontier != nil &&
 		(a.Env != b.Env || len(a.callViews) != 0 || len(b.callViews) != 0) {
