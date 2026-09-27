@@ -211,7 +211,35 @@ func refuteCapability(c *OpContext, impl *FuncValue, t FuncType) (err *Bottom) {
 	// An implementation must not use its own obligation as its evidence.
 	raw := *impl
 	raw.Types = nil
+	fn := *impl.Fn
+	fn.Ret = nil
+	raw.Fn = &fn
 	capabilityPackets(c, t, func(packet *CallExpr) bool {
+		// Packet coverage is a static calling-convention obligation. A
+		// failing body, in contrast, satisfies a partial result contract.
+		bindings, unused, bindErr := impl.bindCall(c, packet)
+		if bindErr == nil {
+			bindErr = unused
+		}
+		if bindErr != nil {
+			err = c.NewErrf("function rejects admitted packet %s: %s", capabilityPacket(c, packet), bindErr.Err)
+			return false
+		}
+		for i, arg := range bindings {
+			if arg.expr == nil {
+				param := impl.Fn.Params[i]
+				if param.ArcType != ArcOptional && param.Default == nil {
+					err = c.NewErrf("function rejects admitted packet %s: missing argument", capabilityPacket(c, packet))
+					return false
+				}
+				continue
+			}
+			value, ok := arg.expr.(Value)
+			if ok && capabilityMember(c, impl.Env, impl.Fn.Params[i].Value, value) == proofRefuted {
+				err = c.NewErrf("function rejects admitted packet %s: incompatible parameter domain", capabilityPacket(c, packet))
+				return false
+			}
+		}
 		saved := c.PushState(impl.Env, t.Fn.Source())
 		result := raw.call(c, packet, Flags{})
 		if b := c.PopState(saved); b != nil {
@@ -220,12 +248,10 @@ func refuteCapability(c *OpContext, impl *FuncValue, t FuncType) (err *Bottom) {
 		if result == nil {
 			return true
 		}
-		if b, ok := Unwrap(result).(*Bottom); ok {
-			if b.IsIncomplete() {
-				return true
-			}
-			err = c.NewErrf("function rejects admitted packet %s: %s", capabilityPacket(c, packet), b.Err)
-			return false
+		if _, ok := Unwrap(result).(*Bottom); ok {
+			// Neither failure nor suspension refutes partial correctness.
+			// The source body must separately receive a static derivation.
+			return true
 		}
 		if fixedCapabilityExpr(t.Fn.Ret) &&
 			capabilityMember(c, t.Env, t.Fn.Ret, result) == proofRefuted {

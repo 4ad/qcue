@@ -134,7 +134,7 @@ func (p *certifier) schema(env *adt.Environment, x adt.Expr) adt.Value {
 	if vertex, ok := v.(*adt.Vertex); ok {
 		vertex.Finalize(p.ctx)
 	}
-	if _, ok := adt.Unwrap(v).(*adt.Bottom); ok {
+	if b, ok := adt.Unwrap(v).(*adt.Bottom); ok && b.IsIncomplete() {
 		return nil
 	}
 	return v
@@ -159,6 +159,11 @@ func (p *certifier) frame(up *adt.Environment, values map[adt.Feature]adt.Value)
 // Captured runtime values must be complete, including conformance of any
 // functions nested inside them. Reuse this proof's dependency context.
 func (p *certifier) captured(v adt.Value) adt.Value {
+	// A refuted data hypothesis is not a value in the checking context.
+	// Only a checked source operation can introduce a failing computation.
+	if _, ok := adt.Unwrap(v).(*adt.Bottom); ok {
+		return nil
+	}
 	if b, ok := adt.Unwrap(v).(*adt.Builtin); ok {
 		if ValidateBuiltin(p.ctx, b) != nil {
 			return nil
@@ -403,6 +408,19 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 	switch x := expr.(type) {
 	case *adt.Null, *adt.Bool, *adt.Num, *adt.String, *adt.Bytes:
 		return x.(adt.Value)
+	case *adt.Top, *adt.BasicType, *adt.BoundValue:
+		return x.(adt.Value)
+	case *adt.Bottom:
+		if !x.IsIncomplete() {
+			return x
+		}
+		return nil
+	case *adt.BoundExpr:
+		v := p.expr(env, x.Expr)
+		if v == nil || !adt.IsConcrete(v) {
+			return nil
+		}
+		return p.schema(nil, &adt.BoundExpr{Op: x.Op, Expr: v})
 	case *adt.Builtin:
 		return x
 	case *adt.FieldReference:
@@ -616,6 +634,11 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		ka, kb := a.Kind(), b.Kind()
 		switch x.Op {
+		case adt.AndOp:
+			// Both operands have their own derivation. Their meet constrains
+			// successful results even when they conflict; it is an operation
+			// in the source body, never a filter supplied by an annotation.
+			return p.schema(nil, &adt.Conjunction{Values: []adt.Value{a, b}})
 		case adt.AddOp, adt.SubtractOp, adt.MultiplyOp:
 			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
 				if x.Op == adt.AddOp || x.Op == adt.SubtractOp {

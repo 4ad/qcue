@@ -179,6 +179,15 @@ func (m membershipCheck) packetMembership(c *OpContext) proofResult {
 	if !concreteCapture(c, m.subject) {
 		return proofUnknown
 	}
+	// Prove membership from the supplied subject before requiring its meet
+	// with the predicate to be concrete. For an open-record union, that meet
+	// can retain alternatives which add fields even though one original arm
+	// already includes the whole subject. Those alternatives do not make the
+	// independently established inclusion ambiguous.
+	bound, complete := c.Evaluate(m.predicate.env, m.predicate.expr)
+	if complete && c.provesInclusion(bound, m.subject) {
+		return proofEstablished
+	}
 	if b := m.meet.Bottom(); b != nil {
 		if !b.IsIncomplete() {
 			return proofRefuted
