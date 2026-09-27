@@ -125,7 +125,8 @@ func (p *certifier) functionBinding(binding proofBinding, seen map[proofBinding]
 	switch x := binding.expr.(type) {
 	case *adt.Function:
 		if x.Body != nil {
-			return &adt.FuncValue{Fn: x, Src: x.Src, Env: binding.env}
+			value, _ := adt.Unwrap(p.schema(binding.env, x)).(*adt.FuncValue)
+			return value
 		}
 	case *adt.Quantified:
 		if f, ok := x.Body.(*adt.Function); ok && f.Body != nil && !x.Src.Exists {

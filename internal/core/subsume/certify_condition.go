@@ -61,9 +61,15 @@ func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit,
 		region: make(map[conditionSubject]adt.Value),
 		exact:  true,
 	}
+	optional := make(map[adt.Feature]adt.Value)
 	for _, decl := range base.Decls {
 		field := decl.(*adt.Field)
-		initial.fields[field.Label] = field.Value.(adt.Value)
+		if field.ArcType == adt.ArcOptional {
+			optional[field.Label] = field.Value.(adt.Value)
+			initial.exact = false
+		} else {
+			initial.fields[field.Label] = field.Value.(adt.Value)
+		}
 	}
 	states := []conditionalRecordState{initial}
 	for _, comp := range comps {
@@ -131,6 +137,18 @@ func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit,
 	var results []adt.Value
 	for _, state := range states {
 		out := &adt.StructLit{}
+		state.fields = maps.Clone(state.fields)
+		for _, label := range slices.Sorted(maps.Keys(optional)) {
+			value := optional[label]
+			if field := state.fields[label]; field != nil {
+				state.fields[label] = p.sourceMeet(field, value)
+				if state.fields[label] == nil {
+					return nil
+				}
+			} else {
+				out.Decls = append(out.Decls, &adt.Field{Label: label, Value: value, ArcType: adt.ArcOptional})
+			}
+		}
 		for _, label := range slices.Sorted(maps.Keys(state.fields)) {
 			out.Decls = append(out.Decls, &adt.Field{Label: label, Value: state.fields[label]})
 		}

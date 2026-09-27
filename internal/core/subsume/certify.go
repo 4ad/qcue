@@ -37,10 +37,13 @@ func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 // budget. A fresh certifier could let a callback obligation justify itself.
 func (p *certifier) enter() func() {
 	check, inclusion := p.ctx.CheckFunction, p.ctx.ProveInclusion
+	application := p.ctx.CheckApplication
 	p.ctx.CheckFunction = p.validateFunction
 	p.ctx.ProveInclusion = p.proveInclusion
+	p.ctx.CheckApplication = p.validateApplication
 	return func() {
 		p.ctx.CheckFunction, p.ctx.ProveInclusion = check, inclusion
+		p.ctx.CheckApplication = application
 	}
 }
 
@@ -679,6 +682,17 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return x.(adt.Value)
 	case *adt.Top, *adt.BasicType, *adt.BoundValue:
 		return x.(adt.Value)
+	case *adt.DisjunctionExpr:
+		var alternatives []adt.Value
+		for _, branch := range x.Values {
+			v := p.expr(env, branch.Val)
+			if v == nil {
+				return nil
+			}
+			alternatives = append(alternatives, v)
+		}
+		// A preference does not remove an incoming type alternative.
+		return proofUnion(alternatives)
 	case *adt.Bottom:
 		if !x.IsIncomplete() {
 			return x
@@ -843,8 +857,11 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		return p.project(v, adt.MakeIntLabel(adt.IntLabel, i))
 	case *adt.Function:
-		f := &adt.FuncValue{Fn: x, Src: x.Src, Env: env}
-		if !p.implementation(f) {
+		// Use the source descriptor, including its explicit interface root.
+		// A local constructor still needs an implementation. Conditional
+		// import hypotheses enter through their named capture bindings.
+		f, ok := adt.Unwrap(p.schema(env, x)).(*adt.FuncValue)
+		if !ok || !p.implementation(f) {
 			return nil
 		}
 		return f
@@ -932,6 +949,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		scope := p.scopes[e]
 		scope.fields = make(map[adt.Feature]adt.Expr)
+		optional := make(map[adt.Feature]adt.Expr)
 		var conditions []*adt.Comprehension
 		for _, decl := range x.Decls {
 			if comp, ok := decl.(*adt.Comprehension); ok {
@@ -943,13 +961,17 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				continue
 			}
 			f, ok := decl.(*adt.Field)
-			if !ok || f.ArcType != adt.ArcMember {
+			if !ok || (f.ArcType != adt.ArcMember && f.ArcType != adt.ArcOptional) {
 				return nil
 			}
-			if scope.fields[f.Label] != nil {
+			if scope.fields[f.Label] != nil || optional[f.Label] != nil {
 				return nil
 			}
-			scope.fields[f.Label] = f.Value
+			if f.ArcType == adt.ArcOptional {
+				optional[f.Label] = f.Value
+			} else {
+				scope.fields[f.Label] = f.Value
+			}
 		}
 		out := &adt.StructLit{}
 		for _, decl := range x.Decls {
@@ -965,17 +987,30 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				continue
 			}
 			f := decl.(*adt.Field)
-			v := p.expr(e, &adt.FieldReference{Label: f.Label})
+			var v adt.Value
+			if f.ArcType == adt.ArcOptional {
+				// An optional constraint is checked without introducing a
+				// present value that an ordinary field reference could read.
+				v = p.expr(e, f.Value)
+			} else {
+				v = p.expr(e, &adt.FieldReference{Label: f.Label})
+			}
 			if v == nil {
 				return nil
 			}
-			out.Decls = append(out.Decls, &adt.Field{Label: f.Label, Value: v})
+			out.Decls = append(out.Decls, &adt.Field{Label: f.Label, ArcType: f.ArcType, Value: v})
 		}
 		if len(conditions) != 0 {
 			return p.conditionalRecord(e, out, conditions)
 		}
 		v := p.schema(nil, out)
 		if v, ok := v.(*adt.Vertex); ok {
+			if len(optional) != 0 {
+				// Keep optional constraints and their possible presence. They
+				// do not establish an exact singleton constructor inventory.
+				p.projections[v] = scope.values
+				return v
+			}
 			// A constructed runtime record has exactly these fields, even
 			// though their symbolic values describe many possible packets.
 			summary := v.ToDataSingle()
@@ -1498,11 +1533,25 @@ func (p *certifier) translateNumber(v adt.Value, n *adt.Num, op adt.Op) adt.Valu
 
 func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 	callee := adt.Unwrap(p.expr(env, call.Fun))
+	return p.apply(env, callee, call)
+}
+
+func (p *certifier) apply(env *adt.Environment, callee adt.Value, call *adt.CallExpr) adt.Value {
+	if err := (&relevanceChecker{p: p}).description(callee, make(map[adt.Value]bool)); err != nil {
+		p.failure = &adt.Bottom{Src: call.Source(), Code: adt.BlockedError,
+			Err: p.ctx.NewPosf(adt.Pos(call), "%s", err)}
+		return nil
+	}
 	packet := &adt.Function{}
 	args := make([]adt.Value, len(call.Args))
 	for i, arg := range call.Args {
 		args[i] = p.expr(env, arg)
 		if args[i] == nil {
+			return nil
+		}
+		if err := (&relevanceChecker{p: p}).description(args[i], make(map[adt.Value]bool)); err != nil {
+			p.failure = &adt.Bottom{Src: arg.Source(), Code: adt.BlockedError,
+				Err: p.ctx.NewPosf(adt.Pos(arg), "%s", err)}
 			return nil
 		}
 		label := adt.InvalidLabel
@@ -1512,10 +1561,19 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 		packet.Params = append(packet.Params, adt.FuncParam{Value: args[i], Label: label, Positional: label == adt.InvalidLabel})
 	}
 	target := adt.FuncType{Fn: packet}
+	var result adt.Value
 	if call.Partial {
-		return p.partialCall(callee, target)
+		result = p.partialCall(callee, target)
+	} else {
+		result = p.callValue(callee, target)
 	}
-	result := p.callValue(callee, target)
+	if result != nil {
+		for _, arg := range args {
+			if refuted(arg) {
+				return arg // The checked packet cannot produce a value.
+			}
+		}
+	}
 	if builtin, ok := callee.(*adt.Builtin); ok && result != nil &&
 		builtin.Package == adt.InvalidLabel && builtin.Name == "len" {
 		result = p.length(args[0])
@@ -1697,13 +1755,14 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 }
 
 func (p *certifier) meetResults(consequences []adt.Value) adt.Value {
-	if len(consequences) == 1 {
-		return consequences[0]
+	if len(consequences) == 0 {
+		return nil
 	}
-	if len(consequences) > 1 {
-		return p.schema(nil, &adt.Conjunction{Values: consequences})
+	result := consequences[0]
+	for _, constraint := range consequences[1:] {
+		result = p.eagerMeet(result, constraint)
 	}
-	return nil
+	return result
 }
 
 func proofUnion(values []adt.Value) adt.Value {

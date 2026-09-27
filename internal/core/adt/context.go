@@ -154,6 +154,11 @@ type OpContext struct {
 	CheckFunction func(*OpContext, *FuncValue) *Bottom
 	CheckBuiltin  func(*OpContext, *Builtin) *Bottom
 
+	// CheckApplication derives the result interface from the supplied source
+	// packet. A declaration without an implementation may use this derivation
+	// as a conditional hypothesis, but cannot synthesize an execution witness.
+	CheckApplication func(*OpContext, *Environment, *FuncValue, *CallExpr) (Value, *Bottom)
+
 	// Shared only by one finite expansion and work it invokes. Retained
 	// lexical frames also carry it for bodies whose evaluation is deferred.
 	finiteExpansion  *finiteExpansionBudget

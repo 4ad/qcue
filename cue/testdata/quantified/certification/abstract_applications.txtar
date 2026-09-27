@@ -1,0 +1,66 @@
+// A missing implementation leaves a link obligation after static application
+// checking. It cannot excuse an incompatible packet or an invalid interface.
+
+-- in.cue --
+@test(validate, concrete, incomplete, at="literal")
+@test(validate, concrete, incomplete, at="schema")
+@test(validate, concrete, incomplete, at="union")
+@test(validate, concrete, incomplete, at="width")
+@test(validate, concrete, incomplete, at="optional")
+@test(validate, concrete, incomplete, at="callback")
+@test(validate, concrete, incomplete, at="callbackHypothesis")
+@test(validate, concrete, incomplete, at="partial")
+@test(validate, concrete, incomplete, at="resumed")
+@test(validate, blocked, at="wrongKind")
+@test(validate, blocked, at="missingArgument")
+@test(validate, blocked, at="wrongLabel")
+@test(validate, blocked, at="extraArgument")
+@test(validate, blocked, at="mixedUnion")
+@test(validate, blocked, at="missingField")
+@test(validate, blocked, at="wrongCallback")
+@test(validate, blocked, at="invalidCallback")
+@test(validate, blocked, at="invalidLiteralCallback")
+@test(validate, blocked, at="invalidInterface")
+@test(validate, blocked, at="discarded")
+@test(validate, blocked, at="badPartial")
+@test(validate, blocked, at="hiddenByUnion")
+@test(validate, blocked, at="observedBlocked")
+@test(json, [true, true], at="failures")
+
+source: func(int) -> string
+literal: source(3)
+schema: source(int)
+union: source(1 | 2)
+wrongKind: source("three")
+missingArgument: source()
+wrongLabel: source(wrong: 3)
+extraArgument: source(1, 2)
+mixedUnion: source(int | string)
+
+record: func({a: int}) -> int
+width: record({a: 1, b: true})
+missingField: record({})
+anyRecord: func({}) -> int
+optional: anyRecord({a?: int})
+
+apply: func(func(number) -> string) -> string
+callback: apply(func(x: number) -> string: "ok")
+importedCallback: func(number) -> string
+callbackHypothesis: apply(importedCallback)
+wrongCallback: apply(func(x: int) -> string: "ok")
+bad: (func(int) -> int) & (func(int) -> bool)
+use: func(func(int) -> int) -> int
+invalidCallback: use(bad)
+invalidLiteralCallback: use(func(x: int) -> _|_: _|_)
+invalidInterface: bad(1)
+discarded: source({unused: bad(1), value: 3}.value)
+
+pair: func(int, string) -> bool
+partial: pair(1, ...)
+resumed: partial("one")
+badPartial: pair(true, ...)
+
+hiddenByUnion: wrongKind | 3
+observedBlocked: wrongKind == _|_
+meet(A, B): func(A, B) -> (A & B)
+failures: [source(1 & 2) == _|_, meet[int, bool](1, true) == _|_]

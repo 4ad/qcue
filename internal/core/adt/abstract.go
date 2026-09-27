@@ -53,51 +53,19 @@ func (r *AbstractResult) validate(c *OpContext, v Value) *Bottom {
 }
 
 func (f *FuncValue) abstractCall(c *OpContext, call *CallExpr, state Flags) Value {
+	if c.CheckApplication == nil {
+		return &Bottom{Src: call.Source(), Code: BlockedError,
+			Err: c.Newf("function application checker is not configured")}
+	}
+	description, b := c.CheckApplication(c, c.Env(0), f, call)
+	if b != nil {
+		return b
+	}
+	// Checking an application may establish result constraints, including
+	// a derived empty result. It never supplies the missing implementation.
 	pending := &AbstractResult{Src: call.Source()}
-	if call.Partial {
-		return pending
-	}
-	conjuncts := []Conjunct{MakeRootConjunct(nil, pending)}
-	admit := func(t FuncType) *packetAdmission {
-		// Binding determines protocol slots only. Admission must examine
-		// the original packet, without executing a synthetic function or
-		// conjoining parameter predicates into an activation.
-		view := &FuncValue{Fn: t.Fn, Env: t.Env}
-		saved := c.PushState(c.Env(0), call.Source())
-		args, unused, bindErr := view.bindCall(c, call)
-		var admitted *packetAdmission
-		if unused == nil && bindErr == nil {
-			admitted, _ = (callPacket{args: args}).admit(c, t, false)
-		}
-		if err := c.PopState(saved); err != nil {
-			return nil
-		}
-		return admitted
-	}
-	propagate := func(admitted *packetAdmission) {
-		if t := admitted.clause; t.Fn.Ret != nil {
-			conjuncts = append(conjuncts, MakeRootConjunct(t.Env, t.Fn.Ret))
-		}
-	}
-	covered := false
-	seen := make(map[FuncType]bool)
-	for _, clause := range f.CallClauses(c) {
-		seen[clause] = true
-		if admitted := admit(clause); admitted != nil {
-			covered = true
-			propagate(admitted)
-		}
-	}
-	if covered {
-		for _, clause := range f.ResultClauses(c) {
-			if !seen[clause] {
-				if admitted := admit(clause); admitted != nil {
-					propagate(admitted)
-				}
-			}
-		}
-	}
-	result := c.newInlineVertex(nil, nil, conjuncts...)
+	result := c.newInlineVertex(nil, nil,
+		MakeRootConjunct(nil, pending), MakeRootConjunct(nil, description))
 	result.Finalize(c)
 	return result
 }

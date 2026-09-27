@@ -71,6 +71,7 @@ func (r *Runtime) ConfigureOpCtx(ctx *adt.OpContext) {
 	ctx.ProveInclusion = subsume.ProveInclusion
 	ctx.CheckFunction = subsume.ValidateFunction
 	ctx.CheckBuiltin = subsume.ValidateBuiltin
+	ctx.CheckApplication = subsume.ValidateApplication
 }
 
 func (r *Runtime) SetBuildData(b *build.Instance, x interface{}) {
