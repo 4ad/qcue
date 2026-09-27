@@ -2057,11 +2057,7 @@ func (n *nodeContext) scheduleFuncCall(ref *FuncCallRef, env *Environment, ci Cl
 		}
 	}
 	if capabilityMode(fn, ref.types) {
-		n.scheduleCapabilityResults(ref, env, ci)
 		n.scheduleConjunct(MakeConjunct(env, fn.Body, ci), ci)
-		if fn.Ret != nil {
-			n.scheduleConjunct(MakeConjunct(env.Up, fn.Ret, ci), ci)
-		}
 		return
 	}
 	// The function types the called value was unified with contribute their
@@ -2584,7 +2580,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	for _, a := range arcs {
 		a.Parent = activation
 	}
-	bodyEnv := &Environment{Up: x.Env, Vertex: activation, packet: &callPacket{args: bindings}}
+	bodyEnv := &Environment{Up: x.Env, Vertex: activation}
 	bodyCI := c.ci
 	if recursive {
 		// This activation's finite descent discharges the call-cycle edge.
@@ -2632,6 +2628,12 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 					return b
 				}
 			}
+		}
+	}
+
+	if capabilityMode(x.Fn, x.Types) {
+		if b := x.checkCallResult(c, callPacket{args: bindings}, result); b != nil {
+			return b
 		}
 	}
 
@@ -3239,9 +3241,9 @@ func (builtin *Builtin) applyParamTypes(c *OpContext, args []Value) ([]Value, *B
 	return args, nil
 }
 
-// applyResultTypes unifies the result of a builtin call with the result
-// constraints of the function types the builtin was unified with. The
-// constraints are evaluated in their type's environment.
+// applyResultTypes checks guarded contracts against the primitive's own
+// result, without letting annotations construct data. Intrinsic and legacy
+// signatures retain their relational interpretation.
 func (x *Builtin) applyResultTypes(c *OpContext, v Value, args []Value) Value {
 	if len(x.Types) == 0 || v == nil {
 		return v
@@ -3261,6 +3263,10 @@ func (x *Builtin) applyResultTypes(c *OpContext, v Value, args []Value) Value {
 			case proofUnknown:
 				return &Bottom{Code: IncompleteError, Err: c.Newf("incomplete builtin contract domain")}
 			}
+			if b := checkCallValue(c, v, scopedPredicate{t.Env, t.Fn.Ret}, "result"); b != nil {
+				return b
+			}
+			continue
 		}
 		if t.Fn.Ret == nil {
 			continue

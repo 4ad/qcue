@@ -597,6 +597,14 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 
 	switch x := v.(type) {
 	case *Vertex:
+		if snapshot && x.sealed != nil {
+			if n.node.sealed != nil && n.node.sealed != x.sealed {
+				n.addBottom(ctx.NewErrf("conflicting opaque package identities"))
+				return
+			}
+			n.node.sealed = x.sealed
+			n.node.sealedOpened = n.node.sealedOpened || x.sealedOpened
+		}
 		if x.ClosedNonRecursive {
 			n.node.ClosedNonRecursive = true
 		} else if x.ClosedRecursive {

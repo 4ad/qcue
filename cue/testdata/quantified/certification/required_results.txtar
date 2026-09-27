@@ -8,7 +8,7 @@
 @test(validate, concrete, at="present")
 @test(validate, concrete, at="optional")
 @test(validate, conflict, at="badClosed")
-@test(validate, concrete, incomplete, at="badTop")
+@test(validate, conflict, at="badTop")
 @test(json, {a: 1}, at="good")
 @test(subsume, requiredType, closedType, fail)
 @test(subsume, requiredTopType, emptyType, fail)

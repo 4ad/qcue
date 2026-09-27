@@ -38,6 +38,40 @@ func checkMembership(c *OpContext, subject Value, predicate scopedPredicate) mem
 	return membershipCheck{subject: subject, predicate: predicate, meet: v}
 }
 
+// checkCallValue discharges an execution boundary without changing its
+// subject. Concrete membership and schema inclusion are different proofs;
+// compatibility alone is neither. In particular, an incomplete body cannot
+// become a value by meeting its result annotation or selecting its default.
+func checkCallValue(c *OpContext, subject Value, predicate scopedPredicate, role string) *Bottom {
+	if b, ok := Unwrap(subject).(*Bottom); ok {
+		return b
+	}
+	if predicate.expr == nil {
+		return nil
+	}
+	if concreteCapture(c, subject) {
+		m := checkMembership(c, subject, predicate)
+		switch m.packetMembership(c) {
+		case proofEstablished:
+			return nil
+		case proofRefuted:
+			if b := m.meet.Bottom(); b != nil && !b.IsIncomplete() {
+				return b
+			}
+			return c.NewErrf("function %s does not satisfy its contract", role)
+		}
+	} else {
+		// Inclusion can certify a schema-valued computation, but cannot
+		// narrow it. Keep the independently evaluated subject as the result.
+		bound, complete := c.Evaluate(predicate.env, predicate.expr)
+		if complete && c.provesInclusion(bound, subject) {
+			return nil
+		}
+	}
+	return &Bottom{Code: IncompleteError,
+		Err: c.Newf("function %s conformance remains unproved", role)}
+}
+
 // membershipOperand exposes the evaluated root without replaying its root
 // validators. The original subject remains responsible for those obligations.
 // Children are retained in their original scopes, including their predicates;

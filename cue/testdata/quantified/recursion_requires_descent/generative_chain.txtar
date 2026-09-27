@@ -1,8 +1,10 @@
 // Allocating fresh closures during a call is not descent through an existing
 // finite capture graph, and still requires a decreasing list argument.
+// The factory's result is unconstrained so execution reaches the recursive
+// call; a callable result contract would first demand a termination proof.
 
 -- in.cue --
 @test(validate, conflict, at="out")
 
-make: func(n: int) -> func() -> int: func() -> int: make(n + 1)()
+make: func(n: int) -> _: func() -> int: make(n + 1)()
 out:  make(0)()

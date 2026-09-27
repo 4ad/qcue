@@ -310,31 +310,34 @@ func refuteArrowIntersection(c *OpContext, a, b FuncType) *Bottom {
 	return nil
 }
 
-func (n *nodeContext) scheduleCapabilityResults(ref *FuncCallRef, env *Environment, ci CloseInfo) {
-	for _, t := range ref.types {
+// checkCallResult checks consequences of admitted clauses against the body's
+// independently computed value. A contract never participates in constructing
+// that value: doing so would let erased type arguments become runtime data.
+func (f *FuncValue) checkCallResult(c *OpContext, packet callPacket, value Value) *Bottom {
+	if b := checkCallValue(c, value, scopedPredicate{f.Env, f.Fn.Ret}, "result"); b != nil {
+		return b
+	}
+	for _, t := range f.Types {
 		if t.Fn.Body != nil {
 			continue
 		}
-		result := proofUnknown
+		projected, result := packet.project(t, f.Fn)
 		var admitted *packetAdmission
-		if env.packet != nil {
-			var packet callPacket
-			packet, result = env.packet.project(t, ref.fn)
-			if result == proofEstablished {
-				admitted, result = packet.admit(n.ctx, t, false)
-			}
+		if result == proofEstablished {
+			admitted, result = projected.admit(c, t, false)
 		}
 		switch result {
 		case proofEstablished:
 			t := admitted.clause
-			if t.Fn.Ret != nil {
-				n.scheduleConjunct(MakeConjunct(t.Env, t.Fn.Ret, ci), ci)
+			if b := checkCallValue(c, value, scopedPredicate{t.Env, t.Fn.Ret}, "result"); b != nil {
+				return b
 			}
 		case proofUnknown:
-			n.addBottom(&Bottom{Code: IncompleteError,
-				Err: n.ctx.Newf("incomplete function contract domain")})
+			return &Bottom{Code: IncompleteError,
+				Err: c.Newf("incomplete function contract domain")}
 		}
 	}
+	return nil
 }
 
 // capabilityMatches translates a residual packet back to the implementation
