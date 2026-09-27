@@ -19,6 +19,7 @@ import (
 	"slices"
 
 	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/core/walk"
 )
 
 // ValidateFunction checks an implementation's contracts under arbitrary
@@ -450,6 +451,43 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.schema(nil, &adt.BoundExpr{Src: x.Src, Op: x.Op, Expr: v})
 	case *adt.Builtin:
 		return x
+	case *adt.AliasApplication:
+		args := make([]adt.Value, len(x.Args))
+		for i, argument := range x.Args {
+			if !p.typeOperations(env, argument) {
+				return nil
+			}
+			args[i] = p.schema(env, argument)
+			if args[i] == nil {
+				return nil
+			}
+		}
+		scope, b := x.Expand(p.ctx, env, args)
+		if b != nil {
+			return nil
+		}
+		return p.expr(scope, x.Template.Body)
+	case *adt.TypeReference:
+		// Runtime erasure checking has already excluded arbitrary type
+		// variables here. An alias may still substitute a fixed literal
+		// used as an ordinary data index or constructor constraint.
+		v := p.schema(env, x)
+		if _, arbitrary := adt.Unwrap(v).(*adt.RigidType); arbitrary {
+			return nil
+		}
+		return v
+	case *adt.LetReference:
+		e := env
+		for range x.UpCount {
+			if e == nil {
+				return nil
+			}
+			e = e.Up
+		}
+		if scope := p.scopes[e]; scope != nil && !x.IsPredicate {
+			return p.expr(e, &adt.FieldReference{Label: x.Label})
+		}
+		return p.expr(e, x.X)
 	case *adt.FieldReference:
 		e := env
 		for range x.UpCount {
@@ -537,6 +575,10 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		scope := p.scopes[e]
 		scope.fields = make(map[adt.Feature]adt.Expr)
 		for _, decl := range x.Decls {
+			if let, ok := decl.(*adt.LetField); ok {
+				scope.fields[let.Label] = let.Value
+				continue
+			}
 			f, ok := decl.(*adt.Field)
 			if !ok || f.ArcType != adt.ArcMember {
 				return nil
@@ -548,6 +590,14 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		out := &adt.StructLit{}
 		for _, decl := range x.Decls {
+			if let, ok := decl.(*adt.LetField); ok {
+				// Every present source term is checked, even when a let is
+				// unused by the returned fields.
+				if p.expr(e, &adt.FieldReference{Label: let.Label}) == nil {
+					return nil
+				}
+				continue
+			}
 			f := decl.(*adt.Field)
 			v := p.expr(e, &adt.FieldReference{Label: f.Label})
 			if v == nil {
@@ -724,6 +774,144 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.call(env, x)
 	}
 	return nil
+}
+
+// Type arguments can contain computations as well as finite type syntax.
+// Check those operations before normalization: an ill-typed operation must
+// not become an empty predicate that an unused alias argument can conceal.
+// Literal function bodies have their own parameter scopes and are checked by
+// the implementation rule even if the abbreviation never uses its argument.
+func (p *certifier) typeOperations(env *adt.Environment, expr adt.Expr) bool {
+	ok := true
+	seen := make(map[adt.Node]bool)
+	var visitor walk.Visitor
+	visitor.Before = func(node adt.Node) bool {
+		if node == nil || seen[node] || !ok {
+			return false
+		}
+		seen[node] = true
+		if !p.step() {
+			ok = false
+			return false
+		}
+		switch x := node.(type) {
+		case *adt.AliasApplication:
+			args := make([]adt.Value, len(x.Args))
+			for i, argument := range x.Args {
+				if !p.typeOperations(env, argument) {
+					ok = false
+					return false
+				}
+				args[i] = p.schema(env, argument)
+				if args[i] == nil {
+					ok = false
+					return false
+				}
+			}
+			scope, b := x.Expand(p.ctx, env, args)
+			ok = b == nil && p.typeOperations(scope, x.Template.Body)
+			return false
+		case *adt.Quantified:
+			scope := x.CheckingScope(p.ctx, env)
+			for _, param := range x.Params {
+				if param.ValueRange != nil {
+					// Value-sorted expansion requires a separate finite witness
+					// proof; an arbitrary type variable cannot stand in for it.
+					ok = false
+					return false
+				}
+				if param.Bound != nil && !p.typeOperations(scope, param.Bound) {
+					ok = false
+					return false
+				}
+				bound := p.schema(scope, param.Bound)
+				if bound == nil {
+					ok = false
+					return false
+				}
+				scope = adt.BindFunctionTypes(adt.FuncType{Env: scope},
+					[]adt.Value{&adt.RigidType{Param: param, Bound: bound}}).Env
+			}
+			ok = p.typeOperations(scope, x.Body)
+			return false
+		case *adt.StructLit:
+			scope := p.frame(env, make(map[adt.Feature]adt.Value))
+			p.scopes[scope].fields = make(map[adt.Feature]adt.Expr)
+			for _, decl := range x.Decls {
+				switch field := decl.(type) {
+				case *adt.Field:
+					p.scopes[scope].fields[field.Label] = field.Value
+				case *adt.LetField:
+					p.scopes[scope].fields[field.Label] = field.Value
+				}
+			}
+			for _, decl := range x.Decls {
+				switch field := decl.(type) {
+				case *adt.Field:
+					ok = p.typeOperations(scope, field.Value)
+				case *adt.LetField:
+					ok = p.typeOperations(scope, field.Value)
+				case adt.Expr:
+					ok = p.typeOperations(scope, field)
+				default:
+					ok = false
+				}
+				if !ok {
+					break
+				}
+			}
+			return false
+		case *adt.ListLit:
+			scope := p.frame(env, make(map[adt.Feature]adt.Value))
+			for _, elem := range x.Elems {
+				switch item := elem.(type) {
+				case *adt.Ellipsis:
+					ok = item.Value == nil || p.typeOperations(scope, item.Value)
+				case adt.Expr:
+					ok = p.typeOperations(scope, item)
+				default:
+					ok = false
+				}
+				if !ok {
+					break
+				}
+			}
+			return false
+		case *adt.Function:
+			for _, param := range x.Params {
+				visitor.Elem(param.Value)
+				visitor.Elem(param.Default)
+			}
+			visitor.Elem(x.Ret)
+			if ok && x.Body != nil {
+				ok = p.implementation(&adt.FuncValue{Fn: x, Src: x.Src, Env: env})
+			}
+			return false
+		case *adt.LetReference:
+			e := env
+			for range x.UpCount {
+				if e == nil {
+					ok = false
+					return false
+				}
+				e = e.Up
+			}
+			ok = p.typeOperations(e, x.X)
+			return false
+		case *adt.BinaryExpr:
+			if x.Op == adt.AndOp {
+				return true
+			}
+			ok = p.expr(env, x) != nil
+			return false
+		case *adt.UnaryExpr, *adt.BoundExpr, *adt.CallExpr, *adt.IndexExpr, *adt.SelectorExpr:
+			ok = p.expr(env, x.(adt.Expr)) != nil
+			return false
+		}
+		return true
+	}
+	visitor.Elem(expr)
+	return ok
 }
 
 // Run the shared eager service on an intersection independently of whether

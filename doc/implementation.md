@@ -250,6 +250,11 @@ and retain the original universal obligation. A checked call's result carries
 its callable evidence into later selections and applications, including
 impredicative instances. Record projection and callback application check every
 incoming union branch; an absent or optional field cannot justify selection.
+Alias applications share the evaluator's lexical substitution and bound checks.
+Their arguments are checked before normalization, including operations and
+function bodies in unused arguments. An invalid computation cannot be hidden
+by an abbreviation that discards its argument. Local and captured `let`
+expressions retain the surrounding proof scope and callable evidence.
 Fixed and homogeneous list indexes constrain successful selections and permit
 out-of-range failure. Enabled ground arithmetic, scalar comparisons, Boolean
 operations, concatenation, and string/bytes repetition retain their exact

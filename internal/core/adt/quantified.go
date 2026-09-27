@@ -95,18 +95,41 @@ func (*AliasApplication) declNode()          {}
 func (*AliasApplication) elemNode()          {}
 
 func (a *AliasApplication) evaluate(c *OpContext, state Flags) Value {
-	args := make(map[*TypeParameter]Value, len(a.Args))
+	args := make([]Value, len(a.Args))
 	for i, x := range a.Args {
 		v, _ := c.Evaluate(c.Env(0), x)
 		if v == nil {
 			return nil
 		}
-		args[a.Template.Params[i]] = v
+		args[i] = v
+	}
+	env, b := a.Expand(c, c.Env(0), args)
+	if b != nil {
+		return b
+	}
+	v, _ := c.Evaluate(env, a.Template.Body)
+	return v
+}
+
+// Expand substitutes checked predicate arguments into an abbreviation's
+// lexical scope without executing its body. Proof synthesis uses this same
+// substitution and bound check, with its own symbolic caller environment.
+func (a *AliasApplication) Expand(c *OpContext, caller *Environment, arguments []Value) (*Environment, *Bottom) {
+	if len(arguments) != len(a.Template.Params) {
+		return nil, c.NewErrf("incorrect number of alias arguments")
+	}
+	args := make(map[*TypeParameter]Value, len(arguments))
+	for i, value := range arguments {
+		args[a.Template.Params[i]] = value
+	}
+	outer := caller
+	for range a.UpCount {
+		outer = outer.Up
 	}
 	scope := c.newInlineVertex(nil, &StructMarker{})
-	env := &Environment{Up: c.Env(a.UpCount), Vertex: scope,
+	env := &Environment{Up: outer, Vertex: scope,
 		types: &typeScope{quantifier: a.Template}}
-	for e := c.Env(0); e != nil; e = e.Up {
+	for e := caller; e != nil; e = e.Up {
 		if e.types != nil && len(e.types.erasedIndices) != 0 {
 			if env.types.erasedIndices == nil {
 				env.types.erasedIndices = make(map[*IndexExpr]bool)
@@ -123,10 +146,9 @@ func (a *AliasApplication) evaluate(c *OpContext, state Flags) Value {
 	f := &FuncValue{Env: env}
 	inst, b := f.instantiate(c, args)
 	if b != nil {
-		return b
+		return nil, b
 	}
-	v, _ := c.Evaluate(inst.Env, a.Template.Body)
-	return v
+	return inst.Env, nil
 }
 
 func (c *OpContext) erasedAliasIndex(index *IndexExpr) bool {
@@ -192,6 +214,14 @@ func (q *Quantified) lexicalScope(c *OpContext) *Environment {
 type quantifiedScopeKey struct {
 	q      *Quantified
 	vertex *Vertex
+}
+
+// CheckingScope introduces a telescope in a symbolic checking environment.
+// It neither substitutes a witness nor normalizes the quantified body, so a
+// source checker can inspect every operation before eager refutation.
+func (q *Quantified) CheckingScope(c *OpContext, outer *Environment) *Environment {
+	return &Environment{Up: outer, Vertex: c.newInlineVertex(nil, &StructMarker{}),
+		types: &typeScope{quantifier: q}}
 }
 
 func universalDataMinimum(c *OpContext, x Expr, params map[*TypeParameter]bool) Expr {

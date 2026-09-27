@@ -162,6 +162,9 @@ func TestQuantifiedAliasErasureSelectionContexts(t *testing.T) {
 					functions = fixed + generic
 				}
 				v := cuecontext.New().CompileString("xs: [10, 20]\n" + tt.decl + "\n" + functions + "out: g()\nbad: f[0]()")
+				if err := v.LookupPath(cue.ParsePath("g")).Validate(cue.Concrete(true)); err != nil {
+					t.Fatalf("fixed alias application did not certify: %v", err)
+				}
 				if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 10 {
 					t.Fatalf("fixed alias application inherited another use's erasure check: %d, %v", got, err)
 				}
@@ -177,6 +180,9 @@ Select(B) = id[B]
 f(T): func(x: T) -> T: Select(T)(x)
 out: f[int](3)
 `)
+	if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); err != nil {
+		t.Fatalf("type selection through an alias did not certify: %v", err)
+	}
 	if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 3 {
 		t.Fatalf("erased alias argument prevented type selection: %d, %v", got, err)
 	}
