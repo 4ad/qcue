@@ -274,11 +274,16 @@ cannot escape.
 
 Certification shares one bounded proof context through nested evaluator calls.
 Completed proofs are reusable only when their inherited hypotheses are still
-available; a proof in progress is never evidence for itself. The work budget
+available. Recursive implementations may use their own declared contracts
+under the partial-correctness fixed-point rule, while every body's obligations
+are checked. Runtime descriptor identity and protocol inclusion must both be
+established; a recursive dependency cannot justify a stronger callback demand.
+These temporary hypotheses and dependent cached proofs cannot escape a failed
+checking scope. The work budget
 bounds repeated proof expansion as well as depth. Exhaustion reports
 incompleteness and leaves the original obligations available for another check.
 
-Unproved arithmetic implications, recursive termination proofs, optional
+Unproved arithmetic implications, optional
 presence branches, arbitrary quantified Boolean inclusion, and general
 existential witness synthesis remain incomplete. Effect annotations are retained
 and compared as capabilities, but implementation proofs for functions marked

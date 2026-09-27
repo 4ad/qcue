@@ -73,10 +73,14 @@ type proofScope struct {
 }
 
 type certifier struct {
-	ctx        *adt.OpContext
-	active     []*adt.FuncValue
-	hypotheses map[*adt.FuncValue]bool
-	scopes     map[*adt.Environment]*proofScope
+	ctx    *adt.OpContext
+	active []*adt.FuncValue
+	// A recursive implementation can use its declared contracts while all
+	// their bodies are being checked. These hypotheses never survive a
+	// failed implementation proof or justify an unrelated stronger view.
+	implementing []*adt.FuncValue
+	hypotheses   map[*adt.FuncValue]bool
+	scopes       map[*adt.Environment]*proofScope
 	// Constructed composites retain their synthesized members, including
 	// callback hypothesis identity. Re-evaluating a schema approximation
 	// must not replace the evidence attached to a projected runtime value.
@@ -191,6 +195,17 @@ func (p *certifier) captured(v adt.Value) adt.Value {
 
 func (p *certifier) implementation(f *adt.FuncValue) bool {
 	clauses := f.Obligations()
+	if p.recursing(f) {
+		return p.recursiveContracts(f, clauses)
+	}
+	saved := p.hypotheses
+	p.hypotheses = maps.Clone(saved)
+	p.hypotheses[f] = true
+	p.implementing = append(p.implementing, f)
+	defer func() {
+		p.hypotheses = saved
+		p.implementing = p.implementing[:len(p.implementing)-1]
+	}()
 	for _, target := range clauses {
 		if !p.function(f, target) {
 			return false
@@ -199,16 +214,58 @@ func (p *certifier) implementation(f *adt.FuncValue) bool {
 	return true
 }
 
+func (p *certifier) recursing(f *adt.FuncValue) bool {
+	for _, active := range p.active {
+		if active.Fn == f.Fn {
+			if same, known := adt.SameFunctionInstance(p.ctx, active, f); same || !known {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// The fixed-point rule is a partial-correctness rule, not a termination
+// certificate. Each declaration in a recursive dependency must still pass
+// its body proof. A recursive reference can use only contracts implied by
+// that declaration, with independently established runtime identity.
+func (p *certifier) recursiveContracts(f *adt.FuncValue, targets []adt.FuncType) bool {
+	for _, active := range p.implementing {
+		if active.Fn != f.Fn {
+			continue
+		}
+		if same, known := adt.SameFunctionInstance(p.ctx, active, f); !same || !known {
+			continue
+		}
+		s := &subsumer{ctx: p.ctx}
+		for _, target := range targets {
+			proved := false
+			for _, source := range active.Obligations() {
+				if !p.step() {
+					return false
+				}
+				// Residual protocols require their own bound-slot evidence.
+				if target.Partial() == source.Partial() && s.capabilitySignature(target, source) {
+					proved = true
+					break
+				}
+			}
+			if !proved {
+				return false
+			}
+		}
+		p.useHypothesis(active)
+		return true
+	}
+	return false
+}
+
 func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool) {
 	if !p.step() || f.Fn.Body == nil || len(p.active) >= 256 {
 		return false
 	}
-	for _, active := range p.active {
-		if active.Fn == f.Fn {
-			if same, known := adt.SameFunctionInstance(p.ctx, active, f); same || !known {
-				return false
-			}
-		}
+	if p.recursing(f) {
+		return p.recursiveContracts(f, []adt.FuncType{target})
 	}
 	if f.Src != nil && (f.Src.Extern.IsValid() || f.Src.Effect != nil) {
 		return false

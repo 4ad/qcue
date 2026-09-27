@@ -1,6 +1,9 @@
 -- in.cue --
 @test(validate, at="f")
-@test(validate, concrete, incomplete, at="f")
+@test(validate, concrete, at="f")
+
+// Partial correctness allows a recursive dependency when each declaration's
+// body checks under the declared contracts. This is not a termination proof.
 
 f: func(x: int) -> int: g(x)
 g: func(x: int) -> int: f(x)

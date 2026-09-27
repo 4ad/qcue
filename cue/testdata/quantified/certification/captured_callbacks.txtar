@@ -1,13 +1,13 @@
 // Certification of captured records and lists must prove every contained
 // callback, including callbacks passed to a function with a checked interface.
-// Their annotations alone are not evidence, and cycles through composites do
-// not discharge a proof. Correct captured callbacks remain certifiable.
+// Each body is checked, including recursive dependencies through composites.
+// Correct captured callbacks remain certifiable without a termination proof.
 
 -- in.cue --
 @test(validate, concrete, incomplete, at="returnRecord")
 @test(validate, concrete, incomplete, at="returnList")
 @test(validate, concrete, incomplete, at="callBad")
-@test(validate, concrete, incomplete, at="cyclic")
+@test(validate, concrete, at="cyclic")
 @test(validate, concrete, at="goodRecord")
 @test(validate, concrete, at="goodList")
 @test(validate, concrete, at="callGood")
