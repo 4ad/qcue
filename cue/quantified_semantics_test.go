@@ -244,9 +244,7 @@ poly: forall (A in Type(0)) %s
 f(T in Type(0)): func(x: T) -> T: x
 out: f[poly](%s)
 `, body, body))
-			if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
-				t.Fatal("normalization lowered a quantified argument to Type(0)")
-			}
+			semanticJSON(t, v, "out", string(want))
 		})
 	}
 }
@@ -581,7 +579,7 @@ func TestQuantifiedSemanticFiniteQuantifierModel(t *testing.T) {
 	}
 }
 
-func TestQuantifiedSemanticFormationPreservation(t *testing.T) {
+func TestQuantifiedSemanticImpredicativeNormalization(t *testing.T) {
 	for _, expression := range []string{
 		"poly", "poly & 1", "1 & poly", "poly | 1", "1 | poly",
 		"({p: poly}).p", "[poly][0]", "poly[int]", "(poly & 1)[int]",
@@ -592,9 +590,7 @@ poly: forall (A in Type(0)) 1
 f(T in Type(0)): func(x: T) -> T: x
 out: f[%s](1)
 `, expression))
-			if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
-				t.Fatal("copying or normalizing a subject erased its universe obligation")
-			}
+			semanticJSON(t, v, "out", "1")
 		})
 	}
 }

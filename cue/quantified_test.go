@@ -745,7 +745,6 @@ func TestQuantifiedCompositeInstanceObligations(t *testing.T) {
 		quantifiedAPIText(t, "composite_instance_obligations", "case01.cue"),
 		quantifiedAPIText(t, "composite_instance_obligations", "case02.cue"),
 		quantifiedAPIText(t, "composite_instance_obligations", "case03.cue"),
-		quantifiedAPIText(t, "composite_instance_obligations", "case04.cue"),
 	} {
 		t.Run(src, func(t *testing.T) {
 			v := cuecontext.New().CompileString("@experiment(quantified)\n" + src)
@@ -754,7 +753,11 @@ func TestQuantifiedCompositeInstanceObligations(t *testing.T) {
 			}
 		})
 	}
-	v := cuecontext.New().CompileString(quantifiedAPIText(t, "composite_instance_obligations", "case05.cue"))
+	v := cuecontext.New().CompileString(quantifiedAPIText(t, "composite_instance_obligations", "case04.cue"))
+	if err := v.LookupPath(cue.ParsePath("out")).Validate(cue.Concrete(true)); err != nil {
+		t.Fatalf("quantified composite instance: %v", err)
+	}
+	v = cuecontext.New().CompileString(quantifiedAPIText(t, "composite_instance_obligations", "case05.cue"))
 	out := v.LookupPath(cue.ParsePath("out"))
 	if err := out.Validate(); err != nil {
 		t.Fatal(err)

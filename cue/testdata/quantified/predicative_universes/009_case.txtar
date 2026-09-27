@@ -1,5 +1,5 @@
 -- in.cue --
-@test(validate, conflict, at="out")
+@test(validate, at="out")
 
 f:   forall (A in Type(1)) func(x: A) -> A: x
 out: f[forall (B in Type(1)) func(B) -> B]

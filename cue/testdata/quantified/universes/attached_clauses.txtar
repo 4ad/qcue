@@ -1,12 +1,12 @@
-// Formation depends on every retained telescope, not only implementation
-// parameters or the occurrences of binders in its parameter/result types.
+// Every retained telescope uses the same impredicative sort, including
+// unused binders and self instances reached through attached clauses.
 
 -- in.cue --
-@test(validate, conflict, at="self")
-@test(validate, conflict, at="tooSmall")
-@test(validate, at="largeEnough")
-@test(validate, conflict, at="compositeTooSmall")
-@test(validate, conflict, at="nestedSelf")
+@test(validate, at="self")
+@test(validate, at="baseSpelling")
+@test(validate, at="higherSpelling")
+@test(validate, at="compositeInstance")
+@test(validate, at="nestedSelf")
 
 f:          func(x: _) -> _: x
 f:          forall (A in Type(0)) func(A) -> A
@@ -17,8 +17,8 @@ g: func(x: _) -> _: x
 g: forall (A in Type(1)) func(A) -> A
 Box(A in Type(1)) = {value: A}
 Large(A in Type(2)) = {value: A}
-tooSmall:    Box(g)
-largeEnough: Large(g)
+baseSpelling:    Box(g)
+higherSpelling: Large(g)
 
 composite:         forall (A in Type(1)) {}
-compositeTooSmall: Box(composite)
+compositeInstance: Box(composite)

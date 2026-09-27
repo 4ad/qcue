@@ -135,9 +135,6 @@ func (f *FuncValue) inferInstance(c *OpContext, bindings []funcArg) (*FuncValue,
 			continue
 		}
 		v, _ := c.Evaluate(binding.env, binding.expr)
-		if err := checkTypeUniverse(c, ref.Param, v); err != nil && !err.IsIncomplete() {
-			return nil, err
-		}
 		if bound := s.declaredUpper(ref.Param); bound != nil &&
 			capabilityMember(c, nil, bound, v) == proofRefuted {
 			return nil, c.NewErrf("argument cannot satisfy bound of %s", ref.Param.Src.Name.Name)

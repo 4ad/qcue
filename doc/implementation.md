@@ -1,6 +1,6 @@
 # Quantified CUE: implementation and use
 
-This implementation supports fragments of profiles **S_H** (predicative
+This implementation supports fragments of profiles **S_H** (impredicative
 higher-rank quantification) and **A** (opaque existential packages) in
 [the proposal](paper.pdf) ([LaTeX source](paper.tex)). The `quantified` experiment
 is **enabled by default at every language version** in this fork, including
@@ -54,12 +54,16 @@ explicit quantifiers remain useful for nested expressions and elaborations.
 Quantifier blocks at the beginning of a record bind the rest of that record.
 Binder names may be shadowed; identity follows their declarations, not spelling.
 
-`A: number` is a subtype bound. `A in Type(0)` supplies an explicit predicative
-universe; a quantifier over `Type(n)` lives above level `n`. Ordinary data and
-monomorphic function types inhabit the base universe. Invalid level bounds and
-self-instantiation cycles are rejected. Unknown inferred universe relationships
-remain incomplete; an explicit level annotation can make a higher-rank boundary
-checkable.
+`A: number` is a subtype bound. All type binders range over one impredicative
+sort, also spelled `A in Type`. A quantified type can itself be an instance
+argument, including the identity's own quantified interface. Bound checking
+and lexical escape checks still apply; scope dependencies are not universe
+levels. The sort has no runtime representation.
+
+For source compatibility, the previously accepted `A in Type(n)` syntax
+denotes this same sort. Its nonnegative integer literal retains the old syntax
+validation but places no restriction on instance types. New code can omit the
+sort or write `Type` directly.
 
 A parametric alias abbreviates a description and creates no subject:
 
@@ -88,7 +92,7 @@ callback inputs, and propagates requirements through dependent subtype bounds.
 Data fields are collected before instantiating callbacks, including callbacks
 nested in records and lists. A chosen instance must admit every supplied slot.
 A failed candidate remains incomplete unless an independent necessary bound or
-universe condition excludes every instance; guarded clauses cannot disappear
+declared bound excludes every instance; guarded clauses cannot disappear
 because one guess failed. This remains a sufficient, incomplete inference rule.
 
 Type-sorted names denote predicates. An ordinary refinable field used in a
@@ -112,7 +116,7 @@ does not invalidate a separate fixed integer index through the same template.
 Finite literal value binders retain their selected values as runtime captures
 and are distinct from erased type binders. Type application and sealing share
 the same sorted witness check: value witnesses must belong to their range; type
-witnesses must satisfy their universe and subtype bounds. A mixed seal creates
+witnesses must satisfy their subtype bounds. A mixed seal creates
 opaque carriers only for its type witnesses.
 
 ## Functions, refinement, and checking
@@ -293,7 +297,7 @@ retain the original graph behind an inverse-image predicate, preserving
 closedness, correlations, optional restrictions, and patterns under later
 refinement. Definitions and absent optional fields undergo predicate transport.
 Unchanged pattern regions also retain their visible lexical dependencies and
-label bindings, so scope and universe checks cannot lose them.
+label bindings, so scope and sort checks cannot lose them.
 Omission passes through an adapter, so the private implementation chooses its
 own default rather than receiving the interface's default as an argument.
 Independent nested packages pass through by identity, preserving their seals
@@ -399,7 +403,7 @@ Projected methods from selected records and fixed lists retain their remaining
 method telescope through export and reimport, including separately supplied
 implementations. Original universal clauses remain proof obligations and cannot
 restart a consumed binder. Scalar normalization, call-result detachment, and graph deduplication likewise
-retain the introduction's universe and selection information. Passing a
+retain the introduction's binder and selection information. Passing a
 quantified scalar or list through an identity call cannot erase its remaining
 telescope or restart a consumed binder.
 
@@ -411,8 +415,8 @@ organized as follows:
 
 - `cue/ast`, `cue/parser`, and `cue/format` define lexical syntax and its round
   trips. `internal/core/compile` records binder identity and runtime captures.
-- `internal/core/adt/quantified.go`, `subject.go`, `universe.go`, and `witness.go`
-  handle type instances, shared subjects, universe checks, and correlated values.
+- `internal/core/adt/quantified.go`, `subject.go`, and `witness.go`
+  handle type instances, shared subjects, sort checks, and correlated values.
 - `internal/core/adt/capability.go`, `closure.go`, `abstract.go`, and `recursion.go`
   implement call obligations, operational identity, symbolic calls, and checked
   finite-list descent.
@@ -436,7 +440,8 @@ organized as follows:
   regression tests.
   Intentional errors and specification-only examples assert their errors or
   residual status. Syntax-only cases live in the parser corpus.
-- Additional txtar fixtures cover refinement, universes, opacity, identity,
+- Additional txtar fixtures cover refinement, impredicative instances, opacity,
+  identity,
   file ordering, certification, and export. Small Go harnesses retain checks
   requiring Go API operations or AST identity. Most inputs are txtar sections;
   small API tables and generated resource stress cases also live in Go tests.

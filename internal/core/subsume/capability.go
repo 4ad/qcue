@@ -164,9 +164,6 @@ func (s *subsumer) capabilityScopes(target, source adt.FuncType) (adt.FuncType, 
 		}
 		for i, p := range params {
 			q := candidates[i]
-			if q.ExplicitLevel && p.Level > q.Level {
-				return target, source, false
-			}
 			if !s.funcConstraint(source.Env, q.Bound, target.Env, p.Bound) {
 				return target, source, false
 			}

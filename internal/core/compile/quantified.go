@@ -109,7 +109,7 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 			continue
 		}
 		param := &adt.TypeParameter{Src: p}
-		if p.Sort != nil {
+		if p.Sort != nil && !isTypeSort(p.Sort) {
 			if finiteValueRange(p.Sort) {
 				param.ValueRange = c.expr(p.Sort)
 				param.References = c.freeReferences(p, param.ValueRange, false)
@@ -135,11 +135,10 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 			}
 			n, err := num.X.Int64()
 			if err != nil || n < 0 || n >= math.MaxInt {
-				// Reserve room for the strict level increase at a binder.
+				// Keep the accepted numeric spellings of legacy Type(n)
+				// declarations, without retaining a universe hierarchy.
 				return c.errf(p, "universe level exceeds the supported integer range")
 			}
-			param.Level = int(n)
-			param.ExplicitLevel = true
 		}
 		param.Bound = c.typeExpr(p.Bound)
 		param.References = c.freeReferences(p, param.Bound, false)
@@ -148,6 +147,13 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 	}
 	q.Body = c.expr(src.Body)
 	return q
+}
+
+// Type is a sort in binder syntax, not a runtime value. Legacy Type(n)
+// spellings are parsed above as aliases for this same impredicative sort.
+func isTypeSort(x ast.Expr) bool {
+	id, ok := x.(*ast.Ident)
+	return ok && id.Name == "Type"
 }
 
 func (c *compiler) typeExpr(x ast.Expr) adt.Expr {

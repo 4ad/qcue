@@ -16,7 +16,7 @@ package adt
 
 // checkWitness is the formation boundary shared by universal elimination and
 // explicit existential introduction. Value ranges require value membership;
-// type bounds require universe formation and predicate inclusion. A runtime
+// type bounds require predicate inclusion in the single type sort. A runtime
 // kind or a successful compatibility calculation cannot choose the sort.
 func (p *TypeParameter) checkWitness(c *OpContext, env *Environment, value Value) *Bottom {
 	if p.ValueRange != nil {
@@ -28,9 +28,6 @@ func (p *TypeParameter) checkWitness(c *OpContext, env *Environment, value Value
 				Err: c.Newf("unresolved value argument range for %s", p.Src.Name.Name)}
 		}
 		return nil
-	}
-	if b := checkTypeUniverse(c, p, value); b != nil {
-		return b
 	}
 	if p.Bound == nil {
 		return nil

@@ -1,5 +1,5 @@
 -- in.cue --
-@test(validate, conflict, at="p")
+@test(validate, at="p")
 
 #I: exists (A in Type(0)) {value: A}
 p: seal #I with (A = forall (B in Type(0)) func(B) -> B) {

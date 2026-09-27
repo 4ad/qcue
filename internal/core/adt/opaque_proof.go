@@ -33,7 +33,7 @@ func (o *PackageOpen) ProofView(c *OpContext, value Value) (*OpaqueType, Value) 
 		return nil, nil
 	}
 	p := &sealedPackage{interfaceType: e, carriers: make(map[*TypeParameter]*opaqueCarrier)}
-	carrier := &opaqueCarrier{owner: p, parameter: param, level: param.Level}
+	carrier := &opaqueCarrier{owner: p, parameter: param}
 	p.carriers[param] = carrier
 	typ := &OpaqueType{carrier: carrier}
 	env := quantifiedEnvironment(c, e, map[*TypeParameter]Value{param: typ})

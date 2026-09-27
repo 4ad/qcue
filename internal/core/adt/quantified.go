@@ -23,12 +23,10 @@ import (
 
 // TypeParameter is identified by its declaration, never by its spelling.
 // Bounds remain expressions in their telescope scope until an instance is
-// selected. Level is the predicative universe of admissible arguments.
+// selected. All type parameters range over the same impredicative sort.
 type TypeParameter struct {
-	Src           *ast.TypeParam
-	Bound         Expr
-	Level         int
-	ExplicitLevel bool
+	Src   *ast.TypeParam
+	Bound Expr
 	// ValueRange is non-nil for the finite value-binder fragment. General
 	// dependent ranges and signatures remain outside this profile.
 	ValueRange Expr

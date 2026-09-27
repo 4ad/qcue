@@ -707,7 +707,8 @@ out: (open p as (A, P) {
 }
 
 // Memoizing a successful call may detach ground data from its activation, but
-// cannot erase a subject's remaining type-selection or formation obligations.
+// cannot erase a subject's remaining type-selection obligations. Quantified
+// arguments belong to the same type sort as ordinary data predicates.
 func TestQuantifiedBoundaryCallSubjectPreservation(t *testing.T) {
 	for _, subject := range []string{"1", "[1]", "{v: 1}"} {
 		for _, wrap := range []string{"%s", "[%s]"} {
@@ -728,18 +729,16 @@ id: func(x: _) -> _: x
 p: seal #M with (Z = int) {id: func(x: _) -> _: x}
 copied: %s
 selected: %s[int]
-bad: %s[forall (X in Type(0)) func(X) -> X]
+polymorphic: %s[forall (X in Type(0)) func(X) -> X]
 consumed: %s[int][bool]
 `, subject, call, selectSubject, selectSubject, selectSubject))
-					for _, path := range []string{"copied", "selected"} {
+					for _, path := range []string{"copied", "selected", "polymorphic"} {
 						if err := v.LookupPath(cue.ParsePath(path)).Validate(cue.Concrete(true)); err != nil {
 							t.Fatalf("%s: %v", path, err)
 						}
 					}
-					for _, path := range []string{"bad", "consumed"} {
-						if err := v.LookupPath(cue.ParsePath(path)).Validate(); err == nil {
-							t.Fatalf("%s lost a formation/elimination constraint", path)
-						}
+					if err := v.LookupPath(cue.ParsePath("consumed")).Validate(); err == nil {
+						t.Fatal("a consumed binder became available for selection again")
 					}
 				})
 			}

@@ -1,5 +1,5 @@
 -- in.cue --
-@test(validate, conflict, at="out")
+@test(validate, at="out")
 
 id:
 	forall (A) func(x: A) -> A: x

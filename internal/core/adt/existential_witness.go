@@ -91,9 +91,7 @@ func openDataWitness(c *OpContext, subject *Vertex) (*Vertex, *Bottom) {
 				Err: c.Newf("opening a bounded transparent witness remains unresolved")}
 		}
 		representation := witness.arguments[param]
-		level, _ := universeOf(c, representation, make(map[Expr]bool))
-		carrier := &opaqueCarrier{owner: p, parameter: param, representation: representation,
-			level: max(param.Level, level)}
+		carrier := &opaqueCarrier{owner: p, parameter: param, representation: representation}
 		p.carriers[param] = carrier
 		public[param] = &OpaqueType{carrier: carrier}
 	}

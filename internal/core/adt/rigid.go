@@ -77,7 +77,7 @@ func FunctionTypeArguments(t FuncType) map[*ast.TypeParam]Value {
 
 // BindFunctionTypes opens a telescope with proof variables. It performs no
 // bound checking: callers must prove the corresponding premises. Program
-// instantiation instead uses instantiate, which checks bounds and universes.
+// instantiation instead uses instantiate, which checks the declared bounds.
 func BindFunctionTypes(t FuncType, args []Value) FuncType {
 	bindings := make(map[*TypeParameter]Value)
 	for i, p := range typeParameters(t.Env) {

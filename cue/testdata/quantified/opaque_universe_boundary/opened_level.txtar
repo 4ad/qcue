@@ -1,13 +1,13 @@
-// An opening preserves the representation binder's declared or inferred
-// universe. Abstract types and their singleton values cannot lower that level.
+// Opaque witnesses and their singleton values use the same impredicative
+// sort. Legacy Type(n) spellings no longer restrict their instance types.
 
 -- in.cue --
 @test(validate, concrete, at="p")
-@test(validate, conflict, at="badType")
-@test(validate, conflict, at="badValue")
-@test(validate, conflict, at="badRecord")
-@test(validate, conflict, at="badInferred")
-@test(validate, conflict, at="badDeclared")
+@test(json, true, at="typeInstance")
+@test(json, true, at="valueInstance")
+@test(json, true, at="recordInstance")
+@test(json, true, at="inferredInstance")
+@test(json, true, at="declaredInstance")
 @test(json, [true, true, true], at="good")
 
 #Poly: forall (B in Type(0)) func(B) -> B
@@ -17,17 +17,17 @@ p: seal #I with (A = #Poly) {
 }
 Base(T in Type(0)) = true
 Higher(T in Type(1)) = true
-badType:   (open p as (A, P) {x: Base(A)}).x
-badValue:  (open p as (A, P) {x: Base(P.value)}).x
-badRecord: (open p as (A, P) {x: Base({value: A})}).x
+typeInstance:   (open p as (A, P) {x: Base(A)}).x
+valueInstance:  (open p as (A, P) {x: Base(P.value)}).x
+recordInstance: (open p as (A, P) {x: Base({value: A})}).x
 
 #Inferred: exists (A) {value: A}
 inferred: seal #Inferred with (A = #Poly) {
 	value: forall (B in Type(0)) func(x: B) -> B: x
 }
-badInferred: (open inferred as (A, P) {x: Base(A)}).x
+inferredInstance: (open inferred as (A, P) {x: Base(A)}).x
 declared:    seal #I with (A = int) {value: 1}
-badDeclared: (open declared as (A, P) {x: Base(A)}).x
+declaredInstance: (open declared as (A, P) {x: Base(A)}).x
 base:        seal #Inferred with (A = int) {value: 1}
 good: [
 	(open p as (A, P) {x: Higher(A)}).x,

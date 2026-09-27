@@ -47,10 +47,10 @@ adding a semantic case.
 | [opaque_closure_escape](opaque_closure_escape/) | Captured abstract values and delayed escape checks |
 | [opaque_composite_transport](opaque_composite_transport/) | Composite data, hidden fields, and complete overloaded interfaces across opaque boundaries |
 | [opaque_generic_operations](opaque_generic_operations/) | Generic operations on abstract carriers |
-| [opaque_universe_boundary](opaque_universe_boundary/) | Universe restrictions at opaque boundaries |
+| [opaque_universe_boundary](opaque_universe_boundary/) | Impredicative witnesses across opaque boundaries |
 | [parametric_aliases](parametric_aliases/) | Description aliases, lexical scope, arity, and cycles |
 | [partial_capabilities](partial_capabilities/) | Partial application and residual capabilities |
-| [predicative_universes](predicative_universes/) | Universe levels and higher-rank checking |
+| [predicative_universes](predicative_universes/) | Higher-rank instances through legacy sort spellings |
 | [record_data_projections](record_data_projections/) | Correlated fields and data projections |
 | [recursion_requires_descent](recursion_requires_descent/) | Rejected recursion without a decreasing argument |
 | [seal_generativity](seal_generativity/) | Fresh carriers, copied packages, and incompatible seals |
@@ -58,8 +58,8 @@ adding a semantic case.
 | [slice_preserves_source](slice_preserves_source/) | Slicing a universally constrained list |
 | [structural_recursion](structural_recursion/) | Execution with finite structural descent |
 | [universal_refutations](universal_refutations/) | Concrete counterexamples to universal descriptions |
-| [universe_literals](universe_literals/) | Formation errors for invalid universe level literals |
-| [universe_occurs_check](universe_occurs_check/) | Predicative cycles and self-application |
+| [universe_literals](universe_literals/) | Syntax checks for legacy Type(n) literals |
+| [universe_occurs_check](universe_occurs_check/) | Impredicative self-application |
 | [validation](validation/) | Ordinary concrete validation of function contracts, defaults, nested values, and residual proofs |
 
 ## Other layers
@@ -148,7 +148,7 @@ These regressions check membership, bounds, and lexical preservation:
 | Type arguments prove inclusion in structural bounds | [structural_bounds](invalid_instances/structural_bounds.txtar) |
 | An unknown callback row cannot establish complete call coverage | [open_callback_row](certification/open_callback_row.txtar) |
 | Required results impose field presence, including top-valued fields | [required_results](certification/required_results.txtar) |
-| Opened abstract types retain their representation universe | [opened_level](opaque_universe_boundary/opened_level.txtar) |
+| Opened abstract types admit quantified type arguments | [opened_level](opaque_universe_boundary/opened_level.txtar) |
 | Finite alias arguments satisfy their declared range | [value_ranges](parametric_aliases/value_ranges.txtar) |
 | Export preserves shared code origins and distinct captures | [closure_export](api/closure_export.txtar) |
 | Residual quantifier export retains lexical substitutions | [quantifier_export](api/quantifier_export.txtar) |
@@ -184,7 +184,7 @@ Further regressions cover call protocols, identity, and bounded evaluation:
 | Callable guard membership requires independent proof | [higher_order_guard_proof](capabilities/higher_order_guard_proof.txtar) |
 | Certified calls respect partial and builtin protocols | [certification_protocol_test.go](../../certification_protocol_test.go) |
 | Seal identity survives singleton and capture equality | [seal_identity](opaque/seal_identity.txtar) |
-| Every retained telescope participates in universe checks | [attached_clauses](universes/attached_clauses.txtar) |
+| Attached telescopes admit impredicative instances | [attached_clauses](universes/attached_clauses.txtar) |
 | Composite selection considers every admissible clause | [composite_clause_order](instantiation/composite_clause_order.txtar) |
 | Aliases retain contextual witness decoding and code identity | [alias_witness_test.go](../../alias_witness_test.go) |
 | Export preserves lexical predicates and contract environments | [lexical_export_test.go](../../lexical_export_test.go) |
