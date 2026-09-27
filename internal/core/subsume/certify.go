@@ -161,36 +161,77 @@ func (p *certifier) frame(up *adt.Environment, values map[adt.Feature]adt.Value)
 	return env
 }
 
-// Captured runtime values must be complete, including conformance of any
-// functions nested inside them. Reuse this proof's dependency context.
+// Static capture types need not be materialized yet. Named imports supply
+// conditional hypotheses, while supplied implementations require their own
+// proofs. Concrete closure validation separately discharges these links and
+// requires every runtime capture to be complete.
 func (p *certifier) captured(v adt.Value) adt.Value {
-	// A refuted data hypothesis is not a value in the checking context.
-	// Only a checked source operation can introduce a failing computation.
-	if _, ok := adt.Unwrap(v).(*adt.Bottom); ok {
+	if !p.captureType(v, make(map[adt.Value]bool)) {
 		return nil
 	}
-	if b, ok := adt.Unwrap(v).(*adt.Builtin); ok {
-		if ValidateBuiltin(p.ctx, b) != nil {
-			return nil
-		}
-		return b
-	}
-	if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok {
-		if !p.implementation(f) {
-			return nil
-		}
-		return f
-	}
-	if vertex, ok := v.(*adt.Vertex); ok {
-		if adt.Validate(p.ctx, vertex, &adt.ValidateConfig{
-			Concrete: true, Runtime: true, CheckFunction: p.validateFunction, CheckBuiltin: ValidateBuiltin,
-		}) != nil {
-			return nil
-		}
-	} else if v == nil || !adt.IsConcrete(v) {
-		return nil
+	switch x := adt.Unwrap(v).(type) {
+	case *adt.FuncValue, *adt.Builtin:
+		return x.(adt.Value)
 	}
 	return v
+}
+
+func (p *certifier) captureType(v adt.Value, seen map[adt.Value]bool) bool {
+	if v == nil || !p.step() {
+		return false
+	}
+	if seen[v] {
+		return true
+	}
+	seen[v] = true
+	switch x := adt.Unwrap(v).(type) {
+	case *adt.Bottom:
+		// A refuted data hypothesis is not a value. Only a checked source
+		// operation can introduce a failing computation into the proof.
+		return false
+	case *adt.Builtin:
+		return ValidateBuiltin(p.ctx, x) == nil
+	case *adt.FuncValue:
+		if x.Fn.Body == nil {
+			p.assume(x, make(map[adt.Value]bool))
+			return true
+		}
+		return p.implementation(x)
+	case *adt.Conjunction:
+		for _, term := range x.Values {
+			if !p.captureType(term, seen) {
+				return false
+			}
+		}
+	case *adt.Disjunction:
+		for _, branch := range x.Values {
+			if !p.captureType(branch, seen) {
+				return false
+			}
+		}
+	}
+	if vertex, ok := v.(*adt.Vertex); ok {
+		cfg := &adt.ValidateConfig{Runtime: true}
+		_, opaque := adt.Unwrap(v).(*adt.OpaqueValue)
+		if opaque || vertex.IsOpaquePackage() {
+			// Opaque representations carry their own private implementation
+			// obligations, not just the visible fields walked below.
+			cfg.Concrete = true
+			cfg.CheckFunction, cfg.CheckBuiltin = p.validateFunction, ValidateBuiltin
+		}
+		if adt.Validate(p.ctx, vertex, cfg) != nil {
+			return false
+		}
+		for _, field := range vertex.Arcs {
+			if field.Label.IsDef() || field.Label.IsLet() || field.ArcType == adt.ArcOptional {
+				continue
+			}
+			if !p.captureType(field, seen) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (p *certifier) implementation(f *adt.FuncValue) bool {

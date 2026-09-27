@@ -228,8 +228,12 @@ The conformance checker handles annotated structural bodies, higher-rank
 arguments, records, lists, projections, finite comprehensions, supported pure
 primitives, and defaults proved to belong to the argument domain. Partial
 closures retain the original implementation obligations; attached residual
-contracts are checked using the saved argument slots. Bound and captured
-callbacks require their own proofs, including callbacks inside composites.
+contracts are checked using the saved argument slots. Static captures may
+remain typed data constraints or named unlinked imports. Supplied bound and
+captured callbacks require their own proofs, including callbacks inside
+composites. Unlinked callback interfaces provide conditional hypotheses;
+concrete closure validation still requires their implementations and runtime
+capture values. Refuted captured data cannot justify a body proof.
 Every saved argument must also belong to its parameter's required domain; a
 callback's own valid annotation is insufficient. This check is separate from
 the universal proof of the original implementation and residual contracts.
