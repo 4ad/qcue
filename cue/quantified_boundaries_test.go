@@ -300,7 +300,7 @@ func TestQuantifiedBoundaryScopedTransport(t *testing.T) {
 		{`[{value: A|null}]`, `[{value: int}]`, `[{value: 7}]`, `[0].value`},
 	} {
 		t.Run(tc.public, func(t *testing.T) {
-			v := semanticValue(t, fmt.Sprintf(`
+			source := fmt.Sprintf(`
 #M: exists A {
     make: func() -> %s
     read: func(A) -> int
@@ -310,7 +310,14 @@ p: seal #M with (A = int) {
     read: func(x: int) -> int: x
 }
 out: (open p as (A, P) {r: P.read(P.make()%s)}).r
-`, tc.public, tc.private, tc.value, tc.access))
+`, tc.public, tc.private, tc.value, tc.access)
+			// The public result admits null. Its private implementation
+			// cannot supply the missing A evidence to a client call.
+			requireBlockedCall(t, semanticValue(t, source).LookupPath(cue.ParsePath("out")))
+			// An explicit source assertion supplies that evidence and keeps
+			// the original transport behavior on successful results.
+			v := semanticValue(t, strings.Replace(source,
+				"P.read(P.make()"+tc.access+")", "P.read(P.make()"+tc.access+" & A)", 1))
 			if err := v.Validate(cue.Concrete(true)); err != nil {
 				t.Fatal(err)
 			}
