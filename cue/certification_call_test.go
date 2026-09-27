@@ -34,6 +34,12 @@ func TestQuantifiedCallRequiresCertificate(t *testing.T) {
 		`bad(1) != _|_`,
 		`{field: bad(1)} == _|_`,
 		`{field: bad(1)} != _|_`,
+		`{field: bad(1), value: 0}.value`,
+		`{let field = bad(1), unused: field, value: 0}.value`,
+		`[bad(1), 0][1]`,
+		`[bad(1), 0][1:]`,
+		`{if false {field: bad(1)}, value: 0}.value`,
+		`{[string]: bad(1), value: 0}.value`,
 	} {
 		t.Run(expr, func(t *testing.T) {
 			v := cuecontext.New().CompileString(`

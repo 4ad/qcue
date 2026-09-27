@@ -1131,6 +1131,10 @@ func (x *SelectorExpr) Source() ast.Node {
 }
 
 func (x *SelectorExpr) resolve(c *OpContext, state Flags) *Vertex {
+	if b := c.checkSourceOperations(x.X); b != nil {
+		c.AddBottom(b)
+		return emptyNode
+	}
 	n := c.node(x, x.X, x.Sel.IsRegular(), Flags{
 		status:    partial,
 		condition: needFieldSetKnown,
@@ -1179,6 +1183,10 @@ func (x *IndexExpr) Source() ast.Node {
 }
 
 func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
+	if b := ctx.checkSourceOperations(x.X); b != nil {
+		ctx.AddBottom(b)
+		return emptyNode
+	}
 	// Type application uses predicates as arguments, so it must precede
 	// the ordinary index path, which requires a concrete string or integer.
 	if x.Quantified {
@@ -1277,6 +1285,9 @@ func (x *SliceExpr) Source() ast.Node {
 }
 
 func (x *SliceExpr) evaluate(c *OpContext, state Flags) Value {
+	if b := c.checkSourceOperations(x.X); b != nil {
+		return b
+	}
 	// TODO: strides
 
 	v := c.value(x.X, Flags{

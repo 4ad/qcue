@@ -169,3 +169,22 @@ func (f *FuncValue) ResidualSignature() *Function {
 	fn, _ := f.residualSignature()
 	return fn
 }
+
+// A checked function scope already has a derivation for every source term.
+// Other projections must retain the obligations of discarded constructors.
+func (c *OpContext) checkSourceOperations(expr Expr) *Bottom {
+	if c.CheckSourceOperations == nil {
+		return nil
+	}
+	for env := c.Env(0); env != nil; env = env.Up {
+		if env.checkedCalls {
+			return nil
+		}
+	}
+	switch expr.(type) {
+	case *StructLit, *ListLit, *BinaryExpr, *DisjunctionExpr,
+		*SelectorExpr, *IndexExpr, *SliceExpr, *AliasApplication:
+		return c.CheckSourceOperations(c, c.Env(0), expr)
+	}
+	return nil
+}

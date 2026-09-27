@@ -39,6 +39,8 @@ func (p *certifier) enter() func() {
 	check, inclusion := p.ctx.CheckFunction, p.ctx.ProveInclusion
 	application := p.ctx.CheckApplication
 	argument := p.ctx.CheckArgument
+	source := p.ctx.CheckSourceOperations
+	p.ctx.CheckSourceOperations = nil
 	p.ctx.CheckFunction = p.validateFunction
 	p.ctx.ProveInclusion = p.proveInclusion
 	p.ctx.CheckApplication = p.validateApplication
@@ -49,6 +51,7 @@ func (p *certifier) enter() func() {
 		p.ctx.CheckFunction, p.ctx.ProveInclusion = check, inclusion
 		p.ctx.CheckApplication = application
 		p.ctx.CheckArgument = argument
+		p.ctx.CheckSourceOperations = source
 	}
 }
 

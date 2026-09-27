@@ -159,6 +159,10 @@ type OpContext struct {
 	// as a conditional hypothesis, but cannot synthesize an execution witness.
 	CheckApplication func(*OpContext, *Environment, Value, *CallExpr) (Value, *Bottom)
 
+	// CheckSourceOperations checks source calls before a projection can
+	// discard their enclosing constructor. It never executes those calls.
+	CheckSourceOperations func(*OpContext, *Environment, Expr) *Bottom
+
 	// CheckArgument retains source construction evidence when a saved
 	// partial packet is checked against a residual clause.
 	CheckArgument func(*Environment, Expr) Value
