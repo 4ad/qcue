@@ -1,11 +1,11 @@
 // Inference may select the empty predicate for an unconstrained type argument
 // when that instance admits the supplied packet. Empty containers and unused
 // binders do not require element witnesses. A failed speculative instance
-// remains incomplete rather than refuting an unsupported inference shape.
+// blocks static application rather than refuting an unsupported inference shape.
 
 -- in.cue --
 @test(json, [[], 3, [], {items: []}, [1], "ordinary"], at="out")
-@test(validate, concrete, incomplete, at="unsupported")
+@test(validate, blocked, at="unsupported")
 
 #id:
 	forall (A) func(xs: [...A]) -> [...A]: xs

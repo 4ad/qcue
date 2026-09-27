@@ -40,17 +40,22 @@ func TestQuantifiedCallRequiresCertificate(t *testing.T) {
 bad: func(x:int)->int: {value:"wrong"}.value
 out: ` + expr)
 			out := v.LookupPath(cue.ParsePath("out"))
-			if err := out.Validate(); err == nil {
-				t.Fatal("ordinary validation accepted an uncertified call")
-			}
-			if _, err := out.MarshalJSON(); err == nil {
-				t.Fatal("an uncertified call produced a successful observation")
-			}
-			_, vertex := value.ToInternal(out)
-			b := adt.CombineErrors(nil, vertex.Bottom(), vertex.ChildErrors)
-			if b == nil || b.Code != adt.BlockedError {
-				t.Fatalf("missing non-refuting static diagnostic: %v", b)
-			}
+			requireBlockedCall(t, out)
 		})
+	}
+}
+
+func requireBlockedCall(t *testing.T, out cue.Value) {
+	t.Helper()
+	if err := out.Validate(); err == nil {
+		t.Fatal("ordinary validation accepted an uncertified call")
+	}
+	if _, err := out.MarshalJSON(); err == nil {
+		t.Fatal("an uncertified call produced a successful observation")
+	}
+	_, vertex := value.ToInternal(out)
+	b := adt.CombineErrors(nil, vertex.Bottom(), vertex.ChildErrors)
+	if b == nil || b.Code != adt.BlockedError {
+		t.Fatalf("missing non-refuting static diagnostic: %v", b)
 	}
 }

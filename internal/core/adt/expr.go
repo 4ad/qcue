@@ -1464,7 +1464,7 @@ func (x *UnaryExpr) evaluate(c *OpContext, state Flags) Value {
 		if v, ok := v.(*Num); ok {
 			f := *v
 			f.X.Neg(&v.X)
-			f.Src = x.Src
+			f.Src = x.Source()
 			return &f
 		}
 		expectedKind = NumberKind
@@ -2373,14 +2373,14 @@ func (x *FuncValue) bindCall(c *OpContext, call *CallExpr) (bindings []funcArg, 
 
 func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	if x.Fn != nil && x.Fn.Body != nil && capabilityMode(x.Fn, x.Types) {
-		if c.CheckFunction == nil {
+		if c.CheckApplication == nil {
 			return &Bottom{Src: call.Source(), Code: BlockedError,
-				Err: c.Newf("function conformance checker is not configured")}
+				Err: c.Newf("function application checker is not configured")}
 		}
-		// Every retained contract is proved before selecting an instance,
-		// binding a partial packet, executing code, or reusing a result.
-		// A successful call cannot replace this universal obligation.
-		if b := c.CheckFunction(c, x); b != nil {
+		// Check the source application, including every retained body
+		// contract, before binding a partial packet or executing code.
+		// Memoization and a successful result cannot replace that proof.
+		if _, b := c.CheckApplication(c, c.Env(0), x, call); b != nil {
 			return b
 		}
 	}

@@ -20,6 +20,8 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/value"
 )
 
 // A callback can implement its own declared type without belonging to the
@@ -49,7 +51,11 @@ g: func(y: int) -> int: p(y)
 								t.Fatalf("%s: static membership check: %v, good=%v", path, err, good)
 							}
 							if err := x.Err(); err != nil {
-								t.Fatalf("%s: blocked membership became semantic bottom: %v", path, err)
+								_, vertex := value.ToInternal(x)
+								b := adt.CombineErrors(nil, vertex.Bottom(), vertex.ChildErrors)
+								if good || path == "cb" || b == nil || b.Code != adt.BlockedError {
+									t.Fatalf("%s: unexpected call diagnostic: %v", path, err)
+								}
 							}
 							if err := x.Validate(cue.Concrete(true)); (err == nil) != (good || path == "cb") {
 								t.Fatalf("%s: conformance %v, good=%v", path, err, good)

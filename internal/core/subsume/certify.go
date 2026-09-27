@@ -1182,6 +1182,11 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return nil
 	case *adt.CallExpr:
 		return p.call(env, x)
+	case adt.Value:
+		// Internal calls can carry an already evaluated argument across a
+		// representation boundary. Retain its own capture and conformance
+		// checks instead of treating it as a new source constructor.
+		return p.captured(x)
 	}
 	return nil
 }
@@ -1712,7 +1717,7 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 		sources = function.CallClausesFor(p.ctx, target)
 		results = function.ResultClausesFor(p.ctx, target)
 	}
-	s := &subsumer{ctx: p.ctx}
+	s := &subsumer{ctx: p.ctx, certifier: p}
 	admit := func(source adt.FuncType) (adt.FuncType, bool) {
 		if len(adt.FunctionTypeParameters(source)) != 0 {
 			var b *adt.Bottom

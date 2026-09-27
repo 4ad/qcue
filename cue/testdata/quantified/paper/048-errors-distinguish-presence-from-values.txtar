@@ -15,7 +15,9 @@ e: sum(_, 2)               // supplied but incomplete, not missing
 @test(validate, conflict, at="b")
 @test(validate, conflict, at="c")
 @test(validate, conflict, at="d")
-@test(validate, concrete, incomplete, at="e")
+// The supplied top value cannot establish integer packet membership yet.
+// This is a blocked static judgment, not a missing-argument error.
+@test(validate, blocked, at="e")
 
 sum: func(a: int, b: int) -> int: a + b
 a: sum(1, a: 1)            // duplicate binding, even with equal values

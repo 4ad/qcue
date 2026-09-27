@@ -1,0 +1,32 @@
+// Admission checks every source argument before execution, even when its
+// evaluated projection or the called body would discard an invalid operation.
+
+-- in.cue --
+@test(json, [0, 0, 0, 0], at="out")
+@test(validate, blocked, at="discardedField")
+@test(validate, blocked, at="discardedLet")
+@test(validate, blocked, at="badAlternative")
+@test(validate, blocked, at="badDefaultAlternative")
+@test(validate, blocked, at="badPartial")
+@test(validate, blocked, at="unknown")
+@test(validate, blocked, at="badCallback")
+@test(json, [true, true], at="failed")
+
+ignore: func(x: int) -> int: 0
+needs: func(r: {a: int}) -> int: r.a
+use: func(h: func(int) -> 1) -> int: 0
+constant: func(x: int) -> int: 1
+identity: func(x: int) -> int: x
+
+out: [ignore(2), ignore(1 | 2), use(constant),
+	ignore({unused: needs({a: 1}), value: 2}.value)]
+discardedField: ignore({unused: needs({}), value: 2}.value)
+discardedLet: ignore({let invalid = needs({}), unused: invalid, value: 2}.value)
+badAlternative: ignore(1 | "one")
+badDefaultAlternative: ignore(*1 | "one")
+badPartial: ignore(1 | "one", ...)
+unknown: ignore(_)
+badCallback: use(identity)
+
+stop: func(x: int) -> int: _|_
+failed: [ignore(1 & 2) == _|_, stop(1) == _|_]

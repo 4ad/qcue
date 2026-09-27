@@ -43,9 +43,7 @@ func TestQuantifiedAliasWitness(t *testing.T) {
 				}
 				v := ctx.CompileString("x: int\n" + strings.ReplaceAll(alias, ";", "\n") + "\n" + use)
 				out := v.LookupPath(cue.ParsePath("out"))
-				if err := out.Validate(); err != nil {
-					t.Fatalf("pending witness: %v", err)
-				}
+				requireBlockedCall(t, out)
 				if _, err := out.MarshalJSON(); err == nil {
 					t.Fatal("unresolved alias witness was erased")
 				}
@@ -129,9 +127,7 @@ func TestParametricAliasWitness(t *testing.T) {
 					}
 					v := cuecontext.New().CompileString("x: int\n" + use)
 					out := v.LookupPath(cue.ParsePath("out"))
-					if err := out.Validate(); err != nil {
-						t.Fatalf("pending witness: %v", err)
-					}
+					requireBlockedCall(t, out)
 					if _, err := out.MarshalJSON(); err == nil {
 						t.Fatal("unresolved alias witness was erased")
 					}

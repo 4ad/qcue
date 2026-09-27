@@ -670,11 +670,9 @@ func TestQuantifiedWitnessCorrelation(t *testing.T) {
 			if !out.Exists() {
 				t.Fatal(v.Err())
 			}
-			blocked := tt.name == "guard" || tt.name == "selector result" || tt.name == "alias result" ||
-				tt.name == "indexed result" || tt.name == "result"
-			if err := out.Validate(); (err != nil) != blocked {
-				t.Fatalf("unresolved witness: blocked=%v: %v", blocked, err)
-			}
+			// Neither a result implication nor packet membership can assume
+			// that an unresolved witness equals this call's concrete value.
+			requireBlockedCall(t, out)
 			if err := out.Validate(cue.Concrete(true)); err == nil {
 				t.Fatal("witness upper bound was mistaken for its singleton")
 			}

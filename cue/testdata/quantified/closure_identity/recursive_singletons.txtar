@@ -2,7 +2,7 @@
 // singleton obligation, not evidence that the witnesses are different.
 
 -- in.cue --
-@test(validate, concrete, incomplete, at="out")
+@test(validate, blocked, at="out")
 @test(validate, concrete, at="selfOut")
 
 #C: {cb: func() -> _, f: func() -> _: cb}

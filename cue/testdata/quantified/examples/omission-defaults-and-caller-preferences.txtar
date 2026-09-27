@@ -1,7 +1,7 @@
 -- in.cue --
 @test(json, 11, at="omitted")
 @test(json, 6, at="supplied")
-@test(validate, concrete, incomplete, at="unknown")
+@test(validate, blocked, at="unknown")
 
 add:      func(a: int, b: int = 10) -> int: a + b
 x:        int | *5
