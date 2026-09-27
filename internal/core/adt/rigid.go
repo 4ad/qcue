@@ -58,18 +58,55 @@ func SelectFunctionType(c *OpContext, f *FuncValue, argument Value) (*FuncValue,
 	return f.selectType(c, argument)
 }
 
-// BoundArgumentInstance selects a witness for the saved part of a packet.
-// This checks that partial application is possible; it does not specialize
-// the closure's residual protocol or discharge its universal obligations.
-func (f *FuncValue) BoundArgumentInstance(c *OpContext) (FuncType, *Bottom) {
-	if f.IsPartial() && len(typeParameters(f.Env)) != 0 {
-		inst, b := f.inferInstance(c, f.args)
-		if b != nil {
-			return FuncType{}, b
-		}
-		return FuncType{Fn: f.Fn, Env: inst.Env}, nil
+// BoundArgumentInstances supplies candidate instances for the saved part of
+// a packet, in the implementation's parameter coordinates. A conjunction of
+// selected views admits any of their domains. The checker must still prove
+// saved argument membership in one candidate; these instances neither freeze
+// the residual protocol nor discharge the original universal obligations.
+func (f *FuncValue) BoundArgumentInstances(c *OpContext) []FuncType {
+	views := f.callViews
+	if len(views) == 0 {
+		views = []*FuncValue{f}
 	}
-	return FuncType{Fn: f.Fn, Env: f.Env}, nil
+	var instances []FuncType
+	for _, view := range views {
+		env := view.Env
+		if f.IsPartial() && len(typeParameters(env)) != 0 {
+			inst, b := view.inferInstance(c, f.args)
+			if b != nil {
+				continue
+			}
+			env = inst.Env
+		}
+		instances = append(instances, FuncType{Fn: view.Fn, Env: env})
+	}
+	return instances
+}
+
+// BindFunctionPacket constructs a residual proof descriptor using the runtime
+// packet-binding protocol, without evaluating the body or accepting argument
+// membership. The caller separately proves each supplied argument's type.
+func BindFunctionPacket(c *OpContext, f *FuncValue, packet FuncType) (*FuncValue, *Bottom) {
+	call := &CallExpr{Partial: true}
+	for _, arg := range packet.Fn.Params {
+		call.Args = append(call.Args, arg.Value)
+		call.ArgLabels = append(call.ArgLabels, arg.Label)
+	}
+	bindings, unused, b := f.bindCall(c, call)
+	if b != nil {
+		return nil, b
+	}
+	if unused != nil {
+		return nil, unused
+	}
+	for i := range bindings {
+		if i >= len(f.args) || f.args[i].expr == nil {
+			bindings[i].env = packet.Env
+		}
+	}
+	copy := *f
+	copy.args = bindings
+	return &copy, nil
 }
 
 // FunctionTypeArguments returns the lexical substitutions selected for a

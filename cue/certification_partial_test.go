@@ -63,3 +63,69 @@ g: func(y: int) -> int: p(y)
 		}
 	}
 }
+
+func TestQuantifiedSavedSelectedViews(t *testing.T) {
+	for _, views := range []string{"f[int] & f[string]", "f[string] & f[int]"} {
+		for _, argument := range []string{"1", `"s"`} {
+			for _, binding := range []string{"%s, ...", "x: %s, ..."} {
+				t.Run(views+argument+binding, func(t *testing.T) {
+					v := semanticValue(t, fmt.Sprintf(`
+f(A): func(x: A, y: bool) -> A: x
+views: %s
+p: views(%s)
+client: func(y: bool) -> (int | string): p(y)
+out: client(true)
+`, views, fmt.Sprintf(binding, argument)))
+					for _, path := range []string{"p", "client"} {
+						if err := v.LookupPath(cue.ParsePath(path)).Validate(cue.Concrete(true)); err != nil {
+							t.Fatalf("%s certificate: %v", path, err)
+						}
+					}
+					semanticJSON(t, v, "out", argument)
+				})
+			}
+		}
+	}
+}
+
+func TestQuantifiedPartialSourceChecking(t *testing.T) {
+	for _, tt := range []struct {
+		name, source, output string
+		valid                bool
+	}{
+		{"positional", `f:func(x:int,y:int)->int:y
+g:func(x:int)->(func(int)->int):f(x,...)
+out:g(1)(2)`, "2", true},
+		{"named", `f:func(x:int,y:int)->int:y
+g:func(x:int)->(func(int)->int):f(x:x,...)
+out:g(1)(2)`, "2", true},
+		{"generic", `f(A):func(x:A,y:A)->A:y
+g(A):func(x:A)->(func(A)->A):f[A](x,...)
+out:g[int](1)(2)`, "2", true},
+		{"callback", `f:func(h:func(int,int)->int)->(func(int)->int):h(1,...)
+g:func()->int:f(func(x:int,y:int)->int:y)(2)
+out:g()`, "2", true},
+		{"bad_argument", `f:func(x:int,y:int)->int:y
+g:func(x:string)->(func(int)->int):f(x,...)`, "", false},
+		{"bad_result", `f:func(x:int,y:int)->int:y
+g:func(x:int)->(func(int)->string):f(x,...)`, "", false},
+		{"bad_label", `f:func(x:int,y:int)->int:y
+g:func(x:int)->(func(int)->int):f(z:x,...)`, "", false},
+		{"bad_callback", `f:func(h:func(int)->1,y:int)->int:y
+cb:func(x:int)->int:x
+g:func()->(func(int)->int):f(cb,...)`, "", false},
+		{"invalid_generic_body", `f(A):func(x:A,y:int)->A:0
+g:func()->(func(int)->int):f[int](1,...)`, "", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := semanticValue(t, tt.source)
+			err := v.LookupPath(cue.ParsePath("g")).Validate(cue.Concrete(true))
+			if (err == nil) != tt.valid {
+				t.Fatalf("certificate: valid=%v: %v", tt.valid, err)
+			}
+			if tt.valid {
+				semanticJSON(t, v, "out", tt.output)
+			}
+		})
+	}
+}

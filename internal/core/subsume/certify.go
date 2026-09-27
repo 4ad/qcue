@@ -315,6 +315,44 @@ func (p *certifier) recursiveContracts(f *adt.FuncValue, targets []adt.FuncType)
 	return false
 }
 
+// Saved arguments require their own implementation proofs and admission by
+// one executable view. The original body proof still introduces arbitrary
+// admitted arguments; these values cannot specialize away an obligation.
+func (p *certifier) savedPacket(f *adt.FuncValue) bool {
+	if !f.IsPartial() {
+		return true
+	}
+	values := make([]adt.Value, len(f.Fn.Params))
+	for i := range f.Fn.Params {
+		env, expr := f.BoundArgument(i)
+		if expr == nil {
+			continue
+		}
+		v := p.captured(p.schema(env, expr))
+		if v == nil {
+			return false
+		}
+		values[i] = v
+	}
+	for _, instance := range f.BoundArgumentInstances(p.ctx) {
+		admitted := true
+		for i, value := range values {
+			if value == nil {
+				continue
+			}
+			want := p.schema(instance.Env, instance.Fn.Params[i].Value)
+			if want == nil || !p.proveInclusion(p.ctx, want, value) {
+				admitted = false
+				break
+			}
+		}
+		if admitted {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool) {
 	if !p.step() || f.Fn.Body == nil || len(p.active) >= 256 {
 		return false
@@ -355,23 +393,8 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	defer func() { p.hypotheses = savedHypotheses }()
 	p.active = append(p.active, f)
 	defer func() { p.active = p.active[:len(p.active)-1] }()
-	boundType, boundErr := f.BoundArgumentInstance(p.ctx)
-	if boundErr != nil {
+	if !p.savedPacket(f) {
 		return false
-	}
-	for i := range f.Fn.Params {
-		env, expr := f.BoundArgument(i)
-		if expr == nil {
-			continue
-		}
-		// A saved argument needs both its own implementation proof and
-		// membership in the parameter's domain. The original body proof
-		// below introduces arbitrary admitted arguments, not these values.
-		value := p.captured(p.schema(env, expr))
-		want := p.schema(boundType.Env, boundType.Fn.Params[i].Value)
-		if value == nil || want == nil || !p.proveInclusion(p.ctx, want, value) {
-			return false
-		}
 	}
 	s := &subsumer{ctx: p.ctx}
 	source := adt.FuncType{Fn: f.Fn, Env: f.Env}
@@ -1253,9 +1276,6 @@ func (p *certifier) translateNumber(v adt.Value, n *adt.Num, op adt.Op) adt.Valu
 }
 
 func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
-	if call.Partial {
-		return nil
-	}
 	callee := adt.Unwrap(p.expr(env, call.Fun))
 	packet := &adt.Function{}
 	args := make([]adt.Value, len(call.Args))
@@ -1271,12 +1291,57 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 		packet.Params = append(packet.Params, adt.FuncParam{Value: args[i], Label: label, Positional: label == adt.InvalidLabel})
 	}
 	target := adt.FuncType{Fn: packet}
+	if call.Partial {
+		return p.partialCall(callee, target)
+	}
 	result := p.callValue(callee, target)
 	// The call rule establishes the successful result's interface. Retain
 	// that evidence for higher-order elimination, including a quantified
 	// callback returned by an explicitly impredicative instance.
 	p.assume(result, make(map[adt.Value]bool))
 	return result
+}
+
+func (p *certifier) partialCall(callee adt.Value, packet adt.FuncType) adt.Value {
+	if !p.step() {
+		return nil
+	}
+	switch f := callee.(type) {
+	case *adt.Disjunction:
+		var results []adt.Value
+		for _, branch := range f.Values {
+			v := p.partialCall(adt.Unwrap(branch), packet)
+			if v == nil {
+				return nil
+			}
+			results = append(results, v)
+		}
+		return proofUnion(results)
+	case *adt.Conjunction:
+		var results []adt.Value
+		for _, term := range f.Values {
+			if v := p.partialCall(adt.Unwrap(term), packet); v != nil {
+				results = append(results, v)
+			}
+		}
+		return p.meetResults(results)
+	case *adt.FuncValue:
+		if f.Src != nil && f.Src.Effect != nil {
+			return nil
+		}
+		if p.hypotheses[f] {
+			p.useHypothesis(f)
+		} else if !p.implementation(f) {
+			return nil
+		}
+		bound, b := adt.BindFunctionPacket(p.ctx, f, packet)
+		if b != nil || !p.savedPacket(bound) {
+			return nil
+		}
+		p.assume(bound, make(map[adt.Value]bool))
+		return bound
+	}
+	return nil
 }
 
 func (p *certifier) callValue(callee adt.Value, target adt.FuncType) adt.Value {

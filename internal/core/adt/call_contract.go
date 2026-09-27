@@ -100,15 +100,42 @@ func (f *FuncValue) residualClauses(c *OpContext, clauses []FuncType, remaining 
 				}
 				clause.Env = inst.Env
 			}
-			admission, _ := bound.admit(c, clause, true)
-			if admission == nil {
+			// A static residual view may save an arbitrary admitted value,
+			// represented by its type. Concrete packet membership would
+			// wrongly demand that value's materialization here.
+			instance, ok := bound.typeAdmission(c, clause)
+			if !ok {
 				continue
 			}
-			clause = admission.clause
+			clause = instance
 		}
 		view := &FuncValue{Fn: clause.Fn, Env: clause.Env, args: bound.args}
 		fn, _ := view.residualSignature()
 		residual = append(residual, FuncType{Fn: fn, Env: clause.Env})
 	}
 	return residual
+}
+
+func (packet callPacket) typeAdmission(c *OpContext, clause FuncType) (FuncType, bool) {
+	if len(typeParameters(clause.Env)) != 0 {
+		instance, b := (&FuncValue{Fn: clause.Fn, Env: clause.Env}).inferInstance(c, packet.args)
+		if b != nil {
+			return clause, false
+		}
+		clause.Env = instance.Env
+	}
+	for i, arg := range packet.args {
+		if arg.expr == nil || clause.Fn.Params[i].Value == nil {
+			continue
+		}
+		value, ok := c.Evaluate(arg.env, arg.expr)
+		if !ok {
+			return clause, false
+		}
+		want, ok := c.Evaluate(clause.Env, clause.Fn.Params[i].Value)
+		if !ok || c.ProveInclusion == nil || !c.ProveInclusion(c, want, value) {
+			return clause, false
+		}
+	}
+	return clause, true
 }
