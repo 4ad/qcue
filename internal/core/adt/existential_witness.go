@@ -53,6 +53,25 @@ func (e *Existential) dataWitness(c *OpContext) (*existentialDataWitness, *Botto
 	return witness, nil
 }
 
+// DataWitnessType exposes the constructive covariant-data introduction rule
+// to static inclusion. Its greatest admissible witnesses attain the join;
+// callers must independently prove the supplied description below this type.
+// No package is allocated and no constraint is attached to the supplied data.
+func (e *Existential) DataWitnessType(c *OpContext) Value {
+	witness, b := e.dataWitness(c)
+	if b != nil {
+		return nil
+	}
+	value, complete := c.Evaluate(witness.env, e.Template.Body)
+	if !complete {
+		return nil
+	}
+	if vertex, ok := value.(*Vertex); ok {
+		vertex.Finalize(c)
+	}
+	return value
+}
+
 type dataWitnessKey struct {
 	subject  *Vertex
 	template *Quantified

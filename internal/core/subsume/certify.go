@@ -699,13 +699,36 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		return f
 	case *adt.Quantified:
-		// Creating the lexical telescope does not execute the body.
-		v := p.schema(env, x)
-		f, ok := adt.Unwrap(v).(*adt.FuncValue)
-		if !ok || !p.implementation(f) {
+		if _, function := x.Body.(*adt.Function); function && !x.Src.Exists {
+			// Creating the lexical telescope does not execute the body.
+			v := p.schema(env, x)
+			f, ok := adt.Unwrap(v).(*adt.FuncValue)
+			if !ok || !p.implementation(f) {
+				return nil
+			}
+			return f
+		}
+		if x.Src.Exists {
 			return nil
 		}
-		return f
+		scope := x.CheckingScope(p.ctx, env)
+		for _, param := range x.Params {
+			if param.ValueRange != nil {
+				return nil
+			}
+			bound := p.schema(scope, param.Bound)
+			if bound == nil {
+				return nil
+			}
+			scope = adt.BindFunctionTypes(adt.FuncType{Env: scope},
+				[]adt.Value{&adt.RigidType{Param: param, Bound: bound}}).Env
+		}
+		if p.expr(scope, x.Body) == nil {
+			return nil
+		}
+		// Retain the source telescope after proving its arbitrary instance.
+		// The rigid variables belong only to this introduction proof.
+		return &adt.Universal{Template: x, Env: env}
 	case *adt.SliceExpr:
 		return p.slice(env, x)
 	case *adt.PackageOpen:
