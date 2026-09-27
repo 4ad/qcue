@@ -58,7 +58,8 @@ func TestQuantifiedConditionalCertification(t *testing.T) {
 		`f:func(n:int)->int:{if true {out:1}
  if false {bad:n+"bad"}}.out`,
 		`f:func(n:int)->int:{if n<0 {out:1}
- if n>=0 {out:"bad"}}.out`,
+if n>=0 {out:"bad"}}.out`,
+		`f:func(r:{a:int},b:bool)->close({a:int}):{if b {r} else {r}}`,
 	} {
 		v := cuecontext.New().CompileString("@experiment(try)\n" + source)
 		f := v.LookupPath(cue.ParsePath("f"))

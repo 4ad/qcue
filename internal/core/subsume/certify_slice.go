@@ -115,6 +115,9 @@ func (p *certifier) sliceValue(value, low, high adt.Value) adt.Value {
 		}
 	}
 	result := p.schema(nil, out)
+	if v, ok := result.(*adt.Vertex); ok {
+		p.constructors[v] = out
+	}
 	if v, ok := result.(*adt.Vertex); ok && loKnown && hiKnown {
 		fields := make(map[adt.Feature]adt.Value, len(elems))
 		for i, elem := range elems {

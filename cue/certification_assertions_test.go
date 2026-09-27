@@ -78,6 +78,8 @@ func TestQuantifiedPartialComputationCertification(t *testing.T) {
 
 func TestQuantifiedFailureDoesNotProveUncheckedTerms(t *testing.T) {
 	for _, source := range []string{
+		`f: func() -> string: {a: 1} & {b: true}`,
+		`f: func() -> string: {r: {a: 1}} & {r: {b: true}}`,
 		`f: func(x: int) -> (int & >0): x`,
 		`f: func(x: int | string) -> int: x`,
 		`f(A): func(x: A) -> A: 0`,

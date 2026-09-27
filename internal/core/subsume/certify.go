@@ -47,8 +47,9 @@ func (p *certifier) enter() func() {
 func newCertifier(ctx *adt.OpContext) *certifier {
 	return &certifier{ctx: ctx,
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope),
-		projections: make(map[*adt.Vertex]map[adt.Feature]adt.Value),
-		completed:   make(map[proofKey][]*adt.FuncValue), remaining: 10000}
+		projections:  make(map[*adt.Vertex]map[adt.Feature]adt.Value),
+		constructors: make(map[*adt.Vertex]adt.Expr),
+		completed:    make(map[proofKey][]*adt.FuncValue), remaining: 10000}
 }
 
 // Reuse the current proof context when validating captured composites.
@@ -85,9 +86,13 @@ type certifier struct {
 	// callback hypothesis identity. Re-evaluating a schema approximation
 	// must not replace the evidence attached to a projected runtime value.
 	projections map[*adt.Vertex]map[adt.Feature]adt.Value
-	completed   map[proofKey][]*adt.FuncValue
-	attempts    []*proofAttempt
-	remaining   int
+	// Constructor descriptions precede the exact field inventory added to
+	// their synthesized types. Source meets combine those descriptions;
+	// a typing inventory is not an explicit close constraint.
+	constructors map[*adt.Vertex]adt.Expr
+	completed    map[proofKey][]*adt.FuncValue
+	attempts     []*proofAttempt
+	remaining    int
 }
 
 type proofKey struct {
@@ -138,6 +143,15 @@ func (p *certifier) schema(env *adt.Environment, x adt.Expr) adt.Value {
 	}
 	if vertex, ok := v.(*adt.Vertex); ok {
 		vertex.Finalize(p.ctx)
+		if _, shared := vertex.BaseValue.(*adt.Vertex); shared && vertex.ClosedNonRecursive {
+			// close returns a wrapper whose closedness takes effect when
+			// inserted into a conjunct. A bare Evaluate result must not
+			// lose that constraint when a proof inspects the shared value.
+			closed := &adt.Vertex{}
+			closed.AddConjunct(adt.MakeRootConjunct(nil, vertex))
+			closed.Finalize(p.ctx)
+			v = closed
+		}
 	}
 	if b, ok := adt.Unwrap(v).(*adt.Bottom); ok && b.IsIncomplete() {
 		return nil
@@ -738,10 +752,11 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		if v, ok := v.(*adt.Vertex); ok {
 			// A constructed runtime record has exactly these fields, even
 			// though their symbolic values describe many possible packets.
-			out := v.ToDataSingle()
-			out.ClosedNonRecursive = true
-			p.projections[out] = scope.values
-			return out
+			summary := v.ToDataSingle()
+			summary.ClosedNonRecursive = true
+			p.projections[summary] = scope.values
+			p.constructors[summary] = out
+			return summary
 		}
 		return v
 	case *adt.ListLit:
@@ -780,6 +795,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 		}
 		result := p.schema(nil, out)
+		if v, ok := result.(*adt.Vertex); ok {
+			p.constructors[v] = out
+		}
 		if v, ok := result.(*adt.Vertex); ok && !variable {
 			fields := make(map[adt.Feature]adt.Value)
 			for i, value := range elements {
@@ -837,10 +855,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			// Both operands have their own derivation. Their meet constrains
 			// successful results even when they conflict; it is an operation
 			// in the source body, never a filter supplied by an annotation.
-			if value := p.eagerMeet(a, b); refuted(value) {
-				return value
-			}
-			return p.schema(nil, &adt.Conjunction{Values: []adt.Value{a, b}})
+			return p.sourceMeet(a, b)
 		case adt.AddOp, adt.SubtractOp, adt.MultiplyOp, adt.FloatQuotientOp:
 			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
 				if v := ground(); v != nil {

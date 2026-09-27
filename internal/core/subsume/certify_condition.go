@@ -38,6 +38,7 @@ type checkedCondition struct {
 type conditionalRecordState struct {
 	fields map[adt.Feature]adt.Value
 	region map[conditionSubject]adt.Value
+	exact  bool
 }
 
 // Enumerate the finite presence branches, retaining correlations between
@@ -48,6 +49,7 @@ func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit,
 	initial := conditionalRecordState{
 		fields: make(map[adt.Feature]adt.Value),
 		region: make(map[conditionSubject]adt.Value),
+		exact:  true,
 	}
 	for _, decl := range base.Decls {
 		field := decl.(*adt.Field)
@@ -127,8 +129,11 @@ func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit,
 			return nil
 		}
 		if v, ok := value.(*adt.Vertex); ok && v.Bottom() == nil {
-			v = v.ToDataSingle()
-			v.ClosedNonRecursive = true
+			if state.exact {
+				v = v.ToDataSingle()
+				v.ClosedNonRecursive = true
+				p.constructors[v] = out
+			}
 			p.projections[v] = state.fields
 			value = v
 		}
@@ -159,6 +164,9 @@ func (p *certifier) addConditionalFields(state conditionalRecordState, value adt
 	if !ok || record.Kind() != adt.StructKind {
 		return nil, false
 	}
+	// An embedded input may contain undeclared extra fields. Its declared
+	// inventory justifies selections but not an exact data-closed shape.
+	state.exact = state.exact && p.constructors[record] != nil
 	state.fields = maps.Clone(state.fields)
 	for _, field := range record.Arcs {
 		if field.Label.IsLet() || field.Label.IsDef() {
@@ -169,7 +177,7 @@ func (p *certifier) addConditionalFields(state conditionalRecordState, value adt
 		}
 		v := p.project(record, field.Label)
 		if old := state.fields[field.Label]; old != nil {
-			v = p.eagerMeet(old, v)
+			v = p.sourceMeet(old, v)
 		}
 		if v == nil {
 			return nil, false

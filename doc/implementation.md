@@ -269,6 +269,11 @@ operations, concatenation, and string/bytes repetition retain their exact
 results, including CUE's numeric representation. Both operands are checked
 before an operation can introduce a failing computation.
 Explicit body meets run the same eager refutation service as relevance.
+Constructor descriptions remain separate from the exact field inventories
+used by the proof. A source meet combines record fields before deriving its
+result inventory, including records nested in lists and records; synthetic
+typing closedness cannot invent a failure. Explicit `close` constraints are
+preserved when schema evaluation returns a shared wrapper.
 Known kind, interval, field, and list conflicts constrain that computation's
 successful results to bottom; they do not refute the closure constructing it.
 This also certifies failing instances selected from an accepted generic meet.
