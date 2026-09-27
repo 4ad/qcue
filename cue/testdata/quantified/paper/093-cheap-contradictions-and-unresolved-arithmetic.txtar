@@ -1,0 +1,29 @@
+// Paper example 093: Cheap contradictions and unresolved arithmetic
+
+#noformat
+#paper: 93
+#mode: evaluation
+
+-- paper.cue.txt --
+eager: {x: <0, y: x & >0}    // refuted by constant-bound intersection
+
+hypothesis: {
+    a: int & b * 5
+    b: a - 1
+}                            // retained without symbolic elimination
+concrete: hypothesis & {a: 0} // refuted: b = -1 and a = -5
+-- in.cue --
+@test(validate, conflict, at="eager")
+@test(validate, concrete, incomplete, at="hypothesis")
+@test(validate, conflict, at="concrete")
+@test(json, [true, true], at="failures")
+
+eager: {x: <0, y: x & >0}    // refuted by constant-bound intersection
+
+hypothesis: {
+    a: int & b * 5
+    b: a - 1
+}                            // retained without symbolic elimination
+concrete: hypothesis & {a: 0} // refuted: b = -1 and a = -5
+
+failures: [eager == _|_, concrete == _|_]

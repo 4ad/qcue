@@ -1,0 +1,33 @@
+// Paper example 100: Explicit kind refinement
+
+#noformat
+#paper: 100
+#mode: evaluation
+
+-- paper.cue.txt --
+pick: func(x: int | string) -> int: x
+// blocked: the result inclusion is false
+
+pickChecked: func(x: int | string) -> int: x & int
+// accepted: successful unification produces an integer
+
+same(A: number): func(x: A) -> A: x + 1
+// blocked: a numeric upper bound does not establish closure of A
+-- in.cue --
+@test(validate, blocked, at="pick")
+@test(validate, concrete, at="pickChecked")
+@test(validate, blocked, at="same")
+@test(json, 3, at="ok")
+@test(json, true, at="failed")
+
+pick: func(x: int | string) -> int: x
+// blocked: the result inclusion is false
+
+pickChecked: func(x: int | string) -> int: x & int
+// accepted: successful unification produces an integer
+
+same(A: number): func(x: A) -> A: x + 1
+// blocked: a numeric upper bound does not establish closure of A
+
+ok: pickChecked(3)
+failed: pickChecked("three") == _|_

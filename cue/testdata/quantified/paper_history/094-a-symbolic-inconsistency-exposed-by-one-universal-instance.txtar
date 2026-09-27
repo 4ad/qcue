@@ -1,0 +1,14 @@
+// Historical paper example 094: A symbolic inconsistency exposed by one universal instance
+
+#noformat
+#former-paper: 94
+#mode: evaluation
+
+-- paper.cue.txt --
+f(A): func(A) -> A
+r: f(3) & string
+-- in.cue --
+@test(validate, conflict, at="r")
+
+f(A): func(A) -> A
+r: f(3) & string

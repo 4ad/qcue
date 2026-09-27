@@ -1,0 +1,32 @@
+// Paper example 096: A generic computation and an explicit specialization
+
+#noformat
+#paper: 96
+#mode: evaluation
+
+-- paper.cue.txt --
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+// accepted: A & B is not refuted at the declaration
+
+good: meet({a: 1}, {b: true}) // {a: 1, b: true}
+bad:  meet[int, bool](1, true) // _|_, a failing computation
+
+specialized: func(int, bool) -> (int & bool)
+// blocked: a newly declared interface with refuted results
+-- in.cue --
+@test(validate, concrete, at="meet")
+@test(json, {a: 1, b: true}, at="good")
+@test(validate, conflict, at="bad")
+@test(validate, blocked, at="specialized")
+@test(json, true, at="failed")
+
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+// accepted: A & B is not refuted at the declaration
+
+good: meet({a: 1}, {b: true}) // {a: 1, b: true}
+bad:  meet[int, bool](1, true) // _|_, a failing computation
+
+specialized: func(int, bool) -> (int & bool)
+// blocked: a newly declared interface with refuted results
+
+failed: bad == _|_

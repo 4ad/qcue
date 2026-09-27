@@ -1,0 +1,25 @@
+// Paper example 098: Separate alternatives and nested callback contracts
+
+#noformat
+#paper: 98
+#mode: evaluation
+
+-- paper.cue.txt --
+choice: (func(int) -> int) | (func(int) -> bool)
+// accepted interface: alternatives, not simultaneous obligations
+
+callback: func(
+    (func(int) -> int) & (func(int) -> bool),
+) -> string
+// blocked: the explicit callback interface is relevance-invalid
+-- in.cue --
+@test(validate, concrete, incomplete, at="choice")
+@test(validate, blocked, at="callback")
+
+choice: (func(int) -> int) | (func(int) -> bool)
+// accepted interface: alternatives, not simultaneous obligations
+
+callback: func(
+    (func(int) -> int) & (func(int) -> bool),
+) -> string
+// blocked: the explicit callback interface is relevance-invalid

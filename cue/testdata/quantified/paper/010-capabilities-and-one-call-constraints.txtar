@@ -6,16 +6,19 @@
 
 -- paper.cue.txt --
 wide:   func(number) -> string
-wide:   func(x: int) -> string: "ok"  // incompatible coverage
+wide:   func(x: int) -> string: "ok"  // blocked: static domain mismatch
 
 narrow: func(int) -> string
 narrow: func(x: number) -> string: "ok" // conforming implementation
 -- in.cue --
-@test(validate, at="narrow")
-@test(validate, conflict, at="wide")
+@test(validate, blocked, at="wide")
+@test(validate, concrete, at="narrow")
+@test(json, "ok", at="out")
 
 wide:   func(number) -> string
-wide:   func(x: int) -> string: "ok"  // incompatible coverage
+wide:   func(x: int) -> string: "ok"  // blocked: static domain mismatch
 
 narrow: func(int) -> string
 narrow: func(x: number) -> string: "ok" // conforming implementation
+
+out: narrow(3)

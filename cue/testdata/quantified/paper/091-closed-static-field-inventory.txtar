@@ -1,0 +1,28 @@
+// Paper example 091: Closed static field inventory
+
+#noformat
+#paper: 91
+#mode: evaluation
+
+-- paper.cue.txt --
+get: func(r: {a: int}) -> int: r.a
+ok: get({a: 1, b: true})        // 1: width subtyping
+
+bad: func(r: {a: int}) -> int: r.b
+// blocked at definition: b is absent from the parameter interface
+
+needsB: func(r: {a: int, b: bool}) -> int: r.a
+badCall: needsB({a: 1})         // blocked: required field b is missing
+-- in.cue --
+@test(json, 1, at="ok")
+@test(validate, blocked, at="bad")
+@test(validate, blocked, at="badCall")
+
+get: func(r: {a: int}) -> int: r.a
+ok: get({a: 1, b: true})        // 1: width subtyping
+
+bad: func(r: {a: int}) -> int: r.b
+// blocked at definition: b is absent from the parameter interface
+
+needsB: func(r: {a: int, b: bool}) -> int: r.a
+badCall: needsB({a: 1})         // blocked: required field b is missing

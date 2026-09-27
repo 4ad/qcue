@@ -1,0 +1,29 @@
+// Paper example 013: A language operator with a polymorphic type
+
+#noformat
+#paper: 13
+#mode: evaluation
+
+-- paper.cue.txt --
+f(A): func(xs: [A, A]) -> A: xs[0] & xs[1]
+x: f([{a: 1}, {b: 1}])       // {a: 1, b: 1}
+y: f([1, 2])                 // _|_: conflicting concrete operands
+
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+z: meet({a: 1}, {b: true})   // {a: 1, b: true}
+-- in.cue --
+@test(validate, concrete, at="f")
+@test(validate, concrete, at="meet")
+@test(json, {a: 1, b: 1}, at="x")
+@test(validate, conflict, at="y")
+@test(json, {a: 1, b: true}, at="z")
+@test(json, true, at="failed")
+
+f(A): func(xs: [A, A]) -> A: xs[0] & xs[1]
+x: f([{a: 1}, {b: 1}])       // {a: 1, b: 1}
+y: f([1, 2])                 // _|_: conflicting concrete operands
+
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+z: meet({a: 1}, {b: true})   // {a: 1, b: true}
+
+failed: y == _|_

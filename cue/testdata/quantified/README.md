@@ -5,9 +5,11 @@ expectations live in txtar archives, grouped by topic. The ordinary CUE evaluato
 runner discovers this directory automatically; no Go table needs updating when
 adding a semantic case.
 
-- [Paper examples](paper/): all 101 listings reproduced verbatim, in paper
+- [Paper examples](paper/): all 111 listings reproduced verbatim, in paper
   order, with executable assertions, syntax checks, and documented limits.
   `TestQuantifiedPaperIndex` checks every listing against `doc/paper.tex`.
+- [Historical paper examples](paper_history/): earlier listings preserved as
+  regressions when the revised paper changes or removes them.
 - [Additional examples](examples/): standalone programs with explicit
   expectations, including expected errors and incomplete specifications.
 - [API fixtures](api/): programs for refinement with `Unify` and `FillPath`,
@@ -105,10 +107,11 @@ The directives express different observations:
 | Assertion | Expectation |
 | --- | --- |
 | `@test(json, VALUE)` | JSON export succeeds and equals the expected concrete value. |
-| `@test(validate)` | Ordinary validation succeeds; residual obligations are allowed. |
-| `@test(validate, concrete)` | Values and runtime captures are concrete, and function implementations satisfy their declared contracts. |
-| `@test(validate, concrete, incomplete)` | Ordinary validation permits the residual, but materialization or function conformance remains incomplete. |
+| `@test(validate)` | Ordinary validation succeeds, including function body and explicit interface checks; unresolved data is allowed. |
+| `@test(validate, concrete)` | Ordinary validation succeeds, and values and runtime captures are concrete. |
+| `@test(validate, concrete, incomplete)` | Ordinary validation permits the residual, but materialization remains incomplete. |
 | `@test(validate, conflict)` | Ordinary validation reports an established contradiction. |
+| `@test(validate, blocked)` | Static checking is blocked without making the subject semantic bottom. |
 | `@test(subsume, broad, narrow)` | The first path's value subsumes the second. |
 | `@test(subsume, narrow, broad, fail)` | Subsumption fails in that direction. |
 
@@ -118,9 +121,10 @@ The directives express different observations:
 Formation errors prevent inline evaluation: those fixtures use the standard
 `out/evalalpha` diagnostic golden and a documented `#inlinetest:exclude` marker.
 
-Function contract checks use the same `concrete` demand as all other values.
-There is no separate proof option. The [certification](certification/) cases
-exercise the supported proof rules through ordinary concrete validation.
+Ordinary validation checks function bodies and explicit callable interfaces.
+Concrete validation additionally requires implementations and runtime captures
+to be available. There is no separate proof option. The
+[certification](certification/) cases exercise these proof and linking rules.
 
 Semantic regressions cover retained universal obligations after selection and
 source export, captured callbacks, partial closures, completed open protocols,

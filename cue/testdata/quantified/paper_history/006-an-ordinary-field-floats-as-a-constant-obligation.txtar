@@ -1,20 +1,20 @@
-// Paper example 006: An ordinary field floats as a constant obligation
+// Historical paper example 006: An ordinary field floats as a constant obligation
 
 #noformat
-#paper: 6
+#former-paper: 6
 #mode: evaluation
 
 -- paper.cue.txt --
 r(A): {id: func(A) -> A}
 r:    {label: "utilities"}
 
-// The type sort contains the empty predicate:
+// Type universes are nonempty:
 r(A): {id: func(A) -> A, label: "utilities"}
 -- in.cue --
-@test(validate, concrete, incomplete, at="r")
+@test(validate, at="r")
 
 r(A): {id: func(A) -> A}
 r:    {label: "utilities"}
 
-// The type sort contains the empty predicate:
+// Type universes are nonempty:
 r(A): {id: func(A) -> A, label: "utilities"}
