@@ -95,6 +95,19 @@ func checkCallValue(c *OpContext, subject Value, predicate scopedPredicate, role
 	}
 	if concreteCapture(c, subject) {
 		m := checkMembership(c, subject, predicate)
+		if capabilityHasCallable(subject, make(map[Value]bool)) {
+			bound, complete := c.Evaluate(predicate.env, predicate.expr)
+			if complete && c.provesInclusion(bound, subject) {
+				return nil
+			}
+			// Keep a failed body judgment distinct from unresolved value
+			// membership. The admission search uses a three-way result, but
+			// an execution boundary must preserve its blocking diagnostic.
+			if b := Validate(c, m.meet, &ValidateConfig{Concrete: true, Final: true, Runtime: true,
+				CheckFunction: c.CheckFunction, CheckBuiltin: c.CheckBuiltin}); b != nil && b.Code == BlockedError {
+				return b
+			}
+		}
 		switch m.packetMembership(c) {
 		case proofEstablished:
 			return nil

@@ -1737,11 +1737,6 @@ func (x *Function) evaluate(c *OpContext, state Flags) Value {
 	if x.Quantified {
 		f.explicit = []FuncType{{Fn: x, Env: env}}
 	}
-	if x.Quantified && x.Body != nil && len(typeParameters(env)) != 0 {
-		if b := refuteGenericFunction(c, f); b != nil {
-			return b
-		}
-	}
 	return f
 }
 

@@ -20,6 +20,8 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/value"
 )
 
 // Certification must check the same packet protocol as runtime invocation.
@@ -81,8 +83,15 @@ func TestQuantifiedCallbackPacket(t *testing.T) {
 					if _, err := out.MarshalJSON(); (err == nil) != good {
 						t.Fatalf("serialization discarded callback proof: %v", err)
 					}
-					if !good && out.Validate() != nil {
-						t.Fatal("unproved conformance became a contradiction")
+					if !good && out.Validate() == nil {
+						t.Fatal("unproved callback conformance was not blocked")
+					}
+					if !good {
+						_, vertex := value.ToInternal(out)
+						b := adt.CombineErrors(nil, vertex.Bottom(), vertex.ChildErrors)
+						if b == nil || b.Code != adt.BlockedError {
+							t.Fatalf("callback proof failure became semantic bottom: %v", b)
+						}
 					}
 				})
 			}

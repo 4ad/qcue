@@ -14,10 +14,7 @@
 
 package adt
 
-import (
-	"slices"
-	"strings"
-)
+import "slices"
 
 // A capability is a universal implication from admitted packets to successful
 // results. Its domain constrains the implication, not the implementation's
@@ -46,29 +43,12 @@ func mergeCapabilities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
 		}
 	}
 	m.Types = mergeFuncTypes(a.Types, incoming)
-	clauses := append([]FuncType{{Fn: m.Fn, Env: m.Env}}, m.Types...)
-	for _, t := range clauses {
-		if t.Fn.Body != nil {
-			continue
-		}
-		if !IsFuncType(&m) && !m.IsPartial() {
-			if err := refuteCapability(c, &m, t); err != nil {
-				return nil, err
-			}
-			if len(typeParameters(t.Env)) != 0 {
-				if err := refuteGenericCapability(c, &m, t); err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
 	return &m, nil
 }
 
-// fixedCapabilityExpr admits a small closed vocabulary for counterexample
-// search. A reference to a refinable witness is deliberately outside it: a
-// counterexample to one assignment of that witness cannot refute every
-// remaining environment. Such implications remain in the signature store.
+// fixedCapabilityExpr identifies descriptions independent of refinable
+// witnesses. Ground membership and lexical-identity checks can inspect these
+// without selecting one possible completion of an unresolved environment.
 func fixedCapabilityExpr(x Expr) bool {
 	switch x := x.(type) {
 	case nil, *Top, *BasicType, *Num, *String, *Bool, *Bytes, *Null:
@@ -121,155 +101,6 @@ func capabilityHasCallable(v Value, seen map[Value]bool) bool {
 				return true
 			}
 		}
-	}
-	return false
-}
-
-// capabilityPackets searches a bounded, deterministic vocabulary. Its results
-// are witnesses only: successful trials never certify a universal obligation.
-// The budget belongs to this clause, so unrelated declarations cannot consume
-// another clause's opportunities to find a counterexample.
-func capabilityPackets(c *OpContext, t FuncType, visit func(*CallExpr) bool) {
-	if t.Fn.Open {
-		return // The protocol row has not yet been supplied.
-	}
-	for _, p := range t.Fn.Params {
-		if !fixedCapabilityExpr(p.Value) {
-			return
-		}
-	}
-	values := []Value{&Null{}, &Bool{B: false}, &Bool{B: true},
-		&String{Str: ""}, &String{Str: "x"}}
-	for _, s := range []string{"0", "1", "-1", "2", "1.5"} {
-		x := &Num{K: IntKind}
-		x.X.SetString(s)
-		if s == "1.5" {
-			x.K = FloatKind
-		}
-		values = append(values, x)
-	}
-	budget := 64
-	var enumerate func(int, []Expr, []Feature, bool) bool
-	enumerate = func(i int, args []Expr, labels []Feature, positional bool) bool {
-		if budget == 0 {
-			return false
-		}
-		if i == len(t.Fn.Params) {
-			budget--
-			return visit(&CallExpr{Args: slices.Clone(args), ArgLabels: slices.Clone(labels)})
-		}
-		p := t.Fn.Params[i]
-		if p.ArcType == ArcOptional || p.Default != nil {
-			if !enumerate(i+1, args, labels, positional && !p.Positional) {
-				return false
-			}
-		}
-		for _, value := range values {
-			if capabilityMember(c, t.Env, p.Value, value) != proofEstablished {
-				continue
-			}
-			if p.Positional && positional {
-				if !enumerate(i+1, append(args, value), append(labels, InvalidLabel), true) {
-					return false
-				}
-			}
-			if p.Label != InvalidLabel {
-				if !enumerate(i+1, append(args, value), append(labels, p.Label), false) {
-					return false
-				}
-			}
-		}
-		return true
-	}
-	enumerate(0, nil, nil, true)
-}
-
-func refuteCapability(c *OpContext, impl *FuncValue, t FuncType) (err *Bottom) {
-	// Speculative refutation must not execute a foreign operation, demand a
-	// captured computation, or unfold recursion. The larger expression
-	// language remains a residual obligation until a sound rule handles it.
-	if !probeBody(impl.Fn.Body) || !fixedCapabilityExpr(impl.Fn.Ret) {
-		return nil
-	}
-	for _, p := range impl.Fn.Params {
-		if !fixedCapabilityExpr(p.Value) || !fixedCapabilityExpr(p.Default) {
-			return nil
-		}
-	}
-	// Remove the target and every other asserted contract from the trial.
-	// An implementation must not use its own obligation as its evidence.
-	raw := *impl
-	raw.Types = nil
-	fn := *impl.Fn
-	fn.Ret = nil
-	raw.Fn = &fn
-	capabilityPackets(c, t, func(packet *CallExpr) bool {
-		// Packet coverage is a static calling-convention obligation. A
-		// failing body, in contrast, satisfies a partial result contract.
-		bindings, unused, bindErr := impl.bindCall(c, packet)
-		if bindErr == nil {
-			bindErr = unused
-		}
-		if bindErr != nil {
-			err = c.NewErrf("function rejects admitted packet %s: %s", capabilityPacket(c, packet), bindErr.Err)
-			return false
-		}
-		for i, arg := range bindings {
-			if arg.expr == nil {
-				param := impl.Fn.Params[i]
-				if param.ArcType != ArcOptional && param.Default == nil {
-					err = c.NewErrf("function rejects admitted packet %s: missing argument", capabilityPacket(c, packet))
-					return false
-				}
-				continue
-			}
-			value, ok := arg.expr.(Value)
-			if ok && capabilityMember(c, impl.Env, impl.Fn.Params[i].Value, value) == proofRefuted {
-				err = c.NewErrf("function rejects admitted packet %s: incompatible parameter domain", capabilityPacket(c, packet))
-				return false
-			}
-		}
-		saved := c.PushState(impl.Env, t.Fn.Source())
-		result := raw.call(c, packet, Flags{})
-		if b := c.PopState(saved); b != nil {
-			result = b
-		}
-		if result == nil {
-			return true
-		}
-		if _, ok := Unwrap(result).(*Bottom); ok {
-			// Neither failure nor suspension refutes partial correctness.
-			// The source body must separately receive a static derivation.
-			return true
-		}
-		if fixedCapabilityExpr(t.Fn.Ret) &&
-			capabilityMember(c, t.Env, t.Fn.Ret, result) == proofRefuted {
-			err = c.NewErrf("function result conflicts with its contract at packet %s", capabilityPacket(c, packet))
-			return false
-		}
-		return true
-	})
-	return err
-}
-
-func probeBody(x Expr) bool {
-	if fixedCapabilityExpr(x) {
-		return true
-	}
-	switch x := x.(type) {
-	case *FieldReference:
-		return x.UpCount == 0
-	case *UnaryExpr:
-		return probeBody(x.X)
-	case *BinaryExpr:
-		return probeBody(x.X) && probeBody(x.Y)
-	case *Interpolation:
-		for _, p := range x.Parts {
-			if !probeBody(p) {
-				return false
-			}
-		}
-		return true
 	}
 	return false
 }
@@ -347,15 +178,4 @@ func (f *FuncValue) residualSignature() (*Function, []int) {
 func (f *FuncValue) ResidualSignature() *Function {
 	fn, _ := f.residualSignature()
 	return fn
-}
-
-func capabilityPacket(c *OpContext, packet *CallExpr) string {
-	values := make([]string, len(packet.Args))
-	for i, x := range packet.Args {
-		if i < len(packet.ArgLabels) && packet.ArgLabels[i] != InvalidLabel {
-			values[i] = packet.ArgLabels[i].SelectorString(c) + ": "
-		}
-		values[i] += c.String(x)
-	}
-	return "(" + strings.Join(values, ", ") + ")"
 }
