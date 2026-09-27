@@ -35,6 +35,19 @@ func TestQuantifiedRecursiveCertification(t *testing.T) {
  if len(xs)>0 {out:f(xs[1:])+xs[0]}
  }.out`, true},
 		{"self", `f: func(x: int) -> int: f(x)`, true},
+		{"local_self", `f: func(n:int)->(func([...int])->int): {
+sum:func(xs:[...int])->int:{
+if len(xs)==0 {out:n}
+if len(xs)>0 {out:sum(xs[1:])+xs[0]}
+}.out
+}.sum`, true},
+		{"local_mutual", `f:func()->(func(int)->int):{
+g:func(x:int)->int:h(x)
+h:func(x:int)->int:g(x)
+}.g`, true},
+		{"local_generic", `f:func()->(forall A func(A)->A):{
+g(A):func(x:A)->A:g(x)
+}.g`, true},
 		{"mutual", `f: func(x: int) -> int: g(x)
 g: func(x: int) -> int: f(x)`, true},
 		{"generic", `f(A): func(x: A) -> A: f(x)`, true},
@@ -49,6 +62,11 @@ g: func(x: int) -> int: f(x)`, false},
 f: func(x: int) -> int: apply(f, x)`, false},
 		{"unchecked_sibling", `f: func(x: int) -> int: g(x)
 g: func(x: int) -> int: {again: f(x), bad: x + "bad"}.again`, false},
+		{"local_bad_body", `f:func()->(func(int)->int):{
+g:func(x:int)->int:h(x)
+h:func(x:int)->int:{again:g(x),bad:x+"bad"}.again
+}.g`, false},
+		{"local_data_cycle", `f:func()->int:{x:y,y:x}.x`, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			v := cuecontext.New().CompileString(tt.source)

@@ -562,7 +562,25 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 			if field := scope.fields[x.Label]; field != nil {
 				scope.active[x.Label] = true
-				v := p.expr(e, field)
+				var v adt.Value
+				var function *adt.FuncValue
+				switch literal := field.(type) {
+				case *adt.Function:
+					function = &adt.FuncValue{Fn: literal, Src: literal.Src, Env: e}
+				case *adt.Quantified:
+					function, _ = adt.Unwrap(p.schema(e, literal)).(*adt.FuncValue)
+				}
+				if function != nil {
+					// Tie only annotated function bindings before checking
+					// their bodies. Ordinary cyclic data is never a typing
+					// hypothesis. Failed bodies remove the temporary binding.
+					scope.values[x.Label] = function
+					if p.implementation(function) {
+						v = function
+					}
+				} else {
+					v = p.expr(e, field)
+				}
 				delete(scope.active, x.Label)
 				scope.values[x.Label] = v
 				return v
@@ -595,7 +613,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.project(v, adt.MakeIntLabel(adt.IntLabel, i))
 	case *adt.Function:
 		f := &adt.FuncValue{Fn: x, Src: x.Src, Env: env}
-		if !p.function(f, adt.FuncType{Fn: x, Env: env}) {
+		if !p.implementation(f) {
 			return nil
 		}
 		return f

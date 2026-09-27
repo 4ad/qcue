@@ -291,7 +291,9 @@ under the partial-correctness fixed-point rule, while every body's obligations
 are checked. Runtime descriptor identity and protocol inclusion must both be
 established; a recursive dependency cannot justify a stronger callback demand.
 These temporary hypotheses and dependent cached proofs cannot escape a failed
-checking scope. The work budget
+checking scope. Local annotated function bindings can refer to themselves or
+each other while their bodies are checked; ordinary cyclic data supplies no
+such hypothesis. The work budget
 bounds repeated proof expansion as well as depth. Exhaustion reports
 incompleteness and leaves the original obligations available for another check.
 
