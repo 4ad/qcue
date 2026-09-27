@@ -1,9 +1,9 @@
-// A recursive closure has a complete identity, but its termination and
-// universal contract proof remain incomplete. Ground execution still works.
+// A recursive closure has a complete identity and a partial-correctness
+// certificate. Finite conditional branches establish the result's presence.
 
 -- in.cue --
 @test(validate)
-@test(validate, concrete, incomplete, at="f")
+@test(validate, concrete, at="f")
 @test(json, 3, at="observation")
 f: func(xs: [...int]) -> int: ({
 	if len(xs) == 0 {out: 0}

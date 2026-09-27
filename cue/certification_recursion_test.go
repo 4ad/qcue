@@ -26,6 +26,14 @@ func TestQuantifiedRecursiveCertification(t *testing.T) {
 		name, source string
 		valid        bool
 	}{
+		{"fold", `f(A, B): func(step: func(B,A)->B, seed:B, xs:[...A])->B: {
+ if len(xs)==0 {out:seed}
+ if len(xs)>0 {out:f(step,step(seed,xs[0]),xs[1:])}
+}.out`, true},
+		{"sum", `f:func(xs:[...int])->int:{
+ if len(xs)==0 {out:0}
+ if len(xs)>0 {out:f(xs[1:])+xs[0]}
+ }.out`, true},
 		{"self", `f: func(x: int) -> int: f(x)`, true},
 		{"mutual", `f: func(x: int) -> int: g(x)
 g: func(x: int) -> int: f(x)`, true},

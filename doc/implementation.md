@@ -271,8 +271,16 @@ This also certifies failing instances selected from an accepted generic meet.
 Numeric translation by a constant preserves supported bounds.
 Boolean negation and numeric signs are also certified. Numeric negation
 preserves unions and exclusions and reverses strict and non-strict bounds.
-Constructed records carry their exact field set during proof. Package clients
-can be checked by opening the admitted interface under a fresh abstract carrier,
+Constructed records carry their exact field set during proof. For finite
+conditional records, every condition and body is checked, and
+the checker retains each surviving field-presence branch. Guards on the same
+scalar binding or its length share finite literal and interval constraints;
+unrelated bindings remain independent even when their types are equal. A
+selection must be available in every surviving shape. An explicit `else`
+also supplies a complementary branch. These rules certify the existing
+structurally recursive fold without requiring a termination proof.
+Package clients can be checked by opening the admitted interface under a fresh
+abstract carrier,
 using its operation contracts as hypotheses, and checking that the carrier
 cannot escape.
 

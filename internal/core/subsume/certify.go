@@ -633,7 +633,12 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		scope := p.scopes[e]
 		scope.fields = make(map[adt.Feature]adt.Expr)
+		var conditions []*adt.Comprehension
 		for _, decl := range x.Decls {
+			if comp, ok := decl.(*adt.Comprehension); ok {
+				conditions = append(conditions, comp)
+				continue
+			}
 			if let, ok := decl.(*adt.LetField); ok {
 				scope.fields[let.Label] = let.Value
 				continue
@@ -649,6 +654,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		out := &adt.StructLit{}
 		for _, decl := range x.Decls {
+			if _, ok := decl.(*adt.Comprehension); ok {
+				continue
+			}
 			if let, ok := decl.(*adt.LetField); ok {
 				// Every present source term is checked, even when a let is
 				// unused by the returned fields.
@@ -663,6 +671,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				return nil
 			}
 			out.Decls = append(out.Decls, &adt.Field{Label: f.Label, Value: v})
+		}
+		if len(conditions) != 0 {
+			return p.conditionalRecord(e, out, conditions)
 		}
 		v := p.schema(nil, out)
 		if v, ok := v.(*adt.Vertex); ok {
