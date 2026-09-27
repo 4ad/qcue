@@ -128,7 +128,14 @@ func (packet callPacket) typeAdmission(c *OpContext, clause FuncType) (FuncType,
 		if arg.expr == nil || clause.Fn.Params[i].Value == nil {
 			continue
 		}
-		value, ok := c.Evaluate(arg.env, arg.expr)
+		var value Value
+		ok := false
+		if c.CheckArgument != nil {
+			value = c.CheckArgument(arg.env, arg.expr)
+			ok = value != nil
+		} else {
+			value, ok = c.Evaluate(arg.env, arg.expr)
+		}
 		if !ok {
 			return clause, false
 		}

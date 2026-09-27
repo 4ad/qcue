@@ -217,7 +217,26 @@ func sameOpaqueProtocol(a, b *Function) bool {
 // overlapping arrows wrap values differently. Prove transport agreement or
 // disjoint packet domains before certifying the complete operation.
 func (s *OpaqueCall) coherent(c *OpContext) bool {
-	clauses := s.origin().clauses
+	clauses := slices.Clone(s.origin().clauses)
+	for i, clause := range clauses {
+		// Compare generic transports under arbitrary type arguments. An
+		// uninstantiated reference is unresolved, not an incoherent plan.
+		for _, param := range typeParameters(clause.Env) {
+			if param.ValueRange != nil {
+				return false
+			}
+			var bound Value = &Top{}
+			if param.Bound != nil {
+				var complete bool
+				bound, complete = c.Evaluate(TypeParameterScope(clause.Env, param), param.Bound)
+				if !complete || bound == nil {
+					return false
+				}
+			}
+			clause = BindFunctionTypes(clause, []Value{&RigidType{Param: param, Bound: bound}})
+		}
+		clauses[i] = clause
+	}
 	for i, a := range clauses {
 		for _, b := range clauses[:i] {
 			if !s.coherentPair(c, a, b) {

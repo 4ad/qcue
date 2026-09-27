@@ -38,12 +38,17 @@ func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 func (p *certifier) enter() func() {
 	check, inclusion := p.ctx.CheckFunction, p.ctx.ProveInclusion
 	application := p.ctx.CheckApplication
+	argument := p.ctx.CheckArgument
 	p.ctx.CheckFunction = p.validateFunction
 	p.ctx.ProveInclusion = p.proveInclusion
 	p.ctx.CheckApplication = p.validateApplication
+	p.ctx.CheckArgument = func(env *adt.Environment, expr adt.Expr) adt.Value {
+		return p.constructorEvidence(p.expr(env, expr))
+	}
 	return func() {
 		p.ctx.CheckFunction, p.ctx.ProveInclusion = check, inclusion
 		p.ctx.CheckApplication = application
+		p.ctx.CheckArgument = argument
 	}
 }
 
@@ -939,8 +944,10 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			return nil
 		}
 		// Retain the source telescope after proving its arbitrary instance.
-		// The rigid variables belong only to this introduction proof.
-		return &adt.Universal{Template: x, Env: env}
+		// The rigid variables belong only to this introduction proof. The
+		// ordinary quantifier normalization distributes over fixed record
+		// projections and retains non-distributive Boolean predicates.
+		return p.schema(env, x)
 	case *adt.SliceExpr:
 		return p.slice(env, x)
 	case *adt.PackageSeal:
