@@ -35,6 +35,9 @@ out:(open p as (A,P) {r:P.f()}).r`, "", false},
 p:seal #I with (A=int) {id:func(f:func(int)->int)->(func(int)->int):f}
 f:(func(x:int,y:int)->int:x+y)(1,...)
 out:(open p as (A,P) {r:(P.id(f)&f&(func(int)->0))(2)}).r`, "", false},
+		{"invalid_private_universal", `#I:exists S {f:forall A func(A)->int}
+p:seal #I with (S=int) {f:forall A func(x:A)->A:1}
+out:(open p as (S,P) {r:P.f[1](1)}).r`, "", false},
 		{"label_capture", `labels:{[string]~(L,_):func()->string:L}
 labels:{word:_}
 out:labels.word()`, `"word"`, true},

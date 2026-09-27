@@ -611,10 +611,15 @@ func (s *OpaqueCall) evaluate(c *OpContext, state Flags) Value {
 			args[privateParams[i]] = v
 		}
 		var b *Bottom
+		// The private call selects an executable instance without
+		// discharging the original universal declaration. Its body proof
+		// may revisit that declaration through another package member.
+		original := FuncType{Fn: private.Fn, Env: private.Env}
 		private, b = private.instantiate(c, args)
 		if b != nil {
 			return b
 		}
+		private.Types = mergeFuncTypes(private.Types, []FuncType{original})
 	}
 	protocol, _ := private.residualSignature()
 	matches := matchFuncParams(s.signature, protocol, false)
