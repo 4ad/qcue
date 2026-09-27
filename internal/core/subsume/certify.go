@@ -406,6 +406,19 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	}
 	s := &subsumer{ctx: p.ctx}
 	source := adt.FuncType{Fn: f.Fn, Env: f.Env}
+	if len(adt.FunctionTypeParameters(target)) != 0 {
+		// Selection changes the next executable view, not the source of a
+		// retained universal proof. Another declaration can have its own
+		// telescope, so checking only target.Fn == f.Fn below is insufficient.
+		// Recover this implementation's declaration scope before opening
+		// the two telescopes with shared rigid variables.
+		for _, original := range f.ExplicitClauses() {
+			if original.Fn == source.Fn && len(adt.FunctionTypeParameters(original)) != 0 {
+				source.Env = original.Env
+				break
+			}
+		}
+	}
 	partial := target.Partial()
 	if partial == nil && f.IsPartial() && target.Fn != f.Fn {
 		// A new contract, including a boundary's callback interface,
