@@ -1,0 +1,77 @@
+# An uncalled body needs a proof even when evaluation produces no error.
+! exec cue eval invalid.cue
+stderr 'h: function conformance remains unproved'
+! stdout .
+! exec cue eval -c=false invalid.cue
+stderr 'h: function conformance remains unproved'
+! exec cue eval -e h invalid.cue
+stderr 'function conformance remains unproved'
+! exec cue eval -c invalid.cue
+stderr 'h: function conformance remains unproved'
+
+# Eval must enforce the same static obligations as vet and CUE export.
+! exec cue vet -c=false invalid.cue
+stderr 'h: function conformance remains unproved'
+! exec cue export --out cue invalid.cue
+stderr 'h: function conformance remains unproved'
+
+# The boundary checks nested bodies and every surviving alternative.
+! exec cue eval nested.cue
+stderr 'box.h: function conformance remains unproved'
+stderr 'items.0: function conformance remains unproved'
+stderr 'choice: function conformance remains unproved'
+! stdout .
+
+# Interface admission is mandatory even without an implementation.
+! exec cue eval interface.cue
+stderr 'interface relevance blocked'
+! stdout .
+
+# Incomplete data and named unlinked imports remain valid hypotheses.
+# Syntax's Final option must not become a demand for required data.
+exec cue eval valid.cue
+! stderr .
+exec cue eval -e required valid.cue
+! stderr .
+stdout 'value!: int'
+exec cue eval -e cycle valid.cue
+! stderr .
+
+# Only an assertion actually written in the body can supply the field.
+exec cue eval asserted.cue
+! stderr .
+exec cue export -e out asserted.cue
+cmp stdout asserted.json
+
+# Explicit diagnostic output and the legacy function profile still work.
+exec cue eval -i invalid.cue
+stdout 'func\(x: A\)'
+exec cue eval legacy.cue
+! stderr .
+
+-- invalid.cue --
+h(A): func(x: A) -> {a: 1}: x
+-- nested.cue --
+box: {h(A): func(x: A) -> {a: 1}: x}
+items: [func(x: int) -> string: x]
+choice: *(func(x: int) -> int: x) | (func(x: int) -> string: x)
+-- interface.cue --
+h: (func(int) -> int) & (func(int) -> bool)
+-- valid.cue --
+id(A): func(x: A) -> A: x
+source: func(int) -> string
+client: func() -> string: source(3)
+data: int
+required: {value!: int}
+cycle: {x: y, y: x}
+-- asserted.cue --
+h(A): func(x: A) -> {a: 1}: x & {a: 1}
+out: h({b: 2})
+-- asserted.json --
+{
+    "a": 1,
+    "b": 2
+}
+-- legacy.cue --
+@experiment(quantified=false)
+h: func(x: _) -> {a: 1}: x

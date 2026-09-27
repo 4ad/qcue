@@ -158,21 +158,18 @@ func runEval(cmd *Command, args []string) error {
 		}
 
 		if !flagIgnore.Bool(cmd) {
-			if err := v.Err(); err != nil {
-				if err = v.Validate(syn...); err != nil {
-					errHeader()
-					return err
-				}
-			}
-
-			// TODO(#553): this can be removed once v.Syntax() below retains line
-			// information.
-			if e.IsConcrete() || flagConcrete.Bool(cmd) {
-				if err := v.Validate(cue.Concrete(true)); err != nil {
-					errHeader()
+			// Static obligations can fail even when evaluation has no error:
+			// an uncalled function still needs a proof of its contracts.
+			// Syntax's Final option only controls presentation here; it must
+			// not require complete data from a non-concrete evaluation.
+			concrete := e.IsConcrete() || flagConcrete.Bool(cmd)
+			if err := v.Validate(cue.Concrete(concrete)); err != nil {
+				errHeader()
+				if concrete {
 					printError(cmd, err)
 					continue
 				}
+				return err
 			}
 		}
 
