@@ -607,6 +607,8 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			return nil
 		}
 		return f
+	case *adt.SliceExpr:
+		return p.slice(env, x)
 	case *adt.PackageOpen:
 		typ, view := x.ProofView(p.ctx, p.expr(env, x.Value))
 		if typ == nil || view == nil {
@@ -961,7 +963,7 @@ func (p *certifier) typeOperations(env *adt.Environment, expr adt.Expr) bool {
 			}
 			ok = p.expr(env, x) != nil
 			return false
-		case *adt.UnaryExpr, *adt.BoundExpr, *adt.CallExpr, *adt.IndexExpr, *adt.SelectorExpr:
+		case *adt.UnaryExpr, *adt.BoundExpr, *adt.CallExpr, *adt.IndexExpr, *adt.SliceExpr, *adt.SelectorExpr:
 			ok = p.expr(env, x.(adt.Expr)) != nil
 			return false
 		}
@@ -1070,6 +1072,9 @@ func (p *certifier) project(value adt.Value, label adt.Feature) adt.Value {
 	if b := tail.Bottom(); b != nil && b.IsIncomplete() {
 		return nil
 	}
+	// A successful selection from a checked list has its declared element
+	// interface, including callable evidence for a homogeneous tail.
+	p.assume(tail, make(map[adt.Value]bool))
 	return tail
 }
 

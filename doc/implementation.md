@@ -256,7 +256,11 @@ function bodies in unused arguments. An invalid computation cannot be hidden
 by an abbreviation that discards its argument. Local and captured `let`
 expressions retain the surrounding proof scope and callable evidence.
 Fixed and homogeneous list indexes constrain successful selections and permit
-out-of-range failure. Enabled ground arithmetic, scalar comparisons, Boolean
+out-of-range failure. List slices preserve fixed elements for known bounds and
+homogeneous element predicates for dynamic bounds. Bytes slices preserve the
+bytes kind and exact ground results. Every bound must have an integer type;
+invalid bounds may produce a checked failing computation.
+Enabled ground arithmetic, scalar comparisons, Boolean
 operations, concatenation, and string/bytes repetition retain their exact
 results, including CUE's numeric representation. Both operands are checked
 before an operation can introduce a failing computation.
