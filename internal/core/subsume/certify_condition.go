@@ -28,6 +28,12 @@ type conditionSubject struct {
 	label  adt.Feature
 	length bool
 	other  adt.Expr
+	// A comparison between two stable bindings supplies one Boolean
+	// observation, even when neither operand has a concrete value.
+	rightEnv    *adt.Environment
+	rightLabel  adt.Feature
+	rightLength bool
+	comparison  adt.Op
 }
 
 type checkedCondition struct {
@@ -210,6 +216,27 @@ func (p *certifier) condition(env *adt.Environment, expr adt.Expr) (checkedCondi
 	subject, domain, ok := p.conditionScalar(env, binary.X)
 	literal := p.expr(env, binary.Y)
 	if !ok || literal == nil || !adt.IsConcrete(literal) {
+		if right, _, rightOK := p.conditionScalar(env, binary.Y); ok && rightOK {
+			op := binary.Op
+			negated := false
+			switch op {
+			case adt.GreaterEqualOp:
+				op, negated = adt.LessThanOp, true
+			case adt.GreaterThanOp:
+				op, negated = adt.LessEqualOp, true
+			case adt.NotEqualOp:
+				op, negated = adt.EqualOp, true
+			case adt.LessThanOp, adt.LessEqualOp, adt.EqualOp:
+			default:
+				return c, true
+			}
+			subject.rightEnv, subject.rightLabel, subject.rightLength = right.env, right.label, right.length
+			subject.comparison = op
+			c.subject = subject
+			if negated {
+				c.yes, c.no = c.no, c.yes
+			}
+		}
 		return c, true
 	}
 	var yes, no adt.Value

@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/value"
 )
 
 // runValueAssertion exercises the public validation and observation APIs.
@@ -88,7 +90,9 @@ func (r *inlineRunner) runValueAssertion(t testing.TB, path cue.Path, val cue.Va
 				t.Errorf("path %s: expected a definite conflict", path)
 			}
 		case "blocked":
-			if base == nil || val.Err() != nil {
+			_, vertex := value.ToInternal(val)
+			bottom := adt.CombineErrors(nil, vertex.Bottom(), vertex.ChildErrors)
+			if base == nil || (bottom != nil && !bottom.IsIncomplete()) {
 				t.Errorf("path %s: expected blocked checking without semantic bottom; validation: %v; value: %v", path, base, val.Err())
 			}
 		case "incomplete":

@@ -1210,7 +1210,7 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 			}
 		}
 	}
-	if x.ErasedIndex || ctx.erasedAliasIndex(x) {
+	if x.ErasedRuntimeIndex(ctx.Env(0)) {
 		ctx.AddBottom(ctx.NewErrf("erased type parameter cannot be used as a runtime index"))
 		return emptyNode
 	}
@@ -2377,6 +2377,18 @@ func (x *FuncValue) bindCall(c *OpContext, call *CallExpr) (bindings []funcArg, 
 }
 
 func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
+	if x.Fn != nil && x.Fn.Body != nil && capabilityMode(x.Fn, x.Types) {
+		if c.CheckFunction == nil {
+			return &Bottom{Src: call.Source(), Code: BlockedError,
+				Err: c.Newf("function conformance checker is not configured")}
+		}
+		// Every retained contract is proved before selecting an instance,
+		// binding a partial packet, executing code, or reusing a result.
+		// A successful call cannot replace this universal obligation.
+		if b := c.CheckFunction(c, x); b != nil {
+			return b
+		}
+	}
 	callee := x // Stable identity before selecting this call's type instance.
 	if b := x.checkIdentities(c); b != nil {
 		return b

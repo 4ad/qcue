@@ -151,8 +151,14 @@ func (a *AliasApplication) Expand(c *OpContext, caller *Environment, arguments [
 	return inst.Env, nil
 }
 
-func (c *OpContext) erasedAliasIndex(index *IndexExpr) bool {
-	for e := c.Env(0); e != nil; e = e.Up {
+// ErasedRuntimeIndex reports whether this scoped occurrence can only select
+// a type instance. Alias substitutions retain their own occurrence markers;
+// a fixed argument at another use of the alias is independent.
+func (index *IndexExpr) ErasedRuntimeIndex(env *Environment) bool {
+	if index.ErasedIndex {
+		return true
+	}
+	for e := env; e != nil; e = e.Up {
 		if e.types != nil && e.types.erasedIndices[index] {
 			return true
 		}

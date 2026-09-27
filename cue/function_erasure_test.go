@@ -189,8 +189,12 @@ out: g(1)`,
 					t.Fatalf("certified an invalid universal at %s: %s", path, source)
 				}
 			}
-			if _, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON(); err != nil {
-				t.Fatalf("the selected instance should satisfy the runtime check: %v", err)
+			out := v.LookupPath(cue.ParsePath("out"))
+			if err := out.Validate(); err == nil {
+				t.Fatal("ordinary validation accepted an uncertified call")
+			}
+			if _, err := out.MarshalJSON(); err == nil {
+				t.Fatal("a successful instance bypassed the universal proof")
 			}
 		}
 		for _, options := range [][]cue.Option{nil, {cue.Final()}} {
@@ -311,8 +315,8 @@ func TestQuantifiedCallErasureMembershipModel(t *testing.T) {
 						for _, program := range []string{
 							"out: (func(p: " + predicate + ") -> _: p)(" + string(data) + ")",
 							"out: (func() -> " + predicate + ": " + string(data) + ")()",
-							"f: (func(p: _) -> _: p) & (func(_) -> " + predicate + ")\nout: f(" + string(data) + ")",
-							"f: (func(p: _) -> _: p) & (func(_) -> " + predicate + ")\nout: f(" + string(data) + ", ...)()",
+							"f: (func(p: " + predicate + ") -> _: p) & (func(" + predicate + ") -> " + predicate + ")\nout: f(" + string(data) + ")",
+							"f: (func(p: " + predicate + ") -> _: p) & (func(" + predicate + ") -> " + predicate + ")\nout: f(" + string(data) + ", ...)()",
 						} {
 							if cases%256 == 0 {
 								ctx = cuecontext.New()
@@ -325,7 +329,17 @@ func TestQuantifiedCallErasureMembershipModel(t *testing.T) {
 									t.Fatalf("admitted packet changed: got %s, %v; want %s\n%s", got, err, data, program)
 								}
 							} else if err == nil || out.Validate() == nil {
-								t.Fatalf("contract must refute this complete packet: got %s, %v\n%s", got, err, program)
+								t.Fatalf("contract must reject this complete packet: got %s, %v\n%s", got, err, program)
+							}
+						}
+						// These original unrestricted identities promised the
+						// record result for every input. A matching example packet
+						// cannot justify that invalid universal obligation.
+						for _, call := range []string{"f(" + string(data) + ")", "f(" + string(data) + ", ...)()"} {
+							program := "f: (func(p: _) -> _: p) & (func(_) -> " + predicate + ")\nout: " + call
+							v := ctx.CompileString(program)
+							if v.LookupPath(cue.ParsePath("f")).Validate() == nil || v.LookupPath(cue.ParsePath("out")).Validate() == nil {
+								t.Fatalf("an unrestricted identity acquired a record guarantee: %s", program)
 							}
 						}
 					}

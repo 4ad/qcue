@@ -36,6 +36,12 @@ f:func()->int:get({a:1,b:true})`, true},
 		{"import_hypothesis", `source:func(int)->string
 f:func()->string:source(3)`, true},
 		{"builtin_import", "import \"strings\"\nf:func(x:string)->string:strings.ToUpper(x)", true},
+		{"unused_optional_parameter", `f:func(a!:int,note?:string)->int:a`, true},
+		{"optional_parameter_default", `f:func(x?:int)->int
+f:func(x:int=0)->int:x`, true},
+		{"unguarded_optional_parameter", `f:func(note?:string)->string:note`, false},
+		{"optional_default_not_universal", `f:func(x?:int)->0
+f:func(x:int=0)->int:x`, false},
 		{"wrong_generic", `f(A):func(x:A)->A:({value:0}).value`, false},
 		{"wrong_kind", `f:func(x:int)->string:x`, false},
 		{"wrong_literal", `f:func(x:int)->2:1`, false},
@@ -56,6 +62,9 @@ f:func()->string:apply(ints)`, false},
 		{"absent_body", `f:{optional?:(func(x:int)->int:"wrong")&int}`, true},
 		{"invalid_empty_domain", `f:func(x:({}.missing))->int:0`, false},
 		{"invalid_empty_result", `f:func(x:int&string)->({}.missing):0`, false},
+		{"missing_alias_bound", `Box(A:int)={value:A}
+f(A):func(x:A)->Box(A):{value:x}`, false},
+		{"missing_hidden_inventory", `f:func(r:_)->(func()->int):func()->int:r._secret`, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := cuecontext.New().CompileString(tt.source)

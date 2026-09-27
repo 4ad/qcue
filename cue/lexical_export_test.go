@@ -40,7 +40,7 @@ func TestQuantifiedLexicalExport(t *testing.T) {
 		{"selected_optional", `#T: {a?: int}; id(A): func(x: A) -> A: x; f: id[#T]`, "", `f({a: 1})`, `f({a: "bad"})`},
 		{"alias_result", `Box(A) = {value: A}; f(A): func(x: A) -> Box(A): {value: x}`, "", `f(1).value`, `f(1) & {value: "bad"}`},
 		{"alias_body", `Box(A) = {value: A}; f: func(x: int) -> _: Box(int) & {value: x}`, "", `f(1).value`, `f(1) & {value: "bad"}`},
-		{"alias_bound", `Box(A: int) = {value: A}; f(A): func(x: A) -> Box(A): {value: x}`, "", `f(1).value`, `f("bad")`},
+		{"alias_bound", `Box(A: int) = {value: A}; f(A: int): func(x: A) -> Box(A): {value: x}`, "", `f(1).value`, `f("bad")`},
 		{"binder_alias_bound", `Box(A) = {value: A}; f(A: Box(int)): func(x: A) -> A: x`, "", `f({value: 1}).value`, `f({value: "bad"})`},
 		{"alias_chain", `Box(A) = {value: A}; Wrap(A) = Box(A); f(A): func(x: A) -> Wrap(A): {value: x}`, "", `f(1).value`, `f(1) & {value: "bad"}`},
 		{"alias_dependency", `x: 1; Box(A) = {value: A, tag: x}; f(A): func(x: A) -> Box(A): {value: x, tag: 1}`, "", `f(1).tag`, `f(1) & {tag: 2}`},
@@ -75,9 +75,10 @@ func TestQuantifiedLexicalExport(t *testing.T) {
 }
 
 func TestQuantifiedContractExportScope(t *testing.T) {
-	for _, tt := range []struct{ source, calls, want string }{
-		{"x: 1\nf: func(x) -> 1", `[(f & (func(y: int) -> int: y))(1), (f & (func(y: int) -> int: y))(2)]`, `[1,2]`},
-		{"#T: {a?: int}\nf: func(#T) -> 1", `[(f & (func(y: _) -> int: 1))({}), (f & (func(y: _) -> int: 2))({a: "bad"})]`, `[1,2]`},
+	for _, tt := range []struct{ source, calls, want, blocked string }{
+		{"x: 1\nf: func(x) -> 1", `[(f & (func(y: int) -> int: y))(1), (f & (func(y: int) -> int: y))(2)]`, `[1,2]`, ""},
+		{"#T: {a?: int}\nf: func(#T) -> 1", `[(f & (func(y: {a?:int}) -> int: 1))({}), (f & (func(y: _) -> int: 1))({a: "bad"})]`, `[1,1]`,
+			`[(f & (func(y: _) -> int: 1))({}), (f & (func(y: _) -> int: 2))({a: "bad"})]`},
 	} {
 		for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
 			ctx := cuecontext.New()
@@ -89,6 +90,14 @@ func TestQuantifiedContractExportScope(t *testing.T) {
 			r := ctx.CompileString("x: 2\n#T: _\nf: " + string(src) + "\nout: " + tt.calls)
 			if got, err := r.LookupPath(cue.ParsePath("out")).MarshalJSON(); err != nil || string(got) != tt.want {
 				t.Fatalf("contract %s: got %s, %v; want %s", src, got, err, tt.want)
+			}
+			if tt.blocked != "" {
+				// Preserve the old out-of-domain call as a negative case:
+				// its implementation violates the contract on admitted inputs.
+				r := ctx.CompileString("f: " + string(src) + "\nout: " + tt.blocked)
+				if r.LookupPath(cue.ParsePath("out")).Validate() == nil {
+					t.Fatal("an out-of-domain call bypassed implementation checking")
+				}
 			}
 		}
 	}
@@ -178,7 +187,7 @@ func TestQuantifiedHiddenCaptureExport(t *testing.T) {
 func TestQuantifiedHiddenCaptureIdentityExport(t *testing.T) {
 	ctx := cuecontext.New()
 	v := ctx.CompileString(`
-make: func(r: _) -> (func() -> int): func() -> int: r._secret
+make: func(r: {_secret: int}) -> (func() -> int): func() -> int: r._secret
 f: make({_secret: 1})
 g: make({_secret: 2})
 result: {first: f, copy: f, second: g}

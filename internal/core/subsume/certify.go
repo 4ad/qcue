@@ -58,6 +58,9 @@ func newCertifier(ctx *adt.OpContext) *certifier {
 // permit cycles through records or lists to justify their own annotations.
 func (p *certifier) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 	if !p.implementation(f) {
+		if p.failure != nil {
+			return p.failure
+		}
 		if p.remaining == 0 {
 			return &adt.Bottom{Src: f.Source(), Code: adt.BlockedError,
 				Err: p.ctx.Newf("function conformance remains unproved: proof work limit reached")}
@@ -101,6 +104,7 @@ type certifier struct {
 	completed    map[proofKey][]*adt.FuncValue
 	attempts     []*proofAttempt
 	remaining    int
+	failure      *adt.Bottom
 }
 
 type proofKey struct {
@@ -373,7 +377,7 @@ func (p *certifier) savedPacket(f *adt.FuncValue) bool {
 		if expr == nil {
 			continue
 		}
-		v := p.captured(p.schema(env, expr))
+		v := p.boundArgument(env, expr)
 		if v == nil {
 			return false
 		}
@@ -396,6 +400,17 @@ func (p *certifier) savedPacket(f *adt.FuncValue) bool {
 		}
 	}
 	return false
+}
+
+// A saved source constructor has an exact inventory. Evaluating it as a
+// predicate would permit additional fields and lose evidence of an absent
+// optional argument field. Other saved values retain their capture checks.
+func (p *certifier) boundArgument(env *adt.Environment, expr adt.Expr) adt.Value {
+	switch expr.(type) {
+	case *adt.StructLit, *adt.ListLit:
+		return p.expr(env, expr)
+	}
+	return p.captured(p.schema(env, expr))
 }
 
 func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool) {
@@ -457,9 +472,11 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 		}
 	}
 	partial := target.Partial()
-	if partial == nil && f.IsPartial() && target.Fn != f.Fn {
+	if partial == nil && f.IsPartial() && target.Fn != f.Fn && !slices.Contains(f.Obligations(), target) {
 		// A new contract, including a boundary's callback interface,
-		// describes the residual packet of the supplied closure.
+		// describes the residual packet of the supplied closure. Retained
+		// original clauses still describe its full packet; their meaning
+		// must not change merely because arguments have since been saved.
 		partial = f
 	}
 	if partial != nil {
@@ -521,7 +538,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 			if expr == nil {
 				continue
 			}
-			v := p.captured(p.schema(env, expr))
+			v := p.boundArgument(env, expr)
 			want := p.schema(source.Env, arg.Value)
 			if want == nil || v == nil || !p.proveInclusion(p.ctx, want, v) {
 				return false
@@ -531,14 +548,24 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	}
 	for i, j := range matches {
 		arg := target.Fn.Params[i]
-		if arg.ArcType == adt.ArcOptional {
-			// An optional packet has presence branches. The current rule
-			// leaves their joint proof pending instead of assuming presence.
-			return false
-		}
 		v := p.schema(target.Env, arg.Value)
 		if v == nil {
 			return false
+		}
+		if arg.ArcType == adt.ArcOptional && arg.Default == nil {
+			q := source.Fn.Params[j]
+			if q.Default == nil {
+				// Its presence is not guaranteed. An unused optional slot
+				// needs no value hypothesis; an unguarded use remains blocked.
+				continue
+			}
+			defaultValue := p.expr(source.Env, q.Default)
+			if !p.includes(p.schema(source.Env, q.Value), defaultValue) {
+				return false
+			}
+			// Omission uses the implementation's own default. A supplied
+			// argument still ranges over the full advertised optional domain.
+			v = proofUnion([]adt.Value{v, defaultValue})
 		}
 		if arg.Default != nil {
 			// The contract admits omission. Prove that the implementation's
@@ -753,7 +780,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 			return p.selectType(v, p.schema(env, index))
 		}
-		if x.ErasedIndex {
+		if x.ErasedRuntimeIndex(env) {
+			p.failure = &adt.Bottom{Src: x.Source(), Code: adt.BlockedError,
+				Err: p.ctx.NewPosf(adt.Pos(x), "erased type parameter cannot be used as a runtime index")}
 			return nil
 		}
 		n, ok := adt.Unwrap(p.expr(env, x.Index)).(*adt.Num)
@@ -1274,6 +1303,14 @@ func (p *certifier) selectType(value, argument adt.Value) adt.Value {
 func (p *certifier) project(value adt.Value, label adt.Feature) adt.Value {
 	if !p.step() {
 		return nil
+	}
+	switch x := adt.Unwrap(value).(type) {
+	case *adt.RigidType:
+		// A bound supplies a field inventory and the types of those fields,
+		// without identifying the arbitrary record with its upper bound.
+		return p.project(x.Bound, label)
+	case *adt.WitnessType:
+		return p.project(x.Upper, label)
 	}
 	if union, ok := adt.Unwrap(value).(*adt.Disjunction); ok {
 		var alternatives []adt.Value

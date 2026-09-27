@@ -28,6 +28,10 @@ func TestQuantifiedConditionalCertification(t *testing.T) {
 		{"else", `f:func(b:bool)->int:{if b {out:1} else {out:2}}.out`, `f(false)`, `2`},
 		{"numeric", `f:func(n:int)->int:{if n<=0 {out:1}
  if n>0 {out:2}}.out`, `f(-1)`, `1`},
+		{"two_parameters", `f(A:number):func(x:A,y:A)->A:{if x<=y {out:x}
+ if x>y {out:y}}.out`, `f[int&>=10](12,20)`, `12`},
+		{"parameter_equality", `f:func(x:int,y:int)->bool:{if x==y {out:true}
+ if x!=y {out:false}}.out`, `f(1,2)`, `false`},
 		{"float_equality", `f:func(n:number)->int:{if n==0 {out:1}
  if n!=0 {out:2}}.out`, `f(0.0)`, `1`},
 		{"length", `f:func(xs:[...int])->int:{if len(xs)==0 {out:0}
@@ -49,6 +53,10 @@ func TestQuantifiedConditionalCertification(t *testing.T) {
 		`f:func(b:bool)->int:{if b {out:1}}.out`,
 		`f:func(x:int,y:int)->int:{if x<=0 {out:1}
  if y>0 {out:2}}.out`,
+		`f:func(x:int,y:int,z:int)->int:{if x<=y {out:1}
+ if x>z {out:2}}.out`,
+		`f:func(x:int,y:int)->int:{if x<y {out:1}
+ if x>y {out:2}}.out`,
 		`f:func(xs:[...int],ys:[...int])->int:{if len(xs)==0 {out:1}
  if len(ys)>0 {out:2}}.out`,
 		`f:func(n:int)->int:{if n<0 {out:1}

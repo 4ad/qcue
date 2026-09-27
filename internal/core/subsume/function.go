@@ -357,6 +357,12 @@ func (s *subsumer) funcConstraint(envA *adt.Environment, xa adt.Expr, envB *adt.
 	if !ok {
 		return false
 	}
+	if envA == envB && xa == xb {
+		// Reopening an alias can allocate fresh lexical frames for the
+		// same unresolved value witness. Reflexivity belongs to the scoped
+		// source predicate, independently of those evaluation allocations.
+		return true
+	}
 	if _, isTop := va.(*adt.Top); isTop {
 		return true
 	}

@@ -159,6 +159,9 @@ func TestQuantifiedSemanticExistentialFields(t *testing.T) {
 }
 
 func TestQuantifiedSemanticGuardPresence(t *testing.T) {
+	// A bottom comparison is not permission to invent a field absent from
+	// the parameter's static inventory. Retain these former runtime probes
+	// as rejected source programs for every field-label class.
 	for _, label := range []string{"required", "_required", "#Required", "_#Required"} {
 		t.Run(label, func(t *testing.T) {
 			v := semanticValue(t, fmt.Sprintf(`
@@ -168,7 +171,9 @@ f: (func(x: {}) -> int: {
 }.v) & (func({%[1]s: 1}) -> 1)
 out: f({})
 `, label))
-			semanticJSON(t, v, "out", "0")
+			if v.LookupPath(cue.ParsePath("f")).Validate() == nil || v.LookupPath(cue.ParsePath("out")).Validate() == nil {
+				t.Fatal("an undeclared field acquired presence evidence")
+			}
 		})
 	}
 }

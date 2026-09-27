@@ -214,7 +214,7 @@ func TestQuantifiedSelectedExport(t *testing.T) {
 		want  string
 	}{
 		{"valid", true, "f(3)", "3"},
-		{"invalid", false, "f(3)", "0"},
+		{"invalid", false, "f(3)", ""},
 		{"partial", true, `f(3, "s")`, `[3,"s"]`},
 		{"complete", true, `f(3, "s")`, `[3,"s"]`},
 		{"attached", true, "f(3)", "3"},
@@ -236,6 +236,12 @@ func TestQuantifiedSelectedExport(t *testing.T) {
 				t.Fatalf("export %s: conformance %v; want valid=%v", text, err, tt.valid)
 			}
 			out, err := rebuilt.LookupPath(cue.ParsePath("out")).MarshalJSON()
+			if !tt.valid {
+				if err == nil || rebuilt.LookupPath(cue.ParsePath("out")).Validate() == nil {
+					t.Fatalf("export permitted an uncertified call: %s", text)
+				}
+				return
+			}
 			if err != nil || string(out) != tt.want {
 				t.Fatalf("export %s: got %s, %v; want %s", text, out, err, tt.want)
 			}
@@ -664,8 +670,10 @@ func TestQuantifiedWitnessCorrelation(t *testing.T) {
 			if !out.Exists() {
 				t.Fatal(v.Err())
 			}
-			if err := out.Validate(); err != nil {
-				t.Fatalf("unresolved witness was refuted: %v", err)
+			blocked := tt.name == "guard" || tt.name == "selector result" || tt.name == "alias result" ||
+				tt.name == "indexed result" || tt.name == "result"
+			if err := out.Validate(); (err != nil) != blocked {
+				t.Fatalf("unresolved witness: blocked=%v: %v", blocked, err)
 			}
 			if err := out.Validate(cue.Concrete(true)); err == nil {
 				t.Fatal("witness upper bound was mistaken for its singleton")
