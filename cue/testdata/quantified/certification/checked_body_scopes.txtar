@@ -1,0 +1,22 @@
+// Executing a checked body reuses its derivation, including recursive calls.
+// That reuse cannot hide invalid captured or conjunctive implementations.
+
+-- in.cue --
+@test(json, [6, 1], at="out")
+@test(validate, blocked, at="bad")
+@test(validate, blocked, at="badCallback")
+
+factory: func(n: int) -> _: {
+	sum: func(xs: [...int]) -> int: {
+		if len(xs) == 0 {out: n}
+		if len(xs) > 0 {out: sum(xs[1:]) + xs[0]}
+	}.out
+}.sum
+contract: func({a?: int}) -> 1
+goodBody: func(_) -> int: 1
+badBody: func(_) -> int: 2
+good: func() -> int: (contract & goodBody)({a: "outside"})
+bad: (func() -> int: (contract & badBody)({a: "outside"}))()
+wrap: func(cb: func(int) -> int) -> (func() -> int): func() -> int: cb(1)
+badCallback: wrap(func(x: int) -> int: "wrong")()
+out: [factory(3)([1, 2]), good()]

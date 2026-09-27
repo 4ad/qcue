@@ -86,6 +86,11 @@ import (
 type Environment struct {
 	Up *Environment
 
+	// checkedCalls records a runtime scope whose source terms have a strict
+	// derivation. Nested execution consumes that derivation rather than
+	// rechecking recursive captures while their records are being built.
+	checkedCalls bool
+
 	// types records a lexical quantified scope, independently of ordinary
 	// value cells and their copying rules.
 	types *typeScope

@@ -2372,7 +2372,12 @@ func (x *FuncValue) bindCall(c *OpContext, call *CallExpr) (bindings []funcArg, 
 }
 
 func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
-	if x.Fn != nil && x.Fn.Body != nil && capabilityMode(x.Fn, x.Types) {
+	checked := x.Fn != nil && x.Fn.Body != nil && capabilityMode(x.Fn, x.Types)
+	inCheckedScope := false
+	for env := c.Env(0); env != nil; env = env.Up {
+		inCheckedScope = inCheckedScope || env.checkedCalls
+	}
+	if checked && !inCheckedScope {
 		if c.CheckApplication == nil {
 			return &Bottom{Src: call.Source(), Code: BlockedError,
 				Err: c.Newf("function application checker is not configured")}
@@ -2620,7 +2625,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	for _, a := range arcs {
 		a.Parent = activation
 	}
-	bodyEnv := &Environment{Up: x.Env, Vertex: activation}
+	bodyEnv := &Environment{Up: x.Env, Vertex: activation, checkedCalls: checked}
 	bodyCI := c.ci
 	if recursive {
 		// This activation's finite descent discharges the call-cycle edge.

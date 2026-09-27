@@ -29,7 +29,13 @@ func (p *certifier) validateApplication(ctx *adt.OpContext, env *adt.Environment
 	// A bodyless declaration is a conditional import hypothesis. Supplied
 	// bodies still pass their independent implementation checks in apply.
 	p.assume(f, make(map[adt.Value]bool))
-	if result := p.apply(env, f, call); result != nil {
+	callee := adt.Value(f)
+	if _, nested := call.Fun.(*adt.CallExpr); nested {
+		callee = p.expr(env, call.Fun)
+	} else if call.Fun != nil && !p.typeOperations(env, call.Fun) {
+		callee = nil
+	}
+	if result := p.apply(env, adt.Unwrap(callee), call); result != nil {
 		return result, nil
 	}
 	if p.failure != nil {

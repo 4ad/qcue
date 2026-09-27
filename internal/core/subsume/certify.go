@@ -263,7 +263,7 @@ func (p *certifier) captured(v adt.Value) adt.Value {
 	case *adt.FuncValue, *adt.Builtin:
 		return x.(adt.Value)
 	}
-	if vertex, ok := v.(*adt.Vertex); ok && adt.Validate(p.ctx, vertex,
+	if vertex, ok := v.(*adt.Vertex); ok && vertex.Kind()&(adt.StructKind|adt.ListKind) != 0 && adt.Validate(p.ctx, vertex,
 		&adt.ValidateConfig{Runtime: true, Concrete: true}) == nil {
 		// A complete supplied value has a concrete inventory. Its evaluated
 		// predicate may remain open for later CUE refinement, but that does
@@ -885,12 +885,25 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.project(p.expr(env, x.X), x.Sel)
 	case *adt.IndexExpr:
 		v := p.expr(env, x.X)
-		if v != nil && v.Kind() == adt.FuncKind && x.Quantified {
+		composite, _ := v.(*adt.Vertex)
+		if v != nil && x.Quantified && (v.Kind() == adt.FuncKind || composite != nil && composite.HasSubjectSchemes()) {
 			index := x.TypeIndex
 			if index == nil {
 				index = x.Index
 			}
-			return p.selectType(v, p.schema(env, index))
+			if !p.typeOperations(env, index) {
+				return nil
+			}
+			argument := p.schema(env, index)
+			if argument == nil {
+				return nil
+			}
+			if v.Kind() == adt.FuncKind {
+				return p.selectType(v, argument)
+			}
+			selection := *x
+			selection.X, selection.Index, selection.TypeIndex = v, argument, argument
+			return p.schema(nil, &selection)
 		}
 		if x.ErasedRuntimeIndex(env) {
 			p.failure = &adt.Bottom{Src: x.Source(), Code: adt.BlockedError,
@@ -1617,6 +1630,9 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 }
 
 func (p *certifier) apply(env *adt.Environment, callee adt.Value, call *adt.CallExpr) adt.Value {
+	if callee == nil {
+		return nil
+	}
 	if err := (&relevanceChecker{p: p}).description(callee, make(map[adt.Value]bool)); err != nil {
 		p.failure = &adt.Bottom{Src: call.Source(), Code: adt.BlockedError,
 			Err: p.ctx.NewPosf(adt.Pos(call), "%s", err)}

@@ -77,6 +77,16 @@ func (p *certifier) sourceMeet(a, b adt.Value) adt.Value {
 	if value == nil || refuted(value) {
 		return value
 	}
+	if f, ok := adt.Unwrap(value).(*adt.FuncValue); ok {
+		// A function meet collects obligations on one implementation. Its
+		// components cannot be used as independent alternatives that drop an
+		// inconvenient contract when selecting a call domain.
+		if f.Fn.Body != nil && !p.implementation(f) {
+			return nil
+		}
+		p.assume(f, make(map[adt.Value]bool))
+		return f
+	}
 	if v, ok := value.(*adt.Vertex); ok && v.Bottom() == nil && v.Kind()&(adt.StructKind|adt.ListKind) != 0 {
 		fields := make(map[adt.Feature]adt.Value)
 		for _, field := range v.Arcs {
@@ -110,6 +120,11 @@ func (p *certifier) sourceMeet(a, b adt.Value) adt.Value {
 		}
 		p.projections[summary] = fields
 		return summary
+	}
+	if v, ok := value.(*adt.Vertex); ok && v.HasSubjectSchemes() {
+		// A normalized scalar can still carry a quantified introduction.
+		// Keep that subject evidence for subsequent explicit selection.
+		return v
 	}
 	// Preserve scoped callback hypotheses and rigid predicates when the
 	// meet is symbolic rather than a normalized composite description.
