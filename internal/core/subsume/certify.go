@@ -171,8 +171,45 @@ func (p *certifier) includes(want, got adt.Value) bool {
 	if want == nil || got == nil {
 		return false
 	}
+	if _, ok := adt.Unwrap(want).(*adt.WitnessType); ok {
+		got = p.singletonEvidence(got)
+		if got == nil {
+			return false
+		}
+	}
 	s := &subsumer{ctx: p.ctx}
 	return s.values(want, got)
+}
+
+// Normalizing a structural predicate can forget the exact construction
+// inventories of its nested fields. Recover those checked member descriptions
+// for singleton proofs, without closing an arbitrary input record or a local
+// binding whose context deliberately permits refinement.
+func (p *certifier) singletonEvidence(value adt.Value) adt.Value {
+	if !p.step() {
+		return nil
+	}
+	v, ok := value.(*adt.Vertex)
+	if !ok || p.projections[v] == nil || (v.Kind() == adt.StructKind && !v.IsData()) {
+		return value
+	}
+	out := v.ToDataSingle()
+	out.Arcs = nil
+	for _, field := range v.Arcs {
+		member := p.projections[v][field.Label]
+		if member == nil {
+			out.Arcs = append(out.Arcs, field)
+			continue
+		}
+		member = p.singletonEvidence(member)
+		if member == nil {
+			return nil
+		}
+		arc := field.ToDataSingle()
+		arc.BaseValue, arc.Arcs = member, nil
+		out.Arcs = append(out.Arcs, arc)
+	}
+	return out
 }
 
 func (p *certifier) frame(up *adt.Environment, values map[adt.Feature]adt.Value) *adt.Environment {

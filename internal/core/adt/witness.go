@@ -60,6 +60,56 @@ func (*WitnessType) declNode()                  {}
 func (*WitnessType) elemNode()                  {}
 func (x *WitnessType) Kind() Kind               { return x.Upper.Kind() }
 func (*WitnessType) Concreteness() Concreteness { return Constraint }
+
+// Subsumes proves inclusion of a singleton description in this witness's
+// singleton. Comparing inhabitants alone is insufficient: an open record
+// predicate also admits extensions, even when its current fields are concrete.
+func (x *WitnessType) Subsumes(c *OpContext, value Value) bool {
+	if !singletonDescription(c, value, make(map[Value]bool)) {
+		return false
+	}
+	return x.validate(c, value) == nil
+}
+
+func singletonDescription(c *OpContext, value Value, active map[Value]bool) bool {
+	if value == nil || active[value] {
+		return false
+	}
+	active[value] = true
+	defer delete(active, value)
+	if v, ok := value.(*Vertex); ok {
+		v.Finalize(c)
+		v = v.DerefValue()
+		if v.Bottom() != nil {
+			return false
+		}
+		switch v.Kind() {
+		case StructKind:
+			// IsData records an exact construction inventory. CUE's closed
+			// schemas can still admit optional, patterned, or hidden fields.
+			if !v.IsData() {
+				return false
+			}
+		case ListKind:
+			if !v.IsClosedList() {
+				return false
+			}
+		default:
+			return singletonDescription(c, Unwrap(v), active)
+		}
+		for _, field := range v.Arcs {
+			if field.Label.IsLet() || field.Label.IsDef() || field.ArcType == ArcOptional {
+				continue
+			}
+			if field.ArcType != ArcMember || !singletonDescription(c, field, active) {
+				return false
+			}
+		}
+		return true
+	}
+	return concreteCapture(c, value)
+}
+
 func (x *WitnessType) validate(c *OpContext, value Value) *Bottom {
 	witness, complete := c.Evaluate(x.Env, x.Ref.X)
 	if !complete || !concreteCapture(c, witness) {

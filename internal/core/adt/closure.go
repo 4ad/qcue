@@ -190,6 +190,11 @@ func concreteCapture(c *OpContext, v Value) bool {
 			if !IsConcrete(x) || x.Bottom() != nil {
 				return false
 			}
+			if x.IsList() && !x.IsClosedList() {
+				// A known prefix is not a complete captured list. Its unknown
+				// length also prevents it from identifying a singleton witness.
+				return false
+			}
 			for _, a := range x.Arcs {
 				if a.ArcType == ArcRequired {
 					return false

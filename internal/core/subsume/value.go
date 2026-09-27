@@ -112,7 +112,7 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		// type. Its upper bound is never a substitute for that type.
 		return false
 	case *adt.WitnessType:
-		return false
+		return x.Subsumes(s.ctx, b)
 	case *adt.OpaqueType:
 		return x.Subsumes(b)
 	case *adt.Existential:
