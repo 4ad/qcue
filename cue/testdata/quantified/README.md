@@ -129,6 +129,13 @@ and omission defaults; the escape cases also refine optional fields, patterns,
 and list tails after opening. Existential instances retain their captured
 predicates, effect intersections retain shared admitted outcomes, and recursive
 closure equality stays incomplete without overflowing the evaluator stack.
+The [call erasure invariants](../../function_erasure_test.go) check that
+parameter and result annotations never manufacture runtime data. They compare
+inferred and selected identity calls, partial and named packets, later record
+refinement, and source round trips. Successful specializations must not certify
+an invalid universal. Existential membership evidence supports opening and
+export without adding constraints to the supplied value.
+
 The [quantified fragment fixture](certification/quantified_fragment.txtar) records
 both supported universal checks and the general Boolean predicates that remain
 residual. Successful concrete calls alone are not certification assertions.

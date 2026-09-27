@@ -14,11 +14,41 @@
 
 package adt
 
+import "slices"
+
 // scopedPredicate is a proposition in its declaration scope. It is not a
 // runtime witness, even when its evaluation has a concrete approximation.
 type scopedPredicate struct {
 	env  *Environment
 	expr Expr
+}
+
+func mergeCallWitnesses(a, b []*Existential) []*Existential {
+	for _, witness := range b {
+		if !slices.ContainsFunc(a, func(e *Existential) bool {
+			return e.Template == witness.Template && e.Env == witness.Env
+		}) {
+			a = append(slices.Clone(a), witness)
+		}
+	}
+	return a
+}
+
+func (v *Vertex) addCallWitness(c *OpContext, predicate scopedPredicate) {
+	if predicate.expr == nil {
+		return
+	}
+	if e := existentialExprOf(c, predicate.env, predicate.expr, make(map[Expr]bool)); e != nil {
+		v.callWitnesses = mergeCallWitnesses(v.callWitnesses, []*Existential{e})
+	}
+}
+
+// CallWitnesses returns existential interfaces established at an execution
+// boundary. They are proof metadata, not constraints on future refinements.
+// Source export can re-establish them with an identity call, preserving both
+// elimination and the original runtime value without conjoining a schema.
+func (v *Vertex) CallWitnesses() []*Existential {
+	return v.callWitnesses
 }
 
 // membershipCheck keeps the subject and the compatibility calculation apart.
@@ -152,7 +182,19 @@ func (m membershipCheck) packetMembership(c *OpContext) proofResult {
 	}
 	if capabilityHasCallable(m.subject, make(map[Value]bool)) {
 		bound, complete := c.Evaluate(m.predicate.env, m.predicate.expr)
-		if !complete || !c.provesInclusion(bound, m.subject) {
+		if complete && c.provesInclusion(bound, m.subject) {
+			return proofEstablished
+		}
+		// The meet records callable contracts as obligations on the same
+		// implementation. Prove each from its body; merely comparing the
+		// combined signatures would assume the promised conformance. This
+		// also covers singleton witnesses and packages, whose membership
+		// evidence is identity rather than structural arrow inclusion.
+		if c.CheckFunction == nil || c.CheckBuiltin == nil {
+			return proofUnknown
+		}
+		if b := Validate(c, m.meet, &ValidateConfig{Concrete: true, Final: true, Runtime: true,
+			CheckFunction: c.CheckFunction, CheckBuiltin: c.CheckBuiltin}); b != nil {
 			return proofUnknown
 		}
 	}

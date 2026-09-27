@@ -119,11 +119,31 @@ opaque carriers only for its type witnesses.
 
 Conjoining function contracts retains every guarded capability clause. An
 implementation keeps its original labels, defaults, omitted-argument behavior,
-and extra-argument policy. Applicable clauses constrain its actual call result.
+and extra-argument policy. Applicable clauses check its actual call result.
 An unresolved applicability guard remains an obligation. Applicability is
-checked against the original supplied packet, before parameter constraints or
-defaults enrich the activation. Abstract application retains missing execution
+checked against the original supplied packet, before implementation defaults
+supply omitted slots. Abstract application retains missing execution
 as an obligation and propagates only independently admitted result clauses.
+
+Implemented calls evaluate arguments and bodies independently of their
+annotations. A parameter or result predicate must establish membership of
+the supplied value, or inclusion of an independently computed schema. A
+compatible unification alone proves neither. The checker never publishes that
+unification as the argument or result: annotations cannot add fields, solve
+`self` references, choose alternatives or defaults, or leave optional fields
+and patterns on the returned value. A contradicted check fails the call;
+an unresolved check leaves it incomplete. Ordinary constraints written in the
+body and declared omission defaults remain part of the implementation.
+
+This boundary enforces type erasure operationally, in addition to the
+compiler's ban on using type parameters as runtime values. Changing an admitted
+type selection cannot change what the body computes. Successful instance
+checks still do not certify the universal implementation. Existential
+membership evidence is retained separately for opening; source export
+re-establishes it through an identity call without adding data constraints.
+The explicit `@experiment(quantified=false)` compatibility profile retains
+the older relational function semantics.
+
 For callable domains, including callbacks inside records or lists, applicability
 requires independent conformance evidence from the original argument.
 Completing a call also checks the actual packet's callable membership

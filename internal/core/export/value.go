@@ -60,6 +60,19 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 		}
 		return e.predicateValue(n)
 	}
+	defer func() {
+		for _, witness := range n.CallWitnesses() {
+			// A proved existential permits opening this value, but must not
+			// become a data constraint during source reconstruction. An
+			// identity call re-establishes the proof on the exported packet.
+			name := e.uniqueAlias("CUEValue")
+			param := &ast.FuncParam{Label: ast.NewIdent(name), Value: e.predicateValue(witness)}
+			body := ast.NewIdent(name)
+			body.Node = param
+			fn := &ast.Func{Params: []*ast.FuncParam{param}, Ret: ast.NewIdent("_"), Body: body}
+			result = ast.NewCall(&ast.ParenExpr{X: fn}, result)
+		}
+	}()
 	// Guard against infinite recursion when a vertex cycles back to itself
 	// through BuiltinValidator arguments or other value-level cycles.
 	for i := range e.stack {

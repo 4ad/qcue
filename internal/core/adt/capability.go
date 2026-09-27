@@ -317,6 +317,7 @@ func (f *FuncValue) checkCallResult(c *OpContext, packet callPacket, value Value
 	if b := checkCallValue(c, value, scopedPredicate{f.Env, f.Fn.Ret}, "result"); b != nil {
 		return b
 	}
+	evidence := []scopedPredicate{{f.Env, f.Fn.Ret}}
 	for _, t := range f.Types {
 		if t.Fn.Body != nil {
 			continue
@@ -332,9 +333,15 @@ func (f *FuncValue) checkCallResult(c *OpContext, packet callPacket, value Value
 			if b := checkCallValue(c, value, scopedPredicate{t.Env, t.Fn.Ret}, "result"); b != nil {
 				return b
 			}
+			evidence = append(evidence, scopedPredicate{t.Env, t.Fn.Ret})
 		case proofUnknown:
 			return &Bottom{Code: IncompleteError,
 				Err: c.Newf("incomplete function contract domain")}
+		}
+	}
+	if v, ok := value.(*Vertex); ok {
+		for _, predicate := range evidence {
+			v.addCallWitness(c, predicate)
 		}
 	}
 	return nil

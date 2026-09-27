@@ -415,6 +415,9 @@ func existentialOf(c *OpContext, value Value, seen map[Expr]bool) *Existential {
 		}
 	}
 	if v, ok := value.(*Vertex); ok {
+		if len(v.callWitnesses) != 0 {
+			return v.callWitnesses[0]
+		}
 		for conjunct := range v.LeafConjuncts() {
 			env, expr := conjunct.EnvExpr()
 			if e := existentialExprOf(c, env, expr, seen); e != nil {
@@ -438,7 +441,7 @@ func existentialExprOf(c *OpContext, env *Environment, expr Expr, seen map[Expr]
 		v := r.resolve(c, Flags{status: partial, condition: arcTypeKnown, mode: yield})
 		c.PopState(saved)
 		if v != nil {
-			return existentialOf(c, v.DerefValue(), seen)
+			return existentialOf(c, v, seen)
 		}
 		return nil
 	}
@@ -755,6 +758,11 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 		return abstractEscapes(c, v.Upper, owner, seen) ||
 			abstractEscapes(c, witness, owner, seen)
 	case *Vertex:
+		for _, witness := range v.callWitnesses {
+			if abstractEscapes(c, witness, owner, seen) {
+				return true
+			}
+		}
 		v = v.DerefValue()
 		if v.sealed == owner {
 			// A closed package binds its own witness. The opened structural

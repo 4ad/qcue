@@ -16,9 +16,9 @@ package adt
 
 // callPacket retains the supplied expressions in their original scopes,
 // normalized into a particular protocol's slots. It contains neither defaults
-// nor parameter predicates. An activation is a different object: it supports
-// relational refinement during execution and cannot serve as admission
-// evidence for the packet that created it.
+// nor parameter predicates. An activation is a different object: it also
+// holds implementation defaults for omitted slots, and in the legacy profile
+// supports relational refinement. It is not evidence for an attached guard.
 type callPacket struct {
 	args []funcArg
 }

@@ -1643,11 +1643,11 @@ type FuncParam struct {
 
 // A FuncValue is a function closure captured in an evaluation environment.
 //
-// Types holds the function types (bodyless signatures) the value has been
-// unified with; their parameter constraints and result constraints are
-// additionally enforced on every call (see [nodeContext.scheduleFuncCall]),
-// A plain name from an attached signature supplies the contract label of a
-// matched positional slot when that slot was otherwise unnamed.
+// Types holds scoped obligations attached by unification. In the quantified
+// profile, admitted packet guards require independently checked results (see
+// [FuncValue.checkCallResult]). The explicit legacy profile instead conjoins
+// their parameter and result constraints during execution and may supply
+// labels for otherwise unnamed slots.
 // For a bodyless FuncValue — itself a function type — Types holds the other
 // types it has been met with.
 type FuncValue struct {
@@ -2012,7 +2012,12 @@ func (x *FuncValue) Kind() Kind { return FuncKind }
 // to env.Up, preserving the documented scoping (e.g. `b: a` refers to an
 // outer `a`, not the sibling parameter).
 //
-// The constraint and body conjuncts carry ci, which by now includes the
+// Only implementation defaults and the body contribute to computation in the
+// quantified profile. Parameter predicates check the original argument arcs;
+// return predicates check the independently evaluated body in checkCallResult.
+// The legacy profile retains its relational constraint propagation.
+//
+// The default, legacy constraint, and body conjuncts carry ci, which includes the
 // anchor's cycle reference, so recursive calls in either the body or a
 // parameter constraint (e.g. `f: func(a: f(1)) -> int: 1`) participate in
 // structural cycle detection. The argument conjuncts, in contrast, were
@@ -2021,6 +2026,7 @@ func (x *FuncValue) Kind() Kind { return FuncKind }
 // nesting, not recursion.
 func (n *nodeContext) scheduleFuncCall(ref *FuncCallRef, env *Environment, ci CloseInfo) {
 	fn := ref.fn
+	capabilities := capabilityMode(fn, ref.types)
 	if act := env.Vertex; act != nil {
 		// The activation arcs are built in parameter order (see
 		// [FuncValue.call]), so walk them in lockstep with the parameters
@@ -2050,13 +2056,22 @@ func (n *nodeContext) scheduleFuncCall(ref *FuncCallRef, env *Environment, ci Cl
 				if p.Default != nil && !funcArgBound(a, fn, ref.types) {
 					a.addConjunctUnchecked(MakeConjunct(env.Up, p.Default, ci))
 				}
-				if p.Value != nil {
+				if p.Value != nil && !capabilities {
 					a.addConjunctUnchecked(MakeConjunct(env.Up, p.Value, ci))
+				}
+				if capabilities && a.ArcType == ArcMember {
+					a.Finalize(n.ctx)
+					predicate := scopedPredicate{env.Up, p.Value}
+					if b := checkCallValue(n.ctx, a, predicate, "argument"); b != nil {
+						n.addBottom(b)
+						return
+					}
+					a.addCallWitness(n.ctx, predicate)
 				}
 			}
 		}
 	}
-	if capabilityMode(fn, ref.types) {
+	if capabilities {
 		n.scheduleConjunct(MakeConjunct(env, fn.Body, ci), ci)
 		return
 	}
@@ -2527,10 +2542,10 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 
 		// The activation carries one arc per parameter. The argument is
 		// evaluated in the environment it was bound in — the caller's, or an
-		// earlier partial application's — mirroring the original
-		// `(f & {param: arg})` binding. The parameter constraint is appended
-		// by scheduleFuncCall with the anchored CloseInfo once the call
-		// reference passes cycle detection.
+		// earlier partial application's. Once the call passes cycle
+		// detection, scheduleFuncCall supplies an omitted default and checks
+		// the parameter predicate independently. Only the legacy profile
+		// appends that predicate as an activation conjunct.
 		arc := &Vertex{
 			Label:     local,
 			ArcType:   ArcMember,
@@ -2538,7 +2553,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		}
 		if arg == nil && p.ArcType == ArcOptional && !x.hasDefault(i) {
 			// An omitted optional parameter is an optional field of the
-			// activation, holding only its constraint: a reference to it
+			// activation: a reference to it
 			// from the body reports the error a reference to an absent
 			// optional field reports, rather than seeing the bare
 			// constraint.
@@ -2566,9 +2581,9 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	// inline vertex holding only the call reference. The vertex is
 	// non-rooted, so a recursive call that re-reaches the anchor through ref
 	// while this call is in progress is flagged as a structural cycle. The
-	// reference's payload — body, return type, and parameter constraints —
-	// is dispatched by scheduleFuncCall once the reference passes cycle
-	// detection. The result is the vertex itself: there is no result arc to
+	// reference's payload is dispatched by scheduleFuncCall once the reference
+	// passes cycle detection. Only the body contributes to the result in the
+	// quantified profile. The result is the vertex itself: no result arc to
 	// select, and parameters live on the separate activation, so unifying
 	// two call results does not unify their arguments.
 	// The activation is created through newInlineVertex so that it is

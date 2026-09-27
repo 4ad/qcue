@@ -376,6 +376,7 @@ func (n *nodeContext) markStructLit(s *StructLit, ci CloseInfo) {
 // scheduleVertexConjuncts injects the conjuncst of src n. If src was not fully
 // evaluated, it subscribes dst for future updates.
 func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo CloseInfo) {
+	n.node.callWitnesses = mergeCallWitnesses(n.node.callWitnesses, arc.callWitnesses)
 	for _, s := range arc.schemes {
 		found := false
 		for _, existing := range n.node.schemes {
@@ -597,6 +598,7 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 
 	switch x := v.(type) {
 	case *Vertex:
+		n.node.callWitnesses = mergeCallWitnesses(n.node.callWitnesses, x.callWitnesses)
 		if snapshot && x.sealed != nil {
 			if n.node.sealed != nil && n.node.sealed != x.sealed {
 				n.addBottom(ctx.NewErrf("conflicting opaque package identities"))

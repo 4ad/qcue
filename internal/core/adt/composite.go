@@ -168,6 +168,11 @@ type Vertex struct {
 	sealed       *sealedPackage
 	sealedOpened bool
 
+	// callWitnesses retains existential interfaces proved on an argument or
+	// result. Elimination rechecks membership after later refinement. These
+	// interfaces never add fields, constraints, defaults, or runtime identity.
+	callWitnesses []*Existential
+
 	// schemes retain universal introductions independently of runtime kind. Type
 	// selection changes its view, while the original value graph is shared.
 	schemes []subjectScheme
