@@ -109,6 +109,38 @@ func TestQuantifiedCertificationBounds(t *testing.T) {
 	}
 }
 
+func TestQuantifiedCertificationOwnDefault(t *testing.T) {
+	for _, tt := range []struct {
+		name, source, want string
+		valid              bool
+	}{
+		{"narrow_supplied_domain", `f:func(x:int=-1)->int:x
+f:func(x:int&>=0=10)->int`, "-1", true},
+		{"different_literal", `f:func(x:int=2)->int:x
+f:func(x:1=1)->int`, "2", true},
+		{"result_covers_default", `f:func(x:int=2)->int:x
+f:func(x:1=1)->(1|2)`, "2", true},
+		{"result_excludes_default", `f:func(x:int=2)->int:x
+f:func(x:1=1)->1`, "", false},
+		{"default_outside_own_domain", `f:func(x:int="bad")->int:x`, "", false},
+		{"default_not_supplied_argument", `f:func(x:int=1)->int:x
+f:func(x:int=1)->1`, "", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := semanticValue(t, tt.source+"\nout:f()")
+			f := root.LookupPath(cue.ParsePath("f"))
+			if err := f.Validate(); (err == nil) != tt.valid {
+				t.Fatalf("valid=%v: %v", tt.valid, err)
+			}
+			if tt.valid {
+				semanticJSON(t, root, "out", tt.want)
+			} else if _, err := root.LookupPath(cue.ParsePath("out")).MarshalJSON(); err == nil {
+				t.Fatal("executed an uncertified function")
+			}
+		})
+	}
+}
+
 func TestQuantifiedCertificationPackageOpening(t *testing.T) {
 	for _, escape := range []bool{false, true} {
 		body := "P.show(P.value)"

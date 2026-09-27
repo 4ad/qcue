@@ -51,7 +51,17 @@ func (s *subsumer) capabilityValues(a, b *adt.FuncValue) bool {
 			return false
 		}
 		for _, target := range targets {
-			if !s.certifier.function(b, target) {
+			// A proved declaration can establish a weaker result interface
+			// directly. Rechecking the body is needed only for a stronger
+			// interface, including a newly introduced universal telescope.
+			proved := false
+			for _, source := range b.CallClausesFor(s.ctx, target) {
+				if s.capabilitySignature(target, source) {
+					proved = true
+					break
+				}
+			}
+			if !proved && !s.certifier.function(b, target) {
 				return false
 			}
 		}

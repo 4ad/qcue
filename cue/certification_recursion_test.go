@@ -73,6 +73,9 @@ g:func(x:int)->int:h(x)
 h:func(x:int)->int:{again:g(x),bad:x+"bad"}.again
 }.g`, false},
 		{"local_data_cycle", `f:func()->int:{x:y,y:x}.x`, false},
+		{"reflexive_data", `f:func()->_:{x:x,g:func()->int:1}`, true},
+		{"reflexive_data_not_int", `f:func()->{x:int}:{x:x}`, false},
+		{"reflexive_data_not_operand", `f:func()->_:{x:x+1}`, false},
 		{"projected_bad_argument", `f:func()->(func(int)->int):{
 g:{impl:func(x:int)->int:g("bad")}.impl
 }.g`, false},

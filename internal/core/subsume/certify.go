@@ -181,7 +181,7 @@ func (p *certifier) includes(want, got adt.Value) bool {
 			return false
 		}
 	}
-	s := &subsumer{ctx: p.ctx}
+	s := &subsumer{ctx: p.ctx, certifier: p}
 	return s.values(want, got)
 }
 
@@ -568,14 +568,18 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 			v = proofUnion([]adt.Value{v, defaultValue})
 		}
 		if arg.Default != nil {
-			// The contract admits omission. Prove that the implementation's
-			// own default supplies a value in the same domain as an explicit
-			// argument, so the body proof covers both cases. A target's
-			// default must never stand in for the implementation's default.
-			defaultExpr := source.Fn.Params[j].Default
-			if defaultExpr == nil || !p.includes(v, p.expr(source.Env, defaultExpr)) {
+			// Omission runs the implementation's default, checked against
+			// its own parameter description. A narrower attached domain
+			// constrains supplied arguments, not that private default.
+			q := source.Fn.Params[j]
+			if q.Default == nil {
 				return false
 			}
+			defaultValue := p.expr(source.Env, q.Default)
+			if !p.includes(p.schema(source.Env, q.Value), defaultValue) {
+				return false
+			}
+			v = proofUnion([]adt.Value{v, defaultValue})
 		}
 		values[source.Fn.Params[j].Local] = v
 		p.assume(v, make(map[adt.Value]bool))
@@ -729,6 +733,13 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				return v
 			}
 			if scope.active[x.Label] {
+				if ref, ok := scope.fields[x.Label].(*adt.FieldReference); ok &&
+					ref.UpCount == 0 && ref.Label == x.Label {
+					// A reflexive data equation adds no constraint. Its
+					// description is top, not an assumed concrete value or
+					// a hypothesis for arbitrary recursive computations.
+					return &adt.Top{}
+				}
 				return nil
 			}
 			if field := scope.fields[x.Label]; field != nil {

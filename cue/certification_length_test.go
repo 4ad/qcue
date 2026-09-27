@@ -30,6 +30,14 @@ func TestQuantifiedLengthCertificates(t *testing.T) {
 		{"record_closed", `f:func(r:close({a:int}))->1:len(r)`, true},
 		{"record_optional", `f:func(r:close({a:int,b?:int}))->(int&>=1&<=2):len(r)`, true},
 		{"fixed_list", `f:func(xs:[int,string])->2:len(xs)`, true},
+		{"list_record_definition", `#One:{a:1}
+f:func(xs:[{}])->int:len(xs[0])
+f:func([#One])->1`, true},
+		{"list_record_wrong_length", `#One:{a:1}
+f:func(xs:[{}])->int:len(xs[0])
+f:func([#One])->0`, false},
+		{"list_record_missing_field", `f:func(xs:[{a:int}])->int:xs[0].a
+f:func([{}])->int`, false},
 		{"list_minimum", `f:func(xs:[int,...int])->(int&>=1):len(xs)`, true},
 		{"string", `f:func()->2:len("é")`, true},
 		{"bytes", `f:func()->2:len('ab')`, true},

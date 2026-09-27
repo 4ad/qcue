@@ -65,7 +65,9 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		return true
 
 	case *adt.StructMarker:
-		_, ok := y.BaseValue.(*adt.StructMarker)
+		// A shared record retains closedness on its referring vertex.
+		// Inspect the underlying kind without discarding that wrapper.
+		_, ok := y.DerefValue().BaseValue.(*adt.StructMarker)
 		if !ok {
 			return false
 		}
