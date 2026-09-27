@@ -96,3 +96,39 @@ prefix:
 	}
 	return result, true
 }
+
+// WalkPacketShapes visits each complete packet shape admitted by a closed
+// signature. Slots are parameter indexes, with the positional prefix first.
+// The slice is borrowed for the duration of visit. step charges each presence
+// decision to the caller's work budget. False means unsupported or exhausted,
+// never that a signature's domain is empty.
+func WalkPacketShapes(fn *Function, step func() bool, visit func(positional int, slots []int) bool) bool {
+	families, ok := intersectPacketDomains(fn, fn)
+	if !ok {
+		return false
+	}
+	for _, family := range families {
+		var slots []int
+		var walk func(int) bool
+		walk = func(i int) bool {
+			if !step() {
+				return false
+			}
+			if i == len(family.slots) {
+				return visit(family.positional, slots)
+			}
+			slot := family.slots[i]
+			if slot.optional && !walk(i+1) {
+				return false
+			}
+			slots = append(slots, slot.a)
+			ok := walk(i + 1)
+			slots = slots[:len(slots)-1]
+			return ok
+		}
+		if !walk(0) {
+			return false
+		}
+	}
+	return true
+}
