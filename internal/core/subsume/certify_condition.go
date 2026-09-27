@@ -24,10 +24,11 @@ import (
 // Identity of an observed scalar, not equality of its type. Distinct integer
 // parameters cannot share a guard merely because both have the type int.
 type conditionSubject struct {
-	env    *adt.Environment
-	label  adt.Feature
-	length bool
-	other  adt.Expr
+	env      *adt.Environment
+	label    adt.Feature
+	length   bool
+	presence bool
+	other    adt.Expr
 	// A comparison between two stable bindings supplies one Boolean
 	// observation, even when neither operand has a concrete value.
 	rightEnv    *adt.Environment
@@ -39,6 +40,9 @@ type conditionSubject struct {
 type checkedCondition struct {
 	subject         conditionSubject
 	domain, yes, no adt.Value
+	// Optional parameter observations refine only the corresponding branch.
+	optional      adt.Value
+	presentOnTrue bool
 }
 
 type conditionalRecordState struct {
@@ -76,13 +80,13 @@ func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit,
 		if !ok {
 			return nil
 		}
-		body := p.expr(env, comp.Value)
+		body := p.expr(p.presenceBranch(env, condition, true), comp.Value)
 		if body == nil {
 			return nil
 		}
 		var fallback adt.Value
 		if comp.Fallback != nil {
-			fallback = p.expr(env, comp.Fallback)
+			fallback = p.expr(p.presenceBranch(env, condition, false), comp.Fallback)
 			if fallback == nil {
 				return nil
 			}
@@ -155,6 +159,11 @@ func (p *certifier) addConditionalFields(state conditionalRecordState, value adt
 	if !p.step() {
 		return nil, false
 	}
+	if refuted(value) {
+		// Its source body was checked even if this branch cannot produce
+		// a record. It contributes no successful shape to the union.
+		return nil, true
+	}
 	if union, ok := adt.Unwrap(value).(*adt.Disjunction); ok {
 		var out []conditionalRecordState
 		for _, branch := range union.Values {
@@ -194,17 +203,21 @@ func (p *certifier) addConditionalFields(state conditionalRecordState, value adt
 }
 
 func (p *certifier) condition(env *adt.Environment, expr adt.Expr) (checkedCondition, bool) {
+	if unary, ok := expr.(*adt.UnaryExpr); ok && unary.Op == adt.NotOp {
+		inner, ok := p.condition(env, unary.X)
+		inner.yes, inner.no = inner.no, inner.yes
+		inner.presentOnTrue = !inner.presentOnTrue
+		return inner, ok
+	}
+	if condition, ok := p.presenceCondition(env, expr); ok {
+		return condition, true
+	}
 	value := p.expr(env, expr)
 	if value == nil || value.Kind() != adt.BoolKind {
 		return checkedCondition{}, false
 	}
 	c := checkedCondition{subject: conditionSubject{env: env, other: expr},
 		domain: value, yes: &adt.Bool{B: true}, no: &adt.Bool{B: false}}
-	if unary, ok := expr.(*adt.UnaryExpr); ok && unary.Op == adt.NotOp {
-		inner, ok := p.condition(env, unary.X)
-		inner.yes, inner.no = inner.no, inner.yes
-		return inner, ok
-	}
 	if subject, domain, ok := p.conditionScalar(env, expr); ok {
 		c.subject, c.domain = subject, domain
 		return c, true

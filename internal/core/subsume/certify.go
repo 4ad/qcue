@@ -73,6 +73,8 @@ func (p *certifier) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bo
 
 type proofScope struct {
 	values   map[adt.Feature]adt.Value
+	optional map[adt.Feature]adt.Value
+	absent   map[adt.Feature]bool
 	fields   map[adt.Feature]adt.Expr
 	bindings map[adt.Feature][]proofBinding
 	active   map[adt.Feature]bool
@@ -546,6 +548,8 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	}
 	matches := adt.MatchFuncValueParams(target.Fn, &adt.FuncValue{Fn: source.Fn})
 	values := make(map[adt.Feature]adt.Value)
+	optional := make(map[adt.Feature]adt.Value)
+	absent := make(map[adt.Feature]bool)
 	if partial != nil {
 		for i, arg := range f.Fn.Params {
 			env, expr := partial.BoundArgument(i)
@@ -569,8 +573,10 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 		if arg.ArcType == adt.ArcOptional && arg.Default == nil {
 			q := source.Fn.Params[j]
 			if q.Default == nil {
-				// Its presence is not guaranteed. An unused optional slot
-				// needs no value hypothesis; an unguarded use remains blocked.
+				// Keep its declared type without assuming presence. An
+				// occurrence test can introduce this hypothesis in its branch.
+				optional[q.Local] = v
+				p.assume(v, make(map[adt.Value]bool))
 				continue
 			}
 			defaultValue := p.expr(source.Env, q.Default)
@@ -599,6 +605,18 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 		p.assume(v, make(map[adt.Value]bool))
 	}
 	for _, arg := range source.Fn.Params {
+		if arg.ArcType == adt.ArcOptional && arg.Default == nil && optional[arg.Local] == nil {
+			v := values[arg.Local]
+			if v == nil {
+				v = p.schema(source.Env, arg.Value)
+				absent[arg.Local] = true
+			}
+			if v == nil {
+				return false
+			}
+			optional[arg.Local] = v
+			p.assume(v, make(map[adt.Value]bool))
+		}
 		if _, ok := values[arg.Local]; ok {
 			continue
 		}
@@ -611,6 +629,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 		}
 	}
 	env := p.frame(source.Env, values)
+	p.scopes[env].optional, p.scopes[env].absent = optional, absent
 	body := p.expr(env, source.Fn.Body)
 	return p.includes(p.schema(target.Env, target.Fn.Ret), body)
 }
@@ -1334,6 +1353,14 @@ func (p *certifier) project(value adt.Value, label adt.Feature) adt.Value {
 		return nil
 	}
 	switch x := adt.Unwrap(value).(type) {
+	case *adt.Bottom:
+		// A checked computation with no successful result needs no field
+		// witness. This rule does not add fields to a surviving shape;
+		// every source operand was checked before producing this bottom.
+		if !x.IsIncomplete() {
+			return x
+		}
+		return nil
 	case *adt.RigidType:
 		// A bound supplies a field inventory and the types of those fields,
 		// without identifying the arbitrary record with its upper bound.

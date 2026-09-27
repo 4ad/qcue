@@ -4,6 +4,12 @@
 -- in.cue --
 @test(json, [3, 5, 3, 7, "s"], at="out")
 @test(validate, concrete, incomplete, at="unresolvedPartial")
+@test(validate, blocked, at="missingResult")
+
+// The former implementation had no r field when both slots were absent.
+// Preserve it as a failed field-inventory check. The implementation below
+// supplies an explicit failure on that path and preserves every other path.
+missingResult: func(x?: int, y?: string) -> _: ({if x != _|_ {r: x}, if y != _|_ {r: y}}).r
 
 #M: exists A {
 	f: (func() -> int) & (func(int) -> int)
@@ -13,7 +19,16 @@
 p: seal #M with (A = int) {
 	f: func(x: int = 3) -> int: x
 	h: func(x: _ = 3) -> _: x
-	g: func(x?: int, y?: string) -> _: ({if x != _|_ {r: x}, if y != _|_ {r: y}}).r
+	g: func(x?: int, y?: string) -> _: {
+		if x != _|_ {
+			r: x
+			if y != _|_ {r: y}
+		}
+		if x == _|_ {
+			if y != _|_ {r: y}
+			if y == _|_ {r: _|_}
+		}
+	}.r
 }
 out: (open p as (A, P) {
 	r: [P.f(), P.f(5), P.h(), P.g(x: 7), P.g(y: "s")]

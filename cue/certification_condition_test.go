@@ -40,6 +40,26 @@ func TestQuantifiedConditionalCertification(t *testing.T) {
  if b {out:base}
  if !b {out:base+1}}.out`, `f(false)`, `2`},
 		{"nested", `f:func(b:bool,c:bool)->int:{if b {if c {out:1} else {out:2}} else {out:3}}.out`, `f(true,false)`, `2`},
+		{"optional_present", `f:func(x?:int)->int:{if x!=_|_ {out:x}
+ if x==_|_ {out:0}}.out`, `f(x:3)`, `3`},
+		{"optional_absent", `f:func(x?:int)->int:{if x!=_|_ {out:x}
+ if x==_|_ {out:0}}.out`, `f()`, `0`},
+		{"optional_reversed", `f:func(x?:int)->int:{if _|_!=x {out:x}
+ if _|_==x {out:0}}.out`, `f(x:3)`, `3`},
+		{"optional_negated", `f:func(x?:int)->int:{if !(x==_|_) {out:x} else {out:0}}.out`, `f(x:3)`, `3`},
+		{"optional_closure", `f:func(x?:int)->(func()->int):{
+ if x!=_|_ {out:func()->int:x}
+ if x==_|_ {out:func()->int:0}}.out`, `f(x:3)()`, `3`},
+		{"optional_callback", `f:func(g?:func(int)->int)->int:{
+ if g!=_|_ {out:g(3)}
+ if g==_|_ {out:0}}.out`, `f(g:func(x:int)->int:x)`, `3`},
+		{"optional_nested", `f:func(x?:int,y?:int)->int:{
+ if x!=_|_ {out:x}
+ if x==_|_ {if y!=_|_ {out:y} else {out:0}}}.out`, `f(y:4)`, `4`},
+		{"optional_checked_failure", `f:func(x?:int)->int:{
+ if x!=_|_ {out:x}
+ if x==_|_ {out:_|_}}.out`, `f()==_|_`, `true`},
+		{"conditional_failure", `f:func(b:bool)->int:{if b {out:1} else {_|_}}.out`, `f(true)`, `1`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			v := cuecontext.New().CompileString("@experiment(try)\n" + tt.source + "\nout: " + tt.call)
@@ -68,6 +88,14 @@ func TestQuantifiedConditionalCertification(t *testing.T) {
 		`f:func(n:int)->int:{if n<0 {out:1}
 if n>=0 {out:"bad"}}.out`,
 		`f:func(r:{a:int},b:bool)->close({a:int}):{if b {r} else {r}}`,
+		`f:func(x?:int,y?:int)->int:{if x!=_|_ {out:y} else {out:0}}.out`,
+		`f:func(x?:int)->int:{if x==_|_ {out:x} else {out:0}}.out`,
+		`f:func(x?:int)->int:{if x!=_|_ {out:x} else {out:x}}.out`,
+		`f:func(x?:int)->int:{if x!=_|_ {checked:x}
+ out:x}.out`,
+		`f:func(x?:int)->(func()->int):{outside:func()->int:x
+ if x!=_|_ {out:outside} else {out:func()->int:0}}.out`,
+		`f:func(x?:int,y?:string)->_:({if x!=_|_ {r:x}, if y!=_|_ {r:y}}).r`,
 	} {
 		v := cuecontext.New().CompileString("@experiment(try)\n" + source)
 		f := v.LookupPath(cue.ParsePath("f"))
