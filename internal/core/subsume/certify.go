@@ -53,7 +53,7 @@ func newCertifier(ctx *adt.OpContext) *certifier {
 		projections:  make(map[*adt.Vertex]map[adt.Feature]adt.Value),
 		constructors: make(map[*adt.Vertex]adt.Expr),
 		records:      make(map[proofRecordKey]*proofRecord),
-		completed:    make(map[proofKey][]*adt.FuncValue), remaining: 10000}
+		completed:    make(map[proofKey]proofCertificate), remaining: 10000}
 }
 
 // Reuse the current proof context when validating captured composites.
@@ -106,7 +106,7 @@ type certifier struct {
 	// a typing inventory is not an explicit close constraint.
 	constructors map[*adt.Vertex]adt.Expr
 	records      map[proofRecordKey]*proofRecord
-	completed    map[proofKey][]*adt.FuncValue
+	completed    map[proofKey]proofCertificate
 	attempts     []*proofAttempt
 	remaining    int
 	failure      *adt.Bottom
@@ -115,6 +115,13 @@ type certifier struct {
 type proofKey struct {
 	f      *adt.FuncValue
 	target adt.FuncType
+}
+
+type proofCertificate struct {
+	required []*adt.FuncValue
+	// Keep the checked body's successful-result description. A weaker
+	// annotation must not discard fields or refinements proved by its body.
+	result adt.Value
 }
 
 // A completed proof can be reused only while its inherited hypotheses are
@@ -443,13 +450,13 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 		return false
 	}
 	key := proofKey{f, target}
-	if required, ok := p.completed[key]; ok {
+	if certificate, ok := p.completed[key]; ok {
 		available := true
-		for _, h := range required {
+		for _, h := range certificate.required {
 			available = available && p.hypotheses[h]
 		}
 		if available {
-			for _, h := range required {
+			for _, h := range certificate.required {
 				p.useHypothesis(h)
 			}
 			return true
@@ -457,6 +464,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	}
 	attempt := &proofAttempt{inherited: p.hypotheses, required: make(map[*adt.FuncValue]bool)}
 	p.attempts = append(p.attempts, attempt)
+	var result adt.Value
 	defer func() {
 		p.attempts = p.attempts[:len(p.attempts)-1]
 		if proved {
@@ -464,7 +472,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 			for h := range attempt.required {
 				required = append(required, h)
 			}
-			p.completed[key] = required
+			p.completed[key] = proofCertificate{required: required, result: result}
 		}
 	}()
 	savedHypotheses := p.hypotheses
@@ -634,7 +642,11 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	env := p.frame(source.Env, values)
 	p.scopes[env].optional, p.scopes[env].absent = optional, absent
 	body := p.expr(env, source.Fn.Body)
-	return p.includes(p.schema(target.Env, target.Fn.Ret), body)
+	if !p.includes(p.schema(target.Env, target.Fn.Ret), body) {
+		return false
+	}
+	result = body
+	return true
 }
 
 // An admitted callback packet or the result of a checked call introduces a
@@ -1732,14 +1744,26 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 	}
 	admitted := false
 	var consequences []adt.Value
+	addResult := func(source adt.FuncType) {
+		if result := p.schema(source.Env, source.Fn.Ret); result != nil {
+			consequences = append(consequences, result)
+		}
+		// Only a visible implementation supplies body evidence. Recursive
+		// calls use their declared induction hypothesis; opaque adapters
+		// expose their certified interface without a private body summary.
+		if function != nil && function.Fn.Body != nil && !p.recursing(function) &&
+			p.function(function, source) {
+			if result := p.completed[proofKey{function, source}].result; result != nil {
+				consequences = append(consequences, result)
+			}
+		}
+	}
 	seen := make(map[adt.FuncType]bool)
 	for _, source := range sources {
 		seen[source] = true
 		if source, ok := admit(source); ok {
 			admitted = true
-			if result := p.schema(source.Env, source.Fn.Ret); result != nil {
-				consequences = append(consequences, result)
-			}
+			addResult(source)
 		}
 	}
 	if !admitted {
@@ -1751,9 +1775,7 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 		}
 		seen[source] = true
 		if source, ok := admit(source); ok {
-			if result := p.schema(source.Env, source.Fn.Ret); result != nil {
-				consequences = append(consequences, result)
-			}
+			addResult(source)
 		}
 	}
 	return p.meetResults(consequences)

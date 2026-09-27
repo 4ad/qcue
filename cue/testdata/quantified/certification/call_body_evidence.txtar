@@ -1,0 +1,18 @@
+// A visible body's inferred result survives a weaker published annotation.
+// This evidence is checked independently, never obtained by executing a call.
+
+-- in.cue --
+@test(json, [1, 2, 3, 4], at="out")
+@test(validate, blocked, at="bad")
+@test(validate, blocked, at="unlinked")
+
+make: func(x: int) -> _: {value: x}
+generic(A): func(x: A) -> _: {value: x}
+part: func(ignored: string, x: int) -> _: {value: x}
+get: func(r: {value: int}) -> int: r.value
+client: func(x: int) -> int: get(make(x))
+out: [get(make(1)), get(generic(2)), client(3), get(part("", ...)(4))]
+
+bad: get(generic("wrong"))
+imported: func(int) -> _
+unlinked: get(imported(1))
