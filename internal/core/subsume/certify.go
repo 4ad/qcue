@@ -1449,6 +1449,9 @@ func (p *certifier) project(value adt.Value, label adt.Feature) adt.Value {
 			return field
 		}
 	}
+	// A transported field may share its structural value through BaseValue.
+	// Its inventory belongs to that value, not to the forwarding field.
+	v = v.DerefValue()
 	field := v.LookupRaw(label)
 	if field != nil && (field.ArcType == adt.ArcMember || field.ArcType == adt.ArcRequired) {
 		return field
