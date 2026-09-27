@@ -47,6 +47,17 @@ func (r *RigidType) validate(c *OpContext, value Value) *Bottom {
 // FunctionTypeParameters returns the still-bound universal telescope.
 func FunctionTypeParameters(t FuncType) []*TypeParameter { return typeParameters(t.Env) }
 
+// SelectFunctionType performs explicit universal elimination. The source's
+// conformance is a premise supplied by the caller; selection checks the type
+// argument's bound and preserves the original obligations and call frontier.
+func SelectFunctionType(c *OpContext, f *FuncValue, argument Value) (*FuncValue, *Bottom) {
+	if argument == nil || !f.hasTypeSelection() {
+		return nil, &Bottom{Code: IncompleteError,
+			Err: c.Newf("no universal clause admits this type application")}
+	}
+	return f.selectType(c, argument)
+}
+
 // BoundArgumentInstance selects a witness for the saved part of a packet.
 // This checks that partial application is possible; it does not specialize
 // the closure's residual protocol or discharge its universal obligations.

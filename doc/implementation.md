@@ -224,6 +224,16 @@ selected view's available domain. Definition fields and absent optional fields
 do not introduce executable callback hypotheses.
 Primitive proof rules check the actual labels, arity, and omission policy before
 using a known total result rule.
+Explicit type applications inside bodies check the selected argument's bound
+and retain the original universal obligation. A checked call's result carries
+its callable evidence into later selections and applications, including
+impredicative instances. Record projection and callback application check every
+incoming union branch; an absent or optional field cannot justify selection.
+Fixed and homogeneous list indexes constrain successful selections and permit
+out-of-range failure. Enabled ground arithmetic, scalar comparisons, Boolean
+operations, concatenation, and string/bytes repetition retain their exact
+results, including CUE's numeric representation. Both operands are checked
+before an operation can introduce a failing computation.
 Numeric translation by a constant preserves supported bounds.
 Boolean negation and numeric signs are also certified. Numeric negation
 preserves unions and exclusions and reverses strict and non-strict bounds.

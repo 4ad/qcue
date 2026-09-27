@@ -376,14 +376,25 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	return p.includes(p.schema(target.Env, target.Fn.Ret), body)
 }
 
-// Only an admitted callback packet introduces a conformance hypothesis.
-// Ordinary named functions must have their bodies checked before a call can
-// use their result annotations. This prevents circular annotation proofs.
+// An admitted callback packet or the result of a checked call introduces a
+// conformance hypothesis. Ordinary named functions must have their bodies
+// checked before a call can use their result annotations. This prevents
+// circular annotation proofs.
 func (p *certifier) assume(v adt.Value, seen map[adt.Value]bool) {
 	if v == nil || seen[v] {
 		return
 	}
 	seen[v] = true
+	switch x := adt.Unwrap(v).(type) {
+	case *adt.Disjunction:
+		for _, branch := range x.Values {
+			p.assume(branch, seen)
+		}
+	case *adt.Conjunction:
+		for _, term := range x.Values {
+			p.assume(term, seen)
+		}
+	}
 	if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok {
 		if f.Fn.Body == nil {
 			p.hypotheses[f] = true
@@ -420,6 +431,22 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		if v == nil || !adt.IsConcrete(v) {
 			return nil
 		}
+		switch x.Op {
+		case adt.LessThanOp, adt.LessEqualOp, adt.GreaterThanOp, adt.GreaterEqualOp:
+			if v.Kind()&adt.NumberKind != v.Kind() && v.Kind() != adt.StringKind && v.Kind() != adt.BytesKind {
+				return nil
+			}
+		case adt.MatchOp, adt.NotMatchOp:
+			if v.Kind() != adt.StringKind && v.Kind() != adt.BytesKind {
+				return nil
+			}
+		case adt.NotEqualOp:
+			if v.Kind()&(adt.NumberKind|adt.StringKind|adt.BytesKind|adt.BoolKind|adt.NullKind) != v.Kind() {
+				return nil
+			}
+		default:
+			return nil
+		}
 		return p.schema(nil, &adt.BoundExpr{Op: x.Op, Expr: v})
 	case *adt.Builtin:
 		return x
@@ -449,24 +476,20 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		return p.captured(p.schema(env, x))
 	case *adt.SelectorExpr:
-		v, ok := p.expr(env, x.X).(*adt.Vertex)
-		if !ok {
-			return nil
-		}
-		if fields := p.projections[v]; fields != nil {
-			return fields[x.Sel]
-		}
-		field := v.LookupRaw(x.Sel)
-		if field == nil || (field.ArcType != adt.ArcMember && field.ArcType != adt.ArcRequired) {
-			return nil
-		}
-		return field
+		return p.project(p.expr(env, x.X), x.Sel)
 	case *adt.IndexExpr:
-		v, ok := p.expr(env, x.X).(*adt.Vertex)
-		if !ok || !v.IsList() {
+		v := p.expr(env, x.X)
+		if v != nil && v.Kind() == adt.FuncKind && x.Quantified {
+			index := x.TypeIndex
+			if index == nil {
+				index = x.Index
+			}
+			return p.selectType(v, p.schema(env, index))
+		}
+		if x.ErasedIndex {
 			return nil
 		}
-		n, ok := x.Index.(*adt.Num)
+		n, ok := adt.Unwrap(p.expr(env, x.Index)).(*adt.Num)
 		if !ok {
 			return nil
 		}
@@ -474,16 +497,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		if err != nil || i < 0 {
 			return nil
 		}
-		if fields := p.projections[v]; fields != nil {
-			return fields[adt.MakeIntLabel(adt.IntLabel, i)]
-		}
-		for a := range v.Elems() {
-			if i == 0 {
-				return a
-			}
-			i--
-		}
-		return nil
+		return p.project(v, adt.MakeIntLabel(adt.IntLabel, i))
 	case *adt.Function:
 		f := &adt.FuncValue{Fn: x, Src: x.Src, Env: env}
 		if !p.function(f, adt.FuncType{Fn: x, Env: env}) {
@@ -633,14 +647,23 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			return nil
 		}
 		ka, kb := a.Kind(), b.Kind()
+		ground := func() adt.Value {
+			if !adt.IsConcrete(a) || !adt.IsConcrete(b) {
+				return nil
+			}
+			return adt.BinOp(p.ctx, x, x.Op, adt.Unwrap(a), adt.Unwrap(b))
+		}
 		switch x.Op {
 		case adt.AndOp:
 			// Both operands have their own derivation. Their meet constrains
 			// successful results even when they conflict; it is an operation
 			// in the source body, never a filter supplied by an annotation.
 			return p.schema(nil, &adt.Conjunction{Values: []adt.Value{a, b}})
-		case adt.AddOp, adt.SubtractOp, adt.MultiplyOp:
+		case adt.AddOp, adt.SubtractOp, adt.MultiplyOp, adt.FloatQuotientOp:
 			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
+				if v := ground(); v != nil {
+					return v
+				}
 				if x.Op == adt.AddOp || x.Op == adt.SubtractOp {
 					if n, ok := adt.Unwrap(b).(*adt.Num); ok {
 						return p.schema(nil, p.translateNumber(a, n, x.Op))
@@ -649,17 +672,47 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 						return p.schema(nil, p.translateNumber(b, n, x.Op))
 					}
 				}
-				return &adt.BasicType{K: ka | kb}
+				kind := ka | kb
+				if x.Op == adt.FloatQuotientOp {
+					kind = adt.NumberKind
+				}
+				return &adt.BasicType{K: kind}
 			}
-			if x.Op == adt.AddOp && ka == adt.StringKind && kb == adt.StringKind {
-				return &adt.BasicType{K: adt.StringKind}
+			if x.Op == adt.AddOp && ka == kb && (ka == adt.StringKind || ka == adt.BytesKind) {
+				if v := ground(); v != nil {
+					return v
+				}
+				return &adt.BasicType{K: ka}
+			}
+			if x.Op == adt.MultiplyOp &&
+				(ka == adt.IntKind && (kb == adt.StringKind || kb == adt.BytesKind) ||
+					kb == adt.IntKind && (ka == adt.StringKind || ka == adt.BytesKind)) {
+				if v := ground(); v != nil {
+					return v
+				}
+				return &adt.BasicType{K: (ka | kb) &^ adt.IntKind}
 			}
 		case adt.EqualOp, adt.NotEqualOp:
-			if ka == kb && ka&(adt.NumberKind|adt.StringKind|adt.BoolKind|adt.NullKind) == ka {
+			if ka == kb && ka&(adt.NumberKind|adt.StringKind|adt.BytesKind|adt.BoolKind|adt.NullKind) == ka ||
+				ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
+				if v := ground(); v != nil {
+					return v
+				}
 				return &adt.BasicType{K: adt.BoolKind}
 			}
 		case adt.LessThanOp, adt.LessEqualOp, adt.GreaterThanOp, adt.GreaterEqualOp:
-			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
+			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb ||
+				ka == kb && (ka == adt.StringKind || ka == adt.BytesKind) {
+				if v := ground(); v != nil {
+					return v
+				}
+				return &adt.BasicType{K: adt.BoolKind}
+			}
+		case adt.BoolAndOp, adt.BoolOrOp:
+			if ka == adt.BoolKind && kb == adt.BoolKind {
+				if v := ground(); v != nil {
+					return v
+				}
 				return &adt.BasicType{K: adt.BoolKind}
 			}
 		}
@@ -668,6 +721,93 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.call(env, x)
 	}
 	return nil
+}
+
+// Type elimination distributes through alternative subjects. For a
+// conjunction it uses the clauses admitting the type argument, retaining
+// all of their consequences rather than arbitrarily selecting one clause.
+func (p *certifier) selectType(value, argument adt.Value) adt.Value {
+	if !p.step() || argument == nil {
+		return nil
+	}
+	switch x := adt.Unwrap(value).(type) {
+	case *adt.Disjunction:
+		var results []adt.Value
+		for _, branch := range x.Values {
+			result := p.selectType(branch, argument)
+			if result == nil {
+				return nil
+			}
+			results = append(results, result)
+		}
+		return proofUnion(results)
+	case *adt.Conjunction:
+		var results []adt.Value
+		for _, term := range x.Values {
+			if result := p.selectType(term, argument); result != nil {
+				results = append(results, result)
+			}
+		}
+		return p.meetResults(results)
+	case *adt.FuncValue:
+		inst, b := adt.SelectFunctionType(p.ctx, x, argument)
+		if b != nil || inst == nil {
+			return nil
+		}
+		if p.hypotheses[x] {
+			p.useHypothesis(x)
+			p.hypotheses[inst] = true
+		}
+		return inst
+	}
+	return nil
+}
+
+// A projection must be justified in every incoming shape. Width subtyping
+// does not make an undeclared field accessible. List indexes instead denote
+// partial computations: an out-of-range index fails, and a homogeneous tail
+// constrains any successful selection without promising that it is present.
+func (p *certifier) project(value adt.Value, label adt.Feature) adt.Value {
+	if !p.step() {
+		return nil
+	}
+	if union, ok := adt.Unwrap(value).(*adt.Disjunction); ok {
+		var alternatives []adt.Value
+		for _, branch := range union.Values {
+			v := p.project(branch, label)
+			if v == nil {
+				return nil
+			}
+			alternatives = append(alternatives, v)
+		}
+		return proofUnion(alternatives)
+	}
+	v, ok := value.(*adt.Vertex)
+	if !ok {
+		return nil
+	}
+	if fields := p.projections[v]; fields != nil {
+		if field := fields[label]; field != nil {
+			return field
+		}
+	}
+	field := v.LookupRaw(label)
+	if field != nil && (field.ArcType == adt.ArcMember || field.ArcType == adt.ArcRequired) {
+		return field
+	}
+	if !v.IsList() || !label.IsInt() {
+		return nil
+	}
+	if v.IsClosedList() {
+		return &adt.Bottom{Code: adt.EvalError, Err: p.ctx.Newf("list index out of range")}
+	}
+	tail := &adt.Vertex{Label: label}
+	v.MatchAndInsert(p.ctx, tail)
+	tail.Finalize(p.ctx)
+	if b := tail.Bottom(); b != nil && b.IsIncomplete() {
+		return nil
+	}
+	return tail
 }
 
 // Negation reverses ordered interval endpoints, while preserving numeric
@@ -775,6 +915,38 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 		packet.Params = append(packet.Params, adt.FuncParam{Value: args[i], Label: label, Positional: label == adt.InvalidLabel})
 	}
 	target := adt.FuncType{Fn: packet}
+	result := p.callValue(callee, target)
+	// The call rule establishes the successful result's interface. Retain
+	// that evidence for higher-order elimination, including a quantified
+	// callback returned by an explicitly impredicative instance.
+	p.assume(result, make(map[adt.Value]bool))
+	return result
+}
+
+func (p *certifier) callValue(callee adt.Value, target adt.FuncType) adt.Value {
+	if !p.step() {
+		return nil
+	}
+	if union, ok := callee.(*adt.Disjunction); ok {
+		var alternatives []adt.Value
+		for _, branch := range union.Values {
+			result := p.callValue(adt.Unwrap(branch), target)
+			if result == nil {
+				return nil
+			}
+			alternatives = append(alternatives, result)
+		}
+		return proofUnion(alternatives)
+	}
+	if conjunction, ok := callee.(*adt.Conjunction); ok {
+		var consequences []adt.Value
+		for _, term := range conjunction.Values {
+			if result := p.callValue(adt.Unwrap(term), target); result != nil {
+				consequences = append(consequences, result)
+			}
+		}
+		return p.meetResults(consequences)
+	}
 	var source adt.FuncType
 	switch f := callee.(type) {
 	case *adt.FuncValue:
@@ -875,6 +1047,10 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 			}
 		}
 	}
+	return p.meetResults(consequences)
+}
+
+func (p *certifier) meetResults(consequences []adt.Value) adt.Value {
 	if len(consequences) == 1 {
 		return consequences[0]
 	}
