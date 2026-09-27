@@ -126,10 +126,14 @@ checks a conjunction of explicit clauses in supplied checking scopes. It
 enumerates closed packet protocols, including labeled, optional, and defaulted
 slots; groups equal domains; and checks joint result intersections. Exact
 negative guards use finite kind/literal and constant-interval differences.
-Unsupported complements retain conservative guards. Rigid universal opening,
-anchored instances, and recursive source-interface traversal are obligations
-of its caller. This service is separate from the current evaluator checks;
-its diagnostics are not CUE values and cannot act as semantic bottom.
+Unsupported complements retain conservative guards. The declaration service
+opens universals rigidly and structurally matches their domains against
+independent sibling domains, checking repeated variables, bounds, and packet
+coverage before adding an instance. Alias-expanded dependencies distinguish
+generic domains from vacuous floated binders. Recursive source-interface
+traversal remains an obligation of its caller. These services are separate
+from the current evaluator checks; their diagnostics are not CUE values and
+cannot act as semantic bottom.
 The service shares the 10,000-step proof budget and blocks on exhaustion.
 An independent finite Boolean oracle covers all triples of Boolean arrows.
 Function descriptors retain explicit declaration clauses in their original
