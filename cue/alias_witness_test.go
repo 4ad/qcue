@@ -82,6 +82,9 @@ func TestQuantifiedAliasCodeOrigin(t *testing.T) {
 		"R(A) = {f: func(x: A) -> A: x}\nf: func(cb: R(int)) -> int: cb.f(1)\nout: f(R(int))",
 	} {
 		v := cuecontext.New().CompileString(source)
+		if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); err != nil {
+			t.Fatalf("alias callback did not certify: %v\n%s", err, source)
+		}
 		if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 1 {
 			t.Fatalf("source %s: %d, %v (compile: %v)", source, got, err, v.Err())
 		}
@@ -176,5 +179,26 @@ out: f[int](3)
 `)
 	if got, err := v.LookupPath(cue.ParsePath("out")).Int64(); err != nil || got != 3 {
 		t.Fatalf("erased alias argument prevented type selection: %d, %v", got, err)
+	}
+}
+
+func TestQuantifiedAliasFunctionViewInclusion(t *testing.T) {
+	v := cuecontext.New().CompileString(`
+F(A) = func(x: A) -> A: x
+R(A) = {f: F(A)}
+a: F(int)
+b: F(int)
+c: F(string)
+r: R(int)
+s: R(int)
+`)
+	for _, pair := range [][2]string{{"a", "b"}, {"r.f", "s.f"}} {
+		a, b := v.LookupPath(cue.ParsePath(pair[0])), v.LookupPath(cue.ParsePath(pair[1]))
+		if err := a.Subsume(b); err != nil {
+			t.Fatalf("repeated alias view %v: %v", pair, err)
+		}
+	}
+	if err := v.LookupPath(cue.ParsePath("a")).Subsume(v.LookupPath(cue.ParsePath("c"))); err == nil {
+		t.Fatal("erased code identity supplied a different instance's protocol")
 	}
 }

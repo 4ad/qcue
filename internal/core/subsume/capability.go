@@ -25,7 +25,17 @@ import (
 // failure to find one leaves inclusion unproved, never refutes the meet.
 func (s *subsumer) capabilityValues(a, b *adt.FuncValue) bool {
 	if !adt.IsFuncType(a) {
-		if adt.IsFuncType(b) || a.Fn != b.Fn || !a.EqualArgs(b) || !a.Env.Equal(s.ctx, b.Env) {
+		if adt.IsFuncType(b) {
+			return false
+		}
+		// Alias expansion can allocate distinct lexical frames for the same
+		// code and captures. Compare the operational identity, then prove
+		// the required view separately: erased identity alone must not
+		// supply another type instance's packet protocol.
+		if same, known := adt.SameFunctionInstance(s.ctx, a, b); !known || !same {
+			return false
+		}
+		if !s.capabilitySignature(adt.FuncType{Fn: a.Fn, Env: a.Env}, adt.FuncType{Fn: b.Fn, Env: b.Env}) {
 			return false
 		}
 		for _, t := range a.Types {
