@@ -4,7 +4,7 @@
 -- in.cue --
 @test(json, [true, true, true, false], at="out")
 @test(validate, concrete, at="p")
-@test(validate, concrete, incomplete, at="invalid")
+@test(validate, blocked, at="invalid")
 
 #M: exists A {
 	left: A

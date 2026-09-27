@@ -60,6 +60,15 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		if _, ok := adt.Unwrap(a).(*adt.Conjunction); ok {
 			break
 		}
+		if bound, ok := a.(*adt.BoundValue); ok && b.Kind() == adt.IntKind {
+			for _, term := range b.Values {
+				if source, ok := adt.Unwrap(term).(*adt.BoundValue); ok {
+					if rounded := integerBound(source); rounded != nil && s.bound(bound, rounded) {
+						return true
+					}
+				}
+			}
+		}
 		for _, y := range b.Values {
 			if s.values(a, y) {
 				return true
@@ -194,25 +203,9 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		return false
 
 	case *adt.Conjunction:
-		if y, ok := b.(*adt.Conjunction); ok {
-			// A Conjunction subsumes another Conjunction if for all values a in
-			// x there is a value b in y such that a subsumes b.
-			//
-			// This assumes overlapping ranges in disjunctions are merged.If
-			// this is not the case, subsumes will return a false negative,
-			// which is allowed.
-		outerC:
-			for _, a := range x.Values {
-				for _, b := range y.Values {
-					if s.values(a, b) {
-						continue outerC
-					}
-				}
-				// TODO: should this be marked as inexact?
-				return false
-			}
-			return true
-		}
+		// Check each target predicate against the complete source. Source
+		// conjuncts can contribute joint evidence, such as an integer kind
+		// together with an open numeric endpoint.
 		subsumed := true
 		for _, a := range x.Values {
 			subsumed = subsumed && s.values(a, b)

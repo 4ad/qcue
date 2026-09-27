@@ -1,9 +1,8 @@
-// An implementation cannot use a hidden helper's unproved annotation as its
-// own proof. Hidden schema fields remain exempt from data completeness, but
-// calling them retains the dependency on their actual implementation.
+// A hidden helper's body is checked before its annotation can justify a call.
+// Its integer interval proof discharges the caller's dependency too.
 
 -- in.cue --
 @test(validate)
-@test(validate, concrete, incomplete, at="f")
+@test(validate, concrete, at="f")
 _helper: func(x: int & >0) -> (int & >=0): x - 1
 f:       func(x: int & >0) -> (int & >=0): _helper(x)

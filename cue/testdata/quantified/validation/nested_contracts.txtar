@@ -1,11 +1,11 @@
-// Concrete validation checks functions inside records and lists, and
-// retains every unresolved sibling contract. Schema declarations alone do not
-// require an implementation until they become an ordinary value.
+// Definition checking proves functions inside records and lists. The shared
+// integer interval rule certifies each sibling separately. Schema declarations
+// alone do not require an implementation until concrete observation.
 
 -- in.cue --
 @test(validate)
-@test(validate, concrete, incomplete, at="record")
-@test(validate, concrete, incomplete, at="items")
+@test(validate, concrete, at="record")
+@test(validate, concrete, at="items")
 @test(validate, concrete, at="instance")
 @test(validate, concrete, at="schemaOnly")
 record: {

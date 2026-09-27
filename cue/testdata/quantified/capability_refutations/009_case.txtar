@@ -1,5 +1,5 @@
 -- in.cue --
-@test(validate, at="f")
+@test(validate, blocked, at="f")
 
 x: number
 f: func(x) -> string

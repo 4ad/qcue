@@ -1,10 +1,16 @@
-// Validate the chosen default's contract, not every unchosen alternative.
-// An unproved default must not be accepted because another branch is proved.
+// Both old arithmetic alternatives now have certificates. Definition checking
+// checks every surviving supplied body before selecting a default, so neither
+// a chosen nor an unchosen invalid implementation escapes admission.
 
 -- in.cue --
 @test(validate, concrete, at="good")
-@test(validate, concrete, incomplete, at="bad")
+@test(validate, concrete, at="bad")
+@test(validate, blocked, at="blockedSelected")
+@test(validate, blocked, at="blockedOther")
 proved:  func(x: int) -> int: x
 pending: func(x: int & >0) -> (int & >=0): x - 1
 good:    *proved | pending
 bad:     proved | *pending
+invalid: func(x: int) -> int: ({value: "wrong"}).value
+blockedSelected: proved | *invalid
+blockedOther: *proved | invalid

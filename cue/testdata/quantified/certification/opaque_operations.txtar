@@ -8,8 +8,8 @@
 @test(validate, concrete, at="composite")
 @test(validate, concrete, at="defaulted")
 @test(validate, concrete, at="client")
-@test(validate, concrete, incomplete, at="bad")
-@test(validate, concrete, incomplete, at="ambiguous")
+@test(validate, blocked, at="bad")
+@test(validate, blocked, at="ambiguous")
 @test(json, [42, 43, 20], at="out")
 
 #Simple: exists (A) {v: A, read: func(A) -> int}
@@ -47,7 +47,7 @@ out: [client.f(),
 
 @test(validate, concrete, at="unions")
 @test(validate, concrete, at="callbacks")
-@test(validate, concrete, incomplete, at="badInterface")
+@test(validate, blocked, at="badInterface")
 @test(json, [44, 45], at="more")
 #Unions: exists (A) {
 	make: func() -> A | string

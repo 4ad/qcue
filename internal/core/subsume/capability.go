@@ -174,13 +174,14 @@ func (s *subsumer) capabilityScopes(target, source adt.FuncType) (adt.FuncType, 
 		}
 		for i, p := range params {
 			q := candidates[i]
-			if !s.funcConstraint(source.Env, q.Bound, target.Env, p.Bound) {
+			se, te := adt.TypeParameterScope(source.Env, q), adt.TypeParameterScope(target.Env, p)
+			if !s.funcConstraint(se, q.Bound, te, p.Bound) {
 				return target, source, false
 			}
 			var bound adt.Value = &adt.Top{}
 			if p.Bound != nil {
 				var ok bool
-				bound, ok = s.evalFuncConstraint(target.Env, p.Bound)
+				bound, ok = s.evalFuncConstraint(te, p.Bound)
 				if !ok {
 					return target, source, false
 				}

@@ -229,8 +229,8 @@ func TestQuantifiedSelectedExport(t *testing.T) {
 			}
 			rebuilt := cuecontext.New().CompileString("f: " + string(text) + "\nout: " + tt.call)
 			f = rebuilt.LookupPath(cue.ParsePath("f"))
-			if err := f.Validate(); err != nil {
-				t.Fatalf("export %s: %v", text, err)
+			if err := f.Validate(); (err == nil) != tt.valid {
+				t.Fatalf("export %s: definition check %v; want valid=%v", text, err, tt.valid)
 			}
 			if err := f.Validate(cue.Concrete(true)); (err == nil) != tt.valid {
 				t.Fatalf("export %s: conformance %v; want valid=%v", text, err, tt.valid)
@@ -484,10 +484,17 @@ func TestQuantifiedOpaquePredicateExport(t *testing.T) {
 #M: exists A {zero: A}
 p: seal #M with (A = int) {zero: 0}
 out: (open p as (A, P) {
-	r: func() -> int: {ignored: func(A) -> A, value: 0}.value
+	r: func() -> int: {ignored: func(x: A) -> A: x, value: 0}.value
 }).r
 result: out()
 `
+	// The previous fixture constructed an unimplemented required callback
+	// in the temporary record. Keep it as a blocked definition: selecting
+	// the other field must not supply the missing implementation proof.
+	unlinked := strings.Replace(source, "func(x: A) -> A: x", "func(A) -> A", 1)
+	if err := cuecontext.New().CompileString(unlinked).LookupPath(cue.ParsePath("out")).Validate(); err == nil {
+		t.Fatal("a local unimplemented callback escaped definition checking")
+	}
 	for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
 		root := cuecontext.New().CompileString(source)
 		if got, err := root.LookupPath(cue.ParsePath("result")).Int64(); err != nil || got != 0 {

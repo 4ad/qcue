@@ -1,20 +1,25 @@
-# Function type conformance is part of ordinary concrete validation.
+# Function type conformance is part of ordinary validation.
 exec cue vet structural.cue
 ! stderr .
 exec cue vet -c structural.cue
 ! stderr .
 
-# An unresolved proof is incomplete, not successful typed validation.
-! exec cue vet residual.cue
-stderr 'some instances are incomplete'
-! exec cue vet -c residual.cue
-stderr 'positive: function conformance remains unproved'
+# Integer interval proofs certify the former residual example statically.
+exec cue vet residual.cue
+! stderr .
+exec cue vet -c residual.cue
+! stderr .
 
-# Explicitly allowing incomplete constraints permits continued refinement.
 exec cue vet -c=false residual.cue
 ! stderr .
 exec cue export residual.cue -e observation
 stdout '^0$'
+
+# Allowing incomplete data does not waive a supplied body's type proof.
+! exec cue vet blocked.cue
+stderr 'wrong: function conformance remains unproved'
+! exec cue vet -c=false blocked.cue
+stderr 'wrong: function conformance remains unproved'
 
 # The proof request is no longer an independent option.
 ! exec cue vet --verify-functions structural.cue
@@ -26,8 +31,12 @@ stderr 'function'
 ! exec cue vet -c=false invalid.cue
 stderr 'function'
 
+# Preserve the valid nested arithmetic programs as accepted cases.
+exec cue vet -c nested.cue
+! stderr .
+
 # All nested errors retain their paths, including later siblings.
-! exec cue vet -c nested.cue
+! exec cue vet -c nested_invalid.cue
 stderr 'box.f: function conformance remains unproved'
 stderr 'box.g: function conformance remains unproved'
 stderr 'items.0: function conformance remains unproved'
@@ -45,9 +54,12 @@ useBoth: func(f: forall A func(A) -> A) -> [int, string]: [f(1), f("one")]
 -- residual.cue --
 package proof
 
-// This true arithmetic fact is outside the structural proof fragment.
+// The integer interval rule proves this fact before observing a call.
 positive: func(x: int & >0) -> (int & >=0): x - 1
 observation: positive(1)
+
+-- blocked.cue --
+wrong: func(x: int) -> string: x
 
 -- invalid.cue --
 f: func(int) -> string
@@ -58,3 +70,9 @@ box: {
     g: func(y: int & >0) -> (int & >=0): y - 1
 }
 items: [func(x: int & >0) -> (int & >=0): x - 1]
+-- nested_invalid.cue --
+box: {
+    f: func(x: int) -> string: x
+    g: func(y: int) -> string: y
+}
+items: [func(x: int) -> string: x]

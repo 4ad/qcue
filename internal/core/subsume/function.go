@@ -373,17 +373,14 @@ func (s *subsumer) funcConstraint(envA *adt.Environment, xa adt.Expr, envB *adt.
 // closure environment.
 func (s *subsumer) evalFuncConstraint(env *adt.Environment, x adt.Expr) (adt.Value, bool) {
 	v, complete := s.ctx.Evaluate(env, x)
-	if !complete {
-		return nil, false
-	}
 	if vertex, ok := v.(*adt.Vertex); ok {
 		vertex.Finalize(s.ctx)
-		if vertex.Bottom() != nil {
-			return nil, false
-		}
 	}
-	if _, ok := v.(*adt.Bottom); ok {
-		return nil, false
+	if b, ok := adt.Unwrap(v).(*adt.Bottom); ok {
+		// A refuted predicate is a checked empty type. It is distinct
+		// from an unresolved signature and participates in ordinary
+		// inclusion, including selected empty domains and codomains.
+		return b, !b.IsIncomplete()
 	}
-	return v, true
+	return v, complete
 }

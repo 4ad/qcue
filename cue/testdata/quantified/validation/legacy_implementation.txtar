@@ -6,5 +6,5 @@
 f: func(x: int & >0) -> (int & >=0): x - 1
 -- in.cue --
 @test(validate)
-@test(validate, concrete, incomplete, at="f")
+@test(validate, concrete, at="f")
 f: func(int & >0) -> (int & >=0)

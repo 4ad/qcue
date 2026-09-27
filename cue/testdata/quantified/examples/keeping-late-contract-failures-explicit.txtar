@@ -1,5 +1,5 @@
 -- in.cue --
-@test(validate, at="checked")
+@test(validate, blocked, at="checked")
 
 checkedResult: extern func(_, _) -> _ !constraint
 legacyBody:    extern func(int) -> _ !constraint

@@ -7,7 +7,7 @@
 @test(validate, concrete, at="scalar")
 @test(validate, concrete, incomplete, at="scalarOpened")
 @test(validate, concrete, incomplete, at="transparentOpened")
-@test(validate, concrete, incomplete, at="effectful")
+@test(validate, blocked, at="effectful")
 @test(validate, concrete, incomplete, at="foreign")
 
 #Multiple:         exists (A, B) {a: A, b: B}

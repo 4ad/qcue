@@ -1,6 +1,5 @@
 -- in.cue --
-@test(validate, at="f")
-@test(validate, concrete, incomplete, at="f")
+@test(validate, blocked, at="f")
 
 external: extern func(int) -> int !bridge
 f:        func(x: int) -> int: external(x)

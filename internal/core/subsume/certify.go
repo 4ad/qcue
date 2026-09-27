@@ -23,8 +23,8 @@ import (
 )
 
 // ValidateFunction checks an implementation's contracts under arbitrary
-// packets and rigid type variables. Concrete validation calls this alongside
-// the checks on the closure's implementation identity and captured values.
+// packets and rigid type variables. Static validation calls this independently
+// of concrete checks on implementation identity and captured values.
 // Unsupported proofs remain incomplete; successful concrete calls and the
 // target annotation itself are not evidence of universal conformance.
 func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
@@ -427,7 +427,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 		// fresh rigid inputs. This checks its body; it does not generalize
 		// a monomorphic callback from an annotation alone.
 		for _, param := range adt.FunctionTypeParameters(target) {
-			bound := p.schema(target.Env, param.Bound)
+			bound := p.schema(adt.TypeParameterScope(target.Env, param), param.Bound)
 			if bound == nil {
 				return false
 			}
@@ -594,6 +594,11 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.schema(nil, &adt.BoundExpr{Src: x.Src, Op: x.Op, Expr: v})
 	case *adt.Builtin:
 		return x
+	case *adt.ImportReference:
+		// Imported declarations provide the same conditional hypotheses as
+		// named captures. Supplied implementations retain their own proofs;
+		// selecting a builtin then uses its independently known contract.
+		return p.captured(p.schema(env, x))
 	case *adt.AliasApplication:
 		args := make([]adt.Value, len(x.Args))
 		for i, argument := range x.Args {
@@ -749,6 +754,30 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return &adt.Universal{Template: x, Env: env}
 	case *adt.SliceExpr:
 		return p.slice(env, x)
+	case *adt.PackageSeal:
+		if !p.typeOperations(env, x.Interface) {
+			return nil
+		}
+		// Preserve all interface conjuncts: this introduction rule applies
+		// to one explicit existential, not to a refined conjunction whose
+		// other predicates would otherwise disappear from the obligation.
+		interfaceType, ok := adt.Unwrap(p.schema(env, x.Interface)).(*adt.Existential)
+		if !ok {
+			return nil
+		}
+		witnesses := make([]adt.Value, len(x.Witnesses))
+		for i, witness := range x.Witnesses {
+			if !p.typeOperations(env, witness) {
+				return nil
+			}
+			witnesses[i] = p.schema(env, witness)
+		}
+		body := p.expr(env, x.Body)
+		private := x.ProofTypes(p.ctx, interfaceType, witnesses)
+		if body == nil || private == nil || !p.proveInclusion(p.ctx, private, body) {
+			return nil
+		}
+		return interfaceType
 	case *adt.PackageOpen:
 		typ, view := x.ProofView(p.ctx, p.expr(env, x.Value))
 		if typ == nil || view == nil {

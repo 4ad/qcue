@@ -10,8 +10,8 @@
 @test(validate, conflict, at="missing")
 @test(validate, conflict, at="extra")
 @test(validate, concrete, incomplete, at="unresolved")
-@test(validate, concrete, incomplete, at="badResult")
-@test(validate, concrete, incomplete, at="badPrefix")
+@test(validate, blocked, at="badResult")
+@test(validate, blocked, at="badPrefix")
 @test(json, [3, 5, 9, "value"], at="out")
 
 #Open:     func(a: int, ...) -> int

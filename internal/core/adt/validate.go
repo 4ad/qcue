@@ -42,10 +42,11 @@ type ValidateConfig struct {
 	// value denotations and are reported even without Concrete.
 	CheckInterfaces func(*OpContext, *Vertex) *Bottom
 
-	// CheckFunction validates the contracts of a concrete function value.
-	// Public validation supplies the conformance checker here. Internal
-	// evaluation can still inspect a closure's concrete representation while
-	// retaining its unresolved contract, without claiming conformance.
+	// CheckFunction validates every supplied function body against its
+	// contracts, independently of Concrete. An absent implementation remains
+	// a hypothesis until concrete validation demands its link obligation.
+	// Internal representation checks may omit this hook, but supply no
+	// conformance certificate by doing so.
 	CheckFunction func(*OpContext, *FuncValue) *Bottom
 
 	// CheckBuiltin independently proves client-added primitive contracts.
@@ -192,6 +193,24 @@ func (v *validator) validate(x *Vertex) {
 		v.visited[x] = true
 	}
 
+	// Defaults choose an executable observation, not which source bodies
+	// need a derivation. Check every surviving alternative before applying
+	// the concrete/default policy below. This pass makes no demand for a
+	// runtime value from unchosen alternatives.
+	if d, ok := x.BaseValue.(*Disjunction); ok && v.CheckFunction != nil {
+		saved := v.ValidateConfig
+		visited := v.visited
+		v.visited = nil
+		v.Concrete, v.Final, v.ReportIncomplete = false, false, false
+		for _, branch := range d.Values {
+			v.validate(ToVertex(branch))
+		}
+		v.ValidateConfig = saved
+		// A static visit cannot discharge a later concrete demand on a
+		// structure-shared field of the selected alternative.
+		v.visited = visited
+	}
+
 	if b := x.Bottom(); b != nil {
 		switch b.Code {
 		case CycleError:
@@ -234,7 +253,7 @@ func (v *validator) validate(x *Vertex) {
 		}
 	}
 	v.validatePackage(x.sealed)
-	if b, ok := x.BaseValue.(*Builtin); ok && b.capabilityMode() && v.checkConcrete() && v.CheckBuiltin != nil {
+	if b, ok := x.BaseValue.(*Builtin); ok && b.capabilityMode() && v.CheckBuiltin != nil {
 		if err := v.CheckBuiltin(v.ctx, b); err != nil {
 			v.add(err)
 		}
@@ -251,14 +270,14 @@ func (v *validator) validate(x *Vertex) {
 		}
 		v.validate(private)
 	}
-	if f, ok := x.BaseValue.(*FuncValue); ok && capabilityMode(f.Fn, f.Types) && v.checkConcrete() {
+	if f, ok := x.BaseValue.(*FuncValue); ok && capabilityMode(f.Fn, f.Types) {
 		if boundary, ok := f.Fn.Body.(*OpaqueCall); ok {
 			v.validatePackage(boundary.owner)
 		}
-		if !concreteCapture(v.ctx, f) {
+		if v.checkConcrete() && !concreteCapture(v.ctx, f) {
 			v.add(&Bottom{Src: f.Source(), Code: IncompleteError,
 				Err: v.ctx.Newf("function implementation or captured values remain unresolved")})
-		} else if v.CheckFunction != nil {
+		} else if f.Fn.Body != nil && v.CheckFunction != nil {
 			if b := v.CheckFunction(v.ctx, f); b != nil {
 				v.add(b)
 			}
@@ -273,6 +292,18 @@ func (v *validator) validate(x *Vertex) {
 			continue
 		}
 
+		if v.CheckFunction != nil && (a.ArcType == ArcOptional || a.ArcType == ArcRequired) {
+			// A conditional field's supplied body still has to type check.
+			// A refuted field predicate instead establishes absence, and
+			// does not introduce a live implementation observation.
+			a.Finalize(v.ctx)
+			if a.Bottom() == nil {
+				v.inDefinition++
+				v.validate(a)
+				v.inDefinition--
+			}
+			continue
+		}
 		if a.Label.IsLet() || !a.IsDefined(v.ctx) {
 			continue
 		}

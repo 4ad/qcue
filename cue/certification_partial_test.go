@@ -45,8 +45,11 @@ g: func(y: int) -> int: p(y)
 						v := cuecontext.New().CompileString(src)
 						for _, path := range []string{"cb", "p", "g", ""} {
 							x := v.LookupPath(cue.ParsePath(path))
-							if err := x.Validate(); err != nil {
-								t.Fatalf("%s: incomplete membership became conflict: %v", path, err)
+							if err := x.Validate(); (err == nil) != (good || path == "cb") {
+								t.Fatalf("%s: static membership check: %v, good=%v", path, err, good)
+							}
+							if err := x.Err(); err != nil {
+								t.Fatalf("%s: blocked membership became semantic bottom: %v", path, err)
 							}
 							if err := x.Validate(cue.Concrete(true)); (err == nil) != (good || path == "cb") {
 								t.Fatalf("%s: conformance %v, good=%v", path, err, good)

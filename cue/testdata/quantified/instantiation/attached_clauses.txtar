@@ -6,7 +6,7 @@
 @test(validate, conflict, at="invalid")
 @test(validate, conflict, at="abstractConflict")
 @test(validate, conflict, at="tooMany")
-@test(validate, concrete, incomplete, at="badSelected")
+@test(validate, blocked, at="badSelected")
 @test(json, "reversed", at="reversedOut")
 
 id:

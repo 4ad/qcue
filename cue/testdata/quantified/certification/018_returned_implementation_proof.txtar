@@ -1,5 +1,4 @@
 -- in.cue --
-@test(validate, at="f")
-@test(validate, concrete, incomplete, at="f")
+@test(validate, blocked, at="f")
 
 f: func() -> (func(int) -> int): func(x: int) -> int: "wrong"

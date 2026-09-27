@@ -1,8 +1,8 @@
 -- in.cue --
-@test(validate, concrete, incomplete, at="badResult")
-@test(validate, concrete, incomplete, at="badDomain")
-@test(validate, concrete, incomplete, at="badDefault")
-@test(validate, concrete, incomplete, at="badLabel")
+@test(validate, blocked, at="badResult")
+@test(validate, blocked, at="badDomain")
+@test(validate, blocked, at="badDefault")
+@test(validate, blocked, at="badLabel")
 @test(validate, concrete, at="good")
 @test(validate, concrete, at="singleton")
 @test(validate, concrete, at="named")

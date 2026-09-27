@@ -2,9 +2,9 @@
 // required field nor a closed candidate makes the presence obligation vacuous.
 
 -- in.cue --
-@test(validate, concrete, incomplete, at="closedMissing")
-@test(validate, concrete, incomplete, at="topMissing")
-@test(validate, concrete, incomplete, at="optionalMissing")
+@test(validate, blocked, at="closedMissing")
+@test(validate, blocked, at="topMissing")
+@test(validate, blocked, at="optionalMissing")
 @test(validate, concrete, at="present")
 @test(validate, concrete, at="optional")
 @test(validate, conflict, at="badClosed")

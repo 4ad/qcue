@@ -8,9 +8,9 @@
 @test(validate, concrete, at="chained")
 @test(validate, concrete, at="named")
 @test(validate, concrete, at="defaulted")
-@test(validate, concrete, incomplete, at="bad")
-@test(validate, concrete, incomplete, at="badCallback")
-@test(validate, concrete, incomplete, at="badResidual")
+@test(validate, blocked, at="bad")
+@test(validate, blocked, at="badCallback")
+@test(validate, blocked, at="badResidual")
 @test(json, [3, 6, 6, 6, 9], at="out")
 
 simple:      (func(x: int, y: int) -> int: x + y)(1, ...)

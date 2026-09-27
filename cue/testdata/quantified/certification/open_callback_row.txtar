@@ -2,7 +2,7 @@
 // protocol row is known. A supplied implementation may require more arguments.
 
 -- in.cue --
-@test(validate, concrete, incomplete, at="use")
+@test(validate, blocked, at="use")
 @test(validate, concrete, at="two")
 @test(validate, concrete, at="accepted")
 @test(validate, concrete, at="closed")

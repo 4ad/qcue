@@ -528,8 +528,8 @@ func TestQuantifiedBoundaryCallbackEvidence(t *testing.T) {
 				}
 				source := fmt.Sprintf("f: func(p: %s) -> int: %s(0)\nout: f(%s)", domain, fmt.Sprintf(tc.path, field), packet)
 				v := semanticValue(t, source)
-				if err := v.Validate(); err != nil {
-					t.Fatal(err)
+				if err := v.Validate(); (err == nil) != required {
+					t.Fatalf("definition check: executable callback=%v: %v", required, err)
 				}
 				if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); (err == nil) != required {
 					t.Fatalf("executable callback=%v: %v", required, err)

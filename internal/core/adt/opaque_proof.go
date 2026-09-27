@@ -14,6 +14,45 @@
 
 package adt
 
+import "slices"
+
+// ProofTypes checks a seal's explicit representation witnesses and returns
+// its private interface obligation. No executable package is created;
+// the caller must check the unchanged body against that obligation before
+// introducing the existential result. The boundary must also transport every
+// admitted value, rather than succeeding only on a particular implementation.
+func (s *PackageSeal) ProofTypes(c *OpContext, e *Existential, witnesses []Value) Value {
+	if e == nil || len(witnesses) != len(s.Names) || len(s.Names) != len(e.Template.Params) {
+		return nil
+	}
+	p := &sealedPackage{interfaceType: e, carriers: make(map[*TypeParameter]*opaqueCarrier)}
+	private, public := make(map[*TypeParameter]Value), make(map[*TypeParameter]Value)
+	for _, param := range e.Template.Params {
+		if param.Bound != nil || param.ValueRange != nil {
+			return nil
+		}
+		i := slices.Index(s.Names, param.Src.Name.Name)
+		if i < 0 || witnesses[i] == nil {
+			return nil
+		}
+		value := witnesses[i]
+		if b := param.checkWitness(c, quantifiedEnvironment(c, e, private), value); b != nil {
+			return nil
+		}
+		carrier := &opaqueCarrier{owner: p, parameter: param, representation: value}
+		p.carriers[param] = carrier
+		private[param], public[param] = value, &OpaqueType{carrier: carrier}
+	}
+	p.privateEnv = quantifiedEnvironment(c, e, private)
+	p.publicEnv = quantifiedEnvironment(c, e, public)
+	if !p.planTransport(c, scopedPredicate{p.publicEnv, e.Template.Body}, true).total {
+		return nil
+	}
+	value := c.newInlineVertex(nil, nil, MakeRootConjunct(p.privateEnv, e.Template.Body))
+	value.Finalize(c)
+	return value
+}
+
 // ProofView eliminates an arbitrary admitted package under a fresh abstract
 // carrier. It exposes its interface hypotheses, never a representation or
 // an executable package witness. Extra interface constraints may be omitted:

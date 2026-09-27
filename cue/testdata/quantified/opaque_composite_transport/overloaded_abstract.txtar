@@ -4,7 +4,7 @@
 -- in.cue --
 @test(validate, concrete, at="p")
 @test(json, [0, "text"], at="out")
-@test(validate, concrete, incomplete, at="incoherent")
+@test(validate, blocked, at="incoherent")
 @test(validate, concrete, incomplete, at="badCall")
 
 #M: exists A {zero: A, f: (func(A) -> A) & (func(string) -> string), read: func(A) -> int}

@@ -56,6 +56,9 @@ func (r *relevanceChecker) declarations(clauses []adt.FuncType) ([]adt.FuncType,
 			if bound == nil {
 				return nil, r.blocked("universal bound remains unresolved")
 			}
+			if refuted(bound) && !r.p.typeOperations(adt.TypeParameterScope(d.opened.Env, param), param.Bound) {
+				return nil, r.blocked("ill-typed operation in universal bound")
+			}
 			rigid := &adt.RigidType{Param: param, Bound: bound}
 			d.rigid = append(d.rigid, rigid)
 			d.opened = adt.BindFunctionTypes(d.opened, []adt.Value{rigid})
@@ -66,13 +69,20 @@ func (r *relevanceChecker) declarations(clauses []adt.FuncType) ([]adt.FuncType,
 			if value == nil {
 				return nil, r.blocked("packet predicate remains unresolved")
 			}
+			if refuted(value) && !r.p.typeOperations(d.opened.Env, param.Value) {
+				return nil, r.blocked("ill-typed operation in packet predicate")
+			}
 			if !r.dependencies(value, owned, d.used, make(map[adt.Value]bool)) {
 				return nil, r.blocked("packet dependencies remain unresolved")
 			}
 			d.domain = append(d.domain, value)
 		}
 		d.anchor = len(d.used) == 0
-		if !r.dependencies(r.p.schema(d.opened.Env, source.Fn.Ret), owned, d.used, make(map[adt.Value]bool)) {
+		result := r.p.schema(d.opened.Env, source.Fn.Ret)
+		if refuted(result) && !r.p.typeOperations(d.opened.Env, source.Fn.Ret) {
+			return nil, r.blocked("ill-typed operation in result predicate")
+		}
+		if !r.dependencies(result, owned, d.used, make(map[adt.Value]bool)) {
 			return nil, r.blocked("result dependencies remain unresolved")
 		}
 		declarations = append(declarations, d)

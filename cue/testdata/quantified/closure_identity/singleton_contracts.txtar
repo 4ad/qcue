@@ -4,7 +4,7 @@
 -- in.cue --
 @test(json, [1, 2, 3, 4], at="out")
 @test(validate, conflict, at="distinct")
-@test(validate, concrete, incomplete, at="retained")
+@test(validate, blocked, at="retained")
 @test(validate, conflict, at="shape")
 
 base: func(x: int) -> int: {v: x}.v

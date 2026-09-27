@@ -4,9 +4,9 @@
 // Correct captured callbacks remain certifiable without a termination proof.
 
 -- in.cue --
-@test(validate, concrete, incomplete, at="returnRecord")
-@test(validate, concrete, incomplete, at="returnList")
-@test(validate, concrete, incomplete, at="callBad")
+@test(validate, blocked, at="returnRecord")
+@test(validate, blocked, at="returnList")
+@test(validate, blocked, at="callBad")
 @test(validate, concrete, at="cyclic")
 @test(validate, concrete, at="goodRecord")
 @test(validate, concrete, at="goodList")
