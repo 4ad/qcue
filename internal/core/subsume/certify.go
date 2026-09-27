@@ -1344,6 +1344,10 @@ func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 		return p.partialCall(callee, target)
 	}
 	result := p.callValue(callee, target)
+	if builtin, ok := callee.(*adt.Builtin); ok && result != nil &&
+		builtin.Package == adt.InvalidLabel && builtin.Name == "len" {
+		result = p.length(args[0])
+	}
 	// The call rule establishes the successful result's interface. Retain
 	// that evidence for higher-order elimination, including a quantified
 	// callback returned by an explicitly impredicative instance.

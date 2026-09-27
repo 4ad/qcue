@@ -254,8 +254,6 @@ func (p *certifier) conditionScalar(env *adt.Environment, expr adt.Expr) (condit
 		}
 		key.length = true
 		expr = call.Args[0]
-		value = &adt.Conjunction{Values: []adt.Value{&adt.BasicType{K: adt.IntKind},
-			&adt.BoundValue{Op: adt.GreaterEqualOp, Value: &adt.Num{K: adt.IntKind}}}}
 	}
 	ref, ok := expr.(*adt.FieldReference)
 	if !ok || value == nil {
