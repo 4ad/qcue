@@ -415,6 +415,12 @@ func (x *BoundExpr) Source() ast.Node {
 }
 
 func (x *BoundExpr) evaluate(ctx *OpContext, state Flags) Value {
+	// Keep an absent source a nil interface. Storing a nil *ast.UnaryExpr
+	// in BoundValue.Src would make later diagnostic position lookup panic.
+	var src ast.Expr
+	if x.Src != nil {
+		src = x.Src
+	}
 	// scalarKnown is used here to ensure we know the value. The result does
 	// not have to be concrete, though.
 	v := ctx.value(x.Expr, Flags{
@@ -459,7 +465,7 @@ func (x *BoundExpr) evaluate(ctx *OpContext, state Flags) Value {
 		if v == nil || v.Concreteness() > Concrete {
 			return ctx.NewErrf("bound has fixed non-concrete value")
 		}
-		return &BoundValue{x.Src, x.Op, v}
+		return &BoundValue{src, x.Op, v}
 	}
 
 	if v.Concreteness() > Concrete {
@@ -468,7 +474,7 @@ func (x *BoundExpr) evaluate(ctx *OpContext, state Flags) Value {
 			"non-concrete value %s for bound %s", x.Expr, x.Op)
 		return nil
 	}
-	return &BoundValue{x.Src, x.Op, v}
+	return &BoundValue{src, x.Op, v}
 }
 
 // A BoundValue is a fully evaluated unary comparator that can be used to

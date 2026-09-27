@@ -181,14 +181,7 @@ func (r *relevanceChecker) sameDomain(a, b []adt.Value) bool {
 // Conjunction alone can retain validators without checking their joint
 // emptiness; source relevance needs the complete shared eager pass.
 func (r *relevanceChecker) meet(a, b adt.Value) adt.Value {
-	if !r.p.step() || a == nil || b == nil {
-		return nil
-	}
-	v := &adt.Vertex{}
-	v.AddConjunct(adt.MakeRootConjunct(nil, a))
-	v.AddConjunct(adt.MakeRootConjunct(nil, b))
-	v.Finalize(r.p.ctx)
-	return v
+	return r.p.eagerMeet(a, b)
 }
 
 func refuted(v adt.Value) bool {

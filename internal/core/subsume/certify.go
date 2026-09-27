@@ -447,7 +447,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		default:
 			return nil
 		}
-		return p.schema(nil, &adt.BoundExpr{Op: x.Op, Expr: v})
+		return p.schema(nil, &adt.BoundExpr{Src: x.Src, Op: x.Op, Expr: v})
 	case *adt.Builtin:
 		return x
 	case *adt.FieldReference:
@@ -658,6 +658,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			// Both operands have their own derivation. Their meet constrains
 			// successful results even when they conflict; it is an operation
 			// in the source body, never a filter supplied by an annotation.
+			if value := p.eagerMeet(a, b); refuted(value) {
+				return value
+			}
 			return p.schema(nil, &adt.Conjunction{Values: []adt.Value{a, b}})
 		case adt.AddOp, adt.SubtractOp, adt.MultiplyOp, adt.FloatQuotientOp:
 			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
@@ -721,6 +724,21 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.call(env, x)
 	}
 	return nil
+}
+
+// Run the shared eager service on an intersection independently of whether
+// its operands are concrete. A proof may retain an unresolved conjunction,
+// but it must preserve an established empty completion predicate. Each source
+// operand must have its own derivation before this operation is used.
+func (p *certifier) eagerMeet(a, b adt.Value) adt.Value {
+	if !p.step() || a == nil || b == nil {
+		return nil
+	}
+	v := &adt.Vertex{}
+	v.AddConjunct(adt.MakeRootConjunct(nil, a))
+	v.AddConjunct(adt.MakeRootConjunct(nil, b))
+	v.Finalize(p.ctx)
+	return v
 }
 
 // Type elimination distributes through alternative subjects. For a

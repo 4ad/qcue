@@ -97,3 +97,24 @@ f(A): func(x: A) -> A: hypothesis`,
 		})
 	}
 }
+
+func TestQuantifiedSelectedFailingComputation(t *testing.T) {
+	for _, source := range []string{
+		`meet(A, B): func(x: A, y: B) -> (A & B): x & y
+f: meet[int, bool]`,
+		`f: func(x: {a: 1}) -> int: x & {a: 2}`,
+		`f: func(x: [1]) -> string: x & [2]`,
+		`f: func(x: int & <=0) -> bool: x & >0`,
+	} {
+		v := semanticValue(t, source)
+		if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); err != nil {
+			t.Errorf("checked empty computation did not certify: %v\n%s", err, source)
+		}
+	}
+	v := semanticValue(t, `meet(A, B): func(x: A, y: B) -> (A & B): x & y
+f: meet[int, bool]
+out: f(1, true)`)
+	if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
+		t.Fatal("a checked failing instance did not refute its call")
+	}
+}

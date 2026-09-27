@@ -255,6 +255,10 @@ out-of-range failure. Enabled ground arithmetic, scalar comparisons, Boolean
 operations, concatenation, and string/bytes repetition retain their exact
 results, including CUE's numeric representation. Both operands are checked
 before an operation can introduce a failing computation.
+Explicit body meets run the same eager refutation service as relevance.
+Known kind, interval, field, and list conflicts constrain that computation's
+successful results to bottom; they do not refute the closure constructing it.
+This also certifies failing instances selected from an accepted generic meet.
 Numeric translation by a constant preserves supported bounds.
 Boolean negation and numeric signs are also certified. Numeric negation
 preserves unions and exclusions and reverses strict and non-strict bounds.
