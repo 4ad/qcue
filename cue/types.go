@@ -1076,7 +1076,9 @@ func (v Value) BuildInstance() *build.Instance {
 	return v.idx.GetInstanceFromNode(v.v)
 }
 
-// Err returns the error represented by v or nil v is not an error.
+// Err returns the error represented by v, or nil if v is not an error.
+// It does not check static function conformance or interface relevance.
+// Use [Value.Validate] to check these obligations even when Err returns nil.
 func (v Value) Err() error {
 	if err := v.checkKind(v.ctx(), adt.BottomKind); err != nil {
 		return v.toErr(err)
@@ -1176,8 +1178,8 @@ func (v Value) IsClosedRecursively() bool {
 // (not relying on default values), a terminal error, a list, or a struct.
 // It does not verify that values of lists or structs are concrete themselves.
 // To check whether there is a concrete default, use this method on [Value.Default].
-// Use [Value.Validate] with [Concrete] to check runtime captures and function
-// contracts; this shallow check does not establish implementation conformance.
+// Use [Value.Validate] to check function contracts, and add [Concrete] to
+// check runtime captures. This shallow check does not establish conformance.
 func (v Value) IsConcrete() bool {
 	if v.v == nil {
 		return false // any is neither concrete, not a list or struct.
@@ -2203,9 +2205,9 @@ func Schema() Option {
 
 // Concrete ensures that all values are concrete.
 //
-// For [Value.Validate] this means it returns an error if this is not the case,
-// and requires quantified function implementations to satisfy their declared
-// contracts. An unresolved conformance proof reports incompleteness.
+// For [Value.Validate] this additionally requires materialized data, linked
+// function implementations, and concrete runtime captures. Static function
+// conformance is checked regardless of this option.
 // In other cases a non-concrete value will be replaced with an error.
 //
 // It applies to [Value.Syntax], [Value.Fields], and [Value.Validate].
@@ -2351,6 +2353,11 @@ func (o *options) updateOptions(opts []Option) {
 // Validate reports any errors, recursively. The returned error may represent
 // more than one error, retrievable with [errors.Errors], if more than one
 // exists.
+//
+// Validation checks explicit function interfaces and requires supplied bodies
+// to satisfy their contracts, including uncalled bodies. These static checks
+// apply even when [Value.Err] returns nil and [Concrete] is not requested.
+// Unimplemented declarations remain hypotheses unless [Concrete] is requested.
 //
 // Note that by default not all errors are reported, unless options like
 // [Concrete] are used. The [Final] option can be used to check for missing

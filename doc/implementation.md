@@ -215,6 +215,19 @@ Validation distinguishes retaining constraints from requiring a complete value:
 | `value.Validate()` | Report data contradictions and require relevance and strict conformance proofs for supplied function bodies; permit typed, unlinked imports and incomplete data. |
 | `value.Validate(cue.Concrete(true))` | Also require materialized values, complete runtime captures, and linked function implementations. |
 
+`cue eval` performs ordinary validation before printing, including the proofs
+for uncalled bodies. For example, `h(A): func(x: A) -> {a: 1}: x` is blocked:
+an arbitrary `A` does not establish the required result field. Writing
+`x & {a: 1}` in the body supplies an explicit assertion and can establish that
+result on success. `cue eval -c` additionally requires concrete validation;
+`cue eval -i` explicitly requests diagnostic output with validation bypassed.
+
+In the Go API, `Value.Err()` reports evaluation errors, not static acceptance.
+A closure can have no evaluation error while its body lacks a conformance
+proof. Call `Value.Validate()` before accepting a value; a successful
+`CompileString`, `Eval`, or `Syntax` operation does not replace that check.
+Static diagnostics leave the value available for refinement and inspection.
+
 `cue vet file.cue` requires concrete validation. An unproved function contract
 blocks ordinary validation as well; there is no separate verification flag.
 `cue vet -c=false` permits incomplete data and unlinked declarations for further
