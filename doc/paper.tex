@@ -1,3 +1,4 @@
+\RequirePackage{fix-cm}
 \documentclass[11pt,a4paper,oneside]{report}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
@@ -7,7 +8,7 @@
 \usepackage{microtype}
 \usepackage{booktabs,longtable,array,tabularx}
 \usepackage{xcolor,listings,enumitem,needspace}
-\usepackage{fancyhdr,titlesec,etoolbox}
+\usepackage{fancyhdr,titlesec,etoolbox,aliascnt}
 \usepackage[unicode,pdfencoding=auto,psdextra]{hyperref}
 \usepackage[nameinlink,noabbrev]{cleveref}
 \definecolor{ink}{HTML}{162D43}
@@ -81,21 +82,34 @@
 \newcommand{\Shigher}{\ensuremath{\profilecal{S}_{H}}}
 \newcommand{\Dep}{\ensuremath{\profilecal{D}}}
 \newcommand{\Abs}{\ensuremath{\profilecal{A}}}
+\newcommand{\Static}{\ensuremath{\profilecal{K}}}
+\newcommand{\Comp}{\mathsf{Comp}}
+\newcommand{\Fail}{\mathsf{fail}}
+\newcommand{\Pending}{\mathsf{pending}}
 \pdfstringdefDisableCommands{%
  \def\Uone{U1}%
  \def\Sone{S1}%
  \def\Shigher{SH}%
  \def\Dep{D}%
  \def\Abs{A}%
+ \def\Static{K}%
 }
 \newcommand{\Rel}{\mathsf{Rel}}
 \newcommand{\todoob}{\textbf{Implementation obligation.}\ }
 \newtheorem{definition}{Definition}[chapter]
-\newtheorem{proposition}[definition]{Proposition}
-\newtheorem{theorem}[definition]{Theorem}
-\newtheorem{lemma}[definition]{Lemma}
+\newaliascnt{proposition}{definition}
+\newtheorem{proposition}[proposition]{Proposition}
+\aliascntresetthe{proposition}
+\newaliascnt{theorem}{definition}
+\newtheorem{theorem}[theorem]{Theorem}
+\aliascntresetthe{theorem}
+\newaliascnt{lemma}{definition}
+\newtheorem{lemma}[lemma]{Lemma}
+\aliascntresetthe{lemma}
 \theoremstyle{remark}
-\newtheorem{remark}[definition]{Remark}
+\newaliascnt{remark}{definition}
+\newtheorem{remark}[remark]{Remark}
+\aliascntresetthe{remark}
 \newcounter{example}[chapter]
 \renewcommand{\theexample}{\thechapter.\arabic{example}}
 \newcommand{\example}[2]{\refstepcounter{example}\Needspace{5\baselineskip}\par\textbf{Example \theexample\ --- #1.}\ \textit{#2}\par\nopagebreak[4]}
@@ -117,7 +131,7 @@ and representation-independent modules\par}
 \vspace{17mm}
 {\large Aram H\u{a}v\u{a}rneanu\par}
 \vspace{2mm}
-{22 September 2026\par}
+{27 September 2026\par}
 \vfill
 \begin{minipage}{\textwidth}
 \textbf{Abstract.}
@@ -133,9 +147,15 @@ catalogue covers calling conventions, higher-order programming, dependent
 invariants, and abstract modules. Existential modules use sealing and
 equality-respecting simulations to support representation-independent evolution.
 The reference model establishes refinement, function soundness, and
-representation-independent replacement under explicit hypotheses. A residual
-normalizer integrates type obligations with refinement-stable propagation and
-demanded concrete validation.
+representation-independent replacement under explicit hypotheses. A mandatory, resource-bounded static kernel checks an annotated polymorphic
+structural fragment. Every annotation is discharged by a static derivation. Explicit source
+assertions retain their runtime checks and contribute refinements to those
+derivations; annotation checking leaves executable code unchanged. Relevant
+consistency rejects explicit interfaces whose declared input regions have
+statically refuted successful results, independently of denotational inhabitation.
+Function arrows express partial correctness;
+constraint failure is permitted without making static typing optional.
+Impredicative quantification uses a single set-sized family of predicates.
 \end{minipage}\par
 \vspace{8mm}
 {\small Comparison baseline: CUE proposal 4484 and its theory addendum,\par
@@ -150,7 +170,10 @@ repository revision \texttt{a949162aedb8}, inspected 21 September 2026.\par}
 Equations and proofs use the semantic reference calculus. Code listings use
 the proposed surface language and carry profile or extension labels. An expected
 contradiction is written \code{_|_}; an unresolved proof or evaluation obligation
-is written \emph{incomplete}.
+is written \emph{incomplete}. A blocked static judgment is a compiler
+diagnostic, not the semantic value \code{_|_}. Relevant consistency is the
+static admissibility condition for explicit interface descriptions. Its failure
+blocks an interface even when the underlying function predicate is inhabited.
 
 \begin{tabularx}{\textwidth}{@{}lY@{}}
 \toprule
@@ -160,12 +183,14 @@ $\rho\in\Env(\Gamma)$ & An assignment to the free variables of context $\Gamma$.
 $\sem{T}_\rho\subseteq V$ & The inhabitants of description $T$ at $\rho$.\\
 $P\le Q$ & Inclusion of predicates, hence refinement toward more information.\\
 $\top,\bot$ & The full subject set and the empty predicate.\\
-$\U_n$ & A set of admissible semantic types at universe level $n$.\\
+$\U=\Pow(V)$ & The set of semantic type interpretations.\\
 \Uone{} & Universal-only, rank-1 surface profile.\\
 \Sone{} & Symmetric rank-1 profile, with scoped existential packages.\\
-\Shigher{} & Full symmetric, predicative higher-rank profile.\\
+\Shigher{} & Full symmetric, impredicative higher-rank profile.\\
 \Dep{} & The dependent-value extension of the indicated profile.\\
 \Abs{} & The opaque-module abstraction discipline.\\
+\Static{} & The mandatory static-checking profile, independent of rank.\\
+$\Comp(T)$ & A computation with successful results in $T$, possibly failing.\\
 \bottomrule
 \end{tabularx}
 
@@ -332,46 +357,71 @@ $(\rho,s)\in P$.
 Thus $\exists_\pi\dashv\pi^*\dashv\forall_\pi$. This is the subset
 hyperdoctrine underlying the proposal \cite{lawvere,mellies}.
 
-\section{Semantic types and universes}
-Fix a set $V$ of operational values. A universe $\U_n\subseteq\Pow(V)$ is a
-set of admissible type interpretations. A valuation assigns
-$\rho(A)\in\U_n$ to a type variable of sort $\Type(n)$.
-Type operations are interpreted pointwise in that valuation:
+
+\section{A single impredicative type sort}
+Fix a set $V$ of operational inhabitants, including a designated set of closure
+codes with captured environments. Their application relation is fixed
+independently of type interpretation. Take
 \[
- \sem{A}_\rho=\rho(A),\quad
- \sem{T\land U}_\rho=\sem T_\rho\cap\sem U_\rho,\quad
+ \U=\Pow(V),\qquad \rho(A)\in\U.
+\]
+The sort $\Type$ classifies predicates on $V$. It is a syntactic sort, not an
+inhabitant of $V$ satisfying $\Type:\Type$. Type operators are interpreted
+pointwise in a valuation:
+\[
+ \sem A_\rho=\rho(A),\qquad
+ \sem{T\land U}_\rho=\sem T_\rho\cap\sem U_\rho,\qquad
  \sem{T\lor U}_\rho=\sem T_\rho\cup\sem U_\rho.
 \]
-A fixed-level admissible family contains the base types and the operations used
-by the selected fragment. Universes are cumulative and closed at higher levels
-under the permitted quantified constructions. Taking sufficiently large
-set-sized families of subsets gives a reference interpretation; an implementation
-uses finitely represented descriptions of selected members.
-
-For a binder ranging over $\U_n$:
+Quantification has the same result sort:
 \begin{align}
  \sem{\forall A\,T}_\rho
- &=\bigcap_{S\in\U_n}\sem T_{\rho[A:=S]},\label{eq:foralltype}\\
+ &=\bigcap_{S\in\U}\sem T_{\rho[A:=S]},\label{eq:foralltype}\\
  \sem{\exists A\,T}_\rho
- &=\bigcup_{S\in\U_n}\sem T_{\rho[A:=S]}.\label{eq:existstype}
+ &=\bigcup_{S\in\U}\sem T_{\rho[A:=S]}.\label{eq:existstype}
 \end{align}
-The quantifier does not replace the subject by a type-indexed family of subjects.
-These equations are a Curry-style, erased interpretation of quantified
-\emph{constraints on one value}.
+Both expressions denote subsets of $V$, hence members of $\U$. A variable may
+therefore be instantiated by the interpretation of a quantified type. This is
+impredicative polymorphism. Interpretation is defined by structural recursion
+on the finite type expression; quantification ranges over a previously fixed
+set of predicates, not over recursive evaluations of every source type.
 
-Stratification gives a predicative source discipline. Operational functions will
-be members of a designated set of closures, rather than the full set-theoretic
-exponential $B^A$. This is a Henkin-style choice of realizers and admissible
-predicates. It lies outside the standard full-function-space extension obstructed
-by Reynolds's theorem \cite{reynolds84}. The equations alone do not assert
-relational parametricity; that property additionally concerns the operations
-available to an abstractly typed client \cite{reynolds83}.
+\begin{proposition}[Impredicative substitution]\label{prop:subst}
+For capture-avoiding substitution of any well-sorted type $S$, including a
+quantified type,
+\[
+ \sem{T[S/A]}_\rho
+ =\sem T_{\rho[A:=\sem S_\rho]}.
+\]
+\end{proposition}
+\begin{proof}
+Induct on $T$. Boolean and structural constructors commute with substitution.
+At a fresh quantifier, the two sides take the same set-indexed intersection or
+union over $\U$. The arrow case uses the fixed operational application relation.
+\end{proof}
+
+Operational arrows are predicates on a fixed set of realizers, rather than the
+full set-theoretic exponentials $B^A$. This is the relevant departure from the
+full-function-space interpretation obstructed by Reynolds's theorem
+\cite{reynolds84}. Interpreting erased quantification by intersection has
+precedents in realizability models of System F \cite{pistone}. Allowing failure
+changes the arrow predicate; it does not by itself justify impredicativity.
+The justification here is the fixed operational carrier and closure of
+$\Pow(V)$ under the displayed operations.
+
+A smaller Henkin family may replace $\Pow(V)$ if it is closed under every type
+constructor and quantified interpretation admitted by the source fragment.
+The powerset is a simple reference choice, not a representation to enumerate.
+An implementation stores finite syntax and derivations. Data descriptions are
+interpreted through their completion predicates; refinement of a description
+is inclusion of those predicates. Type binders remain erased, so the predicate
+sort cannot be reflected or used to construct a runtime self-membership test.
 
 \section{Bounds and dependent ranges}
 A type bound $A:T$ abbreviates the range
 \[
- \operatorname{Sub}_n(T,\rho)
- =\{S\in\U_n\mid S\subseteq\sem T_\rho\}.
+ \operatorname{Sub}(T,\rho)
+ =\{S\in\U\mid S\subseteq\sem T_\rho\}.
 \]
 A value binder $x\mathbin{\mathrm{in}}T$ ranges over $\sem T_\rho$.
 Bounds may depend on earlier variables. Their context extension is the
@@ -414,7 +464,7 @@ The empty-index conventions are essential:
  \bigcap\varnothing=V,\qquad\bigcup\varnothing=\varnothing.
 \]
 Hence $\forall a\in\varnothing\,P=\top$ and
-$\exists a\in\varnothing\,P=\bot$. If $\U_n$ contains bottom, then
+$\exists a\in\varnothing\,P=\bot$. If $\U$ contains bottom, then
 $\forall A\,A=\bot$. If lists are finite and bottom is admissible,
 $\forall A\,\List(A)$ consists exactly of the empty list.
 
@@ -469,8 +519,8 @@ For a common body $P$,
 \]
 Here $D\cup E$ is a union of \emph{assignments}. For type bounds,
 \[
- \operatorname{Sub}_n(B)\cup\operatorname{Sub}_n(C)
- \subseteq\operatorname{Sub}_n(B\cup C)
+ \operatorname{Sub}(B)\cup\operatorname{Sub}(C)
+ \subseteq\operatorname{Sub}(B\cup C)
 \]
 can be strict: mixed subtypes of $B\cup C$ need lie below neither arm.
 \example{Two bounds do not become one upper bound}{\Uone{}}
@@ -506,7 +556,7 @@ independent conjunct separately until inhabitation is known.
 r(A): {id: func(A) -> A}
 r:    {label: "utilities"}
 
-// Type universes are nonempty:
+// The type sort contains the empty predicate:
 r(A): {id: func(A) -> A, label: "utilities"}
 \end{lstlisting}
 \end{minipage}\par
@@ -592,37 +642,63 @@ and the copied witness graph.
 
 \chapter{Function types from universal obligations}
 \label{ch:functions}
-\section{Operational inhabitants and calls}
-A closure is an operational value with code, a captured environment, and a fixed
-argument-binding protocol. Let $F\subseteq V$ be the set of such values. A
-\emph{call packet} records positional arguments, labeled arguments, and explicit
-omission. A deterministic partial evaluator has observations
-\[
- \Run(f,p)\in\{\Ok(S),\Reject,\Raise(e)\},
-\]
-where $S\subseteq V$ is a set of successful result completions. A concrete result
-$v$ gives $S=\{v\}$. Evaluation can also remain unresolved; unresolved evaluation
-is a state of computation, rather than a proof that its completion set is empty.
-The terminating reference fragment uses structurally bounded evaluation.
 
-Define the successful-call predicate
+\section{Values, computations, and failure}
+A closure is an operational value with code, a captured environment, and a fixed
+argument-binding protocol. Let $F\subseteq V$ be the set of closures. A call
+packet records positional arguments, labels, and omission. A complete packet
+contains values; a symbolic packet denotes a relation on its possible complete
+packets, with sharing retained.
+
+Write $\Run(f,p)\Downarrow v$ for a successful complete return. Constraint
+failure, domain rejection, and an allowed execution that does not return have
+no successful result. A symbolic successful result describes a set $S$ of
+complete returns. Bottom is the empty completion predicate; it is not an
+extra successful value in every type.
+
+For a result predicate $B$, define
 \[
- G_B(f,p)\equiv
- \exists S.\;\Run(f,p)=\Ok(S)\land\varnothing\ne S\subseteq B.
+ H_B(f,p)\equiv
+       \forall v.\;(\Run(f,p)\Downarrow v\Rightarrow v\in B).
 \]
-A function contract is then
+The function type is
 \begin{equation}
  A\Rightarrow B
- =\{f\in F\mid\forall p\in A.\;G_B(f,p)\}.\label{eq:arrow}
+ =\{f\in F\mid\forall p\in A.\;H_B(f,p)\}.
+ \label{eq:arrow}
 \end{equation}
-Here $A$ is a set of complete call packets, derived from the parameter surface.
-Single positional arguments can be identified with their one-element packets.
-The surface \code{func(A) -> B} denotes this set.
+Thus $f:A\Rightarrow B$ constrains successful returns; it promises neither a
+return nor success. On symbolic descriptions the analogous condition is
+$S\subseteq B$, including $S=\varnothing$. Ordinary arrows admit CUE constraint
+failure without an effect annotation. A recursion policy remains an independent
+execution restriction.
 
-A body supplies one operational inhabitant. Contract membership asserts its
-coverage and result property. The predicate does not perform program synthesis.
-For an empty domain, $\varnothing\Rightarrow B=F$. For nonempty $A$,
-$A\Rightarrow\varnothing=\varnothing$ in the successful-call interpretation.
+A computation judgment $e:\Comp(T)$ means that every successful complete
+result of $e$ belongs to $T$. A value judgment $v:T$ asserts actual membership.
+Only the latter supplies a witness for an existential or a value for a completed
+field. In particular, a failing computation can have $\Comp(\bot)$ while no
+returned value inhabits $\bot$.
+
+A proved empty successful-result predicate reduces the corresponding
+computation to \code{_|_}. A required data field with that predicate makes its
+containing configuration inconsistent, even before a concrete witness is
+supplied. Thus \code{x: int} conjoined with \code{x: bool} reduces to bottom.
+Suspension is justified by an unresolved predicate, not by retaining a predicate
+already proved empty.
+
+A closure is itself an operational value. A never-successful closure can
+inhabit $A\Rightarrow\bot$, although applying it supplies no returned value.
+The empty-domain identity $\varnothing\Rightarrow B=F$ also holds. Emptiness of
+a result predicate, emptiness of a set of closures, and failure of a particular
+call are therefore distinct judgments. Their scopes govern bottom propagation
+in \cref{sec:failure-propagation}. Explicit interfaces also undergo
+relevant-consistency checking: a refuted successful result on a non-refuted
+stated input region is a static interface error. This condition does not change
+\cref{eq:arrow}; it restricts the descriptions admitted at source boundaries.
+
+The static judgment in \cref{ch:residual} checks the source body and calling
+convention by fixed rules. An annotation creates a proof obligation. It creates
+no result filter or other executable operation.
 
 \section{Variance and intersections}
 \begin{proposition}[Arrow laws]\label{prop:arrow}
@@ -638,9 +714,10 @@ For all domain and result sets:
 \end{proposition}
 \begin{proof}
 The first two statements restrict or split the universal input obligation.
-For the third, determinism fixes the same result description $S$ at each packet;
-requiring $S\subseteq B$ and $S\subseteq D$ is equivalent to requiring
-$S\subseteq B\cap D$, with the same success and nonemptiness conditions.
+For the third, every successful result must belong to both $B$ and $D$.
+Intersecting those obligations is exactly the obligation for $B\cap D$.
+Failure satisfies each implication vacuously. The identities also hold for a
+nondeterministic relation when every successful result is constrained.
 \end{proof}
 Thus $(\Int\Rightarrow\Str)\cap(\Num\Rightarrow\Str)
 =\Num\Rightarrow\Str$. More generally, an intersection of arrows preserves
@@ -659,12 +736,13 @@ On overlapping domains, all result obligations apply.
 \section{Implementations and application refinement}
 For a complete closure $f$, unification with $T$ denotes $\{f\}\cap\sem T$.
 A successful conformance check preserves the closure. An incompatibility makes
-that intersection empty. A symbolic closure carries unresolved environment and
-conformance predicates until sufficient information is available.
+that intersection empty. A symbolic closure retains its captured-environment predicates. Executable use additionally requires the mandatory
+static certificate defined in \cref{ch:residual}. An unproved strict conformance
+judgment is blocked rather than retained as a runtime type test.
 
 For a set of closures $X$ and input packets $Q$, define
 \[
- \App(X,Q)=\bigcup\{S\mid f\in X,\ p\in Q,\ \Run(f,p)=\Ok(S)\}.
+ \App(X,Q)=\{v\mid f\in X,\ p\in Q,\ \Run(f,p)\Downarrow v\}.
 \]
 Joint environments are retained when $X$ and $Q$ share variables.
 Then
@@ -679,54 +757,124 @@ having empty singleton intersection.
 \par\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}
 wide:   func(number) -> string
-wide:   func(x: int) -> string: "ok"  // incompatible coverage
+wide:   func(x: int) -> string: "ok"  // blocked: static domain mismatch
 
 narrow: func(int) -> string
 narrow: func(x: number) -> string: "ok" // conforming implementation
 \end{lstlisting}
 \end{minipage}\par
-The second contract states a minimum capability. A particular call domain can
-be constrained with an existential argument cell as in \cref{ch:refinement}.
-This is the quantifier distinction between clients and producers.
+The second attachment satisfies the static contravariant interface rule.
+The first is blocked by that rule even though a narrow implementation that fails
+on other inputs could satisfy the wider partial-correctness predicate.
+Semantic membership is intentionally more permissive than source certification.
+A particular invocation is constrained with existential argument cells as in
+\cref{ch:refinement}.
 
-\section{Erased polymorphic functions}
-A polymorphic identity has the set interpretation
+For one declaration subject, collect all interface conjuncts before checking its
+available body. An inline result annotation and an independently declared
+function type contribute to the same predicate. The checker retains the body's
+inferred refinements or its proof graph; a weaker previously published result
+annotation does not discard that evidence. Interface checking never modifies
+that body. \Cref{sec:declaration-coherence} gives the normalization rule and
+its consequences for declaration regrouping.
+
+
+\section{Erased polymorphic functions and unification}
+A polymorphic identity constraint denotes
 \[
- I=\bigcap_{A\in\U_n}(A\Rightarrow A).
+ I=\bigcap_{A\in\U}(A\Rightarrow A).
 \]
-If all relevant singletons are admissible, then $f\in I$ implies
-$\Run(f,x)=\Ok(\{x\})$ for each $x$: instantiate at $\{x\}$.
-If the admissible family is coarser, the statement only forces preservation of
-its available predicates.
+Singleton instantiation proves that a successful return on $x$ is $x$. A member
+of $I$ may fail on some inputs. Thus $I$ describes partial identities.
 
-\example{A scheme and an ordinary arrow unify normally}{\Uone{}}
-\par\noindent\begin{minipage}{\linewidth}
+\example{Universal instances and explicit relevant observations}{\Uone{}+\Static{}}
 \begin{lstlisting}
 id(A): func(A) -> A
 id:    func(int) -> int       // redundant instance
 
-bad(A): func(A) -> A
-bad:    func(int) -> bool     // _|_: int and bool are disjoint
+quiet(A): func(A) -> A
+quiet:    func(int) -> bool   // invalid explicit interface on int
 \end{lstlisting}
-\end{minipage}\par
-Universals distribute through these conjunctions by \cref{eq:pointwise}. An
-ordinary instantiation is a consequence of the universal constraint, rather
-than its replacement.
+The ordinary integer clause supplies a relevant input region. Instantiating the
+universal clause at that region gives both $\Int$ and $\Bool$ as successful-result
+requirements. Their intersection is empty, so the accumulated explicit interface
+is rejected without a body or a call. The source condition and its finite
+instantiation rule are defined in \cref{sec:relevant-consistency}.
 
-\section{Checked calls and effects}
-For a set $\epsilon$ of admitted error tags, define
+Denotationally the conjunction remains inhabited. For example,
+\[
+ q=\lambda x.\,(x\mathbin{\&}\Bool)
+ \quad\Longrightarrow\quad
+ q\in I\cap(\Int\Rightarrow\Bool),\qquad q(\mathsf{true})=\mathsf{true}.
+\]
+Behavior outside the stated integer region cannot repair its refuted successful
+observations. Relevant consistency diagnoses the explicit specification; it
+does not assert that the set of partial identities is empty. The predicate
+$I\cap(\Int\Rightarrow\Bool)$ remains available to semantic reasoning and to
+internal descriptions of failing applications.
+
+\example{An empty value hypothesis}{\Uone{}}
+\begin{lstlisting}
+x: int
+x: bool                      // _|_, without a supplied value
+uninhabited(A): A             // _|_, by instantiation at bottom
+\end{lstlisting}
+These predicates have no value inhabitants. They differ from an inhabited set
+of closures whose calls fail on a specified domain.
+
+The meet operator is a refinement-preserving primitive. If $d$ and $e$ denote
+completion predicates $D$ and $E$, their successful unification denotes
+$D\cap E$. Hence
+\[
+ D\subseteq A,\ E\subseteq B
+ \quad\Longrightarrow\quad D\cap E\subseteq A\cap B.
+\]
+No compatibility or inhabitance premise is needed. This gives the primitive
+partial type $\forall A,B.\;(A\times B)\Rightarrow(A\cap B)$.
+Symbolic operands retain their joint constraints; a record expression with
+additional permitted fields is not identified with an exact ground record.
+
+\example{A language operator with a polymorphic type}{\Uone{}+\Static{}}
+\begin{lstlisting}
+f(A): func(xs: [A, A]) -> A: xs[0] & xs[1]
+x: f([{a: 1}, {b: 1}])       // {a: 1, b: 1}
+y: f([1, 2])                 // _|_: conflicting concrete operands
+
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+z: meet({a: 1}, {b: true})   // {a: 1, b: true}
+\end{lstlisting}
+The body of \code{f} synthesizes $A\cap A=A$, so certification is local.
+For \code{x}, instantiate $A$ at \code{{a: 1} | {b: 1}}. The returned record
+refines both open descriptions and therefore their union. Its more precise
+fields follow from evaluating the body, not from a claim that an arbitrary
+inhabitant of the signature always performs a meet. The incompatible call
+\code{y} is refuted when its concrete operands expose the conflict. The explicit
+result $A\cap B$ of \code{meet} is not refuted under its rigid declaration
+variables. It therefore passes relevant consistency. A generated instance such
+as $\Int\cap\Bool$ may describe computation failure without creating a new
+explicit interface obligation.
+
+\section{Effects and conditional guarantees}
+Ordinary arrows already allow constraint failure. An optional effect row records
+observable foreign errors or external actions beyond that failure. For an error
+set $\epsilon$, define
 \[
  A\Rightarrow_\epsilon B
- =\{f\in F\mid\forall p\in A.\;
-       G_B(f,p)\ \lor\ \exists e\in\epsilon.\;\Run(f,p)=\Raise(e)\}.
+ =\{f\in A\Rightarrow B\mid
+       \forall p\in A,e.\;(\Run(f,p)=\Raise(e)\Rightarrow e\in\epsilon)\}.
 \]
-The pure arrow has $\epsilon=\varnothing$. Domain rejection is a separate
-observation from a permitted failure within the domain. A bridge supporting
-logical integers with representability failures has type
-$\Int\Rightarrow_{\mathsf{bridge}}\Int$. It does not thereby support arbitrary
-fractional inputs. Divergence, when admitted by an execution profile, is a
-separately named outcome.
+This is still a partial-correctness contract. A bridge can expose
+\code{func(int) -> int} when conversion failure becomes bottom, or
+\code{func(int) -> int !bridge} when its error tags are observable.
+Neither signature needs native machine widths. Registration must still prove
+logical parameter, result, and protocol compatibility in the strict kernel.
+An integer adapter cannot be certified as a number adapter merely by rejecting
+fractions at runtime.
 
+Termination, guaranteed success, and absence of a selected effect are stronger
+properties with separate proof obligations. A dependent law that actually
+executes a call as a required field can impose such an obligation locally;
+an ordinary arrow never supplies it implicitly.
 
 \chapter{Surface binding and conservative extension}
 \label{ch:surface}
@@ -745,9 +893,9 @@ binder may omit them. The body is the following expression. A record body is
 already delimited by braces. Quantifiers have low expression precedence, and
 parentheses delimit narrower scopes inside unions and arrows.
 
-Unadorned $A$ is type-sorted, at an inferred universe. \code{A: T} is an upper
-bound on that semantic type. \code{x in T} binds an ordinary value. An explicit
-\code{A in Type(n): T} specifies both the universe and the upper bound.
+Unadorned $A$ has sort $\Type$. \code{A: T} bounds that semantic type by
+inclusion. \code{x in T} binds an ordinary value. The explicit form
+\code{A in Type: T} records the type sort and its upper bound.
 All binders are lexical and alpha-renamable. Bounds may reference earlier
 binders and outer variables.
 
@@ -905,11 +1053,14 @@ against the resulting contract.
 
 \chapter{Three implementation profiles}
 \label{ch:profiles}
-\section{Rank, predicativity, and interface boundaries}
+\section{Rank, instantiation, and interface boundaries}
 Type rank measures the placement of polymorphic binders relative to function
 arguments. A callback required to work at all types is higher-rank; an ordinary
-higher-order function such as \code{map} can have a rank-1 type. Predicativity is
-a separate restriction on the universes admitted as instantiations.
+higher-order function such as \code{map} can have a rank-1 type. The semantic
+sort $\Type$ is impredicative. The rank-1 source profiles limit inferred and
+explicit instance types to quantifier-free bodies at executable boundaries;
+\Shigher{} permits explicitly supplied quantified instances. This is a source
+formation restriction, not a hierarchy of semantic universes.
 
 For the restricted profiles, use a \emph{boundary-prenex} discipline. Within one
 executable signature clause, type quantifiers occur in an outer prefix over a
@@ -925,7 +1076,7 @@ Existentials whose witnesses depend on arguments likewise retain that dependence
 
 \section{Full symmetric, higher-rank CUE: \Shigher{}}
 \Shigher{} admits both quantifiers at arbitrary well-sorted type positions, with the
-predicative universe discipline. It includes first-class existential packages,
+single impredicative type sort. It includes first-class existential packages,
 polymorphic arguments, and nested quantified records.
 \par\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}
@@ -942,6 +1093,21 @@ The checker uses explicit introduction and elimination rules, scope levels, and
 annotations. Higher-rank bidirectional checking provides a useful proof-theoretic
 organization \cite{dunfield}, while Boolean connectives and dependent predicates
 require their own sound constraint procedures.
+
+
+\example{An explicitly impredicative instance}{\Shigher{}+\Static{}}
+\begin{lstlisting}
+let Identity = forall A func(A) -> A
+id(A): func(x: A) -> A: x
+again: id[Identity](id)
+a: again[int](3)
+b: again[string]("three")
+\end{lstlisting}
+The instance argument is itself universally quantified. Checking substitutes
+finite type syntax; it does not search for an impredicative instance or evaluate
+any type representation at runtime. Implicit higher-rank inference may request
+this annotation. The mandatory checking profile in \cref{ch:residual} is
+orthogonal to the three formation profiles.
 
 \section{Symmetric, rank-1 CUE: \Sone{}}
 \Sone{} admits existential and universal prefixes at declaration and module-interface
@@ -1460,9 +1626,9 @@ r: both(3)                  // {a: 3, b: 3}
 \end{lstlisting}
 \end{minipage}\par
 The body is a new implementation whose result is the CUE unification of the two
-result descriptions. Totality requires their intersection to be inhabited at
-every admitted input. A version with arbitrary possibly conflicting callbacks
-uses a checked conflict effect.
+result descriptions. The primitive meet rule gives its result their intersection.
+Conflicting callbacks yield bottom on the affected calls; their consistency need
+not be proved when the function is defined.
 
 \section{Validators and iteration}
 \example{A predicate used as an ordinary constraint}{\Uone{}}
@@ -1533,7 +1699,7 @@ rather than introducing another interpretation of refinement.
 A dependent function contract uses its actual argument in the result predicate:
 \[
  \Pi_{x:A}B(x)
- =\{f\in F\mid\forall x\in A.\;G_{B(x)}(f,x)\}.
+ =\{f\in F\mid\forall x\in A.\;H_{B(x)}(f,x)\}.
 \]
 A dependent pair retains the witness:
 \[
@@ -1819,16 +1985,21 @@ finite disjunction splitting, and explicit proof certificates for stronger
 predicates. Refinement-type inference provides a precedent for combining type
 structure with restricted automated implication checking \cite{liquid}.
 
-The logical reference model admits every well-formed predicate. An executable
-profile grants a contract only after a sound derivation. A residual obligation
-retains its variables and scope. Runtime checks produce declared errors and do
-not turn a conditional check into a successful-call theorem.
+The logical reference model admits well-formed dependent predicates.
+Every implementation-to-contract implication is proved before certification.
+A difficult first-order predicate can instead be tested by an explicit source
+assertion such as \code{x & >0}. The assertion has a local typing rule that
+establishes its predicate on successful results; executing it can fail or remain
+pending. \Cref{sec:dynamic-admission} defines this boundary. Predicates on
+functions, abstract types, or infinite universal ranges require a static proof
+or an explicitly justified source operation.
 
-The erasure property states that changing a proved annotation or choosing a
-type-instantiation derivation does not change the underlying closure and its
-runtime call packet. Value indices used computationally are ordinary arguments
-or fields, as in replication and matrices. This separates specification
-parameters from executable data without changing their shared set semantics.
+All function-type annotations, type binders, instantiation selections, and
+proof arguments erase. Executable assertions remain because they are terms.
+Value indices used computationally remain ordinary arguments or fields, as in
+replication and matrices. \Cref{thm:erasure} gives erasure for both inline and
+separately contributed annotations. Explicit refinement systems provide a
+related separation of proof evidence from executable code \cite{explicitrefine}.
 
 \chapter{Existentials and modular reuse}
 \label{ch:modules}
@@ -1843,7 +2014,7 @@ An existential record describes several fields using one representation witness:
 }
 \end{lstlisting}
 \end{minipage}\par
-Its meaning is $\bigcup_{S\in\U_n}\sem{\operatorname{Counter}(S)}$.
+Its meaning is $\bigcup_{S\in\U}\sem{\operatorname{Counter}(S)}$.
 One $S$ must make all three fields satisfy the interface. Replacing it with
 separate existential witnesses for the three fields loses the relationships
 that make composition type-correct.
@@ -1970,8 +2141,8 @@ conflict, not merely the outputs of named methods.
 For two representations $A_1,A_2$, a simulation is a bijection
 $r:A_1\to A_2$ on the entire carriers admitted by the public interface,
 together with corresponding exported capability handles, such that constants
-correspond, every public operation commutes with $r$, and public data results
-and effects agree. The carriers include the abstract states over which a client
+correspond, every public operation commutes with $r$ on successful results,
+and failure, divergence, and public effects correspond as well. The carriers include the abstract states over which a client
 may quantify, as well as those reached by executing operations.
 \end{definition}
 For the counters, $r(n)=\{\mathit{count}:n\}$ is such a bijection. It preserves
@@ -2014,6 +2185,12 @@ logical equivalence classes, and the theorem applies to the resulting public
 carrier. The implementation must realize that equality soundly.
 
 \section{The scope of the evolution guarantee}
+A partial function interface alone does not ensure preservation of successful
+calls across replacement. The outcome-preserving simulation in
+\cref{thm:abstraction} is the additional condition: replacing a successful
+operation by one that always fails has the same partial result type but violates
+that simulation. Required law fields are also preserved as observations.
+
 The theorem yields a checkable class of representation changes for which all
 admissible clients continue to work. Its hypotheses include behavior and
 observable equality. A signature that merely types \code{next} and \code{read}
@@ -2129,657 +2306,1090 @@ separate and explicit.
 
 \chapter{Checking, execution, and formal obligations}
 \label{ch:checking}
-\section{Judgments and rigid scopes}
-Use a constraint context $\Gamma$ with rigid variables, flexible existential
-variables, and a scope level for each variable. The principal judgments are
+
+\section{Typing judgments and operational subjects}
+Use rigid type variables, term variables, and scoped existential witnesses in
+$\Gamma$. Computation typing has synthesis and checking forms
 \[
  \Gamma\vdash e\Rightarrow T,
- \qquad \Gamma\vdash e\Leftarrow T,
- \qquad \Gamma\models T\le U.
+ \qquad \Gamma\vdash e\Leftarrow T.
 \]
-They respectively synthesize a description, check an expression against a
-description, and establish semantic inclusion. The checker returns a proof,
-a refutation with a witness, or a residual obligation.
+Their conclusion constrains successful results. Value membership is separately
+written $\Gamma\vdash_v v:T$. Subtyping certificates establish
+$\Gamma\vdash_{\Static}T\le U$ and are sound for semantic inclusion. A compiler
+may fail to establish such a certificate without proving the denotation empty.
 
-Universal introduction checks one expression under an arbitrary rigid variable:
-\[
- \frac{\Gamma,A:\Type(n)\vdash e\Leftarrow T
-       \quad A\notin\FV(\Gamma,e_{\rm run})}
-      {\Gamma\vdash e\Leftarrow\forall A\,T}.
-\]
-The side condition refers to erased runtime code; $A$ may occur in checked
-annotations. A bounded introduction adds its bound as an assumption. The same
-runtime expression must be valid at every assignment.
+Universal introduction checks the same erased computation under a fresh rigid
+type variable. Universal elimination substitutes any well-sorted source type
+permitted by the formation profile, including a polytype in \Shigher{}.
+Existential elimination opens one rigid witness shared by all projections and
+checks its escape condition. Scope levels record dependencies, not universes.
 
-Universal elimination substitutes a well-sorted admissible type. Inference may
-introduce a fresh flexible type and solve its constraints. Different uses obtain
-different instantiation variables; the declared universal remains unchanged.
-Existential introduction supplies a witness. Elimination opens one shared witness
-in a fresh rigid scope, and the result must respect its escape condition.
+Bidirectional typing separates annotation checking from inference
+\cite{bidirsurvey}. Explicit type abstraction and instantiation provide a route
+to checking every annotated System F derivation. Inference of missing
+impredicative arguments is an optional front-end service, never a condition on
+the decidability of checking the supplied elaboration.
 
-These scope rules have implementation precedents in higher-rank bidirectional
-checking and quantified logic programming \cite{dunfield,nadathur}. A flexible
-witness may depend only on the rigid variables available at its introduction
-site. The solver never resolves an outer existential by referring to a later
-universal.
+\section{Partial correctness of typed computation}
+A lambda is a value even when its body may fail. The lambda rule checks the body
+under its parameter types. Application checks its function and argument types
+before using the result type. It never assumes success of the body.
 
-\section{Functions and declaration conjunction}
-A lambda rule checks the body on arbitrary admitted packets and proves its
-successful result predicate. In the nonrecursive core, evaluation is structurally
-bounded; primitives carry checked contracts. A structural-recursion profile
-adds termination certificates.
-
-Conjunction accumulates predicates on the same subject. In particular,
-\[
- \frac{\Gamma\vdash e\Leftarrow T\qquad\Gamma\vdash e\Leftarrow U}
-      {\Gamma\vdash e\Leftarrow T\land U}
-\]
-concerns one expression, not a synthesis of two bodies. Application uses the
-correlation-preserving arrow clauses applicable to the actual packet.
-Subsumption uses semantic inclusion. Existential calls can propagate constraints
-on their argument and result cells without granting an unproved universal
-capability to the selected implementation.
-
-\begin{theorem}[Soundness of the reference rules]\label{thm:soundness}
-Assume sound primitive contracts and implication procedures, a scope-correct
-elaboration, and the termination obligations of the selected execution profile.
-If the reference checker establishes $\Gamma\vdash e\Leftarrow T$, then every
-admitted environment gives the erased expression an inhabitant of $\sem T$.
-For a checked successful arrow, every admitted call packet produces a nonempty
-result description contained in its codomain. Checked effects are limited to
-the declared outcome set.
+\begin{theorem}[Partial-correctness soundness]\label{thm:soundness}
+Assume sound primitive rules, sound subtyping certificates, scope-correct
+elaboration, and the explicit-assertion rules of \cref{ch:residual}.
+If $\Gamma\vdash e\Leftarrow T$, then in each environment satisfying $\Gamma$,
+every successful complete result of the elaborated computation lies in
+$\sem T$. If a resulting closure is certified at $A\Rightarrow B$, a successful
+call with an admitted $A$-packet returns only a $B$-result. Failure and divergence
+are permitted; a computation cannot produce a successful value by subsuming
+failure to another type.
 \end{theorem}
 \begin{proof}
-Induct on the checking derivation. Base cases use the primitive hypotheses.
-Conjunction and disjunction use set membership. Subsumption uses inclusion.
-The lambda case is the universal packet obligation in \cref{eq:arrow}; the
-application case instantiates it. Universal introduction ranges over arbitrary
-rigid assignments while preserving erased code; elimination specializes the
-intersection. Existential rules choose or open a witness while preserving its
-scope. Termination and primitive outcome obligations establish the successful
-or admitted-effect cases.
+Induct on the derivation. Constants and structural values use membership;
+subsumption uses inclusion. The lambda case establishes the conditional
+universal in \cref{eq:arrow}, and application instantiates it. Meet intersects
+successful completion predicates. Universal introduction varies the rigid
+valuation without changing erased code; elimination uses
+\cref{prop:subst}. Existential rules preserve their shared witness. Source
+assertions forward only validated successes and otherwise fail or remain pending.
+Strict evaluation premises and retained demand dependencies distinguish failed
+computations from returned values.
 \end{proof}
-Sound checking permits annotations and residual obligations; it need not be
-complete.
+The theorem imposes no termination premise. A separately selected execution
+profile may reject recursive code or permit a fixed-point operator with its
+standard partial type. A derivation from an inconsistent data hypothesis is not
+an implementation certificate: source checking uses verified variable types,
+not arbitrary unresolved propositions as axioms for ex falso.
 
-\section{Adequate symbolic evaluation}
-Let $\operatorname{Comp}(E)$ denote successful complete observations of an
-elaborated expression, and let $N(E)$ be the evaluator's retained symbolic graph.
-The adequacy target is
+\section{Symbolic evaluation and delayed structure}
+For a symbolic expression $e$, retain the successful-completion predicate
+$\operatorname{CompObs}(e)$ and its demand and failure dependencies. The exact
+normalization target is
 \[
- \sem{N(E)}=\operatorname{Comp}(E)
+ \sem{N(e)}=\operatorname{CompObs}(e).
 \]
-for the selected reference fragment, with preference and failure observations
-recorded separately. A conservative abstract interpreter may instead retain an
-over-approximation for propagation; its final conformance judgments must still
-be justified independently.
+Abstract shape and bound information may guide propagation while the exact
+residual graph remains present. A candidate concrete result with a pending
+condition is an observation under that condition, not an unconditional export.
 
-Fresh call activations copy parameter cells and preserve closure captures.
-Function application does not invent implementations to satisfy a codomain.
-A call on an unspecified implementation can remain incomplete. A contradiction
-is established only when the retained constraints have no admissible completion,
-or a concrete computation produces a specified failure.
+CUE records and arguments can contain suspended computations. A required field
+whose successful-completion predicate is proved empty makes the record's
+completion predicate empty. The normalizer propagates that refutation through
+its required enclosing fields; a suspended implementation must not indefinitely
+hide an established contradiction. Optional impossible fields instead constrain
+presence, according to ordinary CUE field rules.
 
-Memoization keys include closure identity, bound packets, and the relevant
-resolved environment. Residual obligations are retained with their dependency
-links. A later refinement invalidates stale approximations or further restricts
-them. Cached concrete results can only survive or conflict under the refinement
-theorem.
+Static expression checking nevertheless verifies every subexpression from its
+own justified interface. A contradiction elsewhere in a record does not excuse
+an invalid field selection or produce a certificate for an unrelated expression.
+Within a function, a proof that the body fails under certain arguments is scoped
+to those arguments. It does not turn the returned closure into a failed
+closure-construction computation. The value/computation distinction for
+non-strict semantic subtyping is relevant here \cite{nonstrict}.
 
-\section{Decision fragments}
-A useful implementation combines finite Boolean type structure, a sound
-semantic-subtyping procedure, finite sets of polymorphic instances, and a
-restricted solver for dependent predicates. Castagna--Laurent--Nguyen give a
-sound terminating reconstruction algorithm for a particular first-order
-polymorphic set-theoretic calculus \cite{cln2024}. That result motivates \Uone{};
-its hypotheses and arrow interpretation remain part of its own calculus.
+The reference System F sublanguage uses strict application to value arguments.
+A demand-driven evaluator can postpone computation, but commits a completed
+call only when its required argument and result dependencies have been
+validated. It must not use the empty-domain arrow identity to discard an
+unvalidated argument and produce an arbitrarily typed result. Memoization
+preserves these dependencies as well as code identity and captured bindings.
 
-An implementation reports \emph{established}, \emph{refuted}, or
-\emph{unresolved}. Treating an unresolved implication as false would turn later
-proof discovery into an apparent repair of bottom. Treating it as true would
-lose the universal guarantee. The three outcomes therefore belong to the
-checker contract. \Cref{ch:residual} specifies a finite local kernel, persistent
-proof obligations, and demand-driven concrete validation for that contract.
+\section{Static certificates and executable assertions}
+Every implementation-to-interface obligation has two destinations: a checked
+certificate or a blocking diagnostic. This applies to structural, kind, literal,
+polymorphic, callable-protocol, and dependent-result requirements alike.
+An unresolved implication does not become an inserted runtime check.
 
-\chapter{Refinement-stable normalization and checking}
+An explicitly written assertion has a separately checked executable meaning.
+Its successful-result predicate contributes to the body's inferred type, while
+its execution can remain pending on data. The pending operation is source code,
+not an unproved type obligation. This distinction permits cheap certification
+of \code{x & >0} without proving that every possible \code{x} is positive.
+
+An unspecified implementation may remain an ordinary data hypothesis after its
+explicit interface passes relevant consistency and eager refutation. The
+interface check does not wait for a body or an observing call. A client can be
+checked under that interface;
+linking verifies the actual implementation against that interface. A completed
+executable artifact has neither unchecked imports nor outstanding annotation
+obligations. The stages and minimum judgments are fixed in \cref{ch:residual}.
+
+\chapter{Declarative checking and explicit assertions}
 \label{ch:residual}
-\section{Hypotheses, refutation, and observation}
-A declaration contributes a hypothesis to a retained constraint store. Accepting
-that store for further unification does not certify that it has a completion.
-Denotational satisfiability and operational refutability are distinct judgments:
+\section{The checking contract}
+The checking profile \Static{} fixes a mandatory static fragment independently
+of the formation profiles \Uone{}, \Sone{}, and \Shigher{}, and the extensions
+\Dep{} and \Abs{}. Every annotated implementation receives a complete
+certificate before executable use. Every explicit interface first passes the
+relevant-consistency check of \cref{sec:relevant-consistency}, including an
+interface with no implementation. Body refinements may follow from symbolic
+reasoning or from the successful-result rules of assertions already in its body.
+
+Elaboration produces
 \[
- \sem P\ne\varnothing,
- \qquad P\vdash_{\mathcal K}\bot.
+ (e^\circ,\;\pi,\;R),
 \]
-Here $\mathcal K$ is a specified, sound proof kernel. Soundness requires
-$P\vdash_{\mathcal K}\bot\Longrightarrow\sem P=\varnothing$; the converse
-is not required. An unrefuted empty predicate remains denotationally empty.
-Its residual representation records the hypotheses whose incompatibility has
-yet to be established.
+where $e^\circ$ is the source program with its type annotations erased, $\pi$
+certifies its interface and the source relevance check, and $R$ retains the exact data constraints and
+execution dependencies of its explicit operations. No executable node in $R$
+is created solely to satisfy an annotation. The observable outcomes of checking
+are:
+\begin{enumerate}
+\item \emph{Accepted}: explicit interfaces pass relevant consistency and all
+typing and interface implications have certificates; source assertions may still
+await their data.
+\item \emph{Blocked}: an invalid relevant observation, a missing annotation or
+proof, an unsupported operation, an unproved implication, or exhausted static
+resources.
+\item \emph{Refuted}: a checked empty value or completion predicate, propagated
+at its scope.
+\end{enumerate}
+A refuted required data subject is bottom. A refuted function-body path becomes
+a failing computation at that path, rather than an unrelated global
+contradiction. A blocking diagnostic does not assert semantic emptiness.
 
-\example{An empty arithmetic relation retained as hypotheses}{Base fragment}
-\par\noindent\begin{minipage}{\linewidth}
+A module interface may remain open until linking. Refining that interface
+triggers the same accumulated-conjunction check; it does not attach executable
+checks to a cached closure. Completing missing declarations may resolve a
+blocking diagnostic, but cannot remove a proved contradiction.
+
+\section{The mandatory type fragment}
+\label{sec:strict-fragment}
+The strict grammar is finite, alias-expanded type syntax:
+\[
+\begin{aligned}
+ T,U ::= {}& \bot\mid\top\mid\alpha\mid k\mid c
+       \mid T\land U\mid T\lor U\mid T\Rightarrow U\\
+       &\mid\{\ell_i^{m_i}:T_i\}_{i\in I}
+       \mid[T_1,\ldots,T_n]\mid\List(T)
+       \mid\forall\alpha\,T\mid\exists\alpha\,T.
+\end{aligned}
+\]
+Here $k$ ranges over CUE kinds and $c$ over literals. Field mode $m_i$ records
+requiredness or optionality, together with an explicit absence constraint when
+present. The permitted quantifier positions are those of the selected formation
+profile. Callable packets carry their statically declared arity, labels,
+requiredness, defaults, and bound slots. Recursive aliases are outside this
+finite kernel unless equipped with a separately specified contractive
+regular-type procedure.
+
+The fragment includes all of the following, not just record subtyping:
+\begin{itemize}
+\item kind membership and the kind lattice, including
+$\Int\le\Num$, $\mathsf{Float}\le\Num$, and
+$\Num=\Int\cup\mathsf{Float}$ and
+$\Bool=\{\mathsf{false},\mathsf{true}\}$;
+\item literal equality, literal membership in kinds, and literal inclusion in
+finite unions and intersections;
+\item record width, depth, presence, and required-field checks; fixed list
+lengths and component types; homogeneous lists and their element types;
+\item contravariant arrows, finite union/intersection reasoning, and scoped
+universal and existential introduction and elimination.
+\end{itemize}
+The kind table distinguishes integers from decimal floating-point values,
+strings from bytes, and data kinds from closures. Literal comparison and
+arithmetic preserve CUE's specified numeric representation rules
+\cite{cuespec}.
+
+Consequently both
+\[
+ \{a:1,b:\mathsf{true}\}\le\{a:1\},
+ \qquad (1\lor2)\le\Int
+\]
+are mandatory, although only the first is structural subtyping in the record
+sense. A kernel cannot postpone either judgment to a runtime cast.
+
+\subsection{Records are closed for typing}
+The parameter's declared field inventory is closed for static reasoning:
+unmentioned fields cannot be invented to justify selection or application.
+Width subtyping remains available. The record type $\{a:1\}$ guarantees the
+field $a$ and may describe a value also having $b$; only $a$ is accessible through
+that static interface. This is distinct from \code{close({a: 1})}, which also
+forbids extra fields in the data predicate.
+
+Interpreting every bare type as an exact-label set would contradict the required
+width relation, so the two notions of closure must remain separate. Extra fields
+on an argument are permitted by width subtyping unless explicit data closedness
+forbids them. Missing required fields are blocked, never guessed from an open
+ambient schema.
+
+\example{Closed static field inventory}{\Uone{}+\Static{}}
 \begin{lstlisting}
-a: int & b * 5
-b: a - 1
+get: func(r: {a: int}) -> int: r.a
+ok: get({a: 1, b: true})        // 1: width subtyping
+
+bad: func(r: {a: int}) -> int: r.b
+// blocked at definition: b is absent from the parameter interface
+
+needsB: func(r: {a: int, b: bool}) -> int: r.a
+badCall: needsB({a: 1})         // blocked: required field b is missing
 \end{lstlisting}
-\end{minipage}\par
-The equations imply $a=5(a-1)$, hence $a=5/4$, contradicting $a\in\mathbb Z$.
-A kernel that evaluates multiplication and subtraction only when their operands
-are concrete retains these equations. It need not perform symbolic elimination.
-After adding \code{a: m} for any concrete integer $m$, it computes $b=m-1$
-and checks $m=5(m-1)$. That concrete instance is refuted. For example,
-\code{a: 0} yields \code{b: -1} and the conflict $0=-5$.
-Refuting one instance constrains that instance; it is not a proof that an
-independently instantiated schema has no other witnesses.
+An explicit occurrence test can refine an optional field to present. A finite
+union of record shapes is checked branchwise. A general dynamic-label map
+requires its own declared map interface; it is not an excuse to residualize a
+missing field in a finite record type.
 
-\example{A local bound contradiction}{Base fragment}
-\par\noindent\begin{minipage}{\linewidth}
-\begin{lstlisting}
-x: <0
-y: x & >0
-\end{lstlisting}
-\end{minipage}\par
-Copying the constraint on \code{x} into \code{y} exposes the empty interval
-$(-\infty,0)\cap(0,\infty)$. A local bound rule refutes it without choosing a
-concrete atom. This is as stable under refinement as the arithmetic refutation;
-it is simply cheaper to discover.
+\section{Strict typing rules}
+The internal language records lambda annotations, type abstractions, type
+applications, and the branch choices used by union/intersection derivations.
+Source inference may insert them. The kernel checks the resulting proof graph
+without searching for arbitrary types.
 
-The distinction between suspended expressions and demanded concrete evaluation
-already appears in CUE's treatment of reference cycles \cite{cuecycles}.
-For the extension, the implementation contract specifies which local rules run
-and when observations demand their residual obligations. The mathematical
-meaning of a declaration does not depend on the amount of search performed.
+Representative mandatory rules are
+\[
+\frac{\Gamma,x:S\vdash e\Leftarrow T}
+ {\Gamma\vdash\lambda(x:S).e\Leftarrow S\Rightarrow T}
+\qquad
+\frac{\Gamma\vdash f\Rightarrow S\Rightarrow T\quad
+      \Gamma\vdash x\Leftarrow S}
+ {\Gamma\vdash f(x)\Rightarrow T}.
+\]
+These are computation judgments: success has the displayed type. They do not
+assert that evaluating the computation produces a value. The rules for explicit
+polymorphism are
+\[
+\frac{\Gamma,\alpha:\Type\vdash e\Leftarrow T\quad
+       \alpha\notin\FV(\Gamma,e_{\rm run})}
+ {\Gamma\vdash e\Leftarrow\forall\alpha\,T}
+\qquad
+\frac{\Gamma\vdash e\Rightarrow\forall\alpha\,T\quad S:\Type}
+ {\Gamma\vdash e[S]\Rightarrow T[S/\alpha]}.
+\]
+$S$ may contain quantifiers in \Shigher{}. Checking the substitution is mandatory;
+inferring $S$ is not. The corresponding existential rules choose or open one
+shared witness with its usual escape condition.
 
-\section{Stable reductions}
-Write $P\simeq Q$ when two residual predicates have the same denotation on the
-same exposed interface, with their local witnesses projected according to their
-scopes. A normalizing step must satisfy
+Intersection introduction checks the same expression at both types. Union
+introduction records a proved injection; union elimination checks every
+possible incoming branch. Subsumption requires a checked inclusion derivation.
+A supplied literal synthesizes its singleton, and a supplied record synthesizes
+its present fields. These precise descriptors are not silently widened before
+checking a singleton or required-field obligation.
+
+For unification expressions, the mandatory primitive rule is
 \begin{equation}
- P\longrightarrow Q\quad\Longrightarrow\quad
- P\simeq Q.
- \label{eq:residual-equivalence}
+\frac{\Gamma\vdash e\Rightarrow S\qquad
+      \Gamma\vdash d\Rightarrow T}
+ {\Gamma\vdash e\mathbin{\&}d\Rightarrow S\land T}.
+\label{eq:meettyping}
 \end{equation}
-Every subsequent conjunct $R$ then gives
-\[
- P\land R\simeq Q\land R.
-\]
-This is the extension-stability condition. A step introducing fresh local
-variables must preserve their projection and the free-variable interface.
-Steps under quantifiers use equivalence in that predicate fiber, followed by the
-quantifier; they preserve guards and dependencies.
+The result can fail. Both operands are checked; the possibility of a conflict
+cannot conceal an ill-typed subexpression. A known local conflict is diagnosed
+by the eager rules below. An explicit failure computation has type
+$\Comp(\bot)$ and can occur in a function body or a deliberate failing branch.
+It supplies no successful witness and permits no arbitrary cast of another
+expression.
 
-Two useful special cases are consequence propagation and certified refutation:
+\example{Annotations assert properties of the body}{\Uone{}+\Static{}}
+\begin{lstlisting}
+id(A): func(x: A) -> A: x          // accepted
+wrong(A): func(x: A) -> A: 0       // blocked: 0 is not arbitrary A
+asText: func(x: int) -> string: x  // blocked: int does not imply string
+asTwo: func(x: int) -> 2: 1        // refuted singleton obligation
+stop(A): func(x: A) -> A: _|_      // explicit failure; no successful return
+\end{lstlisting}
+Every result annotation generates the same implication judgment. The body is
+checked before result subsumption; failure of that implication blocks the
+annotation. A source meet uses \cref{eq:meettyping}; no meet is added by checking.
+The explicit failure term has no successful result and is checked by its own
+primitive rule, after all enclosing structural obligations have been verified.
+
+\subsection{A finite subtyping proof calculus}
+Every kernel verifies reflexivity, transitivity with an explicit intermediate
+type, bottom/top, the finite kind table, and literal membership. It verifies
+record width/depth and presence rules, covariant products/lists, and
+contravariant arrows. It also verifies the lattice rules
 \[
- \frac{P\vdash_{\mathcal K}C}{P\longrightarrow P\land C},
+ S\land T\le S,\quad S\le S\lor T,\quad
+ \frac{R\le S\quad R\le T}{R\le S\land T},\quad
+ \frac{S\le R\quad T\le R}{S\lor T\le R},
+\]
+finite distributivity, and the arrow laws in \cref{prop:arrow}. Quantified
+inclusions carry explicit instantiations, openings, or the pointwise rules of
+\cref{ch:refinement}. Bounded universal comparison uses the same bound under a
+rigid variable, or a separately supplied proof of the required guarded
+inclusion; unrestricted bounded-subtyping proof search is not a kernel rule.
+
+This defines a proof-checkable extension of explicitly typed System F with
+structural subtyping, unions, intersections, literals, and CUE kinds. Every
+finite derivation whose explicit interfaces pass relevant consistency is accepted
+when its proof graph fits the published resource bound. Inferred and intermediate
+types may contain empty successful-result predicates; their use in a derivation
+does not turn them into source interface declarations. It is not a completeness claim for every inclusion
+between impredicative denotations. A smaller syntactic inclusion calculus can
+be sound even when semantic inclusion has additional valid statements.
+
+A practical front end memoizes type-pair obligations, normalizes finite record
+fields and kind/literal unions, splits source unions and target intersections,
+and tries the finitely recorded target-union/source-intersection alternatives.
+Structural arrow checks recurse on smaller component types. Quantified
+elimination uses explicit source instances or a finite candidate list; it never
+searches an unbounded space of polytypes. Optional finite Boolean normalization
+and the displayed distributive laws can derive more inclusions within the same
+budget. A supplied proof can resolve a goal the search did not find. Explicitly
+annotated higher-rank checking with union/intersection types and impredicative
+applications has a closely related mechanized precedent \cite{jiang2025}.
+
+\section{Required eager refutation}
+\label{sec:eager}
+Before issuing a certificate, run a shared eager-refutation service over the
+available concrete and abstract descriptors. The service is also used by ordinary
+CUE normalization. A conforming implementation publishes its finite transfer
+rules and the conformance corpus for its chosen base-language version.
+Type checking must preserve every refutation that this service produces; it
+cannot downgrade one to a dynamic residual.
+
+The mandatory minimum includes:
+\begin{enumerate}
+\item incompatible known kinds and unequal atomic literals, including numeric
+kind distinctions and finite literal-union exclusion;
+\item empty intersections of explicit constant numeric intervals, with open
+endpoints and integer rounding handled correctly; concrete pattern checks;
+\item known conflicting required fields, forbidden fields in explicitly closed
+data, impossible field-presence combinations, and incompatible fixed list
+lengths or components;
+\item exact evaluation of enabled ground primitives and comparisons, invalid
+known indexes, malformed call packets, duplicate labels, and missing arguments;
+\item rejection of a finite alternative only after that alternative is refuted,
+and rejection of their union only after all alternatives are refuted.
+\end{enumerate}
+Optional impossible fields describe absence and are not automatically an
+inconsistent record. Required impossible fields propagate bottom. Branch and
+quantifier assumptions remain attached to refutations; a counterexample under
+an impossible guard proves nothing about a live branch. A contradiction in an
+uncalled function body identifies a failing body path. It does not remove the
+closure value or allow an unchecked subexpression to acquire an arbitrary type.
+
+\example{Cheap contradictions and unresolved arithmetic}{Base fragment+\Static{}}
+\begin{lstlisting}
+eager: {x: <0, y: x & >0}    // refuted by constant-bound intersection
+
+hypothesis: {
+    a: int & b * 5
+    b: a - 1
+}                            // retained without symbolic elimination
+concrete: hypothesis & {a: 0} // refuted: b = -1 and a = -5
+\end{lstlisting}
+The arithmetic relation has no integer solution: $a=5(a-1)$ implies $a=5/4$.
+Its general emptiness need not be decided. Type checking establishes the kinds
+of multiplication and subtraction, not the satisfiability of the equations.
+Grounding a particular instance enables exact refutation. This matches the
+distinction between incomplete cyclic constraints and concrete evaluation in
+CUE \cite{cuecycles}.
+
+The corpus requirement concerns the eager service and inputs available at the
+same checking stage. An observation that needs future runtime data is checked
+when those data arrive. An implementation cannot claim compliance by running
+no transfer rules or by exhausting its budget before every trivial judgment.
+Resource exhaustion blocks acceptance and is reported separately.
+
+\section{Relevant consistency of explicit descriptions}
+\label{sec:relevant-consistency}
+An explicit interface describes successful observations on the input regions it
+mentions. Arrow membership constrains partial computations; relevant consistency
+checks whether that explicit description has already refuted a stated successful
+observation. These are separate judgments. A relevance diagnostic blocks source
+admission without equating the denotation of a function type to bottom.
+
+\subsection{Relevant domains and pointwise result specifications}
+For a finite conjunction of explicit arrow clauses
+\[
+ C=\bigwedge_{i\in I}(A_i\Rightarrow B_i),
+\]
+let $p$ range over complete call packets. Its \emph{relevant domain} is
+$D_C=\bigcup_{i\in I}A_i$. Its partial result specification is
+\[
+ \mathcal B_C(p)=\bigcap_{\{i\mid p\in A_i\}}B_i
+ \qquad(p\in D_C).
+\]
+Outside $D_C$ this specification is undefined: there is no relevant observation
+there. Undefinedness is neither a top result nor a failed computation.
+
+For each nonempty set $J\subseteq I$, define the exact input region and its
+combined result predicate by
+\begin{equation}
+ R_J=\left(\bigcap_{j\in J}A_j\right)
+       \setminus\left(\bigcup_{i\in I\setminus J}A_i\right),
+ \qquad B_J=\bigcap_{j\in J}B_j.
+ \label{eq:relevance-regions}
+\end{equation}
+The $R_J$ partition $D_C$; $\mathcal B_C$ is $B_J$ on $R_J$. With dependent
+results, retain $B_j(p)$ in the same packet context. Calling conventions are
+part of $A_i$, so arguments with different arities or incompatible required
+labels need not inhabit overlapping regions.
+
+Let $\Gamma\vdash_{\Static}P\equiv\bot$ denote a verified refutation by the
+finite eager service and the selected strict proof rules. Failure to establish
+this judgment is not a satisfiability proof. Complete the mandatory eager pass
+before classifying a region; resource exhaustion blocks the check.
+
+\begin{definition}[Relevant consistency]
+\label{def:relevant-consistency}
+An explicit arrow conjunction $C$ fails relevant consistency in declaration
+context $\Gamma$ when a generated nonempty index set $J$ satisfies
+\begin{equation}
+ \Gamma\not\vdash_{\Static}R_J\equiv\bot,
  \qquad
- \frac{P\vdash_{\mathcal K}\bot}{P\longrightarrow\bot}.
-\]
-Neither permits deleting an unresolved premise. A primitive equality such as
-\code{z: x + y}, with \code{x: 2} and \code{y: 3}, can be replaced by
-\code{z: 5} while retaining the input bindings. A conjectured solution to an
-existential constraint cannot be committed unless equivalence, rather than mere
-satisfiability of one branch, justifies the commitment.
+ \Gamma,p:R_J\vdash_{\Static}B_J(p)\equiv\bot.
+ \label{eq:relevant-invalid}
+\end{equation}
+A relevance certificate records the prescribed region checks and the absence
+of such a refuted relevant observation. The predicate
+$\operatorname{RC}_{\Static}(\Gamma,C)$ denotes passage of this finite check.
+\end{definition}
+For nondependent results the second judgment can be checked in $\Gamma$ alone.
+A refuted input region is discarded before checking its result; inconsistency
+of the region must not be used as an ex-falso proof of a live result conflict.
+A domain that is merely unresolved is subject to the check.
 
-\example{A concrete result with a residual guard}{Base fragment}
-\par\noindent\begin{minipage}{\linewidth}
+This is a source well-formedness condition relative to a published refutation
+kernel. Passage asserts neither totality nor satisfiability of every result
+predicate. A body may still fail on particular inputs, or on all inputs. A
+failure-only predicate synthesized for that body remains a valid internal type.
+
+\example{Refuted explicit observations}{\Uone{}+\Static{}}
 \begin{lstlisting}
-x: int
-r: 3 & (x + 1)
+f: (func(int) -> int) & (func(int) -> bool)
+// blocked: on int, the explicit result is int & bool
+
+g: func(int) -> _|_
+// blocked: an explicit empty result on a non-refuted domain
+
+h: (func(number) -> int) & (func(int) -> bool)
+// blocked on int, even though the other numeric region is consistent
 \end{lstlisting}
-\end{minipage}\par
-The result cell may carry the candidate atom \code{3}, but the equality
-$3=x+1$ remains active. Adding \code{x: 2} validates it; adding \code{x: 5}
-refutes it. Replacing the whole expression by an unconditional \code{3} would
-lose a constraint. A backward rule deriving \code{x: 2} is also sound if the
-primitive's integer semantics justifies it; the minimal kernel need not include
-that rule.
+The first two declarations have the same relevant result specification. In the
+third, every overlapping integer input requires an impossible successful result.
+Successes elsewhere in the domain, or outside all declared domains, do not
+satisfy that observation.
 
-Monotonicity constrains admissible decisions, not the completeness of the search
-for them. Sound symbolic arithmetic, for example, could refute the first example
-immediately. A terminating implementation instead saturates a declared finite
-rule fragment and retains the remaining program. This makes the criterion
-precise: every committed decision has persistent evidence; computational effort
-is a separate resource policy.
+An explicit empty result is rejected by \cref{eq:relevant-invalid}; the internal
+empty type, executable failure terms, and empty inferred results remain part of
+the calculus. CUE's bottom expression retains its ordinary evaluation role
+\cite{cuespec}.
 
-Semantic entailment from an empty predicate is vacuous. It therefore cannot, by
-itself, justify materializing an arbitrary concrete result. Materialization
-requires an actual primitive-evaluation or constructor derivation, together with
-any still-active guards. An inconsistency proof produces bottom, not invented
-data.
-
-\section{Exact residuals and approximate propagation}
-An implementation state is
-\[
- S=(\Sigma,\Phi,K,W).
-\]
-$\Sigma$ is the binding and sharing graph, including quantifier levels and
-subjects. $\Phi$ contains the exact residual predicates and unevaluated
-expressions. $K$ is a graph of checked consequences with their supporting
-premises. $W$ is a worklist of enabled propagation, evaluation, and checking
-tasks. Only $\Sigma$ and $\Phi$ determine the state's denotation; $K$ and $W$
-record evidence and scheduling.
-
-An approximate descriptor $d_x$ for a cell $x$ has a concretization
-$\gamma(d_x)\subseteq V$ satisfying
-\[
- \operatorname{proj}_x\sem S\subseteq\gamma(d_x).
-\]
-Shapes, primitive kinds, explicit bounds, and finite constructor alternatives
-are useful such descriptors. Their role is abstract interpretation
-\cite{cousot77}. Intersecting two sound upper approximations is sound, and an
-empty upper approximation proves a conflict. A nonempty upper approximation
-proves neither existence of a completion nor realizability of a function.
-
-The exact predicates remain in $\Phi$. Replacing them by the approximation alone
-would enlarge their denotation. In particular, a function's parameter descriptor
-is not substituted for a shared existential type variable. Bounds on that
-variable stay correlated with the function and with every use of the variable.
-
-Each certificate records its scope and assumptions. A certificate valid under a
-guard $G$ licenses the consequence $G\Rightarrow C$, not the unconditional $C$.
-An implication proved from other interface hypotheses is a conditional proof;
-those hypotheses remain attached until independently discharged or preserved in
-the exported interface.
-
-\section{A finite local kernel}
-The default kernel operates on a shared graph and retains disjunctions without
-expanding them into a Cartesian product. It provides the following rules.
-
-\begin{longtable}{@{}P{0.25\textwidth}P{0.69\textwidth}@{}}
-\toprule
-Rule family & Evidence and action\\\midrule
-\endfirsthead
-\toprule Rule family & Evidence and action\\\midrule
-\endhead
-Atoms and kinds & Compare concrete atoms exactly; intersect primitive-kind
-sets; reject a required cell with incompatible kinds.\\
-Bounds & Intersect explicitly available numeric bounds, retaining strictness
-and integer membership; detect an empty interval.\\
-Records and lists & Propagate constraints to shared fields and known positions.
-Respect field presence, closedness, and list tails. An optional impossible field
-forces absence rather than rejecting an otherwise valid record.\\
-Equality & Maintain equivalence of cells established by the elaboration.
-Propagate constants across those classes; preserve local witness scopes.\\
-Ground primitives & Evaluate pure operations when their required operands are
-concrete; retain a suspended operation otherwise.\\
-Boolean structure & Discharge a conjunct with a proof. Remove a disjunct only
-with a refutation of that branch. Refute a disjunction only when all its arms
-are refuted.\\
-Quantified clauses & Combine equal-scope universal clauses pointwise; instantiate
-at explicit or demanded admissible arguments; preserve the original clause.\\
-Function obligations & Decompose annotated arrows and structural bodies using
-sound introduction rules; retain unresolved coverage, outcome, and dependent
-predicate obligations.\\\bottomrule
-\end{longtable}
-
-The record and list rules operate on the host elaborator's presence constraints,
-not merely on displayed labels. They retain its distinctions between open,
-closed, required, optional, hidden, and definition fields. Constructor cycles
-likewise use the selected execution discipline; equality propagation does not
-impose an unrelated finite-tree occurs check on recursive descriptions.
-
-A shape mismatch is refutable when the conflicting shape is required in every
-remaining possibility. For a function contract, refuting its result shape also
-requires an admitted call. A successful arrow with empty domain imposes no
-result obligation. A possibly empty guarded domain is therefore retained until
-its relevant emptiness or inhabitation is established.
-
-\section{Checking goals are residual constraints}
-Formation, type checking, and evaluation share $\Sigma$, $\Phi$, and $K$.
-Formation checks binding, sort, universe level, and profile restrictions.
-Checking an implementation generates predicates on that implementation;
-normalization processes them using the same kernel as other constraints.
-Normalization, materialization, and certification select which obligations are
-demanded. They share the monotone store-and-proof discipline of constraint
-programming \cite{ccp91}.
-
-Distinguish three questions:
-\[
- \sem S\subseteq\sem T,
- \qquad \sem S\cap\sem T=\varnothing,
- \qquad f\in\sem T.
-\]
-They ask for inclusion, disjointness, and membership of a particular
-implementation. Failure to prove the first is not evidence for the second.
-An implementation known only to satisfy $S$ may still satisfy a narrower $T$.
-
-\example{A broad approximation is not a contradiction}{\Uone{}}
-\par\noindent\begin{minipage}{\linewidth}
+\example{Nonconflicting overlap and disjoint cases}{\Uone{}+\Static{}}
 \begin{lstlisting}
-f: func(x: number) -> number: 1
-f: func(number) -> int              // provable from the body
+a: (func(number) -> number) & (func(int) -> int)
+// accepted interface: integers on int, numbers on other numeric inputs
 
-unknown: func(number) -> number
-unknown: func(number) -> int        // a nonempty refinement
+b: (func(int) -> string) & (func(string) -> int)
+// accepted interface: the two domains are disjoint
+
+c: (func(int) -> (0 | 1)) &
+   (func(int) -> (1 | 2)) &
+   (func(int) -> (0 | 2))
+// blocked: all three results have empty intersection on int
 \end{lstlisting}
-\end{minipage}\par
-The checker uses the body of \code{f}, rather than treating its declared result
-upper bound as an exact behavior. The second pair constrains an unspecified
-implementation and leaves its witness unresolved.
+The third example requires joint conjunction, not merely pairwise consistency:
+each pair of its result predicates intersects. Equal-domain grouping exposes
+the contradiction without enumerating input values.
 
-For a known lambda and an obligation $f\in A\Rightarrow B$, introduce an
-arbitrary rigid packet $p\in A$, form a fresh activation, and check the body.
-A certificate establishes termination, permitted outcomes, and the required
-nonempty result predicate for every such packet. Structural constructors,
-identity, certified primitive applications, and finite comprehensions supply
-cheap introduction rules. Unsupported arithmetic facts become residual goals.
+\subsection{Source boundaries, rigid binders, and instantiation}
+A \emph{relevance root} is the accumulated explicit type description of one
+subject at one declaration boundary. Inline and independent annotations share
+that root. It carries source origins, quantifier dependencies, and guards.
+Parametric aliases expand before checking and retain the origin of their use.
+An inferred type, a proof intermediate, or a selected generic instance creates
+no additional root.
 
-For example, the kernel can prove arrow inclusion by the rule
-\[
- \frac{\Gamma\vdash A\le C\qquad\Gamma\vdash D\le B}
-      {\Gamma\vdash(C\Rightarrow D)\le(A\Rightarrow B)}.
-\]
-For a lambda it can instead prove the stronger property directly from the body,
-even when a previously inferred upper bound gives no useful inclusion.
-These are alternative proof procedures for the same target predicate.
+At a universal declaration, check its body under fresh rigid type variables and
+the declared bounds. Refutation of a result must follow under those variables;
+the checker does not choose a type assignment solely to make the result empty.
+This convention permits declarations whose individual instances may fail.
 
-Proof-search premises and program constraints occupy different parts of the
-state. A sufficient rule's undecided premises remain tasks in $W$; they are not
-conjoined into $\Phi$ as additional requirements unless they are equivalent to
-the original target or are themselves entailed. Otherwise an incomplete proof
-attempt would strengthen the program and discard valid implementations.
-For a universal goal, a residual premise obtained under a rigid $A$ likewise
-retains its universal guard. Dropping that scope would turn an arbitrary-case
-obligation into a satisfiable-instance search.
-
-The target obligation may be used as a hypothesis to constrain calls, but not
-as its own evidence of implementation conformance. Proof dependencies must be
-well founded. An annotated callback parameter is a legitimate assumption of the
-caller's conditional proof; the caller's implementation must preserve the
-obligation to validate the actual callback. Mutually assuming two implementations'
-annotations is not a discharge of either obligation.
-
-\example{Concrete counterexamples to implementation contracts}{\Uone{}}
-\par\noindent\begin{minipage}{\linewidth}
+\example{A generic computation and an explicit specialization}{\Uone{}+\Static{}}
 \begin{lstlisting}
-wrongResult: func(int) -> string
-wrongResult: func(x: int) -> int: x
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+// accepted: A & B is not refuted at the declaration
 
-wrongDomain: func(number) -> string
-wrongDomain: func(x: int) -> string: "ok"
+good: meet({a: 1}, {b: true}) // {a: 1, b: true}
+bad:  meet[int, bool](1, true) // _|_, a failing computation
+
+specialized: func(int, bool) -> (int & bool)
+// blocked: a newly declared interface with refuted results
 \end{lstlisting}
-\end{minipage}\par
-The input \code{0} refutes the first contract. The input \code{1.5} is admitted
-by the second contract and rejected by its fixed implementation protocol.
-These are finite, stable witnesses, not failed attempts to prove subtyping.
+The instance $[\Int,\Bool]\Rightarrow\bot$ in the call is derived from an
+accepted generic declaration. It is an internal description of the computation,
+not a new assertion that this particular interface describes successful behavior.
+Instantiation and inference must not convert it into an explicit annotation and
+rerun relevance. An annotation written by the programmer does create a root,
+including one written through a parametric alias.
 
-\section{Universal and existential proof search}
-A universal clause is stored as a scoped template. It has two complementary uses:
-\emph{propagation} instantiates a hypothesis at a demanded argument;
-\emph{certification} checks one implementation under arbitrary rigid binders.
-A finite set of successful tests supports propagation at those instances; it
-does not certify the universal clause.
+Conjoining a universal scheme with another explicit arrow also requires checking
+their stated overlapping obligations. The checker uses the non-generic domains
+of sibling clauses as finite \emph{anchors}. Match a universal clause's domain
+pattern against an anchor, verify the resulting substitution and bounds, and
+add that instance to the root's observation checks. Only variables bound by
+that universal may be substituted; outer existential dependencies remain
+correlated variables. The minimal rule uses finite structural matching, with
+repeated variables required to match the same type. Additional certified matches
+may be supplied within the same budget.
 
-\example{Uniform proofs and finite refutations}{\Uone{}}
-\par\noindent\begin{minipage}{\linewidth}
+\example{A universal obligation at an explicit sibling domain}{\Uone{}+\Static{}}
 \begin{lstlisting}
-id(A): func(x: A) -> A: x        // one structural proof
-bad(A): func(x: A) -> A: 0      // refuted at A = 1, x = 1
+quiet(A): func(A) -> A
+quiet:    func(int) -> bool
+// blocked before any body is supplied
 \end{lstlisting}
-\end{minipage}\par
-For \code{id}, the result is the input cell, so the proof uses the same arbitrary
-$A$. For \code{bad}, the singleton instance gives incompatible atoms. A kernel
-may search a small, fixed vocabulary of witness types and values. Failure of
-that search leaves the obligation unresolved.
+The integer domain anchors the instance $A=\Int$, giving the conflicting
+results $\Int$ and $\Bool$. Matching is triggered by the independently stated
+integer interface, not by a call. The generic \code{meet} declaration has no
+such independently stated ground-domain anchor. Its later applications do not
+modify its source root.
 
-\example{A symbolic inconsistency exposed by one universal instance}{\Uone{}}
-\par\noindent\begin{minipage}{\linewidth}
+Alpha-renaming, quantifier floating, and copied declarations retain which
+variables a source clause depends on. An integer clause floated under
+\code{forall A} remains independent of $A$ and remains an anchor. Equivalent
+same-domain result splitting and conjunction regrouping generate identical
+relevance checks. Arbitrary substitution of an accepted generic declaration by
+a newly written specialized interface need not preserve source admissibility;
+its denotation still obeys the substitution lemma.
+
+\subsection{Nested observations, alternatives, and guards}
+Traverse explicit parameter, result, record, and list interfaces recursively.
+At each function-valued subject, collect conjunctive arrow requirements before
+forming regions. Required-field and element-presence guards are inherited from
+the enclosing description. An impossible optional field constrains absence;
+an empty-list alternative makes no element observation.
+
+Union alternatives describe different possible interfaces. Check each surviving
+explicit alternative separately; never intersect arrow results from opposite
+sides of a union. A guard proved impossible by ordinary eager normalization
+removes its branch before relevance traversal. A semantically inhabited but
+relevance-invalid arrow alternative cannot be silently discarded as though it
+were an empty data alternative.
+
+\example{Separate alternatives and nested callback contracts}{\Uone{}+\Static{}}
 \begin{lstlisting}
-f(A): func(A) -> A
-r: f(3) & string
+choice: (func(int) -> int) | (func(int) -> bool)
+// accepted interface: alternatives, not simultaneous obligations
+
+callback: func(
+    (func(int) -> int) & (func(int) -> bool),
+) -> string
+// blocked: the explicit callback interface is relevance-invalid
 \end{lstlisting}
-\end{minipage}\par
-The instance $A=\{3\}$ entails that a successful result is \code{3}. Together
-with the required result constraint, this refutes the configuration without
-selecting an implementation for \code{f}. The universal hypothesis is retained
-throughout; it is not replaced by this one instance.
+The source checker validates stated observations even in negative type
+positions. This is a formation condition, independent of the semantic variance
+of that position.
 
-Existential introduction instead records an unresolved witness and its
-constraints. A witness assignment can replace that variable only when the
-substitution is an exact solution or when projection justifies the elimination.
-A search heuristic that finds one of several possible witnesses retains the
-alternatives as a disjunction or a residual existential. It cannot choose one
-arbitrarily in an order-independent configuration.
+For dependent results use the packet context in \cref{eq:relevant-invalid}.
+For example, an integer parameter $x$ with result constraints $y>x$ and $y<x$
+has refuted successful results whenever the selected arithmetic rules establish
+the contradiction. Unresolved arithmetic remains unresolved; relevance does not
+supply a general satisfiability oracle.
 
-\example{A flexible witness must remain refinable}{\Sone{}}
-\par\noindent\begin{minipage}{\linewidth}
-\begin{lstlisting}
-x: exists (n in 1 | 2) {value: n}
-x: {value: 2}
-\end{lstlisting}
-\end{minipage}\par
-The first declaration admits both witnesses. Committing to \code{n = 1} would
-introduce an error repaired by choosing a different solution. Retaining the
-existential allows the second declaration to remove the first alternative.
+\subsection{Finite checking and preservation properties}
+A straightforward algorithm enumerates the regions of
+\cref{eq:relevance-regions}, discards refuted guards, and intersects the remaining
+result predicates. A shared decision DAG avoids duplicating equivalent regions.
+Equal-domain aggregation, disjoint-kind tests, finite literal sets, and constant
+interval intersections are mandatory fast cases. Nonempty subsets of three or
+more clauses must be considered when their cumulative results can conflict.
 
-Rigid parameters are arbitrary but not concrete. Their operations remain
-symbolic except where the kernel proves a uniform result. Their scope levels
-prevent an outer existential from being solved by a later universal. Binder
-normalization uses the laws of \cref{ch:refinement}, including the empty-range
-side condition for universal floating.
+A conflicting subset can guide the search. For $J\subseteq I$, put
+$Q_J=\bigcap_{j\in J}A_j$. If its result conjunction is refuted, every
+surviving refinement of that overlap has the same conflicting requirements.
+Split $Q_J$ by the remaining domain guards and stop at a non-refuted exact
+region. A certificate retains that region, its contributing source origins, and
+the result refutation. A known inhabitation witness for $Q_J$ can identify a
+live region directly. This search need not enumerate unrelated regions;
+unknown overlap alone is not a proof that any particular exact region survives.
 
-\section{Counterexamples and remaining environments}
-A failed candidate is not necessarily a failed configuration. Suppose a guarded
-universal is $\forall a\in D_\rho\,P(\rho,a)$ and a concrete $d$ has been
-identified. An unconditional refutation requires evidence, under the current
-remaining environments, that $d\in D_\rho$ and $\neg P(\rho,d)$.
-If failure holds only for a subset $H$ of those environments, the sound
-consequence is exclusion of $H$. Other environments remain possible.
+All expansion, matching, guard checks, and region splitting consume the static
+budget. Exhaustion blocks admission; it never omits a required relevance check
+or turns it into a runtime assertion. On a finite closed kind/literal partition,
+the reference procedure decides relevant consistency exactly. Richer predicates
+use the published finite refutation relation. The existing rank profiles and
+\Static{} remain orthogonal: every profile applies relevance at explicit
+interface boundaries, while their available match and proof forms differ.
 
-\example{A refinable argument restricts a call, not a universal domain}{\Uone{}}
-\par\noindent\begin{minipage}{\linewidth}
-\begin{lstlisting}
-x: number
-f: func(x) -> string
-f: func(n: int) -> string: "ok"
-
-x: int
-\end{lstlisting}
-\end{minipage}\par
-The singleton argument contract on \code{x} excludes noninteger assignments.
-A trial with \code{x = 1.5} refutes that assignment, not every assignment of
-\code{x}. Refining it to \code{int} cannot repair bottom, because the earlier
-joint constraint was never refuted. The same rule applies to an existential
-type variable $X$ in $f\in X\Rightarrow B$: a rejected packet removes choices
-of $X$ that contain it, rather than substituting the current upper bound for $X$.
-
-This distinction also governs branch pruning. A counterexample to one candidate
-implementation or one union arm does not establish that their existential
-union is empty. Branch-local certificates keep their guards until all
-alternatives are excluded or a remaining branch is forced.
-
-\section{Demanded calls and concrete observations}
-A demand identifies an observation and its dependency graph. Requiring a
-concrete data result wakes its primitive operations, equalities, field-presence
-checks, and result constraints. An operation producing the wrong concrete atom
-or shape yields a refutation of that demanded instance.
-
-The evaluator returns one of
-\[
- \mathsf{Conflict}(\pi),\qquad
- \mathsf{Value}(v;S'),\qquad
- \mathsf{Blocked}(S').
-\]
-$\pi$ is a checked refutation. In $\mathsf{Value}(v;S')$, $v$ has a concrete
-constructor or evaluation derivation and $S'$ retains its guards and all
-unresolved declarations. It is a concrete observation \emph{with a residual
-program}, not a certificate of global satisfiability. A data export declared
-complete must discharge its demanded validation obligations; otherwise it
-reports incompleteness. A universally specified module declared verified must
-also discharge its universal conformance obligations.
-
-\example{Local execution and universal verification}{\Uone{}}
-\par\noindent\begin{minipage}{\linewidth}
-\begin{lstlisting}
-externalArithmetic: extern func(int) -> int !bridge
-f: func(x: int) -> int: externalArithmetic(x)
-r: f(0)
-\end{lstlisting}
-\end{minipage}\par
-A terminating, correctly typed observation of \code{externalArithmetic(0)} may
-establish the particular result of \code{r}, with the remaining contract still
-in the store. It does not establish correct termination and results at every
-integer. The foreign operation is evaluated only at its declared execution
-boundary. Certification of the pure arrow requires independent evidence of the
-universal property; a checked foreign arrow instead records the permitted
-failures as in \cref{ch:functions}.
-
-A complete closure descriptor is concrete as an implementation identity, but
-membership in an arbitrary universal type can still require an unresolved
-proof. Concrete-data validation and universal implementation certification have
-different completeness requirements.
-
-\begin{proposition}[Concrete-data completeness of the ground kernel]
-\label{prop:ground-complete}
-Consider a finite, ground validation graph whose leaves are decidable primitive
-data predicates, whose operations terminate on the supplied concrete arguments,
-and whose required structure and labels are fixed. Fair evaluation and exact
-local validation either establish every demanded constraint or produce a finite
-refutation. No inconsistent assignment in this fragment is reported complete.
+\begin{proposition}[Relevance coherence]
+\label{prop:relevance-coherence}
+For fixed source roots, scopes, and canonical checking rules, permuting or
+duplicating interface conjuncts preserves relevant consistency. Replacing a
+same-domain arrow with the conjunction of its result-split arrows preserves
+the relevant regions and their result predicates. These transformations do not
+change erased code.
 \end{proposition}
 \begin{proof}
-Evaluate each ready primitive with exact arguments and compare its result with
-all required constraints. The graph is finite, and the stated evaluation
-hypothesis makes every demanded operation decidable. A false leaf or conflicting
-result supplies a refutation; if every check succeeds, their finite conjunction
-has been validated at the supplied assignment.
+The relevant domain is a union of declared domains; each relevant result is
+an intersection of all applicable requirements. Both operations are
+associative, commutative, and idempotent. Result splitting repeats the same
+guard, and alpha-renaming preserves its dependencies. Canonical sharing makes
+the prescribed comparisons and their budget charges independent of grouping.
+The relevance pass constructs evidence or diagnostics, never executable nodes.
 \end{proof}
-For an already assigned cyclic graph, validation checks its equations against
-that assignment without recursively reevaluating the cycle. Ungrounded cycles
-and hidden quantified obligations remain residual unless another rule decides
-them. The proposition is a completeness guarantee for checking supplied data,
-not for finding its witnesses.
 
-\section{Incremental algorithm}
-Each declaration contributes scoped constraint nodes and enabled tasks. The
-normalizer is a worklist interpreter with checked rule instances:
-\par\noindent\begin{minipage}{\linewidth}
-\begin{lstlisting}[language={},basicstyle=\ttfamily\fontsize{8.5}{10.4}\selectfont]
-refine(state, declarations, demands, resources):
-    elaborate_and_conjoin(state, declarations)
-    enqueue_new_dependencies(state, demands)
-    while an enabled task has an available resource ticket:
-        task = choose_task_deterministically(state)
-        result = local_kernel(task, state)
-        match result:
-            equivalent_rewrite(replacement, proof):
-                verify(proof); install_preserving_scopes(replacement)
-            consequence(fact, proof):
-                verify(proof); conjoin_and_record(fact, proof)
-            refutation(guard, proof):
-                verify(proof); exclude_guarded_case(guard, proof)
-            blocked(dependencies):
-                retain_and_watch(task, dependencies)
-        enqueue_tasks_whose_inputs_gained_information(state)
-    return state_with_all_residuals_and_certificates(state)
-\end{lstlisting}
-\end{minipage}\par
-A proof must be checked before its consequence is committed. A refuted
-unconditional case becomes bottom; a guarded case is eliminated only within
-its guard. Unchanged blocked tasks sleep until a relevant premise is refined.
-The worklist does not repeatedly unfold unresolved arithmetic cycles.
+Relevant consistency is a source admission condition, not a predicate equality
+in $\Pow(V)$ and not an additional lattice operation. Adding a declaration can
+expose an invalid relevant observation while leaving the denotation inhabited.
+If a conflicting region has an inhabitation witness, further arrow conjuncts
+cannot remove the conflict: they only refine results there. When the region is
+merely non-refuted, the blocking judgment is relative to its retained guard and
+checking context; it is not a proof of semantic inconsistency. The normalizer
+therefore never turns a relevance diagnostic alone into bottom. Denotational
+refinement and annotation erasure retain their existing theorems.
 
-Memoization uses stable subject identities, binder identities, explicit
-instantiations, and supporting premises. A proved consequence stays valid under
-additional conjunction. An unresolved cache entry is merely a suspended task,
-not a cached negative answer. A cached concrete atom keeps its validation edges.
+\section{The static--dynamic boundary}
+\label{sec:dynamic-admission}
+Annotations and executable assertions have different judgments. An annotation
+$T$ requires a derivation of the body's successful-result inclusion in $T$.
+The expression \code{e & P} executes a constraint operation written by the
+programmer. When $P$ has a checked first-order interpretation, use
+\begin{equation}
+ \frac{\Gamma\vdash e\Rightarrow S\qquad
+       \Gamma\vdash P\ \mathsf{predicate}(K)\qquad
+       \Gamma\vdash S\le K}
+      {\Gamma\vdash e\mathbin{\&}P\Rightarrow
+           \{v\in S\mid P(v)\}}.
+ \label{eq:asserttyping}
+\end{equation}
+Here $K$ is the predicate operation's admissible data interface. A predicate
+with ordinary CUE meet semantics on all kinds, such as a kind constraint, can
+use $K=\top$ and fail on incompatible kinds. Operation checking is static;
+success or failure of the explicit assertion may depend on runtime data.
 
-Resource tickets bound speculative branch splitting, witness search, and type
-instantiation separately from ground evaluation. Tickets are attached to stable
-tasks or origins; adding an unrelated declaration does not withdraw earlier
-certificates or steal a completed task's proof. An incremental run preserves
-all earlier evidence. A fresh run can replay that evidence independently of its
-search budget. File-order independence is a property of the retained predicates
-and certificates, not a claim that different search budgets produce identical
-printed residual graphs.
+The predicate rule and the ordinary meet rule are source primitives, not casts
+introduced by a subsumption rule. For \code{x: int}, the body \code{x & >0}
+synthesizes $\Int\cap\sem{>0}$. Checking that result against the same bound is
+reflexivity. Checking the body \code{x} against that bound instead requires
+$\Int\subseteq\sem{>0}$ and is blocked.
 
-\section{Preservation and persistence}
-\begin{theorem}[Sound incremental normalization]\label{thm:residual-sound}
-Assume scope-correct elaboration, sound local certificates, exact ground
-primitives, and retention of residual guards. For every finite normalization
-sequence $S\longrightarrow^* S'$:
+The minimum entailment kernel includes conjunction elimination/introduction,
+reflexivity of alpha-equivalent dependent predicates with the same captured
+dependencies, constant-bound inclusion, and the strict rules above. These rules
+accept explicitly asserted refinements without a general arithmetic theorem
+prover. More involved implication proofs may be supplied or searched within a
+budget. An unproved implication always blocks; a runtime assertion must already
+occur in the source term.
+
+A source predicate can retain a pending execution exactly when:
 \begin{enumerate}
-\item $\sem S=\sem{S'}$ on the exposed interface;
-\item every recorded refutation is sound, and remains sound after additional
-conjunction in its recorded scope;
-\item every concrete observation retains its validation dependencies, so a
-later refinement can preserve its atom or refute that guarded observation, but
-cannot justify a different atom for the same retained observation;
-\item no universal conformance certificate is obtained solely by enumerating
-successful instances or by assuming the obligation being certified.
+\item its operands and data interface have been checked;
+\item its successful-result rule is certified independently of the requested
+annotation;
+\item its executable predicate and all shared dependencies remain in the
+source evaluation graph;
+\item the eager service has not already proved its completion predicate empty
+in the applicable scope.
 \end{enumerate}
+A predicate returns pass, fail, or pending. Only pass releases a completed value
+with its refinement. A refuted predicate is normalized to failure instead of
+remaining pending. A predicate not refuted by the finite abstraction is a
+possible residual, not a proved satisfiable relation.
+
+Bounds, regular expressions, finite data traversals, and comparisons on actual
+arguments admit such rules. Quantified function behavior, impredicative
+membership, and opaque representation membership require static evidence;
+their mere occurrence in an annotation supplies no executable test.
+
+\example{An annotation and an explicit assertion}{\Uone{}+\Dep{}+\Static{}}
+\begin{lstlisting}
+positive: func(x: int) -> (int & >0): x
+// blocked: int does not imply >0
+
+positiveChecked: func(x: int) -> (int & >0): x & >0
+// accepted: the body explicitly establishes the refinement on success
+ok:  positiveChecked(3)   // 3
+bad: positiveChecked(0)   // _|_
+\end{lstlisting}
+The accepted body has the same assertion before and after certification. Its
+annotation erases; its \code{& >0} operation remains.
+
+\example{Explicit kind refinement}{\Uone{}+\Static{}}
+\begin{lstlisting}
+pick: func(x: int | string) -> int: x
+// blocked: the result inclusion is false
+
+pickChecked: func(x: int | string) -> int: x & int
+// accepted: successful unification produces an integer
+
+same(A: number): func(x: A) -> A: x + 1
+// blocked: a numeric upper bound does not establish closure of A
+\end{lstlisting}
+The source assertion in \code{pickChecked} can reject a string. A type
+annotation on \code{pick} cannot introduce that rejection.
+
+\section{Conjunctive declarations and body evidence}
+\label{sec:declaration-coherence}
+For each subject, collect a scoped conjunction of its interface predicates and
+its implementation clauses. Inline and separate function-type annotations enter
+the same conjunction. Their placement, order, and parenthesization have no
+operational significance. A concrete implementation contributes its original
+body, captured environment, and call protocol.
+
+Let $\mathcal C_f$ be the finite set of interface conjuncts for $f$, and let
+$e_f$ be its body. First check relevant consistency of the accumulated explicit
+root, irrespective of whether $e_f$ is available. The checker then verifies $e_f$ against
+$\bigwedge\mathcal C_f$, checking each universal clause at its rigid instance.
+It retains the body's inferred refinement or replayable derivation, rather than
+using a weaker declared result type as its only evidence. A separately compiled
+opaque import instead exposes precisely its certified interface. A stronger
+client requirement needs stronger evidence from that module, not a client-side
+wrapper.
+
+\example{Five presentations of one implementation constraint}{\Uone{}+\Dep{}+\Static{}}
+Each listing is an independent declaration set for the same field.
+\begin{lstlisting}
+positive: func(x: int) -> (int & >0): x & >0
+\end{lstlisting}
+\begin{lstlisting}
+positive: func(int) -> (int & >0)
+positive: func(x: int) -> _: x & >0
+\end{lstlisting}
+\begin{lstlisting}
+positive: func(x: int) -> int: x & >0
+positive: func(int) -> >0
+\end{lstlisting}
+\begin{lstlisting}
+positive: func(int) -> int
+positive: func(x: int) -> >0: x & >0
+\end{lstlisting}
+\begin{lstlisting}
+positive: func(int) -> int
+positive: func(int) -> >0
+positive: func(x: int) -> _: x & >0
+\end{lstlisting}
+All five have the erased body $\lambda x.\,(x\mathbin{\&}\sem{>0})$ and the
+combined obligation
+\[
+ (\Int\Rightarrow\Int)\cap(\Int\Rightarrow\sem{>0})
+ =\Int\Rightarrow(\Int\cap\sem{>0}).
+\]
+The body synthesis and result inclusion are identical, modulo redundant
+conjuncts. The relevant integer region has result $\Int\cap\sem{>0}$, which is not
+refuted. All five roots pass relevant consistency. Each declaration set is
+accepted; calls at $3$ return $3$ and calls at $0$ fail.
+
+\begin{proposition}[Declaration coherence]
+\label{prop:decl-coherence}
+For a fixed implementation origin and scope graph, regrouping, permuting, or
+duplicating interface conjuncts preserves the accumulated predicate and erased
+body. Splitting a result intersection into separate same-domain arrow
+constraints preserves both and preserves relevant consistency by
+\cref{prop:relevance-coherence}. The required kernel rules certify the same result
+for the five presentations above. Separately written examples are compared
+up to a consistent renaming of their implementation origins.
+\end{proposition}
+\begin{proof}
+Predicate conjunction is associative, commutative, and idempotent. The arrow
+intersection law in \cref{prop:arrow} distributes a fixed domain over result
+intersection. Body extraction ignores result annotations, and checks all
+conjuncts against the same retained body derivation. No checking step contributes
+an executable operation.
+\end{proof}
+For arbitrary equivalent formulas, bounded proof search need not discover the
+same derivation. The mandatory syntactic regroupings use canonical conjunction
+DAGs and shared body evidence, so they neither duplicate the budget charge nor
+depend on file traversal order.
+
+\section{Failure-only predicates and their scope}
+\label{sec:failure-propagation}
+Write $\operatorname{Succ}_\Gamma(e)$ for the successful-completion predicate
+of $e$ in its retained environment. The finite kernel recognizes empty kind
+intersections, incompatible constants and bounds, and the empty result of an
+applicable arrow-clause intersection. A proved empty predicate triggers
+\[
+ \Gamma\vdash\operatorname{Succ}(e)\subseteq\varnothing
+ \quad\Longrightarrow\quad e\longrightarrow\code{_|_}.
+\]
+This is mandatory whenever the implemented eager rules establish the premise.
+No supplied body or concrete value is needed to refute an already empty data
+hypothesis. Required field propagation turns a bottom field into an inconsistent
+configuration. A lambda body is a different scope: its failure describes a call,
+not a failure to construct the closure.
+
+For an internal result specification
+$(A\Rightarrow B)\cap(A\Rightarrow C)$, any correctly admitted call at an
+argument in $A$ has successful results in $B\cap C$. When that intersection is
+empty, the call reduces to bottom. This rule applies to derived generic
+instances and inferred body paths. A newly written interface asserting the same
+empty relevant result is instead blocked by \cref{sec:relevant-consistency},
+before a call or implementation is required.
+
+\example{Invalid interfaces and scoped computation failure}{\Uone{}+\Static{}}
+\begin{lstlisting}
+q: func(int) -> int
+q: func(int) -> bool        // blocked: explicit relevant conflict
+
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+observed: meet(1, true)     // _|_: computation, not interface rejection
+
+stop(A): func(x: A) -> A: _|_
+// a closure with a failing body and a non-refuted generic interface
+\end{lstlisting}
+Type checking still verifies subexpressions and calling protocols before using
+an empty-result rule. An ill-typed operation is not repaired by assuming that
+some unrelated computation fails.
+
+\section{Stages and mandatory certificates}
+\begin{longtable}{@{}P{0.18\textwidth}P{0.75\textwidth}@{}}
+\toprule
+Stage & Obligations completed before advancing\\\midrule
+\endfirsthead
+\toprule Stage & Obligations completed before advancing\\\midrule
+\endhead
+Elaboration & Scope and sort correctness; profile restrictions; alias expansion;
+fixed calling protocols; accumulation of interface conjuncts and identification
+of explicit source assertions.\\
+Interface admission & Relevant consistency of every explicit root, including
+unimplemented imports and nested callback types; guarded region checks and
+source-anchored universal matching.\\
+Definition checking & Every function body, including uncalled bodies, has a strict
+derivation. Prove every result implication using the unchanged body, including
+the successful-result rules of its explicit assertions.\\
+Linking & Every supplied user function, builtin, foreign adapter, and captured
+callable satisfies the required strict interface. Unspecified imports remain
+link obligations and prevent a closed executable artifact.\\
+Call checking & Check every statically present application and type application.
+Prove packet compatibility and every argument/result implication. Source
+assertions in arguments may supply the required refinements. Generic instances
+are derived types, not new relevance roots. Newly visible literal and shape
+contradictions are propagated at their scopes.\\
+Normalization & Run eager transfers and exact enabled primitives; maintain joint
+constraints, alternatives, guards, and source-assertion dependencies. Propagate
+established empty predicates at their scopes.\\
+Concrete observation & Demand and discharge every source assertion on the
+observed path and every required data-validation dependency. Failure produces bottom;
+pending conditions prevent unconditional completed export.\\
+\bottomrule
+\end{longtable}
+Modules may store relevance-checked unlinked declarations as hypotheses. Their certificates are
+conditional on named imports, as a typing derivation is conditional on its
+context. A body or import does not become certified merely because no call
+currently observes it. Calling an unknown function does not synthesize a suitable
+implementation from the desired codomain.
+
+\example{Higher-order obligations are never runtime residuals}{\Uone{}+\Static{}}
+\begin{lstlisting}
+apply: func(g: func(number) -> string) -> string: g(1.5)
+ints: func(x: int) -> string: "ok"
+blocked: apply(ints)         // blocked before execution
+
+source: func(int) -> string // an unresolved external implementation
+client: func() -> string: source(3)
+\end{lstlisting}
+The strict contravariant rule rejects \code{ints} as the required callback.
+The semantic possibility that its out-of-domain calls fail does not discharge
+that rule. This is the same intentional separation between denotational safety
+and a useful syntactic type discipline that prevents arbitrary dead code from
+being accepted solely on a conjecture that it never returns.
+
+\section{A bounded implementation}
+Store types, interface conjunctions, and body summaries as hash-consed DAGs;
+identify binders and implementations by stable origins. Store proof DAGs
+separately from source evaluation nodes. The checker for one accumulated subject
+has the following form:
+\begin{lstlisting}[language={}]
+check_subject(declarations, budget):
+    scoped = canonicalize_scopes_and_conjuncts(declarations)
+    body, interface, hypotheses = separate_code_and_predicates(scoped)
+    state = eager_normalize_with_scoped_failure(
+        conjunction(hypotheses, interface), budget)
+    if state.required_subject_is_empty:
+        return Refuted(state.proof)
+    relevance = check_explicit_relevance(scoped.roots, state, budget)
+    if relevance is invalid or relevance is exhausted:
+        return Blocked(relevance.diagnostic)
+    if body is absent:
+        return Hypothesis(state, interface, relevance)
+    source = elaborate_source_operations(body)
+    evidence = check_body_and_explicit_assertions(source, budget)
+    for clause in canonical_clauses(interface):
+        proof = check_implication(evidence, clause, budget)
+        if proof is absent:
+            return Blocked(clause, reason="annotation not established")
+        verify_proof(proof, budget)
+    return Accepted(erase_annotations(source), evidence, relevance, state)
+\end{lstlisting}
+Elaborating a source assertion lowers an operation already present in the term;
+it never consults the requested output predicate to invent a check. A missing
+body remains an ordinary hypothesis, not a certified implementation. Linking a
+body reruns the same interface judgment. A retained source operation may await
+its operands only after its operation rule and annotation implications have
+been checked.
+
+All work is charged, including alias expansion, substitution, arithmetic, and
+Boolean splitting. Canonicalized duplicates are shared. Published budgets and
+deterministic traversal make required regroupings reproducible. Budget
+exhaustion blocks certification; it does not alter code or create a runtime
+obligation. Source evaluation has its own resource policy and cannot report a
+false validation pass.
+
+Let $L$ be the size of a supplied proof DAG after sharing and let $C$ bound its
+charged local comparisons. Verification costs $O(L\,C)$ time and $O(L)$ graph
+space. Search uses a declared fuel $B$, costing at most $O(B\,C)$ work.
+Unions and intersections can require exponentially many alternatives. The
+kernel promises its finite rules and minimum fixtures, not complete semantic
+inclusion at a fixed budget.
+
+The minimum direct rules cover kinds, constants, finite record lookup, tuple
+projection, explicit type substitution, meet, predicate reflexivity, and the
+five declaration presentations. In particular, explicit \code{x & >0} needs
+no proof that all inputs satisfy \code{>0}. Its primitive successful-result rule
+supplies the fact needed by annotation checking. Explicit integer-to-integer
+and integer-to-boolean conjuncts are rejected by relevance before any body check.
+A pass-through implementation that stores such an interface as a hypothesis is
+not conforming.
+
+\section{Erasure and refinement preservation}
+\label{sec:erasure}
+Let $|e|$ erase function-type annotations, type abstractions, type-instantiation
+selections, and proof arguments. It preserves the source's data constraints,
+term-level meets, predicate operations, captures, labels, omission behavior,
+and computational indices. Representative clauses are
+\[
+\begin{aligned}
+ |\operatorname{func}(x:S)\mathbin{\to}T:e|
+   &=\lambda_{\mathit{protocol}}x.\,|e|,\\
+ |\forall A\,e|&=|e|,& |e[T]|&=|e|,\\
+ |e\mathbin{\&}P|&=|e|\mathbin{\&}|P|
+     &&\text{for an executable assertion.}
+\end{aligned}
+\]
+The same predicate spelling can occur in an annotation or as an operand of a
+source operation. Its elaborated role determines erasure: \code{-> >0} is a
+proof requirement; \code{x & >0} computes a constrained result. Ordinary CUE
+field constraints remain part of the data language, including their validation
+dependencies. They are not discarded as function-type annotations.
+
+\begin{theorem}[Annotation erasure]
+\label{thm:erasure}
+Assume the source-operation rules preserve their specified observations and
+the static kernel is sound. For an Accepted implementation in an environment
+satisfying its certified interface, erasing its annotations preserves successful
+returns, explicit assertion failures, and the retained demand dependencies.
+The erasure is independent of the placement and grouping of its annotations.
 \end{theorem}
 \begin{proof}
-Induct on the transitions. Equivalent rewrites use
-\cref{eq:residual-equivalence}. Adding a certified consequence preserves the
-predicate. A guarded refutation removes only an impossible case. Scope-preserving
-quantifier steps use reindexing and the adjunction rules. Ground execution uses
-the primitive hypothesis and retains the equations connecting its result to its
-inputs. Conjoining another predicate preserves every such equivalence and
-implication. A concrete atom is a singleton, so a stronger result constraint can
-only retain it or be disjoint from it. The certificate checker enforces the
-universal introduction and dependency conditions on every discharged goal.
+Each typing rule contributes evidence and no executable filter. Lambda erasure
+retains the binder's operational protocol and the erased body. Instantiation
+changes only the proof environment. Subsumption and intersection introduction
+retain the same term. Relevant-consistency checking contributes only static
+evidence or a blocking diagnostic. Executable meets and assertions have the same evaluation
+rule on each side of erasure. Induction on evaluation, together with
+\cref{prop:decl-coherence}, gives observation preservation and declaration
+independence. Computational witnesses, sealing operations, and omission defaults
+remain terms and follow their specified source rules.
 \end{proof}
 
-The theorem is about finite evidence and residual programs. It permits a
-satisfiable store, an unrefuted empty store, and a store awaiting an abstract
-implementation to remain incomplete. It does not identify any of them with a
-successful closed implementation. Defaults, comprehension elaboration, and
-external effects retain their specified observation boundaries.
+For scoped declarations $D$ and $E$ sharing an interface, the elaborated
+predicate is refinement-homomorphic:
+\begin{equation}
+ \sem{D\mathbin{\&}E}=\sem D\cap\sem E.
+ \label{eq:declaration-homomorphism}
+\end{equation}
+For a common body origin, the executable contribution on both sides is the
+same erased body; interface conjunction adds predicates and proof obligations.
+An incompatible additional annotation refutes a predicate, fails relevant
+consistency, or blocks its conformance certificate. It never edits execution to enforce the new annotation. Distinct
+body origins retain the closure-identity semantics in \cref{ch:programs}.
+Equation \eqref{eq:declaration-homomorphism} concerns declaration predicates;
+application still satisfies the inclusion \eqref{eq:appmeet}, not a general
+meet-homomorphism equation.
 
-\section{Cost and profile-specific decision fragments}
-For the finite propagation core, fix the graph and the available descriptor
-vocabulary. Let $n$ be its number of cells and obligation nodes, $m$ its dependency
-edges, $h$ the maximum number of strict descriptor refinements per node, and $c$
-a bound on one transfer or certificate check. A worklist that rechecks a node
-only when an input changes has the bound
-\[
- O\bigl(m\,\alpha(n)+(n+m)h\,c\bigr),
-\]
-with union--find cost $\alpha$ for equality classes. This bound counts graph
-operations; exact arithmetic contributes its bit cost to $c$. Finite bound
-endpoints and shape flags give a finite $h$. Ground calls and newly requested
-instances extend the graph and are charged separately. Unrestricted interval
-strengthening or Boolean distribution does not satisfy the finite-vocabulary
-hypothesis.
+Keep the exact residual predicate and its scope graph during normalization:
+\begin{equation}
+ P\longrightarrow Q\quad\Longrightarrow\quad
+ P\simeq Q,\qquad P\land R\simeq Q\land R.
+ \label{eq:residual-equivalence}
+\end{equation}
+A source assertion passing on a value establishes its refinement. Unresolved
+captured dependencies remain attached to that success; for example,
+\code{3 & (x + 1)} cannot become unconditional \code{3} while \code{x} is
+unresolved. A proved empty required predicate propagates bottom. Quantifier
+and branch scopes prevent a local body failure from becoming a false global
+refutation.
 
-A small nonbranching kernel is therefore cheap, even though arbitrary semantic
-inclusion is not its decision problem. Optional stronger procedures may return
-certificates, refine residuals, or exhaust their budget. Exhaustion produces a
-residual obligation, never a contradiction or a conformance certificate.
+\begin{theorem}[Static gate and explicit-assertion partial correctness]
+\label{thm:residual-sound}
+Assume sound strict rules, sound scoped eager refutation, dependency-preserving
+normalization, and the source assertion rules. Every Accepted artifact has a
+certificate for every annotation and has passed the required relevance checks
+at each explicit interface root. In an environment satisfying its imports,
+every successful completed observation has its stated type and demanded
+refinements. Further conjunction cannot repair a proved data contradiction or
+replace an atomic completed observation by a different atom. Erasure preserves
+the implementation's observations.
+\end{theorem}
+\begin{proof}
+The admission gate establishes the relevance-check clause; it contributes no
+additional execution rule. Induction on body and implication certificates gives
+\cref{thm:soundness}. The source assertion rule constrains successful results without a proof of
+success. Equation \eqref{eq:residual-equivalence} preserves exact constraints,
+and \cref{thm:monotone} lifts this preservation through quantification. A subset
+of an empty predicate is empty; a subset of a singleton either retains that
+atom or is empty. Demand dependencies prohibit unconditional release of a
+conditional value. \Cref{thm:erasure} supplies the final assertion.
+\end{proof}
 
-\begin{longtable}{@{}P{0.15\textwidth}P{0.39\textwidth}P{0.40\textwidth}@{}}
+\section{Profile combinations and conformance examples}
+\begin{tabularx}{\textwidth}{@{}lY@{}}
 \toprule
-Profile & Default checking organization & Exact fragment and residual boundary\\\midrule
+Combination & Mandatory checking organization\\\midrule
+\Uone{}+\Static{} & Prenex schemes, monomorphic argument interfaces, finite
+instance inference; explicit instances where local search is insufficient.\\
+\Sone{}+\Static{} & The preceding kernel plus module-boundary existential
+witnesses, sealing, and shared rigid openings.\\
+\Shigher{}+\Static{} & Annotated arbitrary-rank types and explicit impredicative
+instantiation. Quantified membership never becomes a runtime predicate.\\
+\Dep{}+\Static{} & Mandatory strict skeleton; eager known dependent
+contradictions; source assertions supply certified refinements, and every
+annotation implication is proved.\\
+\Abs{}+\Static{} & Strict abstract operations and scope checks. Representation
+independence additionally uses an outcome-preserving simulation.\\
+\bottomrule
+\end{tabularx}
+
+The following are minimum conformance obligations, not optional examples:
+\begingroup
+\small
+\begin{longtable}{@{}P{0.61\textwidth}P{0.32\textwidth}@{}}
+\toprule
+Judgment or program & Required outcome\\\midrule
 \endfirsthead
-\toprule Profile & Default checking organization & Exact fragment and residual boundary\\\midrule
+\toprule Judgment or program & Required outcome\\\midrule
 \endhead
-\Uone{} & Check an outer universal once with rigid type variables; create
-flexible instances at uses; propagate quantifier-free clause constraints. &
-Annotated, acyclic structural terms over a finite base-type algebra admit a
-terminating structural checker. Refinement predicates and unresolved semantic
-inclusions remain goals.\\
-\Sone{} & The same engine with existential module witnesses, scope levels, and
-escape checks at fixed boundaries. & Explicit witnesses and openings reduce to
-checks in the selected monomorphic fragment. Arbitrary witness synthesis and
-module laws remain residual.\\
-\Shigher{} & Bidirectional checking with explicit introduction and elimination
-at nested quantified positions. & A fixed predicative annotated fragment can
-have decidable checking; arbitrary quantified Boolean subtyping is not inferred
-from that fact.\\
-\Dep{} & Generate value-indexed arithmetic, equality, and shape goals in the
-same store. & Ground validation is exact. A selected decidable arithmetic theory
-can discharge more goals; unsupported predicates stay symbolic.\\\bottomrule
+$(1\lor2)\le\Int$, $\Int\le\Num$ & Proved statically.\\
+$(1\lor\mathsf{true})\le\Int$ & Blocked; no inserted kind check.\\
+$\{a:1,b:\mathsf{true}\}\le\{a:1\}$ & Proved statically.\\
+$\{a:1\}\le\{a:1,b:\Bool\}$ & Blocked required-field judgment.\\
+Identity at $\forall A.\,A\Rightarrow A$ & Accepted with a rigid-variable proof.\\
+Identity instantiated at its own quantified type & Accepted in \Shigher{} with
+explicit instantiation.\\
+\code{func(xs: [A,A]) -> A: xs[0] & xs[1]} & Accepted by tuple projection and meet.\\
+An integer result annotated as string & Blocked at definition.\\
+An integer callback used where a number callback is required & Blocked at the
+static call or link boundary.\\
+An explicit ground interval contradiction & Refuted before execution.\\
+An unresolved arithmetic cycle with compatible operand kinds & Retained as data
+constraints; ground instances checked.\\
+A dependent result bound absent from the body evidence & Blocked unless its
+implication is proved.\\
+\code{x & >0} at \code{int & >0}, under \code{x: int} & Accepted by the explicit
+assertion rule.\\
+The five presentations in \cref{sec:declaration-coherence} & Accepted with one
+erased body and equivalent contracts.\\
+Explicit $\Int\Rightarrow\Int$ and $\Int\Rightarrow\Bool$ on one subject &
+Blocked by relevance without a body or a call.\\
+An explicit $\Int\Rightarrow\bot$ & Blocked by relevance.\\
+A conflicting overlap with a consistent region elsewhere & Blocked; other
+regions do not repair the overlap.\\
+The generic meet declaration with rigid $A,B$ & Accepted; $A\cap B$ is not
+refuted at the declaration.\\
+A failing derived instance of generic meet & Reduced to bottom at its call
+scope; no new explicit-interface relevance check.\\
+An admitted derived call with a proved empty result intersection & Reduced to
+bottom at the call scope, before implementation linkage if possible.\\
+An unresolved polymorphic conformance judgment & Blocked, never a dynamic residual.\\
+Static resource limit exceeded & Blocked with a resource diagnostic.\\
+\bottomrule
 \end{longtable}
-
-Decidability belongs to a precisely delimited judgment and predicate language,
-not to rank alone. Rank-1 set-theoretic reconstruction and annotated higher-rank
-bidirectional checking both have terminating algorithms for particular calculi
-\cite{cln2024,dunfield}. Their restrictions delimit useful components, rather
-than deciding all predicates expressible in the present language.
-
-
+\endgroup
 
 \chapter{Feature correspondence and related designs}
 \label{ch:comparison}
@@ -2864,17 +3474,16 @@ bad: (call & {arg: 1.5}).result // _|_
 This is ordinary CUE instantiation and projection. The argument restriction is
 an existential predicate, while \code{raw}'s capability remains universal.
 
-\example{Keeping late contract failures explicit}{\Uone{} with checked effects}
-\par\noindent\begin{minipage}{\linewidth}
+\example{A first-order dependent result check}{\Uone{}+\Dep{}+\Static{}}
 \begin{lstlisting}
-checked: func(x: int) -> string !constraint:
-    checkedResult(string, legacyBody(x))
+legacyBody: func(int) -> int
+checked: func(x: int) -> (int & >0): legacyBody(x) & >0
 \end{lstlisting}
-\end{minipage}\par
-Here \code{checkedResult(T, e)} is a reference adapter operation: evaluate $e$,
-validate its result against $T$, and return either a successful result or the
-named constraint-failure outcome. The adapter's contract describes late failures
-honestly. A successful arrow is granted only after their absence is established.
+The body explicitly constrains the integer returned by \code{legacyBody}.
+Its meet rule proves the refined codomain without assuming success of the
+comparison. The type annotation erases and the source assertion remains.
+Linking separately verifies \code{legacyBody}'s integer interface. Omitting the
+source assertion requires an independent proof of its positive-result property.
 
 \begin{proposition}[Contract intersection]
 Under the universal arrow interpretation, conjoining a contract with a concrete
@@ -2888,12 +3497,13 @@ Consequently, constructing a label/default adapter and asserting a contract are
 different operations. Keeping that distinction also preserves associativity.
 A full experimental compatibility layer can implement its original invocation
 relation as a checked adapter, while translating its public guarantees into the
-appropriate quantified predicates.
+appropriate quantified predicates. Strict kind and callable checks are verified
+at that boundary rather than silently deferred by the translation.
 
 \section{Modular guarantees}
 Universal constraints express a statement the call-restriction interpretation
-does not express by itself: one selected implementation handles every admitted
-instance. This supports checking \code{map}, polymorphic callbacks, and bounded
+does not express by itself: one selected implementation preserves its result type at every
+admitted instance whenever that instance returns successfully. This supports checking \code{map}, polymorphic callbacks, and bounded
 refinement-preserving utilities without seeing their eventual calls. The
 intersection algebra preserves input/output correlations. Dependent universals
 state relationships across argument and result values. Existential seals support
@@ -2912,8 +3522,8 @@ instantiation with intersections and preserve input/output correlations
 layers here.
 
 The current proposal adds explicit quantifiers to the general CUE predicate
-language. Its total-success and effect-qualified arrows refer to an operational
-inhabitant model. A subtyping algorithm proved for a different arrow model must
+language. Its partial-correctness arrows refer to a fixed operational
+inhabitant model, with impredicative quantification over sets of inhabitants. A subtyping algorithm proved for a different arrow model must
 be revalidated for the selected reference fragment. Convexity of a semantic
 subtyping model and relational parametricity are separate properties.
 
@@ -2925,7 +3535,7 @@ behavior outside the input domain and interaction with dynamic values
 boundaries: failure behavior deserves an explicit interpretation alongside the
 successful result type.
 
-This proposal's universals are general constraint binders. Its checked effect
+This proposal's universals are general constraint binders. Its partial-correctness and optional effect
 arrows are specified by \cref{ch:functions}, rather than identified with Elixir's
 strong-arrow construction. Both approaches use set-theoretic descriptions to
 retain more precise information than an uncorrelated union of inputs and outputs.
@@ -2944,8 +3554,9 @@ a relational category.
 Adding universal formulas enriches the class of definable relations while
 retaining these operations, provided the fragment is closed under the required
 composition and equality relations. Conjunction within one predicate fiber is
-distinct from the tensor of interfaces. The total executable functions form a
-separate subcollection and are not asserted to be compact closed.
+distinct from the tensor of interfaces. Executable functions form a
+separate operational subcollection. The compact structure belongs to the
+relations and does not require executable total functions.
 
 Lawvere's adjunctions and the bifibrational account of Melli\`es and Zeilberger
 organize these refinement predicates over the relational interface category
@@ -2970,7 +3581,10 @@ refinement, by \cref{thm:monotone}. Dependency-preserving copying and retention
 of bound variables prevent accidental weakening of universal obligations.
 An established contradiction remains empty, and an atomic concrete result can
 only persist or conflict. \Cref{ch:residual} implements this property by retaining
-scoped certificates, residual hypotheses, and validation dependencies. Defaults and comprehension execution retain the
+mandatory annotation certificates, explicit source assertions, and
+validation dependencies. Relevant-consistency errors block explicit interfaces;
+they do not rewrite inhabited function predicates to bottom. Annotation erasure preserves the source body, and
+its declaration predicates obey \cref{eq:declaration-homomorphism}. Defaults and comprehension execution retain the
 separate observation treatment already identified in the reference model.
 
 \section{Cross-file input and output invariants}
@@ -2990,15 +3604,17 @@ interface's public alias structure.
 
 \section{Idiomatic foreign interfaces}
 Portable logical domains remain in public signatures. Representability and
-conversion failures are explicit checked effects. The existing bridge performs
-its existing checks and reports those outcomes. Logical kind/domain mismatches
+conversion failures may become ordinary bottom; an explicit effect records them
+when their tags are observable. The existing bridge performs its existing
+checks and reports those outcomes. Logical kind/domain mismatches
 are distinguished from in-domain foreign failures. Native widths remain private
 bridge metadata. No additional conversion stage is required by quantification.
 
 \section{Expressive strength and implementation milestones}
 The reference semantics admits higher-rank and dependent specifications. An
-execution profile may retain the current nonrecursive policy or add certified
-structural recursion. \Uone{} is an implementation entry point with explicit generic
+execution profile may retain the current nonrecursive policy or admit
+recursion with partial-correctness typing. Neither checking nor arrow membership
+requires a termination proof. \Uone{} is an implementation entry point with explicit generic
 capabilities and semantic arrow intersections. \Sone{} adds abstract type witnesses
 at module boundaries. \Shigher{} extends the same formation rules to arbitrary
 well-sorted positions.
@@ -3007,8 +3623,11 @@ A conforming implementation establishes the following contracts:
 \begin{enumerate}
 \item Elaboration preserves legacy data observations, lexical binding, copied
 witness sharing, and quantifier dependencies.
-\item The checker establishes the reference judgments soundly and keeps
-unresolved obligations distinct from contradiction.
+\item Every explicit interface passes relevant consistency, independently of
+implementation linkage. The checker verifies every mandatory strict judgment
+before accepting executable code. Only explicit source operations and data hypotheses may
+remain pending; unproved annotation implications block certification. Proved
+empty predicates normalize to bottom at their retained scopes.
 \item Symbolic evaluation preserves the successful-completion semantics and the
 specified observation/effect behavior.
 \item The abstraction boundary preserves seal identity, public aliasing, and
@@ -3022,7 +3641,9 @@ universally constraining an operational application relation; their variance and
 polymorphic behavior follow from that definition. Dependent contexts and
 existential modules extend the same structure. The resulting language can be
 implemented in rank-restricted stages without changing what its quantified
-descriptions mean.
+descriptions mean. Relevant consistency checks the successful observations
+claimed by explicit interfaces, while partial-correctness typing preserves
+ordinary computation failure.
 
 \appendix
 \chapter{Core judgments and finite regression model}
@@ -3038,7 +3659,7 @@ A reference type expression has the grammar
 \end{aligned}
 \]
 Here $b$ is a base predicate; $a$ is a context variable of the appropriate sort;
-$S$ is a well-formed value sort or type universe, possibly with a guard.
+$S$ is a well-formed value sort or the type sort $\Type$, possibly with a guard.
 Complement is relative to the subject sort. A surface profile may retain only
 its supported decidable negative predicates. Dependent descriptions extend $T_i$
 with references to earlier argument or record cells, using the shared binding
@@ -3078,49 +3699,53 @@ Intersection introduction uses the same term:
 \frac{\Gamma;\Delta\vdash e:T\qquad\Gamma;\Delta\vdash e:U}
      {\Gamma;\Delta\vdash e:T\land U}.
 \]
-Subsumption uses semantic inclusion established by a sound derivation. Application
-requires coverage of the complete supplied-call packet and the stated result or
-effect obligation. A runtime result check is recorded as an effect unless its
-success has been established statically.
+Source-written interfaces additionally pass relevant consistency at their
+retained roots. Inferred types and instantiated proof conclusions remain in the
+full semantic type algebra, including empty successful-result predicates.
+Subsumption uses a checked strict inclusion derivation. Application must pass
+its static callable and argument judgments. Its conclusion concerns successful
+results, not termination or absence of bottom. A runtime refinement operation
+must occur in the source, with its rule checked as in
+\cref{sec:dynamic-admission}. All annotation implications are proved before
+certification; their proofs erase.
 
-The proof of the introduction rules is membership in the corresponding
-intersection or union. Elimination uses the selected instance or a scoped
+For returned values, the introduction rules give membership in the
+corresponding intersection or union; computation judgments quantify only over
+successful returns. Elimination uses the selected instance or a scoped
 existential witness. These principles specify the reference calculus independently
 of a particular constraint-solving strategy.
 
 \section{Regression checks}
-The following families describe finite reference checks for the algebraic laws
-and counterexamples. A suitable model enumerates four data values, their sixteen
-subsets, and 625 partial function tables, with a separate rejection outcome.
-This checkout does not include the reference-model scripts or their result
-files; no executed assertion count is claimed here.
+The source archive includes three executable standard-library Python models.
 
-\begin{tabularx}{\textwidth}{@{}lY@{}}
-\toprule
-Family & Property or counterexample\\\midrule
-Arrows & Domain-union and result-intersection identities; contravariance.\\
-Quantified inhabitants & Singleton-rich universal identity; incompatible
-monomorphic refinement.\\
-Predicate fibers & Both adjunctions; Frobenius reciprocity; inhabited universal
-floating; quantifier monotonicity.\\
-Scope and bounds & Mixed quantifiers do not commute; empty-range extrusion
-requires its side condition; subtype bounds retain guarded ranges.\\
-Application & Refinement inclusion holds; meet equality has a counterexample.\\
-Projection & Existential projection need not preserve intersection.\\
-Abstract values & Bijection transport preserves meet, join, equality, refinement,
-and a finite operation simulation.\\\bottomrule
-\end{tabularx}
+\code{checks/check_model.py} enumerates a finite partial-function algebra and
+checks arrow laws, partial identities, failure-only call regions,
+quantifier laws, scope conditions, and set-valued meet. A partial identity witnesses the nonempty denotation of the rejected
+\code{quiet} interface. The model also checks a finite
+applicative model whose type domain is the full powerset of its value carrier;
+quantified types can occur as instance arguments in that model.
 
-Finite checks for the local kernel of \cref{ch:residual} should additionally
-cover preservation of completion sets under bounded propagation, validation
-of grounded arithmetic cycles, persistence of refutations, retention of guards
-and existential alternatives, and quantified-function counterexamples.
-Such reference checks supplement rather than establish correctness of the Go
-implementation. Executable implementation regressions are indexed in
-\code{cue/testdata/quantified/README.md}; supported fragments and checking limits
-are documented in \code{doc/implementation.md}.
-Checker, elaboration, and abstraction obligations are specified in
-\cref{ch:checking,ch:residual}.
+\code{checks/check_kernel.py} implements a small certificate-oriented structural
+checker and the static/dynamic gate. Its fixtures cover singleton and kind
+inclusions, record width/depth and closed field lookup, union/intersection
+rules, explicit impredicative substitution, the generic meet body, blocked
+annotation obligations, and explicit dependent assertions. Declaration
+fixtures check regrouping and common erasure for the five presentations.
+Negative fixtures verify that unproved result bounds, wrong-kind results, and
+exhausted static budgets produce no executable filters.
+
+\code{checks/check_relevance.py} checks explicit-domain observation partitions,
+incompatible overlaps, multiway result conflicts, conjunction coherence,
+source-anchored universal instances, and the distinction between generic
+interface admission and derived failure types. Its fixtures also check that
+relevance rejection is independent of denotational emptiness and produces no
+executable filter. The exact counts are recorded in \code{checks/results.json}.
+
+The models test finite instances and selected kernel rules. The implementation
+contract is the rule set and conformance table in \cref{ch:residual}; complete
+integration with CUE's graph evaluator requires the elaboration and demand
+invariants in \cref{ch:checking}. In particular, finite tests are not a proof of
+that integration or of complete semantic-subtyping inference.
 
 \chapter{Example and feature index}
 \label{app:index}
@@ -3150,9 +3775,11 @@ laws, heterogeneous packages, shared-witness comparison, codecs.\\
 Compatibility & \Cref{ch:comparison}: feature-by-feature correspondence,
 adapters, old data code, result combination, experimental migration.\\
 Semantic guarantees & \Cref{ch:quantifiers,ch:refinement,ch:functions}:
-adjunctions, floating, monotonicity, coverage, variance and application.\\
-Residual checking & \Cref{ch:residual}: concrete-data validation, scoped
-certificates, local propagation, witness search, and resource bounds.\\
+adjunctions, floating, monotonicity, partial correctness, variance and application.\\
+Mandatory checking & \Cref{ch:residual}: strict System F/structural certificates,
+scoped eager refutation, relevant consistency of explicit observations,
+rigid declaration checks, explicit assertions, declaration coherence,
+annotation erasure, stage gates, and resource bounds.\\
 Evolution guarantees & \Cref{ch:modules}: equality-respecting representation
 simulation, quantified observations, old-compatible views.\\\bottomrule
 \end{longtable}
@@ -3160,6 +3787,7 @@ simulation, quantified observations, old-compatible views.\\\bottomrule
 \clearpage
 \renewcommand{\bibname}{References}
 \begin{thebibliography}{99}
+\small
 \addcontentsline{toc}{chapter}{References}
 \raggedright
 
@@ -3333,6 +3961,41 @@ Vijay A. Saraswat, Martin Rinard, and Prakash Panangaden.
 The semantic foundations of concurrent constraint programming.
 In \emph{POPL}, pages 333--352, 1991.
 \url{https://doi.org/10.1145/99583.99627}.
+
+
+\bibitem{pistone}
+Paolo Pistone.
+On completeness and parametricity in the realizability semantics of System F.
+\emph{Logical Methods in Computer Science}, 15(4), Article 6, 2019.
+\url{https://doi.org/10.23638/LMCS-15(4:6)2019}.
+Preprint: \url{https://arxiv.org/abs/1802.05143}.
+
+\bibitem{bidirsurvey}
+Jana Dunfield and Neel Krishnaswami.
+Bidirectional typing.
+\emph{ACM Computing Surveys}, 54(5), 2021.
+\url{https://doi.org/10.1145/3450952}.
+Preprint: \url{https://arxiv.org/abs/1908.05839}.
+
+\bibitem{jiang2025}
+Shengyi Jiang, Chen Cui, and Bruno C. d. S. Oliveira.
+Bidirectional higher-rank polymorphism with intersection and union types.
+\emph{Proceedings of the ACM on Programming Languages}, 9(POPL),
+Article 71, pages 2118--2148, 2025.
+\url{https://doi.org/10.1145/3704907}.
+
+\bibitem{explicitrefine}
+Jad Elkhaleq Ghalayini and Neel Krishnaswami.
+\emph{Explicit refinement types}.
+2023. arXiv:2311.13995.
+\url{https://arxiv.org/abs/2311.13995}.
+
+\bibitem{nonstrict}
+Tommaso Petrucciani, Giuseppe Castagna, Davide Ancona, and Elena Zucca.
+Semantic subtyping for non-strict languages.
+In \emph{TYPES 2018}, LIPIcs 130, Article 4, 2019.
+\url{https://doi.org/10.4230/LIPIcs.TYPES.2018.4}.
+Preprint: \url{https://arxiv.org/abs/1810.05555}.
 
 \end{thebibliography}
 \end{document}
