@@ -1,0 +1,14 @@
+// A successful trial cannot certify a primitive's stronger client contract.
+// Finite singleton domains can be checked exhaustively before execution.
+
+-- in.cue --
+@test(json, [3, 3], at="out")
+@test(validate, blocked, at="badCall")
+@test(validate, blocked, at="discarded")
+
+bad: len & (func(string) -> 0)
+badCall: bad("")
+good: len & (func(string) -> int)
+exact: len & (func("abc") -> 3)
+discarded: (func(_) -> int: 1)({value: bad("")})
+out: [good("abc"), exact("abc")]

@@ -39,7 +39,6 @@ out: f[1]()`},
 out: f({x: "x"})`},
 		{"field", `out: (func() -> {a: 1}: {})()`},
 		{"hidden", `out: (func() -> {_a: 1}: {})()`},
-		{"definition", `out: (func() -> {#A: 1}: {})()`},
 		{"nested", `out: (func() -> {n: {a: 1}}: {n: {}})()`},
 		{"list", `out: (func() -> [{a: 1}]: [{}])()`},
 		{"choice", `out: (func() -> 1: 1 | 2)()`},
@@ -64,6 +63,13 @@ out: f("{}")`},
 			}
 		})
 	}
+	t.Run("definition", func(t *testing.T) {
+		v := semanticValue(t, `out: (func() -> {#A: 1}: {})()`)
+		semanticJSON(t, v, "out", `{}`)
+		if v.LookupPath(cue.ParsePath("out.#A")).Exists() {
+			t.Fatal("result annotation materialized a definition")
+		}
+	})
 }
 
 // Parameter predicates must not manufacture a packet either, even if the

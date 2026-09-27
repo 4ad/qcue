@@ -105,13 +105,10 @@ func capabilityHasCallable(v Value, seen map[Value]bool) bool {
 	return false
 }
 
-// checkCallResult checks consequences of admitted clauses against the body's
-// independently computed value. A contract never participates in constructing
-// that value: doing so would let erased type arguments become runtime data.
-func (f *FuncValue) checkCallResult(c *OpContext, packet callPacket, value Value) *Bottom {
-	if b := checkCallValue(c, value, scopedPredicate{f.Env, f.Fn.Ret}, "result"); b != nil {
-		return b
-	}
+// recordCallResult retains certified interfaces for later existential and
+// quantified elimination. Annotations neither construct nor filter the body's
+// independently computed result; their implications were proved statically.
+func (f *FuncValue) recordCallResult(c *OpContext, packet callPacket, value Value) {
 	evidence := []scopedPredicate{{f.Env, f.Fn.Ret}}
 	for _, t := range f.Types {
 		if t.Fn.Body != nil {
@@ -125,13 +122,7 @@ func (f *FuncValue) checkCallResult(c *OpContext, packet callPacket, value Value
 		switch result {
 		case proofEstablished:
 			t := admitted.clause
-			if b := checkCallValue(c, value, scopedPredicate{t.Env, t.Fn.Ret}, "result"); b != nil {
-				return b
-			}
 			evidence = append(evidence, scopedPredicate{t.Env, t.Fn.Ret})
-		case proofUnknown:
-			return &Bottom{Code: IncompleteError,
-				Err: c.Newf("incomplete function contract domain")}
 		}
 	}
 	if v, ok := value.(*Vertex); ok {
@@ -139,7 +130,6 @@ func (f *FuncValue) checkCallResult(c *OpContext, packet callPacket, value Value
 			v.addCallWitness(c, predicate)
 		}
 	}
-	return nil
 }
 
 // capabilityMatches translates a residual packet back to the implementation

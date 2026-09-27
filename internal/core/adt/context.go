@@ -157,7 +157,7 @@ type OpContext struct {
 	// CheckApplication derives the result interface from the supplied source
 	// packet. A declaration without an implementation may use this derivation
 	// as a conditional hypothesis, but cannot synthesize an execution witness.
-	CheckApplication func(*OpContext, *Environment, *FuncValue, *CallExpr) (Value, *Bottom)
+	CheckApplication func(*OpContext, *Environment, Value, *CallExpr) (Value, *Bottom)
 
 	// CheckArgument retains source construction evidence when a saved
 	// partial packet is checked against a residual clause.

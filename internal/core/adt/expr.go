@@ -1654,8 +1654,8 @@ type FuncParam struct {
 // A FuncValue is a function closure captured in an evaluation environment.
 //
 // Types holds scoped obligations attached by unification. In the quantified
-// profile, admitted packet guards require independently checked results (see
-// [FuncValue.checkCallResult]). The explicit legacy profile instead conjoins
+// profile, admitted packet guards have static conformance proofs, and
+// [FuncValue.recordCallResult] retains their evidence. The legacy profile conjoins
 // their parameter and result constraints during execution and may supply
 // labels for otherwise unnamed slots.
 // For a bodyless FuncValue — itself a function type — Types holds the other
@@ -2027,8 +2027,8 @@ func (x *FuncValue) Kind() Kind { return FuncKind }
 // outer `a`, not the sibling parameter).
 //
 // Only implementation defaults and the body contribute to computation in the
-// quantified profile. Parameter predicates check the original argument arcs;
-// return predicates check the independently evaluated body in checkCallResult.
+// quantified profile. Parameter predicates retain certified argument evidence;
+// result predicates retain certified evidence through recordCallResult.
 // The legacy profile retains its relational constraint propagation.
 //
 // The default, legacy constraint, and body conjuncts carry ci, which includes the
@@ -2076,10 +2076,6 @@ func (n *nodeContext) scheduleFuncCall(ref *FuncCallRef, env *Environment, ci Cl
 				if capabilities && a.ArcType == ArcMember {
 					a.Finalize(n.ctx)
 					predicate := scopedPredicate{env.Up, p.Value}
-					if b := checkCallValue(n.ctx, a, predicate, "argument"); b != nil {
-						n.addBottom(b)
-						return
-					}
 					a.addCallWitness(n.ctx, predicate)
 				}
 			}
@@ -2450,20 +2446,6 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		if unused != nil {
 			return unused
 		}
-		if x.Fn.Quantified && len(x.callViews) == 0 {
-			for i, arg := range bindings {
-				if arg.expr == nil || x.Fn.Params[i].Value == nil {
-					continue
-				}
-				v := c.newInlineVertex(nil, nil,
-					MakeRootConjunct(arg.env, arg.expr),
-					MakeRootConjunct(x.Env, x.Fn.Params[i].Value))
-				v.Finalize(c)
-				if b := v.Bottom(); b != nil && !b.IsIncomplete() {
-					return b
-				}
-			}
-		}
 		copy := *x
 		copy.args = bindings
 		return &copy
@@ -2677,9 +2659,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	}
 
 	if capabilityMode(x.Fn, x.Types) {
-		if b := x.checkCallResult(c, callPacket{args: bindings}, result); b != nil {
-			return b
-		}
+		x.recordCallResult(c, callPacket{args: bindings}, result)
 	}
 
 	// Memoize only a finalized, error-free result. An incomplete result may
@@ -3060,6 +3040,15 @@ func (x *CallExpr) evaluate(c *OpContext, state Flags) Value {
 }
 
 func (builtin *Builtin) rawCall(c *OpContext, call *CallExpr, state Flags) Value {
+	if builtin.capabilityMode() {
+		if c.CheckApplication == nil {
+			return &Bottom{Src: call.Source(), Code: BlockedError,
+				Err: c.Newf("builtin application checker is not configured")}
+		}
+		if _, b := c.CheckApplication(c, c.Env(0), builtin, call); b != nil {
+			return b
+		}
+	}
 	callCtx := BuiltinCallContext{
 		ctx:     c,
 		call:    call,
@@ -3069,18 +3058,10 @@ func (builtin *Builtin) rawCall(c *OpContext, call *CallExpr, state Flags) Value
 		if !builtin.checkArgs(c, Pos(call), len(call.Args)) {
 			return nil
 		}
-		// RawFunc builtins evaluate their arguments themselves, so the
-		// parameter constraints of any recorded function types are not
-		// enforced for them; the result constraints are.
+		// RawFunc builtins evaluate their arguments themselves. Quantified
+		// client annotations have already passed the strict source gate.
 		result := builtin.RawFunc(callCtx)
-		var args []Value
-		if builtin.capabilityMode() {
-			for _, arg := range call.Args {
-				v, _ := c.Evaluate(c.Env(0), arg)
-				args = append(args, v)
-			}
-		}
-		return builtin.applyResultTypes(c, result, args)
+		return builtin.applyResultTypes(c, result)
 	}
 	// Arguments to functions are open. This mostly matters for NonConcrete
 	// builtins.
@@ -3188,7 +3169,6 @@ func (builtin *Builtin) rawCall(c *OpContext, call *CallExpr, state Flags) Value
 // finishCall applies the attached function types to args, calls the
 // builtin with them, and evaluates its result.
 func (builtin *Builtin) finishCall(c *OpContext, callCtx BuiltinCallContext, args []Value, state Flags) Value {
-	packet := slices.Clone(args[:len(callCtx.call.Args)])
 	args, b := builtin.applyParamTypes(c, args)
 	if b != nil {
 		return b
@@ -3209,7 +3189,7 @@ func (builtin *Builtin) finishCall(c *OpContext, callCtx BuiltinCallContext, arg
 	}
 	v, ci := c.evalStateCI(result, Flags{status: partial, condition: state.condition, mode: state.mode})
 	c.ci = ci
-	return builtin.applyResultTypes(c, v, packet)
+	return builtin.applyResultTypes(c, v)
 }
 
 // callPerDisjunct calls the builtin once per disjunct of d, the disjunction
@@ -3294,10 +3274,9 @@ func (builtin *Builtin) applyParamTypes(c *OpContext, args []Value) ([]Value, *B
 	return args, nil
 }
 
-// applyResultTypes checks guarded contracts against the primitive's own
-// result, without letting annotations construct data. Intrinsic and legacy
-// signatures retain their relational interpretation.
-func (x *Builtin) applyResultTypes(c *OpContext, v Value, args []Value) Value {
+// applyResultTypes preserves the relational interpretation of intrinsic and
+// legacy signatures. Quantified client annotations erase after certification.
+func (x *Builtin) applyResultTypes(c *OpContext, v Value) Value {
 	if len(x.Types) == 0 || v == nil {
 		return v
 	}
@@ -3308,17 +3287,8 @@ func (x *Builtin) applyResultTypes(c *OpContext, v Value, args []Value) Value {
 	a = append(a, MakeConjunct(nil, v, c.ci))
 	for _, t := range x.Types {
 		if x.guardedType(t) {
-			var applies proofResult
-			t, applies = x.capabilityApplies(c, t, args)
-			switch applies {
-			case proofRefuted:
-				continue
-			case proofUnknown:
-				return &Bottom{Code: IncompleteError, Err: c.Newf("incomplete builtin contract domain")}
-			}
-			if b := checkCallValue(c, v, scopedPredicate{t.Env, t.Fn.Ret}, "result"); b != nil {
-				return b
-			}
+			// The strict application gate proved this implementation's
+			// contracts before the primitive ran. They erase at execution.
 			continue
 		}
 		if t.Fn.Ret == nil {

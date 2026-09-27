@@ -1,14 +1,15 @@
 // Attaching a contract is not evidence of membership in a callable domain.
-// Unknown applicability must remain a guard, including inside composites.
+// A certified wider clause admits these packets without an execution-time
+// test of the narrower higher-order domain. The annotations erase.
 
 -- in.cue --
 @test(validate, concrete, at="f")
-@test(validate, concrete, incomplete, at="out")
+@test(json, 0, at="out")
 @test(validate, at="out")
 @test(validate, at="nestedOut")
-@test(validate, concrete, incomplete, at="nestedOut")
+@test(json, 0, at="nestedOut")
 @test(validate, at="primitiveOut")
-@test(validate, concrete, incomplete, at="primitiveOut")
+@test(json, "X", at="primitiveOut")
 @test(json, ["ok", "ok"], at="good")
 
 import "strings"
