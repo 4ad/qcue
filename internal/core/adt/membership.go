@@ -112,6 +112,14 @@ func checkCallValue(c *OpContext, subject Value, predicate scopedPredicate, role
 		case proofEstablished:
 			return nil
 		case proofRefuted:
+			if role == "argument" {
+				// A packet outside the parameter interface is a failed
+				// application judgment, not an execution of a failing body.
+				// In particular, a missing field cannot be manufactured by
+				// the membership meet or observed as a semantic bottom.
+				return &Bottom{Code: BlockedError,
+					Err: c.Newf("function argument does not satisfy its contract")}
+			}
 			if b := m.meet.Bottom(); b != nil && !b.IsIncomplete() {
 				return b
 			}

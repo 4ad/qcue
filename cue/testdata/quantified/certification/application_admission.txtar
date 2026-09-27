@@ -1,0 +1,31 @@
+// Invalid argument implications block application. A failure already present
+// in an argument or in a checked body remains a computation with no result.
+
+-- in.cue --
+@test(json, 1, at="width")
+@test(validate, blocked, at="missing")
+@test(validate, blocked, at="wrongKind")
+@test(validate, blocked, at="wrongBound")
+@test(validate, blocked, at="missingNested")
+@test(validate, blocked, at="observedBlocked")
+@test(validate, blocked, at="alternative")
+@test(json, [true, true, true], at="failures")
+
+get: func(r: {a: int}) -> int: r.a
+width: get({a: 1, b: true})
+missing: get({})
+wrongKind: get({a: "one"})
+positive: func(x: int & >0) -> int: x
+wrongBound: positive(0)
+nested: func(r: {value: {a: int}}) -> int: r.value.a
+missingNested: nested({value: {}})
+
+observedBlocked: missing == _|_
+alternative: missing | 1
+
+checked: func(x: int) -> int: x & >0
+failures: [
+	get(_|_) == _|_,
+	get({a: 1 & 2}) == _|_,
+	checked(0) == _|_,
+]
