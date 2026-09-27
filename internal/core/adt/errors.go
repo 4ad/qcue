@@ -73,6 +73,11 @@ const (
 	// an incomplete error, as reference errors may be broken by providing
 	// a concrete value.
 	CycleError // cycle
+
+	// A BlockedError is a static obligation without a certificate. It must
+	// be reported even when ordinary incomplete data is allowed. It proves
+	// no semantic contradiction and cannot eliminate a union alternative.
+	BlockedError // blocked
 )
 
 // Bottom represents an error or bottom symbol.
@@ -104,7 +109,7 @@ func (b *Bottom) IsIncomplete() bool {
 	if b == nil {
 		return false
 	}
-	return b.Code == IncompleteError || b.Code == CycleError
+	return b.Code == IncompleteError || b.Code == CycleError || b.Code == BlockedError
 }
 
 // isLiteralBottom reports whether x is an error originating from a user.
@@ -192,6 +197,12 @@ func CombineErrors(src ast.Node, x, y Value) *Bottom {
 	}
 
 	if a.Code != b.Code {
+		if a.Code == BlockedError || b.Code == BlockedError {
+			// A contradiction elsewhere does not discharge a source typing
+			// obligation. Preserve the blocker and both diagnostics.
+			return &Bottom{Src: src, Code: BlockedError,
+				Err: errors.Append(a.Err, b.Err)}
+		}
 		if a.Code > b.Code {
 			a, b = b, a
 		}

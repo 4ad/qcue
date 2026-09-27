@@ -25,7 +25,7 @@ import (
 // ValidateFunction checks an implementation's contracts under arbitrary
 // packets and rigid type variables. Static validation calls this independently
 // of concrete checks on implementation identity and captured values.
-// Unsupported proofs remain incomplete; successful concrete calls and the
+// Unsupported proofs remain blocked; successful concrete calls and the
 // target annotation itself are not evidence of universal conformance.
 func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 	p := newCertifier(ctx)
@@ -59,10 +59,10 @@ func newCertifier(ctx *adt.OpContext) *certifier {
 func (p *certifier) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 	if !p.implementation(f) {
 		if p.remaining == 0 {
-			return &adt.Bottom{Src: f.Source(), Code: adt.IncompleteError,
+			return &adt.Bottom{Src: f.Source(), Code: adt.BlockedError,
 				Err: p.ctx.Newf("function conformance remains unproved: proof work limit reached")}
 		}
-		return &adt.Bottom{Src: f.Source(), Code: adt.IncompleteError,
+		return &adt.Bottom{Src: f.Source(), Code: adt.BlockedError,
 			Err: p.ctx.Newf("function conformance remains unproved")}
 	}
 	return nil

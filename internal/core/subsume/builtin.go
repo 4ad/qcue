@@ -30,7 +30,7 @@ func ValidateBuiltin(c *adt.OpContext, b *adt.Builtin) *adt.Bottom {
 	s := &subsumer{ctx: c}
 	for _, t := range types {
 		if !s.builtinCapability(t, b) {
-			return &adt.Bottom{Src: t.Fn.Source(), Code: adt.IncompleteError,
+			return &adt.Bottom{Src: t.Fn.Source(), Code: adt.BlockedError,
 				Err: c.Newf("builtin conformance remains unproved")}
 		}
 	}

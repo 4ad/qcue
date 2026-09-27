@@ -2782,7 +2782,7 @@ func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op, flag
 	case nil:
 	case *Bottom:
 		switch v.Code {
-		case CycleError:
+		case CycleError, BlockedError:
 			c.PopState(s)
 			c.AddBottom(v)
 			// TODO: add this. This erases some
@@ -2842,6 +2842,14 @@ func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op, flag
 		}
 
 		v.Finalize(c)
+		if b := CombineErrors(nil, v.Bottom(), v.ChildErrors); b != nil && b.Code == BlockedError {
+			// A blocked child prevents this observation just as a blocker
+			// on the subject itself does. It is not evidence for either
+			// answer to a comparison with semantic bottom.
+			c.PopState(s)
+			c.AddBottom(b)
+			return nil
+		}
 
 		switch {
 		case isFinalError(v):

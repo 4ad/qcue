@@ -337,6 +337,13 @@ func (n *nodeContext) processDisjunctions() *Bottom {
 
 		// Mark no final in nodeContext and observe later.
 		results = n.crossProduct(results, cross, d, mode)
+		for _, candidate := range d.disjuncts {
+			if b := candidate.err; b != nil && b.Code == BlockedError {
+				// A blocked branch has not been proved empty. Selecting a
+				// successful alternative cannot discharge its static proof.
+				return b
+			}
+		}
 
 		// TODO: do we unwind only at the end or also intermittently?
 		switch len(results) {
@@ -645,6 +652,10 @@ func (n *nodeContext) finalizeDisjunctions() {
 		x.node.Conjuncts = nil
 
 		if b := x.getErr(); b != nil {
+			if b.Code == BlockedError {
+				n.setBaseValue(b)
+				return
+			}
 			if b.Code == UserError {
 				n.userErrs = append(n.userErrs, b)
 			} else {

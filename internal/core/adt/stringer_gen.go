@@ -58,11 +58,12 @@ func _() {
 	_ = x[StructuralCycleError-3]
 	_ = x[IncompleteError-4]
 	_ = x[CycleError-5]
+	_ = x[BlockedError-6]
 }
 
-const _ErrorCode_name = "evaluseruserstructural_cycleincompletecycle"
+const _ErrorCode_name = "evaluseruserstructural_cycleincompletecycleblocked"
 
-var _ErrorCode_index = [...]uint8{0, 4, 8, 12, 28, 38, 43}
+var _ErrorCode_index = [...]uint8{0, 4, 8, 12, 28, 38, 43, 50}
 
 func (i ErrorCode) String() string {
 	idx := int(i) - 0

@@ -872,6 +872,7 @@ func (c *OpContext) evalStateCI(v Expr, state Flags) (result Value, ci CloseInfo
 			if b := v.Bottom(); b != nil {
 				switch b.Code {
 				case IncompleteError:
+				case BlockedError:
 				case CycleError:
 					break
 				default:

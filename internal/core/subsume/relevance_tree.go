@@ -32,7 +32,7 @@ func ValidateInterfaces(ctx *adt.OpContext, value *adt.Vertex) *adt.Bottom {
 		if source == nil {
 			source = value
 		}
-		return &adt.Bottom{Src: source.Source(), Code: adt.IncompleteError,
+		return &adt.Bottom{Src: source.Source(), Code: adt.BlockedError,
 			Err: ctx.NewPosf(adt.Pos(source), "%s", err)}
 	}
 	return nil

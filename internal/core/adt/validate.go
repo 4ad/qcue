@@ -297,7 +297,7 @@ func (v *validator) validate(x *Vertex) {
 			// A refuted field predicate instead establishes absence, and
 			// does not introduce a live implementation observation.
 			a.Finalize(v.ctx)
-			if a.Bottom() == nil {
+			if b := a.Bottom(); b == nil || b.Code == BlockedError {
 				v.inDefinition++
 				v.validate(a)
 				v.inDefinition--
