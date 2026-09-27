@@ -107,6 +107,7 @@ type certifier struct {
 	constructors map[*adt.Vertex]adt.Expr
 	records      map[proofRecordKey]*proofRecord
 	completed    map[proofKey]proofCertificate
+	callProofs   map[*adt.FuncValue][]adt.FuncType
 	attempts     []*proofAttempt
 	remaining    int
 	failure      *adt.Bottom
@@ -257,7 +258,30 @@ func (p *certifier) captured(v adt.Value) adt.Value {
 	case *adt.FuncValue, *adt.Builtin:
 		return x.(adt.Value)
 	}
+	if vertex, ok := v.(*adt.Vertex); ok && adt.Validate(p.ctx, vertex,
+		&adt.ValidateConfig{Runtime: true, Concrete: true}) == nil {
+		// A complete supplied value has a concrete inventory. Its evaluated
+		// predicate may remain open for later CUE refinement, but that does
+		// not add fields to the runtime value supplied by this packet.
+		return capturedInventory(vertex, make(map[*adt.Vertex]*adt.Vertex))
+	}
 	return v
+}
+
+func capturedInventory(v *adt.Vertex, seen map[*adt.Vertex]*adt.Vertex) *adt.Vertex {
+	v = v.DerefValue()
+	if out := seen[v]; out != nil {
+		return out
+	}
+	out := v.ToDataSingle()
+	seen[v] = out
+	out.Arcs = slices.Clone(v.Arcs)
+	for i, field := range out.Arcs {
+		member := *capturedInventory(field, seen)
+		member.Label, member.ArcType = field.Label, field.ArcType
+		out.Arcs[i] = &member
+	}
+	return out
 }
 
 func (p *certifier) captureType(v adt.Value, seen map[adt.Value]bool) bool {
@@ -973,6 +997,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		optional := make(map[adt.Feature]adt.Expr)
 		var conditions []*adt.Comprehension
 		for _, decl := range x.Decls {
+			if _, ok := decl.(*adt.BulkOptionalField); ok {
+				continue
+			}
 			if comp, ok := decl.(*adt.Comprehension); ok {
 				conditions = append(conditions, comp)
 				continue
@@ -996,6 +1023,23 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		out := &adt.StructLit{}
 		for _, decl := range x.Decls {
+			if pattern, ok := decl.(*adt.BulkOptionalField); ok {
+				filter := p.expr(e, pattern.Filter)
+				value := p.expr(e, pattern.Value)
+				if filter == nil || filter.Kind() != adt.StringKind || value == nil {
+					return nil
+				}
+				var constraint adt.Expr = value
+				if label, ok := pattern.Value.(*adt.LabelReference); ok && label.UpCount == 0 {
+					// Preserve a constraint equating the field with its label.
+					// The pattern introduces the same lexical label on replay.
+					constraint = label
+				}
+				out.Decls = append(out.Decls, &adt.BulkOptionalField{
+					Src: pattern.Src, Filter: filter, Value: constraint, Label: pattern.Label,
+				})
+				continue
+			}
 			if _, ok := decl.(*adt.Comprehension); ok {
 				continue
 			}
@@ -1604,8 +1648,15 @@ func (p *certifier) apply(env *adt.Environment, callee adt.Value, call *adt.Call
 		}
 	}
 	if builtin, ok := callee.(*adt.Builtin); ok && result != nil &&
-		builtin.Package == adt.InvalidLabel && builtin.Name == "len" {
-		result = p.length(args[0])
+		builtin.Package == adt.InvalidLabel {
+		switch builtin.Name {
+		case "len":
+			result = p.length(args[0])
+		case "close":
+			// Apply the primitive to the checked description, retaining its
+			// field constraints while adding the explicit source closedness.
+			result = p.schema(nil, &adt.CallExpr{Fun: builtin.Implementation(), Args: []adt.Expr{args[0]}})
+		}
 	}
 	// The call rule establishes the successful result's interface. Retain
 	// that evidence for higher-order elimination, including a quantified
@@ -1763,10 +1814,34 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 		// Only a visible implementation supplies body evidence. Recursive
 		// calls use their declared induction hypothesis; opaque adapters
 		// expose their certified interface without a private body summary.
-		if function != nil && function.Fn.Body != nil && !p.recursing(function) &&
-			p.function(function, source) {
-			if result := p.completed[proofKey{function, source}].result; result != nil {
-				consequences = append(consequences, result)
+		if function != nil && function.Fn.Body != nil && !p.recursing(function) {
+			proof := target
+			noResult := *source.Fn
+			noResult.Ret = nil
+			if s.capabilitySignature(adt.FuncType{Fn: &noResult, Env: source.Env}, target) {
+				// Equivalent packet types reuse the declaration's body proof.
+				proof = source
+			} else {
+				for _, previous := range p.callProofs[function] {
+					if !p.step() {
+						return
+					}
+					if s.capabilitySignature(previous, target) && s.capabilitySignature(target, previous) {
+						proof = previous
+						break
+					}
+				}
+				if proof == target {
+					if p.callProofs == nil {
+						p.callProofs = make(map[*adt.FuncValue][]adt.FuncType)
+					}
+					p.callProofs[function] = append(p.callProofs[function], target)
+				}
+			}
+			if p.function(function, proof) {
+				if result := p.completed[proofKey{function, proof}].result; result != nil {
+					consequences = append(consequences, result)
+				}
 			}
 		}
 	}

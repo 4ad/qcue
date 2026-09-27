@@ -1,0 +1,16 @@
+// Source argument constraints retain their shape and check every operand.
+
+-- in.cue --
+@test(json, [1, 2, 3, 4], at="out")
+@test(validate, blocked, at="badPattern")
+@test(validate, blocked, at="badClose")
+@test(validate, conflict, at="wrongLabel")
+
+read: func(x: {v: int}) -> int: x.v
+needs: func(x: {required: int}) -> int: x.required
+out: [read(close({v: 1})), read({v: 2, [=~"^extra"]: int}),
+	read({v: 3, [=~"^extra"]~(Key, _): Key}),
+	read({v: 4, [=~"^extra"]: int, if true {other: true}})]
+badPattern: read({v: 1, [=~"^extra"]: needs({})})
+badClose: read(close({v: 1, unused: needs({})}))
+wrongLabel: read({v: 1, [=~"^extra"]~(Key, _): Key, extra: "wrong"})

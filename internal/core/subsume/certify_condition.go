@@ -62,8 +62,13 @@ func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit,
 		exact:  true,
 	}
 	optional := make(map[adt.Feature]adt.Value)
+	var constraints []adt.Decl
 	for _, decl := range base.Decls {
-		field := decl.(*adt.Field)
+		field, ok := decl.(*adt.Field)
+		if !ok {
+			constraints = append(constraints, decl)
+			continue
+		}
 		if field.ArcType == adt.ArcOptional {
 			optional[field.Label] = field.Value.(adt.Value)
 			initial.exact = false
@@ -152,6 +157,7 @@ func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit,
 		for _, label := range slices.Sorted(maps.Keys(state.fields)) {
 			out.Decls = append(out.Decls, &adt.Field{Label: label, Value: state.fields[label]})
 		}
+		out.Decls = append(out.Decls, constraints...)
 		value := p.schema(nil, out)
 		if value == nil {
 			return nil

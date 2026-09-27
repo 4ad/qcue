@@ -126,7 +126,14 @@ func (p *certifier) sourceDescription(value adt.Value) adt.Value {
 		case *adt.StructLit:
 			out := &adt.StructLit{}
 			for _, decl := range source.Decls {
-				field := *decl.(*adt.Field)
+				f, ok := decl.(*adt.Field)
+				if !ok {
+					// Pattern constraints have already been checked and do not
+					// contribute a present field's construction inventory.
+					out.Decls = append(out.Decls, decl)
+					continue
+				}
+				field := *f
 				field.Value = p.sourceDescription(field.Value.(adt.Value))
 				if field.Value == nil {
 					return nil

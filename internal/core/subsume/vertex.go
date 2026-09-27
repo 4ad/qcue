@@ -167,7 +167,7 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		return false
 	}
 
-	if xClosed && !yClosed && !s.Final {
+	if xClosed && !yClosed && !final {
 		s.errf("closed struct does not subsume open struct")
 		return false
 	}
@@ -212,6 +212,12 @@ outer:
 		if !s.vertices(a, b) {
 			return false
 		}
+	}
+
+	// An exact data inventory has no additional fields to constrain. Pattern
+	// constraints on its present fields were checked by the field loops.
+	if final {
+		return true
 	}
 
 	// Now compare pattern constraints.

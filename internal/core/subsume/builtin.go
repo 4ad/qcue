@@ -37,12 +37,15 @@ func ValidateBuiltin(c *adt.OpContext, b *adt.Builtin) *adt.Bottom {
 	return nil
 }
 
-// Only primitives with a known total rule can discharge a pure arrow.
-// Native parameter/result kinds alone say nothing about failure or effects.
+// Only primitives with a known successful-result rule can discharge an arrow.
+// Native parameter/result kinds alone do not establish that rule.
 func primitiveContract(c *adt.OpContext, b *adt.Builtin) *adt.Function {
 	f := b.Protocol(c)
 	if b.Package == adt.InvalidLabel && b.Name == "len" {
 		f.Params[0].Value = &adt.BasicType{K: adt.StructKind | adt.ListKind | adt.StringKind | adt.BytesKind}
+		return f
+	}
+	if b.Package == adt.InvalidLabel && b.Name == "close" {
 		return f
 	}
 	if b.Package != adt.InvalidLabel && b.Package.StringValue(c) == "strings" {
