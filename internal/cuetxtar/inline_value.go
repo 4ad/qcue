@@ -67,7 +67,7 @@ func (r *inlineRunner) runValueAssertion(t testing.TB, path cue.Path, val cue.Va
 			switch arg {
 			case "concrete":
 				opts = append(opts, cue.Concrete(true))
-			case "incomplete", "conflict":
+			case "incomplete", "conflict", "blocked":
 				if outcome != "success" {
 					t.Fatal("duplicate validation outcome")
 				}
@@ -86,6 +86,10 @@ func (r *inlineRunner) runValueAssertion(t testing.TB, path cue.Path, val cue.Va
 		case "conflict":
 			if base == nil {
 				t.Errorf("path %s: expected a definite conflict", path)
+			}
+		case "blocked":
+			if base == nil || val.Err() != nil {
+				t.Errorf("path %s: expected blocked checking without semantic bottom; validation: %v; value: %v", path, base, val.Err())
 			}
 		case "incomplete":
 			if base != nil || err == nil {

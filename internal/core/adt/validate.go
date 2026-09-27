@@ -37,6 +37,11 @@ type ValidateConfig struct {
 	// AllErrors continues descending into a Vertex, even if errors are found.
 	AllErrors bool
 
+	// CheckInterfaces checks explicit source descriptions, including
+	// unimplemented and nested interfaces. Its diagnostics do not change
+	// value denotations and are reported even without Concrete.
+	CheckInterfaces func(*OpContext, *Vertex) *Bottom
+
 	// CheckFunction validates the contracts of a concrete function value.
 	// Public validation supplies the conformance checker here. Internal
 	// evaluation can still inspect a closure's concrete representation while
@@ -56,6 +61,11 @@ func Validate(ctx *OpContext, v *Vertex, cfg *ValidateConfig) *Bottom {
 		cfg = &ValidateConfig{}
 	}
 	x := validator{ValidateConfig: *cfg, ctx: ctx}
+	if cfg.CheckInterfaces != nil {
+		if b := cfg.CheckInterfaces(ctx, v); b != nil {
+			x.add(b)
+		}
+	}
 	x.validate(v)
 	if b := ctx.Cancelled(); b != nil {
 		return b

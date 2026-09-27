@@ -47,6 +47,22 @@ func (r *RigidType) validate(c *OpContext, value Value) *Bottom {
 // FunctionTypeParameters returns the still-bound universal telescope.
 func FunctionTypeParameters(t FuncType) []*TypeParameter { return typeParameters(t.Env) }
 
+// TypeParameterScope finds the declaring telescope in a possibly deeper
+// lexical environment. Bounds use that scope's relative references, not the
+// field or nested function scope in which the parameter is later observed.
+func TypeParameterScope(env *Environment, param *TypeParameter) *Environment {
+	for ; env != nil; env = env.Up {
+		if env.types != nil {
+			for _, p := range env.types.quantifier.Params {
+				if p == param {
+					return env
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // SelectFunctionType performs explicit universal elimination. The source's
 // conformance is a premise supplied by the caller; selection checks the type
 // argument's bound and preserves the original obligations and call frontier.

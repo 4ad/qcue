@@ -1,15 +1,13 @@
-// Intersecting effectful arrows retains their common admitted failure outcome.
-// An unspecified implementation is still incomplete; a pure obligation or
-// disjoint effect tags can rule out the shared outcome and establish conflict.
+// Common admitted failure outcomes do not satisfy the explicit interface's
+// successful observations. Relevance blocks these descriptions, including
+// unimplemented and generic declarations, independently of their effect tags.
 
 -- in.cue --
-@test(validate, at="shared")
-@test(validate, concrete, incomplete, at="shared")
-@test(validate, at="generic")
-@test(validate, concrete, incomplete, at="generic")
-@test(validate, conflict, at="pure")
-@test(validate, conflict, at="different")
-@test(validate, conflict, at="refined")
+@test(validate, blocked, at="shared")
+@test(validate, blocked, at="generic")
+@test(validate, blocked, at="pure")
+@test(validate, blocked, at="different")
+@test(validate, blocked, at="refined")
 
 shared: (func(int) -> int !bridge) & (func(int) -> string !bridge)
 generic:

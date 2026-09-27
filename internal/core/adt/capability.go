@@ -47,7 +47,7 @@ func mergeCapabilities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
 	}
 	m.Types = mergeFuncTypes(a.Types, incoming)
 	clauses := append([]FuncType{{Fn: m.Fn, Env: m.Env}}, m.Types...)
-	for i, t := range clauses {
+	for _, t := range clauses {
 		if t.Fn.Body != nil {
 			continue
 		}
@@ -58,18 +58,6 @@ func mergeCapabilities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom) {
 			if len(typeParameters(t.Env)) != 0 {
 				if err := refuteGenericCapability(c, &m, t); err != nil {
 					return nil, err
-				}
-			}
-		}
-		for _, u := range clauses[:i] {
-			if u.Fn.Body == nil {
-				if err := refuteArrowIntersection(c, t, u); err != nil {
-					return nil, err
-				}
-				if len(typeParameters(t.Env)) != 0 || len(typeParameters(u.Env)) != 0 {
-					if err := refuteGenericIntersection(c, t, u); err != nil {
-						return nil, err
-					}
 				}
 			}
 		}
@@ -284,57 +272,6 @@ func probeBody(x Expr) bool {
 		return true
 	}
 	return false
-}
-
-func refuteArrowIntersection(c *OpContext, a, b FuncType) *Bottom {
-	// Disjoint successful results do not refute two contracts that admit
-	// the same failure outcome. Such an implementation may raise that
-	// effect at every packet in their overlapping domain.
-	if a.Fn.Src != nil && b.Fn.Src != nil &&
-		a.Fn.Src.Effect != nil && b.Fn.Src.Effect != nil &&
-		a.Fn.Src.Effect.Name == b.Fn.Src.Effect.Name {
-		return nil
-	}
-	if !fixedCapabilityExpr(a.Fn.Ret) || !fixedCapabilityExpr(b.Fn.Ret) ||
-		len(a.Fn.Params) != len(b.Fn.Params) {
-		return nil
-	}
-	// Only identical packet protocols are compared here; unequal protocols
-	// remain separate clauses until a packet proves that their domains meet.
-	for i, p := range a.Fn.Params {
-		q := b.Fn.Params[i]
-		if p.Positional != q.Positional || p.Label != q.Label ||
-			p.ArcType != q.ArcType || p.Default != nil || q.Default != nil ||
-			!fixedCapabilityExpr(q.Value) {
-			return nil
-		}
-	}
-	if a.Fn.Ret == nil || b.Fn.Ret == nil {
-		return nil
-	}
-	v := c.newInlineVertex(nil, nil,
-		MakeRootConjunct(a.Env, a.Fn.Ret), MakeRootConjunct(b.Env, b.Fn.Ret))
-	v.Finalize(c)
-	if bottom := v.Bottom(); bottom == nil || bottom.IsIncomplete() {
-		return nil
-	}
-	var witness string
-	capabilityPackets(c, a, func(packet *CallExpr) bool {
-		if len(packet.Args) != len(b.Fn.Params) {
-			return true
-		}
-		for i, value := range packet.Args {
-			if capabilityMember(c, b.Env, b.Fn.Params[i].Value, value.(Value)) != proofEstablished {
-				return true
-			}
-		}
-		witness = capabilityPacket(c, packet)
-		return false
-	})
-	if witness != "" {
-		return c.NewErrf("incompatible function results at admitted packet %s", witness)
-	}
-	return nil
 }
 
 // checkCallResult checks consequences of admitted clauses against the body's

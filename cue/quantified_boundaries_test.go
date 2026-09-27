@@ -112,13 +112,21 @@ func TestQuantifiedBoundaryAbstractAdmission(t *testing.T) {
 	// An intersection contributes every established consequence, regardless
 	// of its head clause. A packet outside one domain remains possible.
 	for _, contract := range []string{
-		`(func({a: 1}) -> string) & (func({}) -> int)`,
-		`(func({}) -> int) & (func({a: 1}) -> string)`,
+		`(func({a: 1}) -> string) & (func({}) -> (int|string))`,
+		`(func({}) -> (int|string)) & (func({a: 1}) -> string)`,
 	} {
 		v := semanticValue(t, "f: "+contract+"\nout: f({}) & 0")
 		if err := v.Validate(); err != nil {
 			t.Fatalf("inapplicable clause constrained abstract result: %v", err)
 		}
+	}
+	// The earlier version allowed this explicit interface. Its observations
+	// conflict at {a: 1}, even though this particular call uses {}. Keep the
+	// old program as a rejection case, and test abstract admission above with
+	// compatible result clauses.
+	v := semanticValue(t, "f: (func({a: 1})->string) & (func({})->int)\nout: f({}) & 0")
+	if err := v.Validate(); err == nil {
+		t.Fatal("an unobserved explicit overlap escaped relevance checking")
 	}
 }
 

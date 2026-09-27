@@ -2362,12 +2362,13 @@ func (v Value) Validate(opts ...Option) error {
 	o.updateOptions(opts)
 
 	cfg := &adt.ValidateConfig{
-		Concrete:       o.concrete,
-		Final:          o.final,
-		DisallowCycles: o.disallowCycles,
-		AllErrors:      true,
-		CheckFunction:  subsume.ValidateFunction,
-		CheckBuiltin:   subsume.ValidateBuiltin,
+		Concrete:        o.concrete,
+		Final:           o.final,
+		DisallowCycles:  o.disallowCycles,
+		AllErrors:       true,
+		CheckInterfaces: subsume.ValidateInterfaces,
+		CheckFunction:   subsume.ValidateFunction,
+		CheckBuiltin:    subsume.ValidateBuiltin,
 	}
 
 	b := adt.Validate(v.ctx(), v.v, cfg)

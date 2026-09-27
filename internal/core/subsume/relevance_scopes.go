@@ -52,7 +52,7 @@ func (r *relevanceChecker) declarations(clauses []adt.FuncType) ([]adt.FuncType,
 		owned := make(map[*adt.TypeParameter]bool)
 		for _, param := range d.params {
 			owned[param] = true
-			bound := r.p.schema(d.opened.Env, param.Bound)
+			bound := r.p.schema(adt.TypeParameterScope(d.opened.Env, param), param.Bound)
 			if bound == nil {
 				return nil, r.blocked("universal bound remains unresolved")
 			}

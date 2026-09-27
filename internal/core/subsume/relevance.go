@@ -29,6 +29,7 @@ import (
 type RelevanceError struct {
 	Limit  bool
 	Reason string
+	source adt.Node
 }
 
 func (e *RelevanceError) Error() string { return "interface relevance blocked: " + e.Reason }

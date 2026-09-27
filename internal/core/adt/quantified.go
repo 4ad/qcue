@@ -910,29 +910,6 @@ func refuteGenericFunction(c *OpContext, f *FuncValue) (err *Bottom) {
 	return err
 }
 
-func refuteGenericIntersection(c *OpContext, a, b FuncType) (err *Bottom) {
-	budget := 64
-	genericInstances(c, &FuncValue{Fn: a.Fn, Env: a.Env}, func(x *FuncValue) bool {
-		x = groundSignature(c, x)
-		if x == nil {
-			return true
-		}
-		genericInstances(c, &FuncValue{Fn: b.Fn, Env: b.Env}, func(y *FuncValue) bool {
-			if budget == 0 {
-				return false
-			}
-			budget--
-			if y = groundSignature(c, y); y != nil {
-				err = refuteArrowIntersection(c, FuncType{Fn: x.Fn, Env: x.Env},
-					FuncType{Fn: y.Fn, Env: y.Env})
-			}
-			return err == nil
-		})
-		return err == nil && budget > 0
-	})
-	return err
-}
-
 func refuteGenericCapability(c *OpContext, impl *FuncValue, t FuncType) (err *Bottom) {
 	if !probeBody(impl.Fn.Body) {
 		return nil
