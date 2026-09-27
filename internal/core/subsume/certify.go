@@ -68,9 +68,15 @@ func (p *certifier) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bo
 }
 
 type proofScope struct {
-	values map[adt.Feature]adt.Value
-	fields map[adt.Feature]adt.Expr
-	active map[adt.Feature]bool
+	values   map[adt.Feature]adt.Value
+	fields   map[adt.Feature]adt.Expr
+	bindings map[adt.Feature][]proofBinding
+	active   map[adt.Feature]bool
+}
+
+type proofBinding struct {
+	env  *adt.Environment
+	expr adt.Expr
 }
 
 type certifier struct {
@@ -645,13 +651,19 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				scope.active[x.Label] = true
 				var v adt.Value
 				var function *adt.FuncValue
+				bindings := scope.bindings[x.Label]
+				if len(bindings) == 1 {
+					e = bindings[0].env
+				}
 				switch literal := field.(type) {
 				case *adt.Function:
 					function = &adt.FuncValue{Fn: literal, Src: literal.Src, Env: e}
 				case *adt.Quantified:
 					function, _ = adt.Unwrap(p.schema(e, literal)).(*adt.FuncValue)
 				}
-				if function != nil {
+				if len(bindings) > 1 {
+					v = p.bindingMeet(bindings)
+				} else if function != nil {
 					// Tie only annotated function bindings before checking
 					// their bodies. Ordinary cyclic data is never a typing
 					// hypothesis. Failed bodies remove the temporary binding.
@@ -888,6 +900,11 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		return nil
 	case *adt.BinaryExpr:
+		if x.Op == adt.AndOp {
+			if value, handled := p.recordMeet([]proofBinding{{env, x.X}, {env, x.Y}}); handled {
+				return value
+			}
+		}
 		a, b := p.expr(env, x.X), p.expr(env, x.Y)
 		if a == nil || b == nil {
 			return nil

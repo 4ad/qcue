@@ -31,6 +31,15 @@ func TestQuantifiedConstructorMeets(t *testing.T) {
 		{"argument", `f:func(r:{a:int})->{a:int,b:true}:r&{b:true}`, `f({a:2})`, `{"b":true,"a":2}`},
 		{"repeated", `f:func()->{a:1,b:true,c:"c"}:({a:1}&{b:true})&{c:"c"}`, `f()`, `{"a":1,"b":true,"c":"c"}`},
 		{"callback", `f:func(g:func(int)->int)->int:({a:g}&{b:true}).a(1)`, `f(func(x:int)->int:x+1)`, `2`},
+		{"method_capture", `f:func(n:int)->(func()->int):({capture:_
+get:func()->int:capture}&{capture:n}).get`, `f(3)()`, `3`},
+		{"method_capture_reverse", `f:func(n:int)->(func()->int):({capture:n}&{capture:_
+get:func()->int:capture}).get`, `f(3)()`, `3`},
+		{"generic_method_capture", `Code(T)={capture:_
+get:func()->T:capture}
+f(A):func(n:A)->(func()->A):(Code(A)&{capture:n}).get`, `f(3)()`, `3`},
+		{"nested_method_capture", `f:func(n:int)->(func()->int):({r:{capture:_
+get:func()->int:capture}}&{r:{capture:n}}).r.get`, `f(3)()`, `3`},
 		{"conditional", `f:func()->{r:{a:1,b:true}}:{
 if true {r:{a:1}}
 if true {r:{b:true}}
@@ -55,6 +64,12 @@ if true {r:{b:true}}}`,
 capture:{a:1}
 get:func()->close({a:int}):capture
 }&{capture:{b:true}}).get`,
+		`f:func(n:string)->(func()->int):({capture:_
+get:func()->int:capture}&{capture:n}).get`,
+		`f:func(n:int)->(func()->int):({capture:_
+get:func()->int:capture}&{other:n}).get`,
+		`f:func(n:int)->(func()->int):({capture:_
+get:func()->int:capture}&{capture:n,bad:n+"s"}).get`,
 	} {
 		v := cuecontext.New().CompileString(source)
 		f := v.LookupPath(cue.ParsePath("f"))
