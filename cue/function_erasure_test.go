@@ -15,10 +15,13 @@
 package cue_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
 )
 
@@ -28,11 +31,15 @@ func TestQuantifiedResultErasure(t *testing.T) {
 	for _, tt := range []struct{ name, source string }{
 		{"inferred", `f(A): func(xs: [...A]) -> {b: A}: {a: xs[0], c: self.b}
 out: f([1, 2, 3])`},
+		{"inferred_refined", `f(A): func(xs: [...A]) -> {b: A}: {a: xs[0], c: self.b}
+out: f([1, 2, 3]) & {b: 1}`},
 		{"selected", `f(A): func() -> {b: A}: {c: self.b}
 out: f[1]()`},
 		{"universal", `f(A): func(x: A) -> {a: 1}: x
 out: f({x: "x"})`},
 		{"field", `out: (func() -> {a: 1}: {})()`},
+		{"hidden", `out: (func() -> {_a: 1}: {})()`},
+		{"definition", `out: (func() -> {#A: 1}: {})()`},
 		{"nested", `out: (func() -> {n: {a: 1}}: {n: {}})()`},
 		{"list", `out: (func() -> [{a: 1}]: [{}])()`},
 		{"choice", `out: (func() -> 1: 1 | 2)()`},
@@ -114,6 +121,22 @@ func TestQuantifiedCallErasureIdentity(t *testing.T) {
 	}
 }
 
+// Empty packets, omission defaults, and captured empty records supply no
+// inhabitants of A. Different admitted selections must stay observationally
+// identical, including when checked views are conjoined in either order.
+func TestQuantifiedCallErasureConstant(t *testing.T) {
+	for _, selection := range []string{"f[1]", "f[2]", "f[1] & f[2]", "f[2] & f[1]"} {
+		for _, implementation := range []string{
+			`func() -> {}: {}`,
+			`func(x: {v?: A} = {}) -> _: x`,
+			`func(x: {v?: A} = {}) -> _: (func() -> _: x)()`,
+		} {
+			v := semanticValue(t, "f(A): "+implementation+"\ng: "+selection+"\nout: g() & {v: true}")
+			semanticJSON(t, v, "out", `{"v":true}`)
+		}
+	}
+}
+
 // Erasure includes negative information and future refinements, not just JSON
 // fields. An absent optional field or pattern in a contract cannot become a
 // constraint on the returned record or on data captured by a returned closure.
@@ -188,25 +211,127 @@ out: g(1)`,
 // the evidence needed to open a covariant existential again.
 func TestQuantifiedCallErasureExistentialEvidence(t *testing.T) {
 	for _, expr := range []string{"id({x: 1})", "make()", "id({x: 1}, ...)()", "saved()", "copy"} {
-		v := semanticValue(t, `
+		t.Run(expr, func(t *testing.T) {
+			v := semanticValue(t, `
 #M: exists A {x: A}
 id: func(p: #M) -> _: p
 make: func() -> #M: {x: 1}
 capture: func(p: #M) -> _: func() -> _: p
 saved: capture({x: 1})
 copy: make() & {extra: 2}
-out: (open (`+expr+`) as (A, P) {value: 7}).value
-raw: (`+expr+`).x
+value: `+expr+`
+out: (open value as (A, P) {value: 7}).value
+raw: value.x
 `)
-		semanticJSON(t, v, "out", "7")
-		semanticJSON(t, v, "raw", "1")
-		for _, options := range [][]cue.Option{nil, {cue.Final()}} {
-			source, err := format.Node(v.LookupPath(cue.ParsePath("saved")).Syntax(options...))
-			if err != nil {
-				t.Fatal(err)
+			semanticJSON(t, v, "out", "7")
+			semanticJSON(t, v, "raw", "1")
+			for _, path := range []string{"saved", "value"} {
+				for mode, options := range [][]cue.Option{nil, {cue.Final()}, {cue.Concrete(true)}} {
+					source, err := format.Node(v.LookupPath(cue.ParsePath(path)).Syntax(options...))
+					if err != nil {
+						t.Fatal(err)
+					}
+					use := path
+					if path == "saved" {
+						use += "()"
+					}
+					rebuilt := semanticValue(t, path+": "+string(source)+"\nout: (open "+use+" as (A, P) {value: 7}).value")
+					t.Logf("%s mode %d: %s", path, mode, source)
+					semanticJSON(t, rebuilt, "out", "7")
+				}
 			}
-			rebuilt := semanticValue(t, "saved: "+string(source)+"\nout: (open saved() as (A, P) {value: 7}).value")
-			semanticJSON(t, rebuilt, "out", "7")
+		})
+	}
+}
+
+// Evidence can become inapplicable after refinement without becoming a new
+// constraint. Export must not resurrect it as an obligation on the value.
+func TestQuantifiedCallErasureRefinedEvidence(t *testing.T) {
+	v := semanticValue(t, `
+#M: exists A {x: A, optional?: 1}
+make: func() -> #M: {x: 1}
+out: make() & {optional: 2}
+`)
+	semanticJSON(t, v, "out", `{"x":1,"optional":2}`)
+	for _, options := range [][]cue.Option{nil, {cue.Final()}} {
+		source, err := format.Node(v.LookupPath(cue.ParsePath("out")).Syntax(options...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rebuilt := semanticValue(t, "out: "+string(source))
+		semanticJSON(t, rebuilt, "out", `{"x":1,"optional":2}`)
+	}
+}
+
+// An independent finite denotation checks both acceptance and erasure. A
+// packet has two presence bits and fields drawn from a finite alphabet; a
+// predicate has two presence requirements and sets of permitted field values.
+// Expectations use only those bits and sets, never CUE unification or proofs.
+func TestQuantifiedCallErasureMembershipModel(t *testing.T) {
+	width := 2
+	if extendedQuantifiedOracle(t) {
+		width = 3
+	}
+	ctx := cuecontext.New()
+	cases := 0
+	for maskX := 1; maskX < 1<<width; maskX++ {
+		for maskY := 1; maskY < 1<<width; maskY++ {
+			for optional := range 4 {
+				var fields []string
+				for i, mask := range []int{maskX, maskY} {
+					var values []string
+					for v := range width {
+						if mask&(1<<v) != 0 {
+							values = append(values, fmt.Sprint(v))
+						}
+					}
+					mark := ""
+					if optional&(1<<i) != 0 {
+						mark = "?"
+					}
+					fields = append(fields, fmt.Sprintf("%s%s: %s", []string{"x", "y"}[i], mark, strings.Join(values, " | ")))
+				}
+				predicate := "{" + strings.Join(fields, ", ") + "}"
+				for x := -1; x < width; x++ {
+					for y := -1; y < width; y++ {
+						packet := map[string]int{}
+						admitted := true
+						for i, v := range []int{x, y} {
+							if v < 0 {
+								admitted = admitted && optional&(1<<i) != 0
+							} else {
+								packet[[]string{"x", "y"}[i]] = v
+								admitted = admitted && []int{maskX, maskY}[i]&(1<<v) != 0
+							}
+						}
+						data, err := json.Marshal(packet)
+						if err != nil {
+							t.Fatal(err)
+						}
+						for _, program := range []string{
+							"out: (func(p: " + predicate + ") -> _: p)(" + string(data) + ")",
+							"out: (func() -> " + predicate + ": " + string(data) + ")()",
+							"f: (func(p: _) -> _: p) & (func(_) -> " + predicate + ")\nout: f(" + string(data) + ")",
+							"f: (func(p: _) -> _: p) & (func(_) -> " + predicate + ")\nout: f(" + string(data) + ", ...)()",
+						} {
+							if cases%256 == 0 {
+								ctx = cuecontext.New()
+							}
+							cases++
+							out := ctx.CompileString(program).LookupPath(cue.ParsePath("out"))
+							got, err := out.MarshalJSON()
+							if admitted {
+								if err != nil || string(got) != string(data) {
+									t.Fatalf("admitted packet changed: got %s, %v; want %s\n%s", got, err, data, program)
+								}
+							} else if err == nil || out.Validate() == nil {
+								t.Fatalf("contract must refute this complete packet: got %s, %v\n%s", got, err, program)
+							}
+						}
+					}
+				}
+			}
 		}
 	}
+	t.Logf("checked %d call boundaries over %d field values", cases, width)
 }

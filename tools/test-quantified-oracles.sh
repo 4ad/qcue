@@ -24,7 +24,7 @@ case "$CUE_QUANTIFIED_ORACLE" in
 esac
 
 go test ./cue ./internal/core/adt \
-    -run '^TestQuantified(Oracle|Semantic|Boundary|PacketDomainModel$)' \
+    -run '^TestQuantified(Oracle|Semantic|Boundary|CallErasure|ArgumentErasure|ResultErasure|PacketDomainModel$)' \
     -count=1 -v -timeout=15m
 
 if [ "$CUE_QUANTIFIED_ORACLE" = fast ]; then

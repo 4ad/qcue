@@ -15,6 +15,7 @@ universes and runs coverage-guided fuzzing with replayable minimized failures.
 | Dependent finite domains | 480 cases covering every prefix/domain combination in the vocabulary | 122,880 cases, also exhausting all ternary Boolean relations on two values |
 | Dependent subtype bounds | All 512 chains of subsets of `{0,1,2}` | Same |
 | Record membership | 2,592 cases on two values | 25,088 cases on three values |
+| Call boundary membership and erasure | 1,296 cases on two values | 12,544 cases on three values |
 | Packet-domain intersection | 28,561 ordered row pairs, 12 packet shapes each | 16,875,664 ordered row pairs, 32 packet shapes each |
 | Seeded random finite models | 128 | 4,096 |
 | Generated preservation transformations | 48 models × 10 transformations | 512 models × 10 transformations |
@@ -51,6 +52,13 @@ concrete observation must match the oracle. Incompleteness fails those tests.
 The membership model distinguishes conflict, compatible incomplete descriptions,
 and complete membership. Required/optional presence, all four field classes,
 and both conjunction orders are retained from the original model.
+
+The call boundary model treats a supplied packet or computed result as an
+independent runtime value. It checks required and optional presence and finite
+field membership through parameter annotations, return annotations, attached
+contracts, and partial calls. Every admitted call must return exactly the model's
+packet; every excluded complete packet must give a definite conflict. This
+distinguishes checking an output from constructing one with its annotation.
 
 Feature combinations use identity implementations, whose membership in
 `D -> R` is exactly finite-set inclusion `D ⊆ R`. The seven independent switches

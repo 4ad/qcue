@@ -61,7 +61,7 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 		return e.predicateValue(n)
 	}
 	defer func() {
-		for _, witness := range n.CallWitnesses() {
+		for _, witness := range n.CallWitnesses(e.ctx) {
 			// A proved existential permits opening this value, but must not
 			// become a data constraint during source reconstruction. An
 			// identity call re-establishes the proof on the exported packet.
