@@ -144,21 +144,20 @@ expanding a parametric alias also retains its supplied specialization.
 
 Conjoining function contracts retains every guarded capability clause. An
 implementation keeps its original labels, defaults, omitted-argument behavior,
-and extra-argument policy. Applicable clauses check its actual call result.
-An unresolved applicability guard remains an obligation. Applicability is
-checked against the original supplied packet, before implementation defaults
-supply omitted slots. Abstract application retains missing execution
-as an obligation and propagates only independently admitted result clauses.
+and extra-argument policy. Definition checking proves each result implication
+under its admitted packets. Call checking uses the original supplied packet,
+before implementation defaults supply omitted slots. Abstract application
+retains missing execution as a link obligation and propagates independently
+admitted result clauses.
 
-Implemented calls evaluate arguments and bodies independently of their
-annotations. A parameter or result predicate must establish membership of
-the supplied value, or inclusion of an independently computed schema. A
-compatible unification alone proves neither. The checker never publishes that
-unification as the argument or result: annotations cannot add fields, solve
-`self` references, choose alternatives or defaults, or leave optional fields
-and patterns on the returned value. A contradicted check fails the call;
-an unresolved check leaves it incomplete. Ordinary constraints written in the
-body and declared omission defaults remain part of the implementation.
+Implemented calls evaluate arguments and bodies independently of annotations.
+A strict source derivation must establish packet compatibility and implementation
+conformance before execution; a compatible unification or a successful trial
+proves neither. Annotations then erase: they cannot add fields, solve `self`
+references, choose alternatives or defaults, filter results, or leave optional
+fields and patterns on returned data. A missing proof blocks the application.
+Ordinary constraints written in the body and declared omission defaults remain
+part of the implementation, and a checked computation may fail or diverge.
 
 This boundary enforces type erasure operationally, in addition to the
 compiler's ban on using type parameters as runtime values. Changing an admitted
@@ -171,8 +170,8 @@ the older relational function semantics.
 
 For callable domains, including callbacks inside records or lists, applicability
 requires independent conformance evidence from the original argument.
-Completing a call also checks the actual packet's callable membership
-obligations before returning or caching its result. Ignoring a callback, or
+Static call checking also discharges the actual packet's callable membership
+obligations before execution or reuse of a cached result. Ignoring a callback, or
 calling it on one successful input, cannot discharge its universal contract.
 These checks include hidden runtime fields in packets, captured records and
 package implementations. Host schema validation of undemanded definitions and
@@ -181,10 +180,10 @@ absent optional fields remains separate from runtime conformance.
 Builtins obey the same rule. Their package declarations define their original
 protocol; adding a client contract cannot install a default or rename a slot.
 Attached contracts require an independent conformance proof. The current rules
-cover `len` and the total string primitives `ToUpper`, `ToLower`, `ToTitle`,
+cover `len`, `close`, and the string primitives `ToUpper`, `ToLower`, `ToTitle`,
 `Compare`, `Contains`, `ContainsAny`, `HasPrefix`, and `HasSuffix`. Supported
 inclusion proofs and exhaustive singleton scalar packets can discharge a clause;
-other builtin promises remain incomplete. Source export retains client clauses.
+other builtin promises remain blocked. Source export retains client clauses.
 
 Concrete closures compare by code origin, captured runtime values, and bound
 partial arguments. Type arguments are erased. Two different bodies are different
@@ -213,15 +212,13 @@ Validation distinguishes retaining constraints from requiring a complete value:
 
 | Request | Meaning |
 | --- | --- |
-| `value.Validate()` | Report established contradictions; allow residual obligations. |
-| `value.Validate(cue.Concrete(true))` | Require materialized values, complete runtime captures, and function implementations proved to satisfy their declared contracts for arbitrary admitted inputs. |
+| `value.Validate()` | Report data contradictions and require relevance and strict conformance proofs for supplied function bodies; permit typed, unlinked imports and incomplete data. |
+| `value.Validate(cue.Concrete(true))` | Also require materialized values, complete runtime captures, and linked function implementations. |
 
-`cue vet file.cue` requires concrete validation, including function type
-conformance. An unresolved contract makes validation incomplete; use `cue vet -c`
-to see the detailed errors. There is no separate function-verification flag.
-`cue vet -c=false` explicitly permits incomplete constraints for further
-refinement and does not establish that every retained implementation satisfies
-its type. Definitions and absent optional fields remain schemas until demanded
+`cue vet file.cue` requires concrete validation. An unproved function contract
+blocks ordinary validation as well; there is no separate verification flag.
+`cue vet -c=false` permits incomplete data and unlinked declarations for further
+refinement, while supplied implementations still need their static proofs. Definitions and absent optional fields remain schemas until demanded
 as ordinary values, following CUE's usual concreteness rules.
 
 The conformance checker handles annotated structural bodies, higher-rank
@@ -248,7 +245,8 @@ of admitted input packets, while keeping original obligations separate from a
 selected view's available domain. Definition fields and absent optional fields
 do not introduce executable callback hypotheses.
 Primitive proof rules check the actual labels, arity, and omission policy before
-using a known total result rule.
+using a known successful-result rule. Certified additional primitive contracts
+retain their applicable result consequences; annotations do not filter execution.
 Explicit type applications inside bodies check the selected argument's bound
 and retain the original universal obligation. A checked call's result carries
 its callable evidence into later selections and applications, including
@@ -304,10 +302,12 @@ checking scope. Local annotated function bindings can refer to themselves or
 each other while their bodies are checked; ordinary cyclic data supplies no
 such hypothesis. The work budget
 bounds repeated proof expansion as well as depth. Exhaustion reports
-incompleteness and leaves the original obligations available for another check.
+a blocked static judgment and leaves the original obligations available for
+another checking attempt.
 
-Unproved arithmetic implications, optional
-presence branches, arbitrary quantified Boolean inclusion, and general
+Optional parameter presence tests refine the corresponding branch without
+leaking presence to sibling branches. Unproved arithmetic implications,
+optional record-field presence refinements, arbitrary quantified Boolean inclusion, and general
 existential witness synthesis remain incomplete. Effect annotations are retained
 and compared as capabilities, but implementation proofs for functions marked
 with effects or `extern` remain unsupported. An `extern` declaration does not

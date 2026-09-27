@@ -77,6 +77,12 @@ func (p *certifier) sourceMeet(a, b adt.Value) adt.Value {
 	if value == nil || refuted(value) {
 		return value
 	}
+	if builtin, ok := adt.Unwrap(value).(*adt.Builtin); ok {
+		if ValidateBuiltin(p.ctx, builtin) != nil {
+			return nil
+		}
+		return builtin
+	}
 	if f, ok := adt.Unwrap(value).(*adt.FuncValue); ok {
 		// A function meet collects obligations on one implementation. Its
 		// components cannot be used as independent alternatives that drop an
@@ -200,4 +206,30 @@ func (p *certifier) sourceDescription(value adt.Value) adt.Value {
 		return &out
 	}
 	return value
+}
+
+// A literal arrow in a source meet is an annotation of the other operand.
+// It cannot introduce an executable import hypothesis by itself.
+func (p *certifier) functionAnnotation(env *adt.Environment, expr adt.Expr) (adt.Value, bool) {
+	body := expr
+	if q, ok := body.(*adt.Quantified); ok && !q.Src.Exists {
+		body = q.Body
+	}
+	f, ok := body.(*adt.Function)
+	if !ok || f.Body != nil {
+		return nil, false
+	}
+	if !p.typeOperations(env, expr) {
+		return nil, true
+	}
+	return p.schema(env, expr), true
+}
+
+func (p *certifier) assertFunction(value, annotation adt.Value) adt.Value {
+	if value == nil || annotation == nil || value.Kind() != adt.FuncKind {
+		return nil
+	}
+	// sourceMeet collects the obligations on the supplied implementation
+	// and checks its unchanged body before exposing any result clause.
+	return p.sourceMeet(value, annotation)
 }

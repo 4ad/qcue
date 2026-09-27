@@ -1192,6 +1192,12 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			if value, handled := p.recordMeet([]proofBinding{{env, x}}); handled {
 				return value
 			}
+			if a, annotation := p.functionAnnotation(env, x.X); annotation {
+				return p.assertFunction(p.expr(env, x.Y), a)
+			}
+			if b, annotation := p.functionAnnotation(env, x.Y); annotation {
+				return p.assertFunction(p.expr(env, x.X), b)
+			}
 		}
 		a, b := p.expr(env, x.X), p.expr(env, x.Y)
 		if a == nil || b == nil {
@@ -1765,7 +1771,8 @@ func (p *certifier) callValue(callee adt.Value, target adt.FuncType) adt.Value {
 		}
 		source = adt.FuncType{Fn: f.ResidualSignature(), Env: f.Env}
 	case *adt.Builtin:
-		// Primitive totality and packet coverage are separate obligations.
+		// Primitive successful-result rules and packet coverage are separate
+		// obligations.
 		// Use the same protocol as builtin capability inclusion, including
 		// its label and omission rules.
 		source.Fn = primitiveContract(p.ctx, f)
@@ -1777,6 +1784,9 @@ func (p *certifier) callValue(callee adt.Value, target adt.FuncType) adt.Value {
 	}
 	sources := []adt.FuncType{source}
 	results := sources
+	if builtin, ok := callee.(*adt.Builtin); ok {
+		results = append(slices.Clone(sources), builtin.AdditionalTypes()...)
+	}
 	if f, ok := callee.(*adt.FuncValue); ok {
 		if p.hypotheses[f] {
 			p.useHypothesis(f)

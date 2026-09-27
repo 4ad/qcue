@@ -1,0 +1,18 @@
+// Inline annotations constrain a supplied function without creating a body.
+// Proven builtin clauses retain their stronger successful-result descriptions.
+
+-- in.cue --
+@test(json, [3, 3, "ABC", "ABC"], at="out")
+@test(validate, blocked, at="wrong")
+@test(validate, blocked, at="missing")
+
+import "strings"
+
+left: func(x: int) -> int: ((func(int) -> int) & (func(y: int) -> int: y))(x)
+right: func(x: int) -> int: ((func(y: int) -> int: y) & (func(int) -> int))(x)
+wrong: func() -> int: ((func(int) -> 1) & (func(_) -> int: 2))(0)
+missing: func() -> int: ((func(int) -> int) & _)(0)
+exact: strings.ToUpper & (func("abc") -> "ABC")
+primitive: func() -> "ABC": exact("abc")
+inlinePrimitive: func() -> "ABC": (strings.ToUpper & (func("abc") -> "ABC"))("abc")
+out: [left(3), right(3), primitive(), inlinePrimitive()]
