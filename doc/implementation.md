@@ -256,6 +256,11 @@ selected native views and calls with a previously saved list or comparator.
 A saved comparator retains its source and live captures: its uninvoked fields
 are not incomplete captured data. Repeated template proofs retain their input
 domain and callback hypotheses, and resumed proofs reread live captures.
+Templates produced by the same factory compare their code and free captures;
+unused factory arguments and local comparison operands do not determine their
+identity. Private names for saved templates export their original source in
+its lexical environments. Each runtime comparison resolves that source into
+a fresh field set before supplying its operands.
 Sorting preserves incomplete comparison errors so later refinement can supply
 missing operands. Constructing an
 `IsSorted` validator checks the template without invoking a comparison; its

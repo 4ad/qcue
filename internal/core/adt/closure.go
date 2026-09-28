@@ -54,6 +54,20 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 		if template && x == y && sameTemplateEnvironment(c, xe, ye) {
 			return
 		}
+		if literal, ok := x.(*StructLit); template && ok && x == y && literal.References != nil {
+			// The local x, y, and less fields describe a future comparison.
+			// Identity of this saved template depends on its code and free
+			// dependencies, not on completed inhabitants of those fields.
+			switch templateLiteralIdentity(c, literal, xe, ye) {
+			case proofRefuted:
+				result = proofRefuted
+			case proofUnknown:
+				if result != proofRefuted {
+					result = proofUnknown
+				}
+			}
+			return
+		}
 		xv, _ := c.Evaluate(xe, x)
 		yv, _ := c.Evaluate(ye, y)
 		if cell, ok := xv.(*Vertex); template && ok && cell == yv {
@@ -62,7 +76,13 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 			// same saved template even before x and y have been supplied.
 			return
 		}
-		switch runtimeValueIdentity(c, xv, yv) {
+		comparison := proofUnknown
+		if template {
+			comparison = templateValueIdentity(c, xv, yv)
+		} else {
+			comparison = runtimeValueIdentity(c, xv, yv)
+		}
+		switch comparison {
 		case proofUnknown:
 			if result != proofRefuted {
 				result = proofUnknown
@@ -90,6 +110,59 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 		if x.expr != nil {
 			compare(x.expr, x.env, y.expr, y.env,
 				a.NativeTemplateArgument(c, i) && b.NativeTemplateArgument(c, i))
+		}
+	}
+	return result
+}
+
+func templateLiteralIdentity(c *OpContext, literal *StructLit, a, b *Environment) proofResult {
+	result := proofEstablished
+	for _, ref := range literal.References {
+		x, _ := c.Evaluate(a, ref)
+		y, _ := c.Evaluate(b, ref)
+		switch runtimeValueIdentity(c, x, y) {
+		case proofRefuted:
+			return proofRefuted
+		case proofUnknown:
+			result = proofUnknown
+		}
+	}
+	return result
+}
+
+// References to factory-local templates retain their original conjuncts.
+// Match those code origins and environments rather than requiring the local
+// comparison fields to be complete. A different source graph stays unknown;
+// this is not an equivalence test for arbitrary CUE schemas.
+func templateValueIdentity(c *OpContext, a, b Value) proofResult {
+	x, xok := a.(*Vertex)
+	y, yok := b.(*Vertex)
+	if !xok || !yok || x.Bottom() != nil || y.Bottom() != nil {
+		return runtimeValueIdentity(c, a, b)
+	}
+	xs := slices.Collect(x.LeafConjuncts())
+	ys := slices.Collect(y.LeafConjuncts())
+	if len(xs) == 0 || len(xs) != len(ys) {
+		return proofUnknown
+	}
+	result := proofEstablished
+	for i, left := range xs {
+		right := ys[i]
+		if left.Expr() != right.Expr() {
+			return proofUnknown
+		}
+		if sameTemplateEnvironment(c, left.Env, right.Env) {
+			continue
+		}
+		literal, ok := left.Expr().(*StructLit)
+		if !ok || literal.References == nil {
+			return proofUnknown
+		}
+		switch templateLiteralIdentity(c, literal, left.Env, right.Env) {
+		case proofRefuted:
+			return proofRefuted
+		case proofUnknown:
+			result = proofUnknown
 		}
 	}
 	return result

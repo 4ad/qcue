@@ -46,6 +46,11 @@ type StructLit struct {
 	Src   ast.Node // ast.File or ast.StructLit
 	Decls []Decl
 
+	// References records free dependencies in the enclosing scope for
+	// comparing saved native templates. A nil slice means that this metadata
+	// is unavailable, as with a synthesized structural description.
+	References []Expr
+
 	// TODO: record the merge order somewhere.
 }
 

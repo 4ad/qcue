@@ -69,7 +69,9 @@ func (s *valueSorter) lessNew(i, j int) bool {
 		Conjuncts: s.cmp.Conjuncts,
 	}
 
-	n.Init(ctx)
+	// A named comparator can require reference evaluation before its
+	// fields exist. Complete the field set without demanding less itself.
+	n.CompleteArcsShallow(ctx)
 
 	less := getArc(ctx, n, "less")
 	xa := getArc(ctx, n, "x")
@@ -118,11 +120,12 @@ func makeValueSorter(list []cue.Value, cmp cue.Value) (s valueSorter) {
 
 	v := cmp.Core()
 	ctx := eval.NewContext(v.R, v.V)
+	template := v.V.DerefValue()
 
 	n := &adt.Vertex{
-		Label:     v.V.Label,
-		Parent:    v.V.Parent,
-		Conjuncts: v.V.Conjuncts,
+		Label:     template.Label,
+		Parent:    template.Parent,
+		Conjuncts: template.Conjuncts,
 	}
 	n.CompleteArcsShallow(ctx)
 

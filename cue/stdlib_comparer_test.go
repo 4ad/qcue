@@ -138,6 +138,15 @@ saved:view(cmp:list.Ascending,...)
 sort:func(xs:[...int])->[...int]:saved(list:xs)`,
 		`make:func(n:int)->func([...int])->[...int]:list.Sort(cmp:{x:int,y:int,less:x+n<y+n},...)
 sort:make(3)`,
+		`make:func(n:int)->func([...int])->[...int]:list.Sort(cmp:{x:int,y:int,less:x+n<y+n},...)
+sort:make(3) & make(3)`,
+		`make:func(n:int,unused:string)->func([...int])->[...int]:list.Sort(cmp:{x:int,y:int,less:x+n<y+n},...)
+sort:make(3,"first") & make(3,"second")`,
+		`make:func(n:int)->func([...int])->[...int]:{
+cmp:{x:int,y:int,less:x+n<y+n}
+out:list.Sort(cmp:cmp,...)
+}.out
+sort:make(3) & make(3)`,
 		`wrap:func(f:func([...int])->[...int])->func([...int])->[...int]:func(xs:[...int])->[...int]:f(xs)
 sort:wrap(list.Sort(cmp:list.Ascending,...))`,
 		`make:func(n:int)->func([...int])->[...int]:list.Sort(cmp:{x:int,y:int,less:x+n<y+n},...)
@@ -200,6 +209,12 @@ func TestStdlibComparerDistinctTemplates(t *testing.T) {
 		`a:list.Sort(cmp:list.Ascending,...)
 b:list.Sort(cmp:list.Descending,...)`,
 		`make:func(reverse:bool)->func([...int])->[...int]:list.Sort(cmp:{x:int,y:int,less:(x<y)!=reverse},...)
+a:make(false)
+b:make(true)`,
+		`make:func(reverse:bool)->func([...int])->[...int]:{
+cmp:{x:int,y:int,less:(x<y)!=reverse}
+out:list.Sort(cmp:cmp,...)
+}.out
 a:make(false)
 b:make(true)`,
 	} {

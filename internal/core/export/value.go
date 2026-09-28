@@ -419,7 +419,7 @@ func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
 		previous := e.inlineNativeCaptures
 		e.inlineNativeCaptures = true
 		defer func() { e.inlineNativeCaptures = previous }()
-		return e.withFuncTypes(e.expr(env, call), extra)
+		return e.withFuncTypes(e.nativeBinding(env, call), extra)
 	}
 	if subject, argument, extra := f.TypeSelection(); subject != nil {
 		x := &ast.IndexExpr{X: &ast.ParenExpr{X: e.quantifiedFuncValue(subject)}, Index: e.predicateValue(argument)}
@@ -474,6 +474,79 @@ func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
 		x = &ast.IndexExpr{X: &ast.ParenExpr{X: x}, Index: e.predicateValue(v)}
 	}
 	return e.withFuncTypes(x, types)
+}
+
+// Native templates consume schema source, including uninvoked local fields.
+// A private name for such a template must be unfolded in its original scopes,
+// while ordinary private arguments still require completed runtime captures.
+func (e *exporter) nativeBinding(env *adt.Environment, call *adt.CallExpr) ast.Expr {
+	subject, ok := call.Fun.(*adt.FuncValue)
+	if !ok {
+		return e.expr(env, call)
+	}
+	copy := *call
+	copy.Args = slices.Clone(call.Args)
+	bound := make([]bool, len(subject.Fn.Params))
+	for slot := range bound {
+		_, saved := subject.BoundArgument(slot)
+		bound[slot] = saved != nil
+	}
+	next := 0
+	for i, arg := range copy.Args {
+		label := adt.InvalidLabel
+		if i < len(call.ArgLabels) {
+			label = call.ArgLabels[i]
+		}
+		slot := -1
+		if label != adt.InvalidLabel {
+			var found bool
+			slot, found = adt.BuiltinParamLabelIndex(subject.NativeBuiltin(), label)
+			if !found {
+				continue
+			}
+		} else {
+			for next < len(bound) && bound[next] {
+				next++
+			}
+			slot = next
+			next++
+		}
+		if slot >= 0 && slot < len(bound) {
+			bound[slot] = true
+		}
+		if !subject.NativeTemplateArgument(e.ctx, slot) {
+			continue
+		}
+		ref, ok := arg.(adt.Resolver)
+		if !ok {
+			continue
+		}
+		root := arg
+	base:
+		for {
+			switch r := root.(type) {
+			case *adt.SelectorExpr:
+				root = r.X
+			case *adt.IndexExpr:
+				root = r.X
+			default:
+				break base
+			}
+		}
+		if _, imported := root.(*adt.ImportReference); imported {
+			continue // The import already reconstructs this template.
+		}
+		cell, _ := e.ctx.Lookup(env, ref)
+		if cell == nil || e.exposed[cell] {
+			continue
+		}
+		group := adt.ConjunctGroup(slices.Collect(cell.LeafConjuncts()))
+		if len(group) == 0 {
+			return e.quantifiedExportError("saved native template source is unavailable")
+		}
+		copy.Args[i] = &group
+	}
+	return e.expr(env, &copy)
 }
 
 // withFuncTypes renders the function types a function value, function type,
