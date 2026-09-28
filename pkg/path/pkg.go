@@ -75,6 +75,7 @@ func newStr(s string) adt.Value {
 }
 
 var p = &pkg.Package{
+	Pure: true,
 	CUE: `{
 		Unix:    "unix"
 		Windows: "windows"

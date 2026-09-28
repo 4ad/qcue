@@ -14,6 +14,7 @@ func init() {
 var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
+	Pure: true,
 	Native: []*pkg.Builtin{{
 		Name:      "MarshalSchema",
 		Signature: "func(config: {version: string, selfContained?: bool, expandReferences?: bool, info?: _}, schema: _ @schema()) -> string",

@@ -38,6 +38,7 @@ func newInference(ctx *adt.OpContext) *inference {
 		projections:  make(map[*adt.Vertex]map[adt.Feature]adt.Value),
 		constructors: make(map[*adt.Vertex]adt.Expr),
 		memberships:  make(map[adt.Value][]*adt.LiveType),
+		grounded:     make(map[*adt.Vertex]bool),
 		records:      make(map[proofRecordKey]*proofRecord),
 		completed:    make(map[proofKey]proofCertificate), refutations: make(map[proofKey]*refutation), remaining: 10000}
 }
@@ -102,6 +103,10 @@ type inference struct {
 	// Membership facts keep live coordinates alongside normalized summaries.
 	// Equal current data is not enough to manufacture one of these facts.
 	memberships map[adt.Value][]*adt.LiveType
+	// Supplied concrete captures and evaluated native results have known
+	// data inventories, including record field order. A closed record type
+	// alone does not determine that order (which serializers can observe).
+	grounded    map[*adt.Vertex]bool
 	records     map[proofRecordKey]*proofRecord
 	refutations map[proofKey]*refutation
 	completed   map[proofKey]proofCertificate
@@ -263,6 +268,7 @@ func (p *inference) constructorEvidence(value adt.Value) adt.Value {
 	p.constructors[out] = p.constructors[v]
 	p.projections[out] = p.projections[v]
 	p.memberships[out] = p.memberships[v]
+	p.grounded[out] = p.grounded[v]
 	return out
 }
 
@@ -291,7 +297,9 @@ func (p *inference) captured(v adt.Value) adt.Value {
 		// A complete supplied value has a concrete inventory. Its evaluated
 		// predicate may remain open for later CUE refinement, but that does
 		// not add fields to the runtime value supplied by this packet.
-		return capturedInventory(vertex, make(map[*adt.Vertex]*adt.Vertex))
+		out := capturedInventory(vertex, make(map[*adt.Vertex]*adt.Vertex))
+		p.grounded[out] = true
+		return out
 	}
 	return v
 }

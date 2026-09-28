@@ -80,47 +80,12 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 			return s.builtinBodyCapability(target, b)
 		}
 	}
-	// A singleton packet can be checked exhaustively. This is a proof over
-	// its entire domain, not a successful sample of an infinite predicate.
-	// First establish the full protocol and argument coverage independently
-	// of the result. Optional/defaulted or generic packet families remain
-	// outside this finite rule.
-	fn := *target.Fn
-	fn.Ret = nil
-	if !s.capabilitySignature(adt.FuncType{Fn: &fn, Env: target.Env}, source) ||
-		len(adt.FunctionTypeParameters(target)) != 0 || len(fn.Params) != len(primitive.Params) {
-		return false
+	if b.Pure && !b.NonConcrete {
+		// Use the same finite-data rule as direct calls. In particular, a
+		// client signature cannot turn an effectful call into proof work.
+		return s.builtinBodyCapability(target, b)
 	}
-	call := &adt.CallExpr{Fun: b.Implementation()}
-	for _, param := range fn.Params {
-		if param.ArcType == adt.ArcOptional || param.Default != nil {
-			return false
-		}
-		v, ok := s.evalFuncConstraint(target.Env, param.Value)
-		if !ok {
-			return false
-		}
-		switch adt.Unwrap(v).(type) {
-		case *adt.String, *adt.Bytes, *adt.Num, *adt.Bool, *adt.Null:
-		default:
-			return false
-		}
-		call.Args = append(call.Args, v)
-		label := adt.InvalidLabel
-		if !param.Positional {
-			label = param.Label
-		}
-		call.ArgLabels = append(call.ArgLabels, label)
-	}
-	result, complete := s.ctx.Evaluate(target.Env, call)
-	if !complete || result == nil {
-		return false
-	}
-	if _, bottom := adt.Unwrap(result).(*adt.Bottom); bottom {
-		return false
-	}
-	want, ok := s.evalFuncConstraint(target.Env, target.Fn.Ret)
-	return ok && s.values(want, result)
+	return false
 }
 
 func (s *subsumer) builtinBodyCapability(target adt.FuncType, b *adt.Builtin) bool {

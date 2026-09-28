@@ -14,6 +14,7 @@ func init() {
 var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
+	Pure: true,
 	Native: []*pkg.Builtin{{
 		Name:      "EncodedLen",
 		Signature: "func(n: int) -> int & >=-9223372036854775808 & <=9223372036854775807",

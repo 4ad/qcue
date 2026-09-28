@@ -464,7 +464,11 @@ func newGoEmitter(dir, pkgPath string, params headerParams, registered, pure boo
 		return nil, err
 	}
 	if registered {
-		fmt.Fprintf(g.w, "var p = &pkg.Package{\nNative: []*pkg.Builtin{")
+		fmt.Fprintf(g.w, "var p = &pkg.Package{\n")
+		if pure {
+			fmt.Fprintln(g.w, "Pure: true,")
+		}
+		fmt.Fprint(g.w, "Native: []*pkg.Builtin{")
 	}
 	return g, nil
 }

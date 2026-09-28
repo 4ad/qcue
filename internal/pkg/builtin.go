@@ -66,6 +66,9 @@ type Param struct {
 type Package struct {
 	Native []*Builtin
 	CUE    string
+	// Pure declares that every native in this package is deterministic and
+	// has no side effects. Client CUE attributes cannot establish this fact.
+	Pure bool
 }
 
 // MustCompile initializes a builtin package. Invalid builtin definitions panic,
@@ -99,6 +102,7 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) (*adt.Verte
 			}
 		} else {
 			native := ToBuiltin(&b)
+			native.Pure = p.Pure
 			if b.Signature != "" {
 				t, err := nativeSignature(ctx, obj, native, b.Signature)
 				if err != nil {

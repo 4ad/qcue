@@ -278,6 +278,7 @@ var orBuiltin = &adt.Builtin{
 
 var divBuiltin = &adt.Builtin{
 	Name:   "div",
+	Pure:   true,
 	Params: []adt.Param{intParam, intParam},
 	Result: adt.IntKind,
 	Func: func(call adt.BuiltinCallContext) adt.Expr {
@@ -289,6 +290,7 @@ var divBuiltin = &adt.Builtin{
 
 var modBuiltin = &adt.Builtin{
 	Name:   "mod",
+	Pure:   true,
 	Params: []adt.Param{intParam, intParam},
 	Result: adt.IntKind,
 	Func: func(call adt.BuiltinCallContext) adt.Expr {
@@ -302,6 +304,7 @@ var modBuiltin = &adt.Builtin{
 
 var quoBuiltin = &adt.Builtin{
 	Name:   "quo",
+	Pure:   true,
 	Params: []adt.Param{intParam, intParam},
 	Result: adt.IntKind,
 	Func: func(call adt.BuiltinCallContext) adt.Expr {
@@ -313,6 +316,7 @@ var quoBuiltin = &adt.Builtin{
 
 var remBuiltin = &adt.Builtin{
 	Name:   "rem",
+	Pure:   true,
 	Params: []adt.Param{intParam, intParam},
 	Result: adt.IntKind,
 	Func: func(call adt.BuiltinCallContext) adt.Expr {

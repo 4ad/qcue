@@ -14,6 +14,7 @@ func init() {
 var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
+	Pure: true,
 	Native: []*pkg.Builtin{{
 		Name:      "ByteAt",
 		Signature: "func(b: bytes|string, i: int) -> int & >=0 & <=255",

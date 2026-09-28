@@ -248,13 +248,20 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 	if result == nil || refuted(result) {
 		return result
 	}
-	if f.Package != adt.InvalidLabel {
-		if precise := p.nativeListResult(f, target, &protocol); precise != nil {
-			if p.includes(result, precise) {
-				return precise
-			}
-			return p.eagerMeet(result, precise)
+	if precise := p.nativeListResult(f, target, &protocol); precise != nil {
+		if p.includes(result, precise) {
+			result = precise
+		} else {
+			result = p.eagerMeet(result, precise)
 		}
+	}
+	if precise := p.nativeGroundResult(f, target, &protocol); precise != nil {
+		if p.includes(result, precise) {
+			return precise
+		}
+		return p.eagerMeet(result, precise)
+	}
+	if f.Package != adt.InvalidLabel {
 		return result
 	}
 	switch f.Name {

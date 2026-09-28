@@ -186,6 +186,18 @@ validators support their ordinary call forms; implicit validator constructors
 check the saved arguments and describe inhabitants of the validated parameter's
 type. These contracts do not promise success, termination, or concrete operands.
 
+For implementation-declared pure natives, finite concrete input descriptions
+also provide exact successful results. This covers scalar alternatives and
+closed lists of known values, as well as constructed or supplied records.
+Record predicates alone do not determine serialization: even a closed record
+type does not specify field order. Schema-consuming natives retain their
+declared contracts instead of treating schema inhabitants as the schema itself.
+The generator records package purity in the native descriptor; client CUE
+attributes cannot authorize proof-time execution. Enumeration uses a fraction
+of the proof work allowance, preserving the declared contract when the finite
+domain or a requested repetition, shift, formatting precision, or numeric range
+is too large. Direct calls and attached interfaces use the same rule.
+
 Native checking signatures can retain universal input-output relationships and
 conditional result refinements. For example, `math.Abs` admits every number
 while preserving integer results for integer inputs. Such a refinement adds

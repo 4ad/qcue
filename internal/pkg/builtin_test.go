@@ -202,3 +202,29 @@ func TestInvalidBuiltinPanics(t *testing.T) {
 		})
 	}
 }
+
+func TestBuiltinPurityDescriptor(t *testing.T) {
+	for _, tc := range []struct {
+		name, source string
+		pure         bool
+	}{
+		{"implementation", "", true},
+		{"untrusted_attribute", "@pure()", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &pkg.Package{Pure: tc.pure, CUE: tc.source, Native: []*pkg.Builtin{{
+				Name: "Value", Result: adt.StringKind,
+				Func: func(c *pkg.CallCtxt) { c.Ret = "result" },
+			}}}
+			ctx := eval.NewContext(runtime.New(), nil)
+			v, err := p.MustCompile(ctx, "test/purity")
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, ok := adt.Unwrap(v.Lookup(ctx.StringLabel("Value"))).(*adt.Builtin)
+			if !ok || b.Pure != tc.pure {
+				t.Fatalf("native purity is not implementation-owned: %v", b)
+			}
+		})
+	}
+}

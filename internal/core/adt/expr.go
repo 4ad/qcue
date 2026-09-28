@@ -3301,6 +3301,11 @@ type Builtin struct {
 	// input domains. They never restrict the native's admitted call domain.
 	Refinements []FuncType
 
+	// Pure permits checking to evaluate this implementation on known data.
+	// It is an implementation-owned guarantee of deterministic results and
+	// no side effects, independent of attributes or contracts added by clients.
+	Pure bool
+
 	// NonConcrete should be set to true if a builtin supports non-concrete
 	// arguments. By default, all arguments are checked to be concrete.
 	NonConcrete bool
