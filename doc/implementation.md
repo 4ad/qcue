@@ -176,10 +176,11 @@ native contract still needs linked implementation evidence.
 
 ## Builtins and operators
 
-The [type reference](types.md) lists predeclared types and builtins, operator
-domains, and all standard-library interfaces, including task schemas and
-constants. Its package catalogue is generated from the declarations used by
-editor tooling and checked for drift. The rules below explain how those
+The [type reference](types.md) lists quantified builtin contracts, operator
+signatures, and all standard-library function types, with supporting schemas
+and constants in collapsible sections. Its package catalogue is generated
+from the declarations used by editor tooling and checked for drift. The rules
+below explain how those
 contracts interact with proof and evaluation.
 
 Native result kinds are conservative bounds on successful returns. Generated
@@ -385,8 +386,9 @@ check the resulting values. Kernel tests inspect refutation support and resume
 real proofs after budget exhaustion. [Independent oracles](oracle.md) cover
 finite semantics and preservation separately from these example tests.
 
-The [type-reference checks](../internal/cmd/gentypes/main_test.go) execute its
-examples and compare its catalogue with every published package declaration.
+The [type-reference checks](../internal/cmd/gentypes/main_test.go) check the
+written builtin and operator contracts against implementations and compare
+the package catalogue with every published declaration.
 The `pkg` tests check those declarations against registered native contracts.
 
 ```sh

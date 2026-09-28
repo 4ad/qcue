@@ -5,9 +5,10 @@ assertions, with prior definitions and linked implementations where needed.
 Later refinement and source round trips are also tested by
 [`propagation_test.go`](../../../propagation_test.go).
 
-The companion [type reference](../../../../doc/types.md) documents builtin,
-operator, and standard-library interfaces. Its examples are checked directly
-by [reference tests](../../../../internal/cmd/gentypes/main_test.go), separately
+The companion [type reference](../../../../doc/types.md) lists quantified
+builtin contracts, operator signatures, and standard-library function types.
+The written contracts are checked by
+[reference tests](../../../../internal/cmd/gentypes/main_test.go), separately
 from the verbatim paper listings below.
 
 | Listing | Example |

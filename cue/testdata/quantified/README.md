@@ -18,9 +18,9 @@ runner discovers executable txtar archives automatically.
   explicit finite expansions; value quantification is not language syntax.
 - [Feature combinations](../../quantified_oracle_features_test.go) combine
   callbacks, partial calls, universals, qualified labels, and source export.
-- [Type-reference examples](../../../doc/types.md) are executed directly from
-  the document by `TestReferenceExamples`; `TestReferenceCurrent` checks its
-  generated package catalogue.
+- [Documented function types](../../../doc/types.md) are checked against
+  builtins and operator implementations by `TestReferenceContracts`;
+  `TestReferenceCurrent` checks the generated package catalogue.
 - [Native inventory](../../../pkg/builtin_checking_test.go) checks every
   registered standard-library function's argument and result contracts,
   ordinary and partial calls, labels, and validator forms.

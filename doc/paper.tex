@@ -632,16 +632,15 @@ evidence. Validator constructors check their saved arguments and describe
 inhabitants of the validated slot's type.
 
 The repository's companion type reference,
-\href{types.md}{\code{doc/types.md}}, records the predeclared builtin contracts,
-operator domains, and complete standard-library interfaces, including generic
-relationships, result refinements, parameter defaults, and task schemas.
-Its package catalogue is generated from the published declarations used by
-editor tooling. Tests compare those declarations with registered native
-evidence, check that catalogue formatting preserves their syntax, and execute
-the reference's examples. The reference also explains schema-consuming slots,
-saved arguments, sorting templates, and unresolved native observations. These
-interfaces describe successful returns and retain the partial-correctness
-interpretation of this paper.
+\href{types.md}{\code{doc/types.md}}, lists quantified builtin contracts,
+operator signatures, and standard-library function types. Universal arrows
+retain input--output relationships; intersections record supported overloads
+and result refinements. The package catalogue is generated from published API
+declarations. Tests check the written builtin and operator contracts against
+implementations, preserve each package declaration in the catalogue, and
+compare published signatures with registered native evidence. These interfaces
+describe successful returns with the partial-correctness interpretation of
+this paper.
 
 Some primitives admit more precise structural rules. The conjunction of a
 nonempty list of $A$-values has result $A$, and a disjunction of $A$-values has

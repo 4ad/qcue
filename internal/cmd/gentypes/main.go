@@ -84,27 +84,78 @@ func update(src []byte) ([]byte, error) {
 		if !ok {
 			return nil, fmt.Errorf("missing package source for %q", ip)
 		}
-		// Preserve every declaration, import, attribute, and default. The
-		// linked source carries the detailed API comments; omit them here
-		// to keep the catalogue focused on types.
 		file, err := parser.ParseFile(ip+"/pkg.cue", source)
 		if err != nil {
 			return nil, err
 		}
-		wrapTypes(file)
-		formatted, err := format.Node(file, format.Simplify())
-		if err != nil {
+		fmt.Fprintf(&out, "\n<a id=\"package-%s\"></a>\n\n### `%s`\n\n", strings.ReplaceAll(ip, "/", "-"), ip)
+		fmt.Fprintf(&out, "[Source](../pkg/%s/pkg.cue)\n\n", ip)
+		// Put new function contracts first. Keep supporting declarations
+		// available without burying the signatures beneath constants and
+		// task schemas. Package attributes stay in the linked source.
+		var signatures, support []ast.Decl
+		for _, decl := range file.Decls {
+			switch x := decl.(type) {
+			case *ast.Package, *ast.Attribute:
+				continue
+			case *ast.Field:
+				if hasFunctionType(x.Value) {
+					signatures = append(signatures, decl)
+					continue
+				}
+			}
+			support = append(support, decl)
+		}
+		if err := writeDecls(&out, signatures); err != nil {
 			return nil, err
 		}
-		fmt.Fprintf(&out, "\n<a id=\"package-%s\"></a>\n\n### `%s`\n\n", strings.ReplaceAll(ip, "/", "-"), ip)
-		fmt.Fprintf(&out, "[API declarations and comments](../pkg/%s/pkg.cue)\n\n", ip)
-		out.WriteString("```cue\n")
-		out.Write(formatted)
-		out.WriteString("```\n")
+		if len(support) != 0 {
+			if len(signatures) == 0 {
+				out.WriteString("No function declarations.\n\n")
+			}
+			out.WriteString("\n<details>\n<summary>Supporting schemas and constants</summary>\n\n")
+			if err := writeDecls(&out, support); err != nil {
+				return nil, err
+			}
+			out.WriteString("\n</details>\n")
+		}
 	}
 	out.WriteByte('\n')
 	out.Write(src[end:])
 	return out.Bytes(), nil
+}
+
+func hasFunctionType(expr ast.Expr) bool {
+	switch x := expr.(type) {
+	case *ast.Func:
+		return true
+	case *ast.ParenExpr:
+		return hasFunctionType(x.X)
+	case *ast.Quantifier:
+		return hasFunctionType(x.Body)
+	case *ast.BinaryExpr:
+		return hasFunctionType(x.X) || hasFunctionType(x.Y)
+	}
+	return false
+}
+
+func writeDecls(out *bytes.Buffer, decls []ast.Decl) error {
+	if len(decls) == 0 {
+		return nil
+	}
+	file := &ast.File{Decls: decls}
+	for _, decl := range decls {
+		ast.SetRelPos(decl, token.Newline)
+	}
+	wrapTypes(file)
+	formatted, err := format.Node(file, format.Simplify())
+	if err != nil {
+		return err
+	}
+	out.WriteString("```cue\n")
+	out.Write(formatted)
+	out.WriteString("```\n")
+	return nil
 }
 
 // Insert layout hints at syntax boundaries, leaving the declarations intact.

@@ -18,8 +18,8 @@ Quantifiers are enabled by default for every CUE language version in this fork.
 Builtins, operators, and standard-library functions participate in function
 checking. Native contracts preserve generic element types, structured results,
 parameter labels, defaults, and validator forms. See the
-[type reference](doc/types.md) for the complete package catalogue, examples,
-and compatibility notes.
+[type reference](doc/types.md) for the quantified signatures, builtin
+contracts, and operator overloads.
 
 This repository contains the language implementation, the `cue` command, and
 the Go API under the existing `cuelang.org/go` module path.
@@ -28,8 +28,8 @@ the Go API under the existing `cuelang.org/go` module path.
   design and formal semantics.
 - [Implementation guide](doc/implementation.md): supported features, checking
   limits, installation, and usage.
-- [Type reference](doc/types.md): predeclared types and builtins, operator
-  domains, and every standard-library package interface.
+- [Type reference](doc/types.md): quantified builtin contracts, operator
+  signatures, and every standard-library function type.
 - [Command guide](doc/cmd/cue.md): building and using this fork's `cue` command.
 - [Paper examples](cue/testdata/quantified/paper/README.md): every listing
   reproduced verbatim, with tests and documented implementation limits.
