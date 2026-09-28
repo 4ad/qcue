@@ -664,6 +664,16 @@ func (p *inference) deriveFunction(f *adt.FuncValue, target adt.FuncType) (prove
 				continue
 			}
 			v := p.boundArgument(env, expr)
+			if f.NativeBuiltin() != nil {
+				// savedPacket already proved native operand coverage. Its
+				// description is evidence for the residual body, not an
+				// activation that can be narrowed by a checking annotation.
+				if v == nil {
+					return false
+				}
+				values[arg.Local] = v
+				continue
+			}
 			want := p.schema(source.Env, arg.Value)
 			if want == nil || v == nil || !(&subsumer{ctx: p.ctx, inference: p}).packetMember(want, v) {
 				return false
@@ -1699,6 +1709,16 @@ func (p *inference) partialCall(callee adt.Value, packet adt.FuncType) adt.Value
 		return nil
 	}
 	switch f := callee.(type) {
+	case *adt.Builtin:
+		if ValidateBuiltin(p.ctx, f) != nil {
+			return nil
+		}
+		return p.partialCall(f.FunctionValue(p.ctx), packet)
+	case *adt.BuiltinValidator:
+		if f.Src == nil {
+			return p.partialCall(f.Builtin, packet)
+		}
+		return nil
 	case *adt.Disjunction:
 		var results []adt.Value
 		for _, branch := range f.Values {

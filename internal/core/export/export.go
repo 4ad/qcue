@@ -375,16 +375,17 @@ type exporter struct {
 	experimentsErr error
 	postfixAliases bool
 	// fieldAlias is used to track original alias names of regular fields.
-	fieldAlias        map[*ast.Field]fieldAndScope
-	letAlias          map[*ast.LetClause]*ast.LetClause
-	references        map[*adt.Vertex]*referenceInfo
-	functionOrigins   map[*adt.Function]*functionOrigin
-	closures          *closureGraph
-	inlineFreeRefs    bool
-	quantifierOrigins map[quantifierOriginKey]*ast.LetClause
-	quantifierCode    map[*adt.Function]quantifierOriginKey
-	originDecls       []ast.Decl
-	originNames       map[string]ast.Node
+	fieldAlias           map[*ast.Field]fieldAndScope
+	letAlias             map[*ast.LetClause]*ast.LetClause
+	references           map[*adt.Vertex]*referenceInfo
+	functionOrigins      map[*adt.Function]*functionOrigin
+	closures             *closureGraph
+	inlineFreeRefs       bool
+	inlineNativeCaptures bool
+	quantifierOrigins    map[quantifierOriginKey]*ast.LetClause
+	quantifierCode       map[*adt.Function]quantifierOriginKey
+	originDecls          []ast.Decl
+	originNames          map[string]ast.Node
 
 	pivotter *pivotter
 

@@ -132,12 +132,13 @@ disjunction: {
 	x:    pick("hi") @test(eq, "HI")
 }
 
-// Partial application of builtins is not supported: a call with a trailing
-// "..." reports a clear error instead of silently dropping the "..." (len)
-// or morphing into a validator (strings.Contains).
+// An explicit partial call retains a callable value. A fully saved builtin
+// still needs its final call, and a bool result does not make this a validator.
 partial: {
-	contains: strings.Contains("abcd", ...) @test(err, code=eval, contains="partial application of builtin")
-	length:   len([1, 2], ...) @test(err, code=eval, contains="partial application of builtin")
+	contains: strings.Contains("abcd", ...)
+	length:   len([1, 2], ...)
+	match:    contains("bc") @test(eq, true)
+	size:     length() @test(eq, 2)
 }
 
 // len is polymorphic over strings, bytes, lists, and structs; its kind-level
@@ -263,50 +264,47 @@ typeDefaults: {
     ./in.cue:96:20
 [eval] labelMatch.unknown: parameter times of function type not allowed by builtin strings.Repeat: no parameter of the builtin has this label:
     ./in.cue:100:29
-[eval] partial.contains: partial application of builtin strings.Contains is not supported:
-    ./in.cue:124:12
-[eval] partial.length: partial application of builtin len is not supported:
-    ./in.cue:125:12
 [eval] conflicting values string and [1,2] (mismatched types string and list):
-    ./in.cue:139:13
-    ./in.cue:142:11
+    ./in.cue:140:13
+    ./in.cue:143:11
 [eval] polymorphic.bad: result of function type has kind string, conflicting with result kind int of builtin len:
-    ./in.cue:145:8
+    ./in.cue:146:8
 [eval] labeled.errors.unknown: unknown argument lst in call to list.Drop:
-    ./in.cue:161:12
+    ./in.cue:162:12
 [eval] labeled.errors.dup: argument s provided by position and label in call to strings.Repeat:
-    ./in.cue:164:8
+    ./in.cue:165:8
 [eval] labeled.errors.hole: missing argument 2 in call to list.Slice:
-    ./in.cue:167:9
+    ./in.cue:168:9
 [eval] labeled.user.f: builtin strings.SplitN has more parameters than closed function type:
-    ./in.cue:173:6
+    ./in.cue:174:6
 [eval] labeled.user.badName: conflicting parameter labels text and s for positional parameter 1 in function type and function type:
-    ./in.cue:181:50
-    ./in.cue:181:13
+    ./in.cue:182:50
+    ./in.cue:182:13
 [eval] conflicting defaults for parameter count: conflicting values 2 and 3:
-    ./in.cue:197:43
-    ./in.cue:189:40
-    ./in.cue:198:20
+    ./in.cue:198:43
+    ./in.cue:190:40
+    ./in.cue:199:20
 [eval] conflicting defaults for parameter count: conflicting values 2 and 3:
-    ./in.cue:197:43
-    ./in.cue:189:40
-    ./in.cue:199:37
+    ./in.cue:198:43
+    ./in.cue:190:40
+    ./in.cue:200:37
 [eval] conflicting defaults for parameter count: conflicting values 3 and 2:
-    ./in.cue:189:40
-    ./in.cue:197:43
-    ./in.cue:200:38
+    ./in.cue:190:40
+    ./in.cue:198:43
+    ./in.cue:201:38
 [eval] conflicting defaults for parameter os: conflicting values "unix" and "windows":
-    ./in.cue:204:47
-    ./in.cue:205:10
+    ./in.cue:205:47
+    ./in.cue:206:10
+    path:12:40
 -- out/eval/stats --
-Leaks:  3
-Freed:  167
-Reused: 144
-Allocs: 26
+Leaks:  20
+Freed:  348
+Reused: 315
+Allocs: 53
 Retain: 0
 
-Unifications: 122
-Conjuncts:    288
+Unifications: 303
+Conjuncts:    698
 Disjuncts:    38
 
-NumCloseIDs: 56
+NumCloseIDs: 178

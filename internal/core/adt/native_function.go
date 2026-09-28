@@ -16,6 +16,51 @@ package adt
 
 import "slices"
 
+// nativeBinding retains the operation that saved native arguments, including
+// its lexical environment. It is export provenance, not checking evidence.
+type nativeBinding struct {
+	subject *FuncValue
+	env     *Environment
+	call    *CallExpr
+	types   []FuncType
+}
+
+// bindNativeArguments keeps every selected view at the same saved packet.
+// A later identity merge may expose those views individually on export.
+func (f *FuncValue) bindNativeArguments(args []funcArg, env *Environment, call *CallExpr) *FuncValue {
+	copy := *f
+	copy.args = args
+	copy.nativeBinding = &nativeBinding{subject: f, env: env, call: call, types: f.Types}
+	copy.selection, copy.projection = nil, nil
+	copy.callViews = make([]*FuncValue, len(f.callViews))
+	for i, view := range f.callViews {
+		copy.callViews[i] = view.bindNativeArguments(args, env, call)
+	}
+	return &copy
+}
+
+// NativeBinding reconstructs the last native partial application and returns
+// interfaces attached after that operation. Its subject retains earlier
+// applications and type selections in their original order.
+func (f *FuncValue) NativeBinding() (*Environment, *CallExpr, []FuncType) {
+	b := f.nativeBinding
+	if b == nil {
+		return nil, nil, nil
+	}
+	call := *b.call
+	call.Fun = b.subject
+	var extra []FuncType
+	for _, t := range f.Types {
+		if !slices.Contains(b.types, t) {
+			extra = append(extra, t)
+		}
+	}
+	for _, peer := range f.identities {
+		extra = append(extra, FuncType{Fn: peer.Fn, Env: peer.Env, inhabitant: peer})
+	}
+	return b.env, &call, extra
+}
+
 // FunctionValue exposes a native's own checking scheme to function type
 // selection and packet binding. The synthetic body proves its interfaces by
 // calling the primitive under arbitrary admitted inputs. Runtime calls go
@@ -29,6 +74,9 @@ func (b *Builtin) FunctionValue(c *OpContext) *FuncValue {
 	f := c.nativeFunctions[origin]
 	if f == nil {
 		t := origin.CheckingType(c)
+		if t.Env == nil {
+			t.Env = &Environment{Vertex: &Vertex{BaseValue: &StructMarker{}}}
+		}
 		fn := *t.Fn
 		fn.Src = nil
 		fn.Quantified = true
@@ -40,6 +88,11 @@ func (b *Builtin) FunctionValue(c *OpContext) *FuncValue {
 		fn.Body = call
 		f = &FuncValue{Fn: &fn, Env: t.Env, native: origin,
 			Types: origin.CheckingRefinements(c)}
+		for i := range f.Types {
+			if f.Types[i].Env == nil {
+				f.Types[i].Env = t.Env
+			}
+		}
 		f.explicit = f.Obligations()
 		c.nativeFunctions[origin] = f
 	}

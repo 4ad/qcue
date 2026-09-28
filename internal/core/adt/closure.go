@@ -171,6 +171,7 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 		m.frontier = mergeFuncTypes(a.frontier, b.frontier)
 		m.callViews = mergeCallViews(a, b)
 		m.selection, m.projection = nil, nil
+		m.nativeBinding = nil
 	}
 	if a.Fn != b.Fn || a.Env != b.Env {
 		// Erased identity does not make distinct signature views

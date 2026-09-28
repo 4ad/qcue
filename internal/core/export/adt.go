@@ -425,6 +425,16 @@ func (e *exporter) resolve(env *adt.Environment, r adt.Resolver) ast.Expr {
 
 	switch x := r.(type) {
 	case *adt.FieldReference:
+		if e.inlineNativeCaptures {
+			cell, _ := e.ctx.Lookup(env, x)
+			if cell != nil && !e.exposed[cell] {
+				value, complete := e.ctx.Evaluate(env, x)
+				if !complete || !e.exportableCapture(value) {
+					return e.quantifiedExportError("saved native argument cannot be exported independently")
+				}
+				return e.runtimeCaptureValue(value)
+			}
+		}
 		// Special case when the original CUE already had an alias.
 		if x.Src != nil {
 			if f, ok := x.Src.Node.(*ast.Field); ok {

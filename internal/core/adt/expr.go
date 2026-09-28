@@ -1679,8 +1679,9 @@ type FuncValue struct {
 
 	// native retains the executable primitive behind a function view.
 	// nativeTypes are the contracts already restored by importing it.
-	native      *Builtin
-	nativeTypes []FuncType
+	native        *Builtin
+	nativeTypes   []FuncType
+	nativeBinding *nativeBinding
 
 	// explicit retains source declaration clauses in their introduction
 	// scopes. Unlike Types and frontier, it acquires no inferred or selected
@@ -2448,6 +2449,9 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		if unused != nil {
 			return unused
 		}
+		if x.NativeBuiltin() != nil {
+			return x.bindNativeArguments(bindings, c.Env(0), call)
+		}
 		copy := *x
 		copy.args = bindings
 		return &copy
@@ -2958,8 +2962,7 @@ func (x *CallExpr) evaluate(c *OpContext, state Flags) Value {
 	switch f := fun.(type) {
 	case *Builtin:
 		if x.Partial {
-			c.AddErrf("partial application of builtin %s is not supported", x.Fun)
-			return nil
+			return f.FunctionValue(c).call(c, x, state)
 		}
 		if x.hasArgLabels() {
 			// A labeled argument binds through the parameter names of
@@ -2983,15 +2986,14 @@ func (x *CallExpr) evaluate(c *OpContext, state Flags) Value {
 		return f.rawCall(c, x, state)
 
 	case *BuiltinValidator:
+		if x.Partial && f.Src == nil {
+			return f.Builtin.FunctionValue(c).call(c, x, state)
+		}
 		if x.hasArgLabels() {
 			// A bare validator's argument is the value it validates; its
 			// declared signature names at most that one parameter, so a
 			// labeled call has no position left to select.
 			c.AddErrf("labeled arguments are not supported for validator %s", x.Fun)
-			return nil
-		}
-		if x.Partial {
-			c.AddErrf("partial application of builtin %s is not supported", x.Fun)
 			return nil
 		}
 		// We allow a validator that takes no arguments except the validated

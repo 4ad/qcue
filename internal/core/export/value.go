@@ -224,7 +224,7 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 		result = e.builtinValidator(x)
 
 	case *adt.FuncValue:
-		if x.Fn.Quantified && x.IsPartial() {
+		if x.Fn.Quantified && x.IsPartial() && x.NativeBuiltin() == nil {
 			result = e.quantifiedExportError("partial closure cannot be exported without its bound argument environment")
 		} else if x.Fn.Quantified {
 			result = e.quantifiedFuncValue(x)
@@ -415,6 +415,12 @@ func (e *exporter) builtin(x *adt.Builtin) ast.Expr {
 // Printing a separate body for each clause would create distinct closures on
 // reimport; printing only the selected body would lose universal obligations.
 func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
+	if env, call, extra := f.NativeBinding(); call != nil {
+		previous := e.inlineNativeCaptures
+		e.inlineNativeCaptures = true
+		defer func() { e.inlineNativeCaptures = previous }()
+		return e.withFuncTypes(e.expr(env, call), extra)
+	}
 	if subject, argument, extra := f.TypeSelection(); subject != nil {
 		x := &ast.IndexExpr{X: &ast.ParenExpr{X: e.quantifiedFuncValue(subject)}, Index: e.predicateValue(argument)}
 		return e.withFuncTypes(x, extra)
@@ -651,6 +657,9 @@ func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	if t.Fn == nil {
 		return e.funcSrc(nil)
 	}
+	if f := t.Inhabitant(); f != nil && f.NativeBuiltin() != nil {
+		return e.quantifiedFuncValue(f)
+	}
 	if f := (&adt.FuncValue{Fn: t.Fn, Env: t.Env}); f.NativeBuiltin() != nil {
 		return e.quantifiedFuncValue(f)
 	}
@@ -711,7 +720,7 @@ func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functio
 		return true
 	}
 	if f, ok := value.(*adt.FuncValue); ok {
-		if adt.IsFuncType(f) || f.IsPartial() || !f.Fn.Quantified ||
+		if adt.IsFuncType(f) || f.IsPartial() && f.NativeBuiltin() == nil || !f.Fn.Quantified ||
 			f.Fn.Src == nil && f.NativeBuiltin() == nil {
 			return false
 		}
@@ -721,6 +730,22 @@ func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functio
 		defer delete(functions, key)
 		for _, ref := range f.Fn.Captures {
 			v, complete := e.ctx.Evaluate(f.Env, ref)
+			if !complete || !e.checkCapture(v, seen, functions, depth+1) {
+				return false
+			}
+		}
+		for i := range f.Fn.Params {
+			env, expr := f.BoundArgument(i)
+			if expr == nil {
+				continue
+			}
+			if ref, ok := expr.(adt.Resolver); ok {
+				cell, _ := e.ctx.Lookup(env, ref)
+				if cell != nil && e.exposed[cell] {
+					continue
+				}
+			}
+			v, complete := e.ctx.Evaluate(env, expr)
 			if !complete || !e.checkCapture(v, seen, functions, depth+1) {
 				return false
 			}

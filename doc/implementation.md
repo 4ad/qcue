@@ -215,6 +215,15 @@ calls and saved arguments require operand coverage; their checking descriptors
 cannot constrain incompatible inputs into an empty packet. Export restores the
 native import, selected arguments, and additional interfaces.
 
+Explicit native partial calls, such as `strings.Repeat(count: 2, ...)`, save
+arguments under the same labels and defaults as direct calls. Their residual
+functions retain generic element relationships, strict operand checks, and
+result refinements. Saving every argument still leaves a zero-argument
+function. An explicit partial call of a Boolean native remains a function;
+the implicit validator constructor is a separate call form. Saved arguments
+remain live until supplied values make execution possible. Export preserves
+their captures, selected views, and pending equality obligations.
+
 List transformations additionally preserve known tuple positions and length
 bounds. `FlattenN` uses the supplied depth, while `Take` and `Drop` account for
 clamping at the actual input length. An open tail contributes possible elements
@@ -299,7 +308,9 @@ versions remain in `paper_history`.
 API regressions exercise later refinement, observation triggers, independent
 coverage, packet isolation, strict operands, closure identity, and repeated
 export. The native inventory test checks every registered builtin, rejects
-incompatible argument slots and unproved results, and checks validator forms.
+incompatible argument slots and unproved results, and checks validator forms
+and explicit partial calls. Error-only Go validators return `true` on success
+and retain failures as errors; their checking signatures describe that result.
 Operator matrices cover accepted and rejected operand domains; execution tests
 check the resulting values. Kernel tests inspect refutation support and resume
 real proofs after budget exhaustion. [Independent oracles](oracle.md) cover

@@ -132,12 +132,13 @@ disjunction: {
 	x:    pick("hi")
 }
 
-// Partial application of builtins is not supported: a call with a trailing
-// "..." reports a clear error instead of silently dropping the "..." (len)
-// or morphing into a validator (strings.Contains).
+// An explicit partial call retains a callable value. A fully saved builtin
+// still needs its final call, and a bool result does not make this a validator.
 partial: {
 	contains: strings.Contains("abcd", ...)
 	length:   len([1, 2], ...)
+	match:    contains("bc")
+	size:     length()
 }
 
 // len is polymorphic over strings, bytes, lists, and structs; its kind-level
@@ -301,6 +302,8 @@ typeDefaults: {
       1,
       2,
     ])
+    match: 〈0;contains〉("bc")
+    size: 〈0;length〉()
   }
   polymorphic: {
     L: func(_, ...) -> int

@@ -507,6 +507,7 @@ func (f *FuncValue) hasTypeSelection() bool {
 func (f *FuncValue) selectType(c *OpContext, argument Value) (*FuncValue, *Bottom) {
 	copy := *f
 	copy.projection = nil
+	copy.nativeBinding = nil
 	copy.frontier = []FuncType{}
 	selected := &functionSelection{subject: f, argument: argument}
 	var err *Bottom

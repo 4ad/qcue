@@ -75,6 +75,12 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 				if err := v.Validate(); err != nil {
 					t.Fatalf("%s\n%v", source, err)
 				}
+				partialArgs := strings.Join(append(append([]string(nil), args...), "..."), ", ")
+				partial := fmt.Sprintf("import native %q\nf: func(%s) -> (%s): native.%s(%s)()",
+					ip, strings.Join(params, ", "), resultType, b.Name, partialArgs)
+				if err := cuecontext.New().CompileString(partial).Validate(); err != nil {
+					t.Fatalf("native partial application: %s\n%v", partial, err)
+				}
 				for i, kind := range paramKinds {
 					// Change each constrained slot independently. Top slots
 					// have no incompatible kind to test.
@@ -95,6 +101,11 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 						bad := cuecontext.New().CompileString(badSource)
 						if err := bad.Validate(); err == nil {
 							t.Fatalf("invalid argument accepted: %s", badSource)
+						}
+						partial := fmt.Sprintf("import native %q\nf: func(%s) -> _: native.%s(%s, ...)()",
+							ip, strings.Join(params, ", "), b.Name, strings.Join(badArgs, ", "))
+						if err := cuecontext.New().CompileString(partial).Validate(); err == nil {
+							t.Fatalf("invalid saved argument accepted: %s", partial)
 						}
 						break
 					}

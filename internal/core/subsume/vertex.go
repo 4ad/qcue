@@ -48,9 +48,13 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 	// Its upper bound supplies structural evidence without replacing the
 	// predicate's identity. Going straight to listVertices would instead
 	// inspect the empty wrapper's arcs and lose that bound.
+	// Derived results may also retain a Boolean combination inside a vertex;
+	// dispatch it before interpreting the wrapper as one record or list.
 	switch value := adt.Unwrap(y).(type) {
 	case *adt.RigidType, *adt.LiveType:
 		return s.values(x, value)
+	case *adt.Disjunction, *adt.Conjunction:
+		return s.values(adt.Unwrap(x), value)
 	}
 
 	ctx := s.ctx
@@ -62,6 +66,9 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		return false
 
 	case *adt.ListMarker:
+		// Shared list results keep their elements and tail on the target
+		// vertex. The referring wrapper is not itself a list marker.
+		y = y.DerefValue()
 		if !y.IsList() {
 			s.errf("list does not subsume %v (type %s)", y, y.Kind())
 			return false
