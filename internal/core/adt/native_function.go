@@ -29,7 +29,35 @@ func (b *Builtin) IsListComparer(c *OpContext) bool {
 // necessary for each invocation and for faithful export.
 func (f *FuncValue) NativeTemplateArgument(c *OpContext, slot int) bool {
 	b := f.NativeBuiltin()
-	return b != nil && slot == 1 && b.IsListComparer(c)
+	if b == nil {
+		return false
+	}
+	if slot == 1 && b.IsListComparer(c) {
+		return true
+	}
+	if !b.NonConcrete || slot < 0 || slot >= len(b.Params) {
+		return false
+	}
+	// Read only implementation-owned declarations. Client annotations
+	// cannot turn a data parameter into a schema-consuming native slot.
+	declared := b.declaredTypes()
+	contracts := declared
+	if signature := b.self().Signature; signature != nil {
+		contracts = append(slices.Clone(contracts), *signature)
+	}
+	for _, t := range contracts {
+		for i, index := range matchBuiltinParamsWith(t.Fn, b, declared) {
+			if index != slot || t.Fn.Params[i].Src == nil {
+				continue
+			}
+			for _, attr := range t.Fn.Params[i].Src.Attrs {
+				if name, _ := attr.Split(); name == "schema" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // nativeBinding retains the operation that saved native arguments, including

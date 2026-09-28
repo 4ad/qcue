@@ -211,3 +211,38 @@ func builtinKindSyntax(k adt.Kind) string {
 	}
 	return "(" + strings.Join(terms, " | ") + ")"
 }
+
+func TestNativeSchemaParameterOwnership(t *testing.T) {
+	for _, tc := range []struct {
+		source string
+		schema []bool
+	}{
+		{`import "encoding/json"
+f:json.Validate & (func(b:bytes|string @schema(),v:_)->bool)`, []bool{false, true}},
+		{`import "list"
+f:list.Contains & (func(a:[...] @schema(),v:_ @schema())->bool)`, []bool{false, false}},
+	} {
+		t.Run(tc.source, func(t *testing.T) {
+			v := cuecontext.New().CompileString(tc.source).LookupPath(cue.ParsePath("f"))
+			if err := v.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			core := v.Core()
+			ctx := eval.NewContext(core.R, core.V)
+			var f *adt.FuncValue
+			switch value := adt.Unwrap(core.V).(type) {
+			case *adt.Builtin:
+				f = value.FunctionValue(ctx)
+			case *adt.FuncValue:
+				f = value
+			default:
+				t.Fatalf("unexpected native value %T", value)
+			}
+			for i, want := range tc.schema {
+				if got := f.NativeTemplateArgument(ctx, i); got != want {
+					t.Fatalf("schema slot %d: got %v; want %v", i, got, want)
+				}
+			}
+		})
+	}
+}

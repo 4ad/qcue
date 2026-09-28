@@ -1444,17 +1444,12 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		v := &adt.StructLit{Src: n}
 		c.addDecls(v, n.Elts)
 		c.popScope()
-		if c.experiments.Quantified {
-			// Separate function activations can create the same template
-			// with equal captures. Outside a function, the lexical schema
-			// cell already supplies its identity; do not recompile aliases
-			// merely to collect unused template metadata.
-			for _, frame := range c.stack {
-				if _, ok := frame.scope.(*ast.Func); ok {
-					v.References = append([]adt.Expr{}, c.freeReferences(n, v, false)...)
-					break
-				}
-			}
+		if c.experiments.Quantified && c.errs == nil {
+			// Copies can instantiate the same template with equal captures,
+			// including records introduced by source export. Do not collect
+			// optional identity metadata after compilation has failed:
+			// resolving erroneous aliases again duplicates their diagnostics.
+			v.References = append([]adt.Expr{}, c.freeReferences(n, v, false)...)
 		}
 		return v
 

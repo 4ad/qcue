@@ -288,6 +288,13 @@ CUE's default list prefixes retain their usual observation behavior. The Go
 `Contains` predicate keeps its Boolean API; its native adapter additionally
 preserves incomplete comparison errors.
 
+Saved schema arguments use the same source-preserving template machinery.
+This applies to JSON and YAML validation, OpenAPI schemas, and both schema
+slots of `list.MatchN`. The native's frozen `@schema()` declarations identify
+those slots; a client annotation cannot change a data argument's semantics.
+Named schemas retain their identity through callbacks and export, while later
+refinement still changes the schema used by validation.
+
 The structural primitives have additional rules. `len` preserves known length
 bounds. `close` preserves input constraints while adding closedness where its
 record description is known; a rigid or live input retains its identity.
