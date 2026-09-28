@@ -909,7 +909,14 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 			return nil
 		}
-		value := p.captured(p.schema(env, x))
+		if e == nil {
+			return nil
+		}
+		field := p.fieldDescription(e.DerefVertex(p.ctx), x.Label)
+		if field == nil {
+			return nil
+		}
+		value := p.captured(field)
 		if value != nil && !adt.IsConcrete(value) && !packetHasFunction(value, make(map[adt.Value]bool)) {
 			return &adt.LiveType{Ref: &adt.LiveReference{X: x}, Env: env, Upper: value}
 		}
@@ -1511,8 +1518,7 @@ func (p *inference) project(value adt.Value, label adt.Feature) adt.Value {
 	// A transported field may share its structural value through BaseValue.
 	// Its inventory belongs to that value, not to the forwarding field.
 	v = v.DerefValue()
-	field := v.LookupRaw(label)
-	if field != nil && (field.ArcType == adt.ArcMember || field.ArcType == adt.ArcRequired) {
+	if field := p.fieldDescription(v, label); field != nil {
 		return field
 	}
 	if !v.IsList() || !label.IsInt() {

@@ -666,6 +666,20 @@ func (c *OpContext) Lookup(env *Environment, r Resolver) (*Vertex, *Bottom) {
 	return arc, err
 }
 
+// FieldConstraint resolves a field's description, including a required or
+// optional field that has not been supplied. It does not introduce a member
+// or discharge a runtime reference's presence and validation demands. The
+// caller must inspect ArcType before using the description as a proof premise.
+func (c *OpContext) FieldConstraint(v *Vertex, label Feature) (*Vertex, *Bottom) {
+	s := c.PushState(c.e, nil)
+	arc := v.lookup(c, token.NoPos, label, Flags{
+		status: partial, condition: allKnown, mode: finalize,
+		fieldConstraint: true,
+	})
+	err := c.PopState(s)
+	return arc, err
+}
+
 // Validate calls validates value for the given validator.
 //
 // TODO(errors): return boolean instead: only the caller has enough information

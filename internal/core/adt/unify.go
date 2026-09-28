@@ -1105,6 +1105,9 @@ func (v *Vertex) lookup(c *OpContext, pos token.Pos, f Feature, flags Flags) *Ve
 
 	switch arc.ArcType {
 	case ArcRequired:
+		if flags.fieldConstraint {
+			return arcReturn
+		}
 		label := f.SelectorString(c.Runtime)
 		b := &Bottom{
 			Code: IncompleteError,
@@ -1118,6 +1121,9 @@ func (v *Vertex) lookup(c *OpContext, pos token.Pos, f Feature, flags Flags) *Ve
 		return arcReturn
 
 	case ArcOptional:
+		if flags.fieldConstraint {
+			return arcReturn
+		}
 		// Technically, this failure also applies to required fields. We assume
 		// however, that if a reference field that is made regular will already
 		// result in an error, so that piling up another error is not strictly

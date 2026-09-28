@@ -29,6 +29,11 @@ type Flags struct {
 
 	// checkTypos indicates whether to check for typos (closedness).
 	checkTypos bool
+
+	// fieldConstraint requests a field's description without demanding its
+	// presence as a runtime value. Only FieldConstraint sets this flag; its
+	// callers must preserve the returned arc's presence policy.
+	fieldConstraint bool
 }
 
 var (
