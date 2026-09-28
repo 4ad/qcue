@@ -263,6 +263,9 @@ func TestPreciseParamTypes(t *testing.T) {
 // validator form first and the call form last.
 func signatureForms(v ast.Expr) (callForm *ast.Func, validatorForm bool) {
 	v = unparen(v)
+	if q, ok := v.(*ast.Quantifier); ok {
+		return signatureForms(q.Body)
+	}
 	bin, ok := v.(*ast.BinaryExpr)
 	if !ok || bin.Op != token.OR {
 		f, _ := v.(*ast.Func)

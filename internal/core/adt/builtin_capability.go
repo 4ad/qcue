@@ -89,7 +89,18 @@ func (b *Builtin) Protocol(c *OpContext) *Function {
 	contracts := b.declaredTypes()
 	signature := b.self().Signature
 	if signature != nil {
-		contracts = append(slices.Clone(contracts), *signature)
+		// Protocol describes the whole native domain. Erase universal
+		// variables to their upper bounds here; CheckingType retains their
+		// input-output relationships for each checked invocation.
+		t := *signature
+		for _, param := range FunctionTypeParameters(t) {
+			var bound Value = &Top{}
+			if param.Bound != nil {
+				bound, _ = c.Evaluate(TypeParameterScope(t.Env, param), param.Bound)
+			}
+			t = BindFunctionTypes(t, []Value{bound})
+		}
+		contracts = append(slices.Clone(contracts), t)
 	}
 	for i, p := range b.Params {
 		param := FuncParam{Positional: true, Value: p.Value,
@@ -121,6 +132,27 @@ func (b *Builtin) Protocol(c *OpContext) *Function {
 		}
 	}
 	return f
+}
+
+// CheckingType retains the primitive's universal relationships while adopting
+// the native call slots, labels, defaults, and independently declared bounds.
+// These contracts are implementation evidence, never client assertions.
+func (b *Builtin) CheckingType(c *OpContext) FuncType {
+	protocol := b.Protocol(c)
+	signature := b.self().Signature
+	if signature == nil || len(FunctionTypeParameters(*signature)) == 0 {
+		return FuncType{Fn: protocol}
+	}
+	fn := *signature.Fn
+	fn.Params = slices.Clone(protocol.Params)
+	for i, index := range matchBuiltinParamsWith(signature.Fn, b, b.declaredTypes()) {
+		if index >= 0 {
+			fn.Params[index].Value = &BinaryExpr{Op: AndOp,
+				X: signature.Fn.Params[i].Value, Y: fn.Params[index].Value}
+		}
+	}
+	fn.Ret = &BinaryExpr{Op: AndOp, X: signature.Fn.Ret, Y: protocol.Ret}
+	return FuncType{Fn: &fn, Env: signature.Env}
 }
 
 // Keep a package declaration in its own environment, including any named

@@ -776,6 +776,11 @@ func (g *goEmitter) adtKind(typ types.Type) string {
 // native slots in both forms. Authored definitions may state further refinements
 // not expressible in Go signatures.
 func deriveCallForm(fn *types.Func, precise bool) string {
+	if precise && fn.Pkg().Path() == pkgParent+"/list" {
+		if signature := listSignatures[fn.Name()]; signature != "" {
+			return signature
+		}
+	}
 	sign := fn.Signature()
 	params := sign.Params()
 	defParams := make([]string, params.Len())
@@ -787,6 +792,19 @@ func deriveCallForm(fn *types.Func, precise bool) string {
 		result = cueResultType(sign.Results().At(0).Type())
 	}
 	return fmt.Sprintf("func(%s) -> %s", strings.Join(defParams, ", "), result)
+}
+
+// These contracts express relationships erased by Go's []cue.Value API.
+// They are checking evidence only; runtime argument completion is unchanged.
+var listSignatures = map[string]string{
+	"Drop":    "forall(A) func(x: [...A], n: int) -> [...A]",
+	"Repeat":  "forall(A) func(x: [...A], count: int) -> [...A]",
+	"Concat":  "forall(A) func(a: [...[...A]]) -> [...A]",
+	"Take":    "forall(A) func(x: [...A], n: int) -> [...A]",
+	"Slice":   "forall(A) func(x: [...A], i: int, j: int) -> [...A]",
+	"Reverse": "forall(A) func(x: [...A]) -> [...A]",
+	"Max":     "forall(A: number) func(xs: [...A]) -> A",
+	"Min":     "forall(A: number) func(xs: [...A]) -> A",
 }
 
 // bareValidator reports whether the builtin registers as a bare

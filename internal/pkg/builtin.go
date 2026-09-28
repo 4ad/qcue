@@ -101,6 +101,15 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) (*adt.Verte
 				if err != nil {
 					return nil, err
 				}
+				env := &adt.Environment{Vertex: obj}
+				for {
+					q, ok := expr.(*adt.Quantified)
+					if !ok {
+						break
+					}
+					env = q.CheckingScope(ctx, env)
+					expr = q.Body
+				}
 				fn, ok := expr.(*adt.Function)
 				if !ok {
 					panic(fmt.Errorf("native signature for %s.%s is not a function", importPath, b.Name))
@@ -109,7 +118,7 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) (*adt.Verte
 					panic(err.Err)
 				}
 				native.Signature = &adt.FuncType{
-					Fn: fn, Env: &adt.Environment{Vertex: obj},
+					Fn: fn, Env: env,
 				}
 			}
 			v = native

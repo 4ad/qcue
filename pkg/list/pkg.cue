@@ -33,7 +33,7 @@ package list
 // results in
 //
 // 	[3, 4]
-Drop: func(x: [...], n: int) -> [...]
+Drop: forall(A) func(x: [...A], n: int) -> [...A]
 
 // FlattenN reports a flattened sequence of the list xs by expanding any elements
 // depth levels deep. If depth is negative all elements are expanded.
@@ -56,14 +56,14 @@ FlattenN: func(xs: _, depth: int) -> [...]
 // results in
 //
 // 	[1, 2, 1, 2]
-Repeat: func(x: [...], count: int) -> [...]
+Repeat: forall(A) func(x: [...A], count: int) -> [...A]
 
 // Concat takes a list of lists and concatenates them.
 //
 // Concat([a, b, c]) is equivalent to
 //
 // 	[for x in a {x}, for x in b {x}, for x in c {x}]
-Concat: func(a: [...]) -> [...]
+Concat: forall(A) func(a: [...[...A]]) -> [...A]
 
 // Take reports the prefix of length n of list x, or x itself if n > len(x).
 //
@@ -74,7 +74,7 @@ Concat: func(a: [...]) -> [...]
 // results in
 //
 // 	[1, 2]
-Take: func(x: [...], n: int) -> [...]
+Take: forall(A) func(x: [...A], n: int) -> [...A]
 
 // Slice extracts the consecutive elements from list x starting from position i
 // up till, but not including, position j, where 0 <= i < j <= len(x).
@@ -86,7 +86,7 @@ Take: func(x: [...], n: int) -> [...]
 // results in
 //
 // 	[2, 3]
-Slice: func(x: [...], i: int, j: int) -> [...]
+Slice: forall(A) func(x: [...A], i: int, j: int) -> [...A]
 
 // Reverse reverses a list.
 //
@@ -97,7 +97,7 @@ Slice: func(x: [...], i: int, j: int) -> [...]
 // results in
 //
 // 	[4, 3, 2, 1]
-Reverse: func(x: [...]) -> [...]
+Reverse: forall(A) func(x: [...A]) -> [...A]
 
 // MinItems reports whether a has at least n items.
 MinItems: (func(n: int) -> validator([...])) | (func(list: [...], n: int) -> bool)
@@ -123,10 +123,10 @@ MatchN: (func(n: _ @schema(), matchValue: _ @schema()) -> validator([...])) | (f
 Avg: func(xs: [...number]) -> number
 
 // Max returns the maximum value of a non empty list xs.
-Max: func(xs: [...number]) -> number
+Max: forall(A: number) func(xs: [...A]) -> A
 
 // Min returns the minimum value of a non empty list xs.
-Min: func(xs: [...number]) -> number
+Min: forall(A: number) func(xs: [...A]) -> A
 
 // Product returns the product of a non empty list xs.
 Product: func(xs: [...number]) -> number

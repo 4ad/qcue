@@ -15,7 +15,8 @@ var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
 	Native: []*pkg.Builtin{{
-		Name: "Drop",
+		Name:      "Drop",
+		Signature: "forall(A) func(x: [...A], n: int) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.IntKind},
@@ -41,7 +42,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Repeat",
+		Name:      "Repeat",
+		Signature: "forall(A) func(x: [...A], count: int) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.IntKind},
@@ -54,7 +56,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Concat",
+		Name:      "Concat",
+		Signature: "forall(A) func(a: [...[...A]]) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -66,7 +69,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Take",
+		Name:      "Take",
+		Signature: "forall(A) func(x: [...A], n: int) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.IntKind},
@@ -79,7 +83,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Slice",
+		Name:      "Slice",
+		Signature: "forall(A) func(x: [...A], i: int, j: int) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.IntKind},
@@ -93,7 +98,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Reverse",
+		Name:      "Reverse",
+		Signature: "forall(A) func(x: [...A]) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -185,7 +191,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "Max",
-		Signature: "func(xs: [...number]) -> number",
+		Signature: "forall(A: number) func(xs: [...A]) -> A",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -198,7 +204,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "Min",
-		Signature: "func(xs: [...number]) -> number",
+		Signature: "forall(A: number) func(xs: [...A]) -> A",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},

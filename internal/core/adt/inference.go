@@ -212,6 +212,14 @@ func (s *typeInference) collect(env *Environment, pattern Expr, value Value, cov
 		return
 	}
 	switch p := pattern.(type) {
+	case *BinaryExpr:
+		if p.Op == AndOp && covariant {
+			// A value admitted by an intersection satisfies each conjunct.
+			// Collect witnesses before the instantiated signature performs
+			// its independent argument-membership check.
+			s.collect(env, p.X, value, covariant)
+			s.collect(env, p.Y, value, covariant)
+		}
 	case *TypeReference:
 		b := s.bounds[p.Param]
 		if b == nil {
@@ -243,6 +251,18 @@ func (s *typeInference) collect(env *Environment, pattern Expr, value Value, cov
 			if rest, ok := e.(*Ellipsis); ok {
 				for _, item := range elems[min(i, len(elems)):] {
 					s.collect(env, rest.Value, item, covariant)
+				}
+				if !v.IsClosedList() {
+					// A symbolic list has possible elements beyond its
+					// guaranteed prefix. They also constrain the witness.
+					item := &Vertex{Label: MakeIntLabel(IntLabel, int64(max(i, len(elems))))}
+					v.MatchAndInsert(s.c, item)
+					var tail Value = &Top{}
+					if item.HasConjuncts() {
+						item.Finalize(s.c)
+						tail = item
+					}
+					s.collect(env, rest.Value, tail, covariant)
 				}
 				break
 			}

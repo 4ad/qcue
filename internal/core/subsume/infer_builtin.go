@@ -85,7 +85,7 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 	// obligations.
 	// Use the same protocol as builtin capability inclusion, including
 	// its label and omission rules.
-	source := adt.FuncType{Fn: primitiveContract(p.ctx, f)}
+	source := primitiveContract(p.ctx, f)
 	if source.Fn == nil || ValidateBuiltin(p.ctx, f) != nil {
 		return nil
 	}
@@ -101,10 +101,10 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 		protocol := *source.Fn
 		protocol.Params = protocol.Params[1:]
 		protocol.Ret = nil
-		if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol}) {
+		if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol, Env: source.Env}) {
 			return nil
 		}
-		result := p.schema(nil, source.Fn.Params[0].Value)
+		result := p.schema(source.Env, source.Fn.Params[0].Value)
 		if basic, ok := result.(*adt.BasicType); ok {
 			switch basic.K {
 			case adt.StructKind:
@@ -120,7 +120,7 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 	// into an empty packet and use that contradiction as result evidence.
 	protocol := *source.Fn
 	protocol.Ret = nil
-	if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol}) {
+	if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol, Env: source.Env}) {
 		return nil
 	}
 	sources := []adt.FuncType{source}

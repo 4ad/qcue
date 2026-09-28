@@ -41,16 +41,16 @@ func ValidateBuiltin(c *adt.OpContext, b *adt.Builtin) *adt.Bottom {
 // result kinds describe every successful return; errors and incomplete calls
 // do not promise a value. Client attachments are deliberately excluded from
 // Protocol. ExternalFunc, unlike Builtin, supplies no such contract.
-func primitiveContract(c *adt.OpContext, b *adt.Builtin) *adt.Function {
-	return b.Protocol(c)
+func primitiveContract(c *adt.OpContext, b *adt.Builtin) adt.FuncType {
+	return b.CheckingType(c)
 }
 
 func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
-	primitive := primitiveContract(s.ctx, b)
+	source := primitiveContract(s.ctx, b)
+	primitive := source.Fn
 	if primitive == nil {
 		return false
 	}
-	source := adt.FuncType{Fn: primitive}
 	if s.capabilitySignature(target, source) {
 		return true
 	}
