@@ -147,8 +147,8 @@ posTieBreaker: {
 		Z: a: string
 	}
 	literalLast: {
-		p1: a: _|_ // literalLast.p1.a: invalid value [_,_] (does not satisfy list.UniqueItems): equal values at position 0 and 1
-		p2: a: _|_ // literalLast.p2.a: invalid value [_,_] (does not satisfy list.UniqueItems): equal values at position 0 and 1
+		p1: a: _|_ // literalLast.p1.a: invalid value [_,_] (does not satisfy list.UniqueItems): literalLast.p1.a.1: incomplete value _
+		p2: a: _|_ // literalLast.p2.a: invalid value [_,_] (does not satisfy list.UniqueItems): literalLast.p2.a.1: incomplete value _
 	}
 	posTieBreaker: {
 		p1: {

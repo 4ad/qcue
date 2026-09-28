@@ -262,6 +262,14 @@ incomplete captures. It cannot certify a Boolean result or reject a validator
 input merely because a comparison is not yet resolved. The public Go predicate
 retains its Boolean API and returns false when a comparison cannot be evaluated.
 
+`Contains` and `UniqueItems` compare runtime inhabitants, including closure
+identity, rather than treating equal constraint descriptions as equal values.
+Unresolved comparisons stay incomplete, unless a definite match, duplicate,
+or disjoint pair of descriptions establishes the result. Concrete defaults and
+CUE's default list prefixes retain their usual observation behavior. The Go
+`Contains` predicate keeps its Boolean API; its native adapter additionally
+preserves incomplete comparison errors.
+
 The structural primitives have additional rules. `len` preserves known length
 bounds. `close` preserves input constraints while adding closedness where its
 record description is known; a rigid or live input retains its identity.

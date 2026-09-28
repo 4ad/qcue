@@ -161,7 +161,7 @@ var p = &pkg.Package{
 		Func: func(c *pkg.CallCtxt) {
 			a, v := c.List(0), c.Value(1)
 			if c.Do() {
-				c.Ret = Contains(a, v)
+				c.Ret, c.Err = contains(a, v)
 			}
 		},
 	}, {

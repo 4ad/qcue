@@ -102,11 +102,11 @@ func BinOp(c *OpContext, node Node, op Op, left, right Value) Value {
 			return cmpTonode(c, op, bytes.Compare(c.bytesValue(left, op), c.bytesValue(right, op)))
 
 		case leftKind == ListKind:
-			return runtimeEquality(c, left, right, op)
+			return RuntimeEquality(c, left, right, op)
 
 		case !p.Experiment().StructCmp:
 		case leftKind == StructKind:
-			return runtimeEquality(c, left, right, op)
+			return RuntimeEquality(c, left, right, op)
 		}
 
 	case NotEqualOp:
@@ -136,11 +136,11 @@ func BinOp(c *OpContext, node Node, op Op, left, right Value) Value {
 			return cmpTonode(c, op, bytes.Compare(c.bytesValue(left, op), c.bytesValue(right, op)))
 
 		case leftKind == ListKind:
-			return runtimeEquality(c, left, right, op)
+			return RuntimeEquality(c, left, right, op)
 
 		case !p.Experiment().StructCmp:
 		case leftKind == StructKind:
-			return runtimeEquality(c, left, right, op)
+			return RuntimeEquality(c, left, right, op)
 		}
 
 	case LessThanOp, LessEqualOp, GreaterEqualOp, GreaterThanOp:

@@ -263,6 +263,8 @@ func MaxItems(list pkg.List, n int) (pkg.Validator, error) {
 }
 
 // UniqueItems reports whether all elements in the list are unique.
+// Comparisons of unresolved elements remain incomplete unless a duplicate
+// or disjoint element constraints already determine the result.
 func UniqueItems(a []cue.Value) (pkg.Validator, error) {
 	if len(a) <= 1 {
 		return true, nil
@@ -280,17 +282,22 @@ func UniqueItems(a []cue.Value) (pkg.Validator, error) {
 
 	posX, posY := 0, 0
 	code := adt.IncompleteError
+	var incomplete error
 
 outer:
 	for i, x := range a {
-		_, vx := value.ToInternal(x)
-
 		for j := i + 1; j < len(a); j++ {
-			_, vy := value.ToInternal(a[j])
-
-			if adt.Equal(ctx, vx, vy, adt.RegularOnly) {
+			equal, err := equalItems(ctx, x, a[j])
+			if err != nil {
+				if b, ok := err.(pkg.Bottomer); !ok || !b.Bottom().IsIncomplete() {
+					return false, err
+				}
+				incomplete = err
+				continue
+			}
+			if equal {
 				posX, posY = i, j
-				if adt.IsFinal(vy) {
+				if adt.IsFinal(value.Vertex(a[j])) {
 					code = adt.EvalError
 					break outer
 				}
@@ -299,7 +306,7 @@ outer:
 	}
 
 	if posX == posY {
-		return true, nil
+		return incomplete == nil, incomplete
 	}
 
 	var err errors.Error
@@ -319,8 +326,65 @@ outer:
 // Contains reports whether v is contained in a. The value must be a
 // comparable and concrete value.
 // For non-concrete values, you can use [MatchN] with >0.
+// The Go predicate returns false if a comparison cannot be completed; the CUE
+// builtin preserves that incompleteness until its operands become concrete.
 func Contains(a []cue.Value, v cue.Value) bool {
-	return slices.ContainsFunc(a, v.Equals)
+	ok, err := contains(a, v)
+	return ok && err == nil
+}
+
+// contains retains incomplete comparisons for the CUE native adapter. The
+// exported Go predicate keeps its Boolean API, like IsSorted.
+func contains(a []cue.Value, v cue.Value) (bool, error) {
+	if len(a) == 0 || !v.Exists() {
+		return false, nil
+	}
+	ctx := value.OpContext(v)
+	var incomplete error
+	for _, x := range a {
+		equal, err := equalItems(ctx, x, v)
+		if err != nil {
+			if b, ok := err.(pkg.Bottomer); !ok || !b.Bottom().IsIncomplete() {
+				return false, err
+			}
+			incomplete = err
+			continue
+		}
+		if equal {
+			return true, nil
+		}
+	}
+	return false, incomplete
+}
+
+// equalItems observes inhabitants, not equality of their constraints. Two
+// unresolved values can still be known to differ when their constraints are
+// disjoint, as in UniqueItems([int, string]). Otherwise they must remain live
+// until there is enough information to compare them.
+func equalItems(ctx *adt.OpContext, x, y cue.Value) (bool, error) {
+	if !x.Exists() || !y.Exists() {
+		return false, nil
+	}
+	var incomplete error
+	for _, v := range []cue.Value{x, y} {
+		if err := v.Validate(cue.Concrete(true)); err != nil {
+			if permanent := v.Validate(); permanent != nil {
+				return false, permanent
+			}
+			incomplete = err
+		}
+	}
+	if incomplete != nil {
+		if x.Unify(y).Validate() != nil {
+			return false, nil
+		}
+		return false, incomplete
+	}
+	r := adt.RuntimeEquality(ctx, value.Vertex(x), value.Vertex(y), adt.EqualOp)
+	if b, ok := r.(*adt.Bool); ok {
+		return b.B, nil
+	}
+	return false, value.Make(ctx, r).Err()
 }
 
 // MatchN is a validator that checks that the number of elements in the given

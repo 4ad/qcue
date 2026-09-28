@@ -841,6 +841,7 @@ func nativeName(fn *types.Func) string {
 // result from an incomplete computation. Their native adapters preserve an
 // additional error result without changing the exported Go calling API.
 var nativeErrorAdapters = map[string]string{
+	"list.Contains": "contains",
 	"list.IsSorted": "isSorted",
 }
 

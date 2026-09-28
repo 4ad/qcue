@@ -106,11 +106,15 @@ MinItems: (func(n: int) -> validator([...])) | (func(list: [...], n: int) -> boo
 MaxItems: (func(n: int) -> validator([...])) | (func(list: [...], n: int) -> bool)
 
 // UniqueItems reports whether all elements in the list are unique.
+// Comparisons of unresolved elements remain incomplete unless a duplicate
+// or disjoint element constraints already determine the result.
 UniqueItems: validator([...]) | (func(a: [...]) -> bool)
 
 // Contains reports whether v is contained in a. The value must be a
 // comparable and concrete value.
 // For non-concrete values, you can use [MatchN] with >0.
+// An unresolved comparison remains incomplete unless a definite match or
+// disjoint element constraints already determine the result.
 Contains: func(a: [...], v: _) -> bool
 
 // MatchN is a validator that checks that the number of elements in the given

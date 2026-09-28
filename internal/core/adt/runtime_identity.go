@@ -22,11 +22,13 @@ func runtimeValueIdentity(c *OpContext, a, b Value) proofResult {
 	return compareRuntimeValues(c, a, b, false)
 }
 
-// runtimeEquality implements the language's data observation: hidden fields
+// RuntimeEquality implements the language's data observation: hidden fields
 // and definitions are not compared. It shares the recursive inhabitant
 // comparison with closure captures, so nesting cannot turn
 // a runtime observation into constraint-graph equality.
-func runtimeEquality(c *OpContext, a, b Value, op Op) Value {
+// The operands must first be validated for errors and concreteness.
+// The operator must be EqualOp or NotEqualOp.
+func RuntimeEquality(c *OpContext, a, b Value, op Op) Value {
 	r := compareRuntimeValues(c, a, b, true)
 	if r == proofUnknown {
 		return &Bottom{Code: IncompleteError, Err: c.Newf("runtime equality remains unresolved")}

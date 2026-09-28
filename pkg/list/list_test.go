@@ -17,9 +17,38 @@ package list_test
 import (
 	"testing"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/pkg/internal/builtintest"
+	"cuelang.org/go/pkg/list"
 )
 
 func TestBuiltin(t *testing.T) {
 	builtintest.Run("list", t)
+}
+
+func TestContainsGoPredicate(t *testing.T) {
+	ctx := cuecontext.New()
+	if list.Contains(nil, cue.Value{}) || list.Contains([]cue.Value{{}}, ctx.CompileString("1")) ||
+		list.Contains([]cue.Value{ctx.CompileString("1")}, cue.Value{}) {
+		t.Fatal("an absent Go value was considered equal to a list element")
+	}
+	for _, tc := range []struct {
+		name, item, target string
+		want               bool
+	}{
+		{"equal", "1", "1", true},
+		{"different", "1", "2", false},
+		{"incomplete", "int", "1", false},
+		{"equal_descriptions", "int", "int", false},
+		{"incomplete_record", "{a:int}", "{a:1}", false},
+		{"invalid", "{a:_|_}", "{a:1}", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := list.Contains([]cue.Value{ctx.CompileString(tc.item)}, ctx.CompileString(tc.target))
+			if got != tc.want {
+				t.Fatalf("Contains = %v; want %v", got, tc.want)
+			}
+		})
+	}
 }
