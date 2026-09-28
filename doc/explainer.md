@@ -55,9 +55,10 @@ Choose the singleton type `A = 1`. The call accepts `1` and successfully
 returns `0`, which violates its result contract. Testing a universal claim
 at a singleton is often the quickest way to understand it.
 
-Examples below have their own scopes. Negative lines are individual checks;
-run them separately from the successful cases. A later refinement is an
-additional declaration conjoined with the example's original source.
+Examples below have their own scopes and reuse earlier helpers where stated.
+Negative lines are individual checks; run them separately from the successful
+cases. A later refinement is an additional declaration conjoined with the
+example's original source.
 
 ## Descriptions and their completions
 
@@ -111,7 +112,9 @@ v satisfies forall (A: U) T
 ```
 
 The subject `v` stays fixed as `B` varies. Every bound includes the empty
-type among its subtypes. These facts explain all three declarations below:
+type among its subtypes. The resulting intersection is itself a semantic
+type and can be supplied as a type argument. These facts explain all three
+declarations below:
 
 ```cue
 empty(A): [...A]          // [] is the only possible value
@@ -241,6 +244,12 @@ either of two predicates at *each* instance can admit a subject that satisfies
 neither predicate at *every* instance. Thus distributing `forall` over `|`
 would change its meaning.
 
+For a two-case logical example, let an index `a` range over `0` and `1` and
+keep a subject `z` fixed. At either index, `z = a` or `z = 1 - a` admits
+both possible subjects. Requiring `z = a` at both indices is impossible,
+as is requiring `z = 1 - a` at both. The choice allowed at each instance
+matters to the resulting universal predicate.
+
 ## Function contracts and open refinement
 
 A function type is a predicate on an implementation. For the mathematical
@@ -252,6 +261,11 @@ The arrow means: for every complete packet satisfying `A`, every successful
 return of this implementation satisfies `B`. This is a **partial-correctness
 contract**. Execution can encounter a constraint failure or remain unfinished.
 Successful return is what establishes the result's membership in `B`.
+
+For `forall A func(A) -> A`, choose the semantic type containing only one
+complete input value. Any successful return on that input must equal it.
+Repeating this argument for each input shows that every inhabitant of the
+universal identity interface behaves as an identity wherever it succeeds.
 
 ### A result contract is a proof obligation
 
@@ -395,7 +409,7 @@ functions; the second requires behavior on fewer inputs.
 
 **Refine the shared description by conjunction, and keep its dependencies.**
 This preserves CUE's information order while each function capability is
-checked contravariantly. An established result can stay the same or become
+checked contravariantly. A singleton observation can stay the same or become
 inconsistent. A displayed default retains the ordinary CUE preference rules
 and the alternatives from which it was selected.
 
@@ -454,6 +468,27 @@ The client promises itself all integer inputs, so linking requires
 `int ≤ Small`. The field proves only `Small ≤ int`. The particular packet
 `Small & 2` can be compatible while this universal coverage goal remains
 unproved. A fixed `let Small = int` supplies both inclusions.
+
+A published interface can intentionally track the implementation's live domain:
+
+<!-- example: shared-domain -->
+```cue
+Input: int
+// Required interface:
+step: func(Input) -> int
+// Supplied implementation:
+step: func(x: Input) -> int: x + 1
+answer: step(2)                          // 3
+
+// Input: >=0   preserves answer: 3.
+// Input: >2    refutes this call's packet.
+```
+
+Coverage is now `Input ≤ Input`, true under every refinement. Both the
+published capability and the implementation's accepted packets
+refer to that shared description. Later restrictions still validate every
+saved argument. A client promising the fixed domain `int` keeps the stronger
+coverage requirement of the preceding example.
 
 Bounds on type variables can themselves be live:
 
@@ -592,7 +627,8 @@ on the packet or result must also succeed.
 
 A **higher-rank** interface places a universal inside another function type.
 In the following parameter, `p` itself is universal. The body can therefore
-use the same supplied function at two different instances:
+use the same supplied function at two different instances. The successful
+call supplies the universal `id` introduced at the start:
 
 <!-- paper: 13 -->
 ```cue
@@ -604,8 +640,7 @@ onlyInt: func(x: int) -> int: x
 bad: useBoth(onlyInt)            // rejected
 ```
 
-Here `id` is the universal identity introduced at the start. `onlyInt`
-cannot supply the callback's string instance. Moving `forall A` outside
+`onlyInt` cannot supply the callback's string instance. Moving `forall A` outside
 `useBoth` would give the caller a choice of one `A` for each outer call;
 placing it on `p` gives the body all of `p`'s instances together.
 
@@ -1066,6 +1101,10 @@ unrelated `g` field changes neither. The comprehension creates closures with
 the same origin but different captured `v` values, hence distinct inhabitants.
 When captures are still open, their equality remains a constraint to resolve.
 
+Two distinct origins can return the same result on every input and still
+denote different closures. Thus agreement of application results establishes
+no equality of the function values being constrained.
+
 To combine the results of different implementations, a new body can call
 them both and unify their results:
 
@@ -1149,6 +1188,131 @@ constraints while adding closedness where the record description establishes
 the field inventory. Operators similarly need evidence that each possible
 operand supports the operation; an arbitrary numeric subtype supports
 arithmetic but can require a broader result type.
+
+### Generic library functions and refined callbacks
+
+`list.Reverse` has the universal contract
+`forall A func([...A]) -> [...A]`. It preserves the element description,
+including numeric bounds and record fields:
+
+```cue
+import "list"
+
+reverse(A): func(xs: [...A]) -> [...A]: list.Reverse[A](xs)
+ports: reverse[int & >=1024]([8080, 8443]) // [8443, 8080]
+records: reverse([{name: "api"}, {name: "web"}])
+// records: [{name: "web"}, {name: "api"}]
+bad: list.Reverse[int](["api"])          // rejected: element domain
+```
+
+`Take`, `Drop`, `Slice`, `Repeat`, and `Concat` carry similar element
+relationships. An explicit instance checks both its bound and the supplied
+input. Known tuple shapes can additionally provide precise positions and
+lengths to subsequent checking.
+
+Native functions can also serve as callbacks to the earlier `map`:
+
+```cue
+import (
+    "math"
+    "strings"
+)
+
+values: map[int, int](math.Abs, [-2, 0, 3]) // [2, 0, 3]
+labels: map[string, string](strings.TrimSpace, [" api ", " web "])
+// labels: ["api", "web"]
+badAbs(A: number): func(x: A) -> A: math.Abs(x) // invalid contract
+```
+
+`math.Abs` accepts numbers and has an additional integer-result promise on
+integer inputs. That narrower result clause establishes the callback required
+by `map[int, int]`; contravariance permits its broader input capability.
+The arbitrary-subtype claim in `badAbs` is false: at `A = -1`, the return
+value `1` violates `A`. Preserving integer kind and preserving every integer
+refinement are different promises.
+
+### Saving native arguments and constructing validators
+
+Standard-library functions use the same explicit partial-call syntax. Here
+`repeat` saves `count`, while `atLeastThree` saves the minimum rune count:
+
+```cue
+import "strings"
+
+repeat: strings.Repeat(count: 2, ...)
+repeat: func(string) -> string
+echo: repeat("cue")                         // "cuecue"
+ready: strings.Repeat("go", count: 2, ...)
+out: ready()                               // "gogo"
+bad: strings.Repeat(count: "two", ...)      // rejected at saving
+
+atLeastThree: strings.MinRunes(min: 3, ...)
+yes: atLeastThree("cue")                    // true
+no: atLeastThree("go")                      // false
+longEnough: strings.MinRunes(3)
+name: "cue" & longEnough                    // "cue"
+short: "go" & longEnough                    // _|_
+```
+
+An explicit partial call returns a callable closure. A library's implicit
+**validator constructor**, such as `strings.MinRunes(3)`, returns a constraint
+to apply to a value with `&`. The type notation `validator(string)` describes
+this validator's string domain. The predicate call returns a Boolean; the
+validator requires its test to succeed. Saved arguments are checked when
+supplied and retain their live dependencies until the eventual call.
+
+### Saving a live schema
+
+Some native parameters consume CUE schemas. Their implementation declares
+this in the type reference with `@schema()`. An explicit partial call can save
+such a schema with its lexical references and future refinements:
+
+```cue
+import "encoding/json"
+
+schema: {port: number}
+validate: json.Validate(v: schema, ...)
+ok: validate("{\"port\":8080}")           // true
+bad: validate("{\"port\":\"http\"}")       // _|_
+
+// Separate refinements:
+// schema: {port: int}        // ok remains true
+// schema: {port: >9000}      // ok fails schema validation
+```
+
+The saved schema is a description against which JSON is checked; its
+`port` field can remain nonconcrete. Tightening that description still
+validates the original call. Native data parameters, by comparison, retain
+the demands needed to obtain their runtime data. The implementation's own
+parameter contract determines which interpretation applies.
+
+### Sorting records while preserving their refinements
+
+CUE's sorting API accepts a comparator record with operands `x`, `y`, and
+a Boolean field `less`. For each comparison, the library supplies fresh
+operands from the list. The checker verifies the template with those
+element descriptions:
+
+```cue
+import "list"
+
+byRank(A: {rank: int}): func(xs: [...A]) -> [...A]: list.Sort[A](xs, {
+    x: {}, y: {}, less: x.rank < y.rank
+})
+ordered: byRank([{rank: 2, name: "web"}, {rank: 1, name: "api"}])
+// ordered: [{rank: 1, name: "api"}, {rank: 2, name: "web"}]
+
+bad(A: {rank: int}): func(xs: [...A]) -> [...A]: list.Sort[A](xs, {
+    x: {}, y: {}, less: x.name < y.name
+}) // invalid: A supplies no name field evidence
+```
+
+The bound supplies `rank` for comparisons; sorting preserves each whole
+`A` element, including its `name` in this call. The rejected template's
+generic contract permits elements with no `name`. Checking a comparator
+therefore includes its operand domains, selected fields, and result, in
+addition to its record shape. A captured bound can support this proof while
+the corresponding captured value remains a demand of actual comparisons.
 
 ### Linking native implementations
 
@@ -1354,12 +1518,21 @@ bodies. `cue.Concrete(true)` additionally demands concrete data, linked
 implementations, and runtime captures. Pending proof goals are reported by
 validation even when concrete data is not requested.
 
-`Unify`, `FillPath`, and faithful source export retain the graph needed for
-further constraints. Exported closures preserve their origins, lexical
-captures, saved slots, and obligations; importing the source reinstalls the
-checks. Thus later refinement can finish a pending goal, invalidate a
-particular call, or impose another interface on an existing implementation,
-while every established proof remains valid under its retained premises.
+The paper requires `Unify`, `FillPath`, and source export to retain the graph
+needed for further constraints. Faithful closure export preserves origins,
+lexical captures, saved slots, and obligations; importing the source reinstalls
+the checks. Later refinement can then finish a pending goal, invalidate a
+particular call, or impose another interface on an existing implementation.
+Every established proof remains valid under its retained premises.
+
+There is a current implementation limit in the separate live-interface
+example using `Input` and `step`: the original source validates and supports
+the demonstrated refinements, but reimporting its raw source export leaves
+function conformance pending. Here *raw source export* means
+`Value.Syntax(cue.Raw())`, formatted as CUE source and compiled again. This
+case still needs preservation of the shared description's proof evidence.
+The saved JSON schema example above retains its successful result and both
+refinement outcomes through repeated source export and reimport.
 
 The [paper example index](../cue/testdata/quantified/paper/README.md) maps every
 listing to its executable fixture. The [implementation guide](implementation.md)

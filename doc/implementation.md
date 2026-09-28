@@ -357,6 +357,11 @@ Standalone closure export fails explicitly when a required capture cannot be
 represented faithfully. JSON output has no representation for a function or an
 unresolved implementation.
 
+The [explainer](explainer.md#inspecting-and-refining-a-result) records a
+current limit for separately attached live input interfaces: the original
+source validates, but raw source export and reimport can leave their
+conformance proof pending.
+
 ## Code and verification
 
 - `internal/core/adt/propagate.go` owns goals, dependencies, suspension, and work.
