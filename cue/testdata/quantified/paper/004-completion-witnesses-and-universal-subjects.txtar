@@ -1,0 +1,33 @@
+// Paper example 004: Completion witnesses and universal subjects
+
+#noformat
+#paper: 4
+#mode: evaluation
+
+-- paper.cue.txt --
+#Cell: {value: int}
+left:  #Cell & {value: 1}
+right: #Cell & {value: 2}
+
+empty(A): [...A]          // the empty list
+impossible(A): A          // _|_, using A = _|_
+Box(A) = {value: A}
+one: Box(int) & {value: 1}
+box(A): {value: A}        // _|_: one required field at every A
+-- in.cue --
+@test(json, {value:1}, at="left")
+@test(json, {value:2}, at="right")
+@test(json, [], at="empty")
+@test(validate, conflict, at="impossible")
+@test(json, {value:1}, at="one")
+@test(validate, conflict, at="box")
+
+#Cell: {value: int}
+left:  #Cell & {value: 1}
+right: #Cell & {value: 2}
+
+empty(A): [...A]          // the empty list
+impossible(A): A          // _|_, using A = _|_
+Box(A) = {value: A}
+one: Box(int) & {value: 1}
+box(A): {value: A}        // _|_: one required field at every A

@@ -1,0 +1,18 @@
+// Paper example 022: An unfounded proof dependency
+
+#noformat
+#paper: 22
+#mode: evaluation
+
+-- paper.cue.txt --
+k: f(0)
+f: func(x: int) -> int: k
+a: f(1)
+-- in.cue --
+@test(validate, blocked, at="f")
+@test(validate, blocked, at="a")
+@test(validate, blocked, at="k")
+
+k: f(0)
+f: func(x: int) -> int: k
+a: f(1)

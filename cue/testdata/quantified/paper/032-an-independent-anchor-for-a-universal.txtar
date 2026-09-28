@@ -1,0 +1,19 @@
+// Paper example 032: An independent anchor for a universal
+
+#noformat
+#paper: 32
+#mode: evaluation
+
+-- paper.cue.txt --
+id(A): func(A) -> A
+id: func(int) -> int             // redundant valid instance
+quiet(A): func(A) -> A
+quiet: func(int) -> bool         // rejected by the integer anchor
+-- in.cue --
+@test(validate, at="id")
+@test(validate, blocked, at="quiet")
+
+id(A): func(A) -> A
+id: func(int) -> int             // redundant valid instance
+quiet(A): func(A) -> A
+quiet: func(int) -> bool         // rejected by the integer anchor

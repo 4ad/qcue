@@ -1,0 +1,27 @@
+// Paper example 025: A live universal bound
+
+#noformat
+#paper: 25
+#mode: evaluation
+
+-- paper.cue.txt --
+Upper: number
+choose(A: Upper): func(x: A, y: A) -> A: {
+    if x <= y {out: x}
+    if x > y  {out: y}
+}.out
+a: choose[Upper](2, 5)               // 2, with packet demands
+needs: choose[int & >=0](2, 5)       // instance-bound goal pending
+// A later file may add Upper: int; a still has result 2.
+-- in.cue --
+@test(json, 2, at="a")
+@test(validate, concrete, incomplete, at="needs")
+
+Upper: number
+choose(A: Upper): func(x: A, y: A) -> A: {
+    if x <= y {out: x}
+    if x > y  {out: y}
+}.out
+a: choose[Upper](2, 5)               // 2, with packet demands
+needs: choose[int & >=0](2, 5)       // instance-bound goal pending
+// A later file may add Upper: int; a still has result 2.

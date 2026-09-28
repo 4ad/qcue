@@ -1,0 +1,32 @@
+// Paper example 017: Input and result constraints on one call
+
+#noformat
+#paper: 17
+#mode: evaluation
+
+-- paper.cue.txt --
+_input: int
+_output: int
+_f: func(x: _input) -> int: 2 * x
+a: _f(2)
+a: _output                  // 4, with both dependencies retained
+
+// Separate possible refinements:
+// _input: >=0               // preserves a: 4
+// _input: >2                // _|_ at the invocation
+// _output: >=4              // preserves a: 4
+// _output: <4               // _|_ at the result
+-- in.cue --
+@test(json, 4, at="a")
+
+_input: int
+_output: int
+_f: func(x: _input) -> int: 2 * x
+a: _f(2)
+a: _output                  // 4, with both dependencies retained
+
+// Separate possible refinements:
+// _input: >=0               // preserves a: 4
+// _input: >2                // _|_ at the invocation
+// _output: >=4              // preserves a: 4
+// _output: <4               // _|_ at the result

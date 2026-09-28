@@ -21,12 +21,12 @@ r: Q(string)
 -- capture-want.cue --
 forall (B) {value: (string), bound: (int & >=5), captured: (5)}
 -- shadow.cue --
-Q(A) = forall (B) {value: A, nested: forall (A) {value: A}}
+Q(A) = forall (B) {value: A, nested: forall (A) func(A) -> A}
 r: Q(int)
 -- shadow-want.cue --
-forall (B) {value: (int), nested: forall (A) {value: A}}
+{value: (int), nested: forall (A) func(A) -> A}
 -- bound.cue --
-Q(A) = forall (B: A) {value: B}
+Q(A) = forall (B: A) func(B) -> B
 r: Q(int)
 -- bound-want.cue --
-forall (B: (int)) {value: B}
+forall (B: (int)) func(B) -> B

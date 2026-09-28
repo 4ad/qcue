@@ -1,0 +1,31 @@
+// Paper example 045: Validation across field and call boundaries
+
+#noformat
+#paper: 45
+#mode: evaluation
+
+-- paper.cue.txt --
+positive: func(x: int) -> bool: x > 0
+#Positive: {value: int, _valid: true & positive(value)}
+n: (#Positive & {value: 7}).value  // 7
+bad: #Positive & {value: -1}       // _|_
+raw: func(x: number) -> string: "\(x)"
+call: {arg: number, result: raw(arg)}
+call: {arg: int, result: string}   // another file's restriction
+ok: (call & {arg: 7}).result      // "7"
+wrong: (call & {arg: 1.5}).result // _|_
+-- in.cue --
+@test(json, 7, at="n")
+@test(validate, conflict, at="bad")
+@test(json, "7", at="ok")
+@test(validate, conflict, at="wrong")
+
+positive: func(x: int) -> bool: x > 0
+#Positive: {value: int, _valid: true & positive(value)}
+n: (#Positive & {value: 7}).value  // 7
+bad: #Positive & {value: -1}       // _|_
+raw: func(x: number) -> string: "\(x)"
+call: {arg: number, result: raw(arg)}
+call: {arg: int, result: string}   // another file's restriction
+ok: (call & {arg: 7}).result      // "7"
+wrong: (call & {arg: 1.5}).result // _|_

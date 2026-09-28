@@ -84,6 +84,8 @@ func TestPropagationLaterRefinement(t *testing.T) {
 		{"output_allowed", "Output:int\nf:func(x:int)->int:2*x\na:f(2)&Output", "Output:>=4", 4, false},
 		{"output_excluded", "Output:int\nf:func(x:int)->int:2*x\na:f(2)&Output", "Output:<4", 0, true},
 		{"capture", "factor:int\nf:func(x:int)->int:factor*x\na:f(4)", "factor:3", 12, false},
+		{"universal_bound", "Upper:number\nf(A:Upper):func(x:A)->A:x\na:f[Upper](2)", "Upper:int", 2, false},
+		{"result_excluded", "R:int\nf:func(_:int)->R:2\na:f(0)", "R:>2", 0, true},
 	} {
 		for _, export := range []bool{false, true} {
 			name := tt.name
@@ -117,6 +119,31 @@ func TestPropagationLaterRefinement(t *testing.T) {
 					t.Fatalf("after %s: a = %v, %v; want %d", tt.refinement, a, err, tt.want)
 				}
 			})
+		}
+	}
+}
+
+func TestPropagationObservationRefinement(t *testing.T) {
+	const source = "limit:int\nf:func(x:int & >limit & <10)->_|_:_|_"
+	for _, exported := range []bool{false, true} {
+		ctx := cuecontext.New()
+		v := ctx.CompileString(source)
+		if err := v.LookupPath(cue.ParsePath("f")).Validate(); err == nil {
+			t.Fatal("an unresolved domain guard discharged relevance")
+		}
+		if exported {
+			text, err := format.Node(v.Syntax())
+			if err != nil {
+				t.Fatal(err)
+			}
+			v = ctx.CompileString(string(text))
+		}
+		for _, limit := range []int{10, 0} {
+			r := v.FillPath(cue.ParsePath("limit"), limit)
+			err := r.LookupPath(cue.ParsePath("f")).Validate()
+			if (err == nil) != (limit == 10) {
+				t.Fatalf("export=%v limit=%d: relevance: %v", exported, limit, err)
+			}
 		}
 	}
 }

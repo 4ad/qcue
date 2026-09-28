@@ -245,6 +245,9 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 		return e.withLexicalAliases(ast.Clone(x.Src), nil, make(map[ast.Node]string))
 
 	case *adt.TypeReference:
+		if argument := adt.FunctionTypeArguments(adt.FuncType{Env: env})[x.Param.Src]; argument != nil {
+			return e.predicateValue(argument)
+		}
 		return ast.Clone(x.Src)
 	case *adt.LiveReference:
 		return e.innerExpr(env, x.X)

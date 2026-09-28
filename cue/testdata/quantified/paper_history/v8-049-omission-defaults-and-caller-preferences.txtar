@@ -14,7 +14,7 @@ unknown:  add(1, _)         // incomplete; b was supplied
 @test(json, 11, at="omitted")
 @test(json, 6, at="supplied")
 // Supplying top bypasses the default but leaves integer admission unproved.
-@test(validate, blocked, at="unknown")
+@test(validate, concrete, incomplete, at="unknown")
 
 add: func(a: int, b: int = 10) -> int: a + b
 x: int | *5

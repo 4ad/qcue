@@ -1,0 +1,26 @@
+// Paper example 037: Failure inherited by composition
+
+#noformat
+#paper: 37
+#mode: evaluation
+
+-- paper.cue.txt --
+ignore: func(_: _|_) -> int: 7
+x: ignore(_|_)                // _|_, never 7
+bounded: func(x: int) -> int: x & >0
+pipe: compose[int, int, string](text, bounded)
+good: pipe(3)                 // "3"
+bad: pipe(0)                  // _|_, inherited from bounded
+-- in.cue --
+@test(validate, conflict, at="x")
+@test(json, "3", at="good")
+@test(validate, conflict, at="bad")
+
+text: func(x: int) -> string: "\(x)"
+compose(A, B, C): func(g: func(B) -> C, f: func(A) -> B) -> func(A) -> C: func(x: A) -> C: g(f(x))
+ignore: func(_: _|_) -> int: 7
+x: ignore(_|_)                // _|_, never 7
+bounded: func(x: int) -> int: x & >0
+pipe: compose[int, int, string](text, bounded)
+good: pipe(3)                 // "3"
+bad: pipe(0)                  // _|_, inherited from bounded

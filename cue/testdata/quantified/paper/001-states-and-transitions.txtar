@@ -1,0 +1,18 @@
+// Paper example 001: States and transitions
+
+#noformat
+#paper: 1
+#mode: pseudocode
+
+#skip
+#inlinetest:exclude Syntax and pseudocode are checked by the paper index.
+
+-- paper.cue.txt --
+propagate(state, budget):
+    while work_remains(state) and budget_allows_step(budget):
+        node = take_work(state)
+        for item in one_accounted_step(node, state):
+            verify_derivation_or_exact_rewrite(item)
+            if accumulate_with_scope_and_support(state, item):
+                enqueue_dependents(state, item)
+    return retained_residual(state), scoped_diagnostics(state)

@@ -1,0 +1,26 @@
+// Paper example 026: Residual validation and strict arguments
+
+#noformat
+#paper: 26
+#mode: evaluation
+
+-- paper.cue.txt --
+_x: int
+_f: func(x: _x) -> int: 2 * x
+a: 4 & _f(2)                    // a valid residual
+
+ignore: func(_: int) -> int: 7
+pending: ignore(_)              // demanded argument is incomplete
+bad: ignore(_|_)                // _|_, never 7
+-- in.cue --
+@test(json, 4, at="a")
+@test(validate, concrete, incomplete, at="pending")
+@test(validate, conflict, at="bad")
+
+_x: int
+_f: func(x: _x) -> int: 2 * x
+a: 4 & _f(2)                    // a valid residual
+
+ignore: func(_: int) -> int: 7
+pending: ignore(_)              // demanded argument is incomplete
+bad: ignore(_|_)                // _|_, never 7

@@ -1,0 +1,26 @@
+// Paper example 005: One identity at many instances
+
+#noformat
+#paper: 5
+#mode: evaluation
+
+-- paper.cue.txt --
+id(A): func(x: A) -> A: x
+integer: id(7)                 // 7
+text:    id("seven")           // "seven"
+record:  id({port: 443})        // {port: 443}
+chosen:  id[int & >=0](7)       // 7
+wrong(A): func(x: A) -> A: 0    // rejected: 0 is not arbitrary A
+-- in.cue --
+@test(json, 7, at="integer")
+@test(json, "seven", at="text")
+@test(json, {port:443}, at="record")
+@test(json, 7, at="chosen")
+@test(validate, blocked, at="wrong")
+
+id(A): func(x: A) -> A: x
+integer: id(7)                 // 7
+text:    id("seven")           // "seven"
+record:  id({port: 443})        // {port: 443}
+chosen:  id[int & >=0](7)       // 7
+wrong(A): func(x: A) -> A: 0    // rejected: 0 is not arbitrary A

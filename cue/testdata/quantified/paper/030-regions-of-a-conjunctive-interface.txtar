@@ -1,0 +1,33 @@
+// Paper example 030: Regions of a conjunctive interface
+
+#noformat
+#paper: 30
+#mode: evaluation
+
+-- paper.cue.txt --
+convert: (func(int) -> string) & (func(string) -> int)
+refine:  (func(number) -> number) & (func(int) -> int)
+choice:  (func(int) -> int) | (func(int) -> bool)
+classify: func(x: int) -> ("negative" | "nonnegative"): {
+    if x < 0  {out: "negative"}
+    if x >= 0 {out: "nonnegative"}
+}.out
+classify: (func(int & <0) -> "negative") &
+          (func(int & >=0) -> "nonnegative")
+c: classify(-3)                          // "negative"
+-- in.cue --
+@test(validate, at="convert")
+@test(validate, at="refine")
+@test(validate, at="choice")
+@test(json, "negative", at="c")
+
+convert: (func(int) -> string) & (func(string) -> int)
+refine:  (func(number) -> number) & (func(int) -> int)
+choice:  (func(int) -> int) | (func(int) -> bool)
+classify: func(x: int) -> ("negative" | "nonnegative"): {
+    if x < 0  {out: "negative"}
+    if x >= 0 {out: "nonnegative"}
+}.out
+classify: (func(int & <0) -> "negative") &
+          (func(int & >=0) -> "nonnegative")
+c: classify(-3)                          // "negative"

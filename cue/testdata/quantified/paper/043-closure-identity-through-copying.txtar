@@ -1,0 +1,25 @@
+// Paper example 043: Closure identity through copying
+
+#noformat
+#paper: 43
+#mode: evaluation
+
+-- paper.cue.txt --
+x: {f: func(y: int) -> int: y}
+a: x.f & x.f
+b: x.f & {x}.f
+c: x.f & (x & {g: 1}).f
+r: [a(2), b(2), c(2)]        // [2, 2, 2]
+d: [for v in [1, 2] {func(y: int) -> int: y + v}]
+e: d[0] & d[1]              // _|_: unequal captures
+-- in.cue --
+@test(json, [2,2,2], at="r")
+@test(validate, conflict, at="e")
+
+x: {f: func(y: int) -> int: y}
+a: x.f & x.f
+b: x.f & {x}.f
+c: x.f & (x & {g: 1}).f
+r: [a(2), b(2), c(2)]        // [2, 2, 2]
+d: [for v in [1, 2] {func(y: int) -> int: y + v}]
+e: d[0] & d[1]              // _|_: unequal captures

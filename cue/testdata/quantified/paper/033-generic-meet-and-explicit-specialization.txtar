@@ -1,0 +1,28 @@
+// Paper example 033: Generic meet and explicit specialization
+
+#noformat
+#paper: 33
+#mode: evaluation
+
+-- paper.cue.txt --
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+good: meet({a: 1}, {b: true})     // {a: 1, b: true}
+bad: meet[int, bool](1, true)    // _|_
+specialized: func(int, bool) -> (int & bool) // rejected interface
+f(A): func(xs: [A, A]) -> A: xs[0] & xs[1]
+x: f([{a: 1}, {b: 1}])           // {a: 1, b: 1}
+y: f([1, 2])                     // _|_
+-- in.cue --
+@test(json, {a:1,b:true}, at="good")
+@test(validate, conflict, at="bad")
+@test(validate, blocked, at="specialized")
+@test(json, {a:1,b:1}, at="x")
+@test(validate, conflict, at="y")
+
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+good: meet({a: 1}, {b: true})     // {a: 1, b: true}
+bad: meet[int, bool](1, true)    // _|_
+specialized: func(int, bool) -> (int & bool) // rejected interface
+f(A): func(xs: [A, A]) -> A: xs[0] & xs[1]
+x: f([{a: 1}, {b: 1}])           // {a: 1, b: 1}
+y: f([1, 2])                     // _|_

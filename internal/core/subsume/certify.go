@@ -60,6 +60,7 @@ func newCertifier(ctx *adt.OpContext) *certifier {
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope),
 		projections:  make(map[*adt.Vertex]map[adt.Feature]adt.Value),
 		constructors: make(map[*adt.Vertex]adt.Expr),
+		memberships:  make(map[adt.Value][]*adt.LiveType),
 		records:      make(map[proofRecordKey]*proofRecord),
 		completed:    make(map[proofKey]proofCertificate), remaining: 10000}
 }
@@ -113,12 +114,15 @@ type certifier struct {
 	// their synthesized types. Source meets combine those descriptions;
 	// a typing inventory is not an explicit close constraint.
 	constructors map[*adt.Vertex]adt.Expr
-	records      map[proofRecordKey]*proofRecord
-	completed    map[proofKey]proofCertificate
-	callProofs   map[*adt.FuncValue][]adt.FuncType
-	attempts     []*proofAttempt
-	remaining    int
-	failure      *adt.Bottom
+	// Membership facts keep live coordinates alongside normalized summaries.
+	// Equal current data is not enough to manufacture one of these facts.
+	memberships map[adt.Value][]*adt.LiveType
+	records     map[proofRecordKey]*proofRecord
+	completed   map[proofKey]proofCertificate
+	callProofs  map[*adt.FuncValue][]adt.FuncType
+	attempts    []*proofAttempt
+	remaining   int
+	failure     *adt.Bottom
 }
 
 type proofKey struct {
@@ -202,7 +206,12 @@ func (p *certifier) includes(want, got adt.Value) bool {
 	if want == nil || got == nil {
 		return false
 	}
-	if _, ok := adt.Unwrap(want).(*adt.LiveType); ok {
+	if live, ok := adt.Unwrap(want).(*adt.LiveType); ok {
+		for _, member := range p.memberships[got] {
+			if live.SameReference(p.ctx, member) {
+				return true
+			}
+		}
 		got = p.constructorEvidence(got)
 		if got == nil {
 			return false
@@ -249,6 +258,9 @@ func (p *certifier) constructorEvidence(value adt.Value) adt.Value {
 		}
 		out.Arcs = append(out.Arcs, arc)
 	}
+	p.constructors[out] = p.constructors[v]
+	p.projections[out] = p.projections[v]
+	p.memberships[out] = p.memberships[v]
 	return out
 }
 
@@ -532,8 +544,9 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 		// telescope, so checking only target.Fn == f.Fn below is insufficient.
 		// Recover this implementation's declaration scope before opening
 		// the two telescopes with shared rigid variables.
-		for _, original := range f.ExplicitClauses() {
-			if original.Fn == source.Fn && len(adt.FunctionTypeParameters(original)) != 0 {
+		for _, original := range f.Obligations() {
+			if original.Fn == source.Fn &&
+				len(adt.FunctionTypeParameters(original)) == len(adt.FunctionTypeParameters(target)) {
 				source.Env = original.Env
 				break
 			}
@@ -786,6 +799,11 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			return nil
 		}
 		return p.expr(scope, x.Template.Body)
+	case *adt.LiveReference:
+		// Predicate operations read the same coordinate as ordinary source
+		// expressions. Its live wrapper is a proof dependency, not a new
+		// operation with a separate evaluation phase.
+		return p.expr(env, x.X)
 	case *adt.TypeReference:
 		// Runtime erasure checking has already excluded arbitrary type
 		// variables here. An alias may still substitute a fixed literal
@@ -872,6 +890,9 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		value := p.captured(p.schema(env, x))
 		if value != nil && !adt.IsConcrete(value) && !packetHasFunction(value, make(map[adt.Value]bool)) {
 			return &adt.LiveType{Ref: &adt.LiveReference{X: x}, Env: env, Upper: value}
+		}
+		if value != nil && value.Kind()&(adt.StructKind|adt.ListKind) != 0 && !packetHasFunction(value, make(map[adt.Value]bool)) {
+			p.memberships[value] = append(p.memberships[value], &adt.LiveType{Ref: &adt.LiveReference{X: x}, Env: env, Upper: value})
 		}
 		return value
 	case *adt.SelectorExpr:
@@ -1772,7 +1793,7 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 		results = function.ResultClausesFor(p.ctx, target)
 	}
 	s := &subsumer{ctx: p.ctx, certifier: p}
-	admit := func(source adt.FuncType) (adt.FuncType, bool) {
+	admit := func(source adt.FuncType, activation bool) (adt.FuncType, bool) {
 		if len(adt.FunctionTypeParameters(source)) != 0 {
 			var b *adt.Bottom
 			source, b = adt.InstantiateFunctionType(p.ctx, source, target)
@@ -1782,7 +1803,10 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 		}
 		noResult := *source.Fn
 		noResult.Ret = nil
-		return source, s.activationSignature(target, adt.FuncType{Fn: &noResult, Env: source.Env})
+		if activation {
+			return source, s.activationSignature(target, adt.FuncType{Fn: &noResult, Env: source.Env})
+		}
+		return source, s.capabilitySignature(target, adt.FuncType{Fn: &noResult, Env: source.Env})
 	}
 	admitted := false
 	var consequences []adt.Value
@@ -1827,20 +1851,35 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 	seen := make(map[adt.FuncType]bool)
 	for _, source := range sources {
 		seen[source] = true
-		if source, ok := admit(source); ok {
+		activation := function != nil && function.Fn.Body != nil && source.Fn == function.Fn
+		if source, ok := admit(source, activation); ok {
 			admitted = true
 			addResult(source)
 		}
 	}
 	if !admitted {
-		return nil
+		// A bodyless hypothesis can constrain an open packet to its domain.
+		// Different possible domains describe alternative packets. Their
+		// results are joined; compatible guards are not simultaneous facts.
+		var alternatives []adt.Value
+		for _, source := range sources {
+			if source, ok := admit(source, true); ok {
+				if result := p.schema(source.Env, source.Fn.Ret); result != nil {
+					alternatives = append(alternatives, result)
+				}
+			}
+		}
+		if len(alternatives) == 0 {
+			return nil
+		}
+		return proofUnion(alternatives)
 	}
 	for _, source := range results {
 		if seen[source] {
 			continue
 		}
 		seen[source] = true
-		if source, ok := admit(source); ok {
+		if source, ok := admit(source, false); ok {
 			addResult(source)
 		}
 	}

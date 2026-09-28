@@ -1,0 +1,28 @@
+// Paper example 008: Distinct universal ranges
+
+#noformat
+#paper: 8
+#mode: evaluation
+
+-- paper.cue.txt --
+choose(A: int):    func(A, A) -> A
+choose(A: string): func(A, A) -> A
+stronger(A: int | string): func(A, A) -> A
+
+r(A): {id: func(A) -> A}
+r: {label: "utilities"}
+// Equivalent accumulated predicate:
+r(A): {id: func(A) -> A, label: "utilities"}
+-- in.cue --
+@test(validate, at="choose")
+@test(validate, at="stronger")
+@test(json, "utilities", at="r.label")
+
+choose(A: int):    func(A, A) -> A
+choose(A: string): func(A, A) -> A
+stronger(A: int | string): func(A, A) -> A
+
+r(A): {id: func(A) -> A}
+r: {label: "utilities"}
+// Equivalent accumulated predicate:
+r(A): {id: func(A) -> A, label: "utilities"}

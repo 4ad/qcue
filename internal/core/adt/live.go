@@ -68,10 +68,36 @@ func (x *LiveType) Subsumes(c *OpContext, value Value) bool {
 		return true
 	}
 	witness, complete := c.Evaluate(x.Env, x.Ref.X)
-	if !complete || witness == nil || witness.Kind()&(StructKind|ListKind) != 0 || !IsConcrete(witness) {
+	if !complete || !liveSingleton(c, witness, make(map[*Vertex]bool)) {
 		return false
 	}
 	return Equal(c, witness, value, CheckStructural)
+}
+
+// A finite list of scalar singletons cannot acquire a new element. Records
+// remain extensible description coordinates even when their current fields
+// are concrete, so their present data is not a lower-bound theorem.
+func liveSingleton(c *OpContext, value Value, seen map[*Vertex]bool) bool {
+	if value == nil {
+		return false
+	}
+	value = Unwrap(value)
+	if value.Kind()&ScalarKinds != 0 {
+		return IsConcrete(value)
+	}
+	v, ok := value.(*Vertex)
+	if !ok || seen[v] || !v.IsClosedList() {
+		return false
+	}
+	seen[v] = true
+	defer delete(seen, v)
+	v.Finalize(c)
+	for _, a := range v.Arcs {
+		if a.ArcType == ArcMember && !liveSingleton(c, a, seen) {
+			return false
+		}
+	}
+	return v.Bottom() == nil
 }
 
 // SameReference compares source coordinates, not equal upper approximations.

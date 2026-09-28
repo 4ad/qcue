@@ -1,0 +1,29 @@
+// Paper example 012: Composition and captured data
+
+#noformat
+#paper: 12
+#mode: evaluation
+
+-- paper.cue.txt --
+compose(A, B, C): func(g: func(B) -> C, f: func(A) -> B) ->
+    func(A) -> C: func(x: A) -> C: g(f(x))
+pipeline: compose[int, int, string](text, inc)
+answer: pipeline(4)             // "5"
+withPrefix: func(prefix: string) -> func(string) -> string:
+    func(s: string) -> string: prefix + s
+warn: withPrefix("warning: ")
+message: warn("retry")          // "warning: retry"
+-- in.cue --
+@test(json, "5", at="answer")
+@test(json, "warning: retry", at="message")
+
+text: func(x: int) -> string: "\(x)"
+inc: func(x: int) -> int: x + 1
+compose(A, B, C): func(g: func(B) -> C, f: func(A) -> B) ->
+    func(A) -> C: func(x: A) -> C: g(f(x))
+pipeline: compose[int, int, string](text, inc)
+answer: pipeline(4)             // "5"
+withPrefix: func(prefix: string) -> func(string) -> string:
+    func(s: string) -> string: prefix + s
+warn: withPrefix("warning: ")
+message: warn("retry")          // "warning: retry"

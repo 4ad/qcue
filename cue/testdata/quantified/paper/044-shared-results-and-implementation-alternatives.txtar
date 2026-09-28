@@ -1,0 +1,33 @@
+// Paper example 044: Shared results and implementation alternatives
+
+#noformat
+#paper: 44
+#mode: evaluation
+
+-- paper.cue.txt --
+left:  func(x: int) -> {a: int}: {a: x}
+right: func(x: int) -> {b: int}: {b: x}
+both: func(x: int) -> {a: int, b: int}: left(x) & right(x)
+r: both(3)                  // {a: 3, b: 3}
+first:  func(x: int) -> int: 1
+second: func(x: int) -> int: 2
+conflict: first & second    // _|_: distinct origins
+choice: first | second      // two possible implementations
+preferred: *first | second
+p: preferred(3)             // 1 after default selection
+-- in.cue --
+@test(json, {a:3,b:3}, at="r")
+@test(validate, conflict, at="conflict")
+@test(validate, concrete, incomplete, at="choice")
+@test(json, 1, at="p")
+
+left:  func(x: int) -> {a: int}: {a: x}
+right: func(x: int) -> {b: int}: {b: x}
+both: func(x: int) -> {a: int, b: int}: left(x) & right(x)
+r: both(3)                  // {a: 3, b: 3}
+first:  func(x: int) -> int: 1
+second: func(x: int) -> int: 2
+conflict: first & second    // _|_: distinct origins
+choice: first | second      // two possible implementations
+preferred: *first | second
+p: preferred(3)             // 1 after default selection

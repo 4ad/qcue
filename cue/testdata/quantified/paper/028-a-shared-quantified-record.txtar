@@ -1,0 +1,42 @@
+// Paper example 028: A shared quantified record
+
+#noformat
+#paper: 28
+#mode: evaluation
+
+-- paper.cue.txt --
+utilities(A): {
+    id:   func(x: A) -> A: x
+    wrap: func(x: A) -> {value: A}: {value: x}
+}
+utilities: {name: "core"}
+wrapped: utilities.wrap[string]("payload") // {value: "payload"}
+
+// interface.cue
+wrap(A): func(A) -> {value: A}
+// metadata.cue
+wrap(B): func(B) -> {tag: "wrapped"}
+// implementation.cue
+wrap(T): func(x: T) -> {value: T, tag: "wrapped"}: {
+    value: x, tag: "wrapped"
+}
+-- in.cue --
+@test(json, {value:"payload"}, at="wrapped")
+@test(json, {value:7,tag:"wrapped"}, at="probe")
+
+utilities(A): {
+    id:   func(x: A) -> A: x
+    wrap: func(x: A) -> {value: A}: {value: x}
+}
+utilities: {name: "core"}
+wrapped: utilities.wrap[string]("payload") // {value: "payload"}
+
+// interface.cue
+wrap(A): func(A) -> {value: A}
+// metadata.cue
+wrap(B): func(B) -> {tag: "wrapped"}
+// implementation.cue
+wrap(T): func(x: T) -> {value: T, tag: "wrapped"}: {
+    value: x, tag: "wrapped"
+}
+probe: wrap[int](7)

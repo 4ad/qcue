@@ -1,0 +1,26 @@
+// Paper example 019: Proving a live result
+
+#noformat
+#paper: 19
+#mode: evaluation
+
+-- paper.cue.txt --
+R: int
+same: func(x: R) -> R: x                  // certified
+constant: func(_: int) -> R: 2            // result goal pending
+checked: func(x: int) -> R: x & R         // certified partial body
+
+// Refining R: 2 proves the constant's result goal.
+// Refining R: >2 refutes that constant result.
+-- in.cue --
+@test(validate, at="same")
+@test(validate, blocked, at="constant")
+@test(validate, at="checked")
+
+R: int
+same: func(x: R) -> R: x                  // certified
+constant: func(_: int) -> R: 2            // result goal pending
+checked: func(x: int) -> R: x & R         // certified partial body
+
+// Refining R: 2 proves the constant's result goal.
+// Refining R: >2 refutes that constant result.

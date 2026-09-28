@@ -1,0 +1,31 @@
+// Paper example 036: Field evidence and presence
+
+#noformat
+#paper: 36
+#mode: evaluation
+
+-- paper.cue.txt --
+get: func(r: {a: int}) -> int: r.a
+ok: get({a: 1, b: true})                    // 1
+bad: func(r: {a: int}) -> int: r.b          // rejected: no field evidence
+needsB: func(r: {a: int, b: bool}) -> int: r.a
+missing: needsB({a: 1})                    // pending: b is unresolved
+absent: {a?: int & bool}                   // a must be absent
+conflict: {a: int & bool}                  // _|_
+fixed: [int, string] & [int]               // _|_: length conflict
+-- in.cue --
+@test(json, 1, at="ok")
+@test(validate, blocked, at="bad")
+@test(validate, concrete, incomplete, at="missing")
+@test(json, {}, at="absent")
+@test(validate, conflict, at="conflict")
+@test(validate, conflict, at="fixed")
+
+get: func(r: {a: int}) -> int: r.a
+ok: get({a: 1, b: true})                    // 1
+bad: func(r: {a: int}) -> int: r.b          // rejected: no field evidence
+needsB: func(r: {a: int, b: bool}) -> int: r.a
+missing: needsB({a: 1})                    // pending: b is unresolved
+absent: {a?: int & bool}                   // a must be absent
+conflict: {a: int & bool}                  // _|_
+fixed: [int, string] & [int]               // _|_: length conflict

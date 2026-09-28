@@ -1,0 +1,29 @@
+// Paper example 016: A live input and a fixed alias
+
+#noformat
+#paper: 16
+#mode: evaluation
+
+-- paper.cue.txt --
+let Fixed = int
+fixed: func(x: Fixed) -> int: 2 * x
+
+Live: int
+live: func(x: Live) -> int: 2 * x
+a: fixed(2)                 // 4
+b: live(2)                  // 4
+
+// A later file may add Live: >=0.
+-- in.cue --
+@test(json, 4, at="a")
+@test(json, 4, at="b")
+
+let Fixed = int
+fixed: func(x: Fixed) -> int: 2 * x
+
+Live: int
+live: func(x: Live) -> int: 2 * x
+a: fixed(2)                 // 4
+b: live(2)                  // 4
+
+// A later file may add Live: >=0.

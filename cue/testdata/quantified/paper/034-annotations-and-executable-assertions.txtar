@@ -1,0 +1,36 @@
+// Paper example 034: Annotations and executable assertions
+
+#noformat
+#paper: 34
+#mode: evaluation
+
+-- paper.cue.txt --
+asText: func(x: int) -> string: x           // rejected
+asTwo:  func(x: int) -> 2: 1                // rejected
+positive: func(x: int) -> (int & >0): x     // rejected
+positiveChecked: func(x: int) -> (int & >0): x & >0
+ok: positiveChecked(3)                     // 3
+bad: positiveChecked(0)                    // _|_
+pick: func(x: int | string) -> int: x      // rejected
+pickChecked: func(x: int | string) -> int: x & int
+stop(A): func(x: A) -> A: _|_               // certified partial function
+-- in.cue --
+@test(validate, blocked, at="asText")
+@test(validate, blocked, at="asTwo")
+@test(validate, blocked, at="positive")
+@test(validate, blocked, at="pick")
+@test(validate, concrete, at="positiveChecked")
+@test(validate, concrete, at="pickChecked")
+@test(validate, concrete, at="stop")
+@test(json, 3, at="ok")
+@test(validate, conflict, at="bad")
+
+asText: func(x: int) -> string: x           // rejected
+asTwo:  func(x: int) -> 2: 1                // rejected
+positive: func(x: int) -> (int & >0): x     // rejected
+positiveChecked: func(x: int) -> (int & >0): x & >0
+ok: positiveChecked(3)                     // 3
+bad: positiveChecked(0)                    // _|_
+pick: func(x: int | string) -> int: x      // rejected
+pickChecked: func(x: int | string) -> int: x & int
+stop(A): func(x: A) -> A: _|_               // certified partial function

@@ -2656,9 +2656,12 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	// bottom above and likewise leaves no entry, which is what keeps
 	// memoization from short-circuiting cycle detection.
 	var completed Value = result
+	if x.Fn.Quantified {
+		completed = x.resultInterfaces(c, callPacket{args: bindings}, result)
+	}
 	if x.Fn.Quantified && result.Bottom() == nil &&
 		Validate(c, result, &ValidateConfig{Concrete: true}) == nil {
-		if value := recursiveArgument(c, result); value != nil {
+		if value := recursiveArgument(c, completed); value != nil {
 			// Ground evaluation has discharged the result's validation
 			// edges. Preserve its value, rather than re-expanding the call
 			// activation whenever its result is used by another expression.

@@ -16,6 +16,7 @@ package cue_test
 
 import (
 	"fmt"
+	"math/bits"
 	"strings"
 	"testing"
 
@@ -307,7 +308,7 @@ func TestQuantifiedSemanticMembershipModel(t *testing.T) {
 								var entries []string
 								for i, value := range []int{x, y} {
 									if value < 0 {
-										complete = complete && optional&(1<<i) != 0
+										complete = complete && (optional&(1<<i) != 0 || bits.OnesCount(uint(masks[i])) == 1 || fields[i] != "x" && fields[i] != "y")
 									} else {
 										conflict = conflict || masks[i]&(1<<value) == 0
 										entries = append(entries, fmt.Sprintf("%s: %d", fields[i], value))
@@ -418,7 +419,7 @@ func TestQuantifiedSemanticFiniteQuantifierModel(t *testing.T) {
 					m.domains[0].mask, m.domains[1].mask = uint8(outer), uint8(inner)
 					source := "v: " + m.expression(false, false)
 					v := ctx.CompileString(source)
-					if message := finiteOracleMismatch(v, m.truth()); message != "" {
+					if message := finiteOracleMismatch(v.LookupPath(cue.ParsePath("v")), m.truth()); message != "" {
 						t.Fatalf("%s\n%s", message, source)
 					}
 				}
@@ -492,8 +493,8 @@ func TestQuantifiedSemanticQualifiedLabels(t *testing.T) {
 	if err := v.Validate(); err != nil {
 		t.Fatalf("distinct qualified hidden labels conflicted: %v", err)
 	}
-	if err := v.Validate(cue.Concrete(true)); err == nil {
-		t.Fatal("a different package's hidden field supplied the witness")
+	if err := v.Validate(cue.Concrete(true)); err != nil {
+		t.Fatalf("each package retains its own hidden constraint: %v", err)
 	}
 	v = v.Unify(p.LookupPath(cue.ParsePath("good")))
 	if err := v.Validate(cue.Concrete(true)); err != nil {

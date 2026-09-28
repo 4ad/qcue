@@ -1,0 +1,13 @@
+// Paper example 002: Universal declarations and instances
+
+#noformat
+#paper: 2
+#mode: syntax
+
+#skip
+#inlinetest:exclude Syntax and pseudocode are checked by the paper index.
+
+-- paper.cue.txt --
+map(A, B): func(func(A) -> B, [...A]) -> [...B]
+map: forall (A, B) func(func(A) -> B, [...A]) -> [...B]
+map: func<A, B>(func(A) -> B, [...A]) -> [...B]

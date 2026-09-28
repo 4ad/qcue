@@ -1,0 +1,25 @@
+// Paper example 046: Conditional certificates and native checks
+
+#noformat
+#paper: 46
+#mode: evaluation
+
+-- paper.cue.txt --
+legacyBody: func(int) -> int
+checked: func(x: int) -> (int & >0): legacyBody(x) & >0
+externF: func(int) -> int       // supplied by a checked native adapter
+small: externF(42)
+large: externF(1000000000000000000000000000000)
+fractional: externF(1.5)        // rejected: logical argument mismatch
+-- in.cue --
+@test(validate, at="checked")
+@test(validate, concrete, incomplete, at="small")
+@test(validate, concrete, incomplete, at="large")
+@test(validate, conflict, at="fractional")
+
+legacyBody: func(int) -> int
+checked: func(x: int) -> (int & >0): legacyBody(x) & >0
+externF: func(int) -> int       // supplied by a checked native adapter
+small: externF(42)
+large: externF(1000000000000000000000000000000)
+fractional: externF(1.5)        // rejected: logical argument mismatch

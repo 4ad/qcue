@@ -77,6 +77,16 @@ func (p *certifier) sourceMeet(a, b adt.Value) adt.Value {
 	if value == nil || refuted(value) {
 		return value
 	}
+	// A successful executable assertion establishes membership in the
+	// named live coordinate. Normalizing its current data must not erase
+	// that relation: its upper approximation alone cannot prove the same
+	// result obligation after another refinement.
+	for _, operand := range []adt.Value{a, b} {
+		if live, ok := adt.Unwrap(operand).(*adt.LiveType); ok {
+			p.memberships[value] = append(p.memberships[value], live)
+		}
+		p.memberships[value] = append(p.memberships[value], p.memberships[operand]...)
+	}
 	if builtin, ok := adt.Unwrap(value).(*adt.Builtin); ok {
 		if ValidateBuiltin(p.ctx, builtin) != nil {
 			return nil
@@ -125,6 +135,7 @@ func (p *certifier) sourceMeet(a, b adt.Value) adt.Value {
 			p.constructors[summary] = v
 		}
 		p.projections[summary] = fields
+		p.memberships[summary] = p.memberships[value]
 		return summary
 	}
 	if v, ok := value.(*adt.Vertex); ok && v.HasSubjectSchemes() {

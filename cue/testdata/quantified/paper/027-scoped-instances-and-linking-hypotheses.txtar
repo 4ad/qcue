@@ -1,0 +1,22 @@
+// Paper example 027: Scoped instances and linking hypotheses
+
+#noformat
+#paper: 27
+#mode: evaluation
+
+-- paper.cue.txt --
+id(A): func(x: A) -> A: x
+first: id[int](3)
+second: id[string]("three")
+use: func(p: forall A func(A) -> A) -> int: p[int](4)
+result: use(id)                         // 4
+-- in.cue --
+@test(json, 3, at="first")
+@test(json, "three", at="second")
+@test(json, 4, at="result")
+
+id(A): func(x: A) -> A: x
+first: id[int](3)
+second: id[string]("three")
+use: func(p: forall A func(A) -> A) -> int: p[int](4)
+result: use(id)                         // 4

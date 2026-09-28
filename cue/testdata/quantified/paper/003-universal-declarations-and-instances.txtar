@@ -1,0 +1,15 @@
+// Paper example 003: Universal declarations and instances
+
+#noformat
+#paper: 3
+#mode: syntax
+
+#skip
+#inlinetest:exclude Syntax and pseudocode are checked by the paper index.
+
+-- paper.cue.txt --
+r: {
+    forall A
+    id: func(A) -> A
+}
+r: forall A {id: func(A) -> A}

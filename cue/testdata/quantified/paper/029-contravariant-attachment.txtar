@@ -1,0 +1,26 @@
+// Paper example 029: Contravariant attachment
+
+#noformat
+#paper: 29
+#mode: evaluation
+
+-- paper.cue.txt --
+wide: func(number) -> string
+wide: func(x: int) -> string: "ok"       // rejected: domain coverage
+narrow: func(int) -> string
+narrow: func(x: number) -> string: "ok"  // accepted
+apply: func(g: func(number) -> string) -> string: g(1.5)
+ints: func(x: int) -> string: "ok"
+bad: apply(ints)                         // rejected at linking
+-- in.cue --
+@test(validate, blocked, at="wide")
+@test(validate, concrete, at="narrow")
+@test(validate, blocked, at="bad")
+
+wide: func(number) -> string
+wide: func(x: int) -> string: "ok"       // rejected: domain coverage
+narrow: func(int) -> string
+narrow: func(x: number) -> string: "ok"  // accepted
+apply: func(g: func(number) -> string) -> string: g(1.5)
+ints: func(x: int) -> string: "ok"
+bad: apply(ints)                         // rejected at linking

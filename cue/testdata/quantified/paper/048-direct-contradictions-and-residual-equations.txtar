@@ -1,0 +1,21 @@
+// Paper example 048: Direct contradictions and residual equations
+
+#noformat
+#paper: 48
+#mode: evaluation
+
+-- paper.cue.txt --
+emptyInt: int & >0 & <1       // _|_: integer interval is empty
+emptyData: {a: int} & {a: bool} // _|_
+cycle: {a: int & (5 * b), b: int & (a - 1)}
+grounded: cycle & {a: 0}      // _|_ by ground propagation
+-- in.cue --
+@test(validate, conflict, at="emptyInt")
+@test(validate, conflict, at="emptyData")
+@test(validate, concrete, incomplete, at="cycle")
+@test(validate, conflict, at="grounded")
+
+emptyInt: int & >0 & <1       // _|_: integer interval is empty
+emptyData: {a: int} & {a: bool} // _|_
+cycle: {a: int & (5 * b), b: int & (a - 1)}
+grounded: cycle & {a: 0}      // _|_ by ground propagation

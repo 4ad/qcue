@@ -161,12 +161,24 @@ func (s *subsumer) packetMember(want, got adt.Value) bool {
 	if packetHasFunction(want, make(map[adt.Value]bool)) {
 		return s.values(want, got)
 	}
+	if s.certifier != nil {
+		got = s.certifier.bindingDescription(got)
+		if got == nil {
+			return false
+		}
+	}
 	// The activation retains the meet and its demanded validations. No
 	// inclusion theorem follows from this ordinary first-order constraint.
 	if want.Kind()&got.Kind() == 0 && got.Kind() != adt.BottomKind {
 		return false
 	}
 	meet := unifyValue(s.ctx, want, got)
+	if v, ok := meet.(*adt.Vertex); ok {
+		v.Finalize(s.ctx)
+		if err := adt.Validate(s.ctx, v, &adt.ValidateConfig{}); err != nil && !err.IsIncomplete() {
+			return false
+		}
+	}
 	b, failed := adt.Unwrap(meet).(*adt.Bottom)
 	return !failed || b.IsIncomplete() || got.Kind() == adt.BottomKind
 }

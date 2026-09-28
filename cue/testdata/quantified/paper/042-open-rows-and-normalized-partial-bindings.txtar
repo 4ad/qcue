@@ -1,0 +1,35 @@
+// Paper example 042: Open rows and normalized partial bindings
+
+#noformat
+#paper: 42
+#mode: evaluation
+
+-- paper.cue.txt --
+T: func(a: int, ...) -> number
+f: T & (func(a: int, b: int) -> int: a + b)
+x: f(1, 2)                   // 3
+missing: f(1)                // rejected: b is required
+add3: func(a: int, b: int, c: int) -> int: a + b + c
+part: add3(1, ...)
+part: func(int, int) -> int
+last: part(2, ...)
+answer: last(3)              // 6
+same: add3(a: 1, ...) & part
+again: same(2, 3)            // 6
+-- in.cue --
+@test(json, 3, at="x")
+@test(validate, conflict, at="missing")
+@test(json, 6, at="answer")
+@test(json, 6, at="again")
+
+T: func(a: int, ...) -> number
+f: T & (func(a: int, b: int) -> int: a + b)
+x: f(1, 2)                   // 3
+missing: f(1)                // rejected: b is required
+add3: func(a: int, b: int, c: int) -> int: a + b + c
+part: add3(1, ...)
+part: func(int, int) -> int
+last: part(2, ...)
+answer: last(3)              // 6
+same: add3(a: 1, ...) & part
+again: same(2, 3)            // 6

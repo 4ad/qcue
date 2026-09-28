@@ -1,0 +1,24 @@
+// Paper example 020: Evaluation produces certification premises
+
+#noformat
+#paper: 20
+#mode: evaluation
+
+-- paper.cue.txt --
+seed: func(x: int) -> int: x + 1
+k: seed(2)
+shift: func(x: int) -> int: x + k
+limit: shift(1)
+bounded: func(x: int) -> int: x & <=limit
+a: bounded(3)                           // 3; limit is 4
+-- in.cue --
+@test(json, 3, at="a")
+@test(json, 3, at="k")
+@test(json, 4, at="limit")
+
+seed: func(x: int) -> int: x + 1
+k: seed(2)
+shift: func(x: int) -> int: x + k
+limit: shift(1)
+bounded: func(x: int) -> int: x & <=limit
+a: bounded(3)                           // 3; limit is 4

@@ -21,23 +21,25 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 )
 
+// Open records remain refinable descriptions even when their fields are concrete.
+// Finite lists of scalar singletons instead have a stable exact lower bound.
 func TestQuantifiedSingletonCertification(t *testing.T) {
 	for _, tt := range []struct {
 		name, source string
 		valid        bool
 	}{
 		{"record", `w:{x:1}
-f:func()->w:{x:1}`, true},
+f:func()->w:{x:1}`, false},
 		{"nested", `w:{x:{y:1}}
-f:func()->w:{x:{y:1}}`, true},
+f:func()->w:{x:{y:1}}`, false},
 		{"list", `w:[1,2]
 f:func()->w:[1,2]`, true},
 		{"nested_list", `w:[{x:1}]
-f:func()->w:[{x:1}]`, true},
+f:func()->w:[{x:1}]`, false},
 		{"hidden", `w:{x:1,_secret:2}
-f:func()->w:{x:1,_secret:2}`, true},
+f:func()->w:{x:1,_secret:2}`, false},
 		{"definition", `w:{x:1,#D:int}
-f:func()->w:{x:1}`, true},
+f:func()->w:{x:1}`, false},
 		{"extra", `w:{x:1}
 f:func()->w:{x:1,y:2}`, false},
 		{"missing", `w:{x:1,y:2}

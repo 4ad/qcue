@@ -43,9 +43,8 @@ func TestQuantifiedAliasWitness(t *testing.T) {
 				}
 				v := ctx.CompileString("x: int\n" + strings.ReplaceAll(alias, ";", "\n") + "\n" + use)
 				out := v.LookupPath(cue.ParsePath("out"))
-				requireBlockedCall(t, out)
-				if _, err := out.MarshalJSON(); err == nil {
-					t.Fatal("unresolved alias witness was erased")
+				if got, err := out.MarshalJSON(); err != nil || string(got) != `"ok"` {
+					t.Fatalf("live alias packet: %s, %v", got, err)
 				}
 				for _, n := range []int{1, 2} {
 					r := v.FillPath(cue.ParsePath("x"), n).LookupPath(cue.ParsePath("out"))
@@ -127,9 +126,8 @@ func TestParametricAliasWitness(t *testing.T) {
 					}
 					v := cuecontext.New().CompileString("x: int\n" + use)
 					out := v.LookupPath(cue.ParsePath("out"))
-					requireBlockedCall(t, out)
-					if _, err := out.MarshalJSON(); err == nil {
-						t.Fatal("unresolved alias witness was erased")
+					if got, err := out.MarshalJSON(); err != nil || string(got) != `"ok"` {
+						t.Fatalf("live alias packet: %s, %v", got, err)
 					}
 					for _, n := range []int{1, 2} {
 						r := v.FillPath(cue.ParsePath("x"), n).LookupPath(cue.ParsePath("out"))

@@ -86,8 +86,16 @@ func TestQuantifiedMembershipRefinement(t *testing.T) {
 		r := v.Unify(ctx.CompileString(quantifiedAPIText(t, "membership_refinement", name+".cue")))
 		out := r.LookupPath(cue.ParsePath("out"))
 		_, err := out.MarshalJSON()
-		if (err == nil) != (name == "equal") {
-			t.Errorf("%s witness refinement: %v", name, err)
+		if err == nil {
+			t.Errorf("%s: a concrete open record was used as a stable result theorem", name)
+		}
+		checked := r.LookupPath(cue.ParsePath("safe"))
+		want := `{"x":1}`
+		if name == "different" {
+			want = `{"x":1,"y":2}`
+		}
+		if got, err := checked.MarshalJSON(); err != nil || string(got) != want {
+			t.Errorf("%s: explicit live assertion: %s, %v", name, got, err)
 		}
 	}
 }
@@ -270,6 +278,24 @@ func TestQuantifiedResidualExport(t *testing.T) {
 				rebuilt := ctx.CompileString("r: " + string(text))
 				if err := rebuilt.Err(); err != nil {
 					t.Fatalf("export %s: %v", text, err)
+				}
+				if name == "bound" {
+					// Closure conversion may name the substituted bound. Check
+					// its meaning by linking an implementation and selecting it.
+					run := ctx.CompileString("r: " + string(text) + "\nr: func(x: int)->int:x\nout:r[int](3)\nbad:r[string]")
+					semanticJSON(t, run, "out", "3")
+					if run.LookupPath(cue.ParsePath("bad")).Validate() == nil {
+						t.Fatal("export lost the substituted integer bound")
+					}
+					return
+				}
+				if name == "shadow" {
+					run := ctx.CompileString("r: " + string(text) + "\nr: {nested: forall T func(x:T)->T:x}\nout:[r.nested[int](3),r.nested[string](\"s\")]")
+					semanticJSON(t, run, "out", `[3,"s"]`)
+					if got := run.LookupPath(cue.ParsePath("r.value")).IncompleteKind(); got != cue.IntKind {
+						t.Fatalf("outer substitution was captured by the inner binder: %v", got)
+					}
+					return
 				}
 				// Normalize parentheses and spacing through the formatter. The
 				// expected template records both substitutions and binder scope.
@@ -479,11 +505,15 @@ func TestQuantifiedWitnessCorrelation(t *testing.T) {
 			if !out.Exists() {
 				t.Fatal(v.Err())
 			}
-			// Neither a result implication nor packet membership can assume
-			// that an unresolved witness equals this call's concrete value.
-			requireBlockedCall(t, out)
-			if err := out.Validate(cue.Concrete(true)); err == nil {
-				t.Fatal("witness upper bound was mistaken for its singleton")
+			// A packet may meet the live input. A result or coverage theorem
+			// still requires the opposite inclusion independently.
+			switch tt.name {
+			case "explicit type argument", "protocol", "type bound":
+				if got, err := out.MarshalJSON(); err != nil || string(got) != tt.want {
+					t.Fatalf("live packet: %s, %v", got, err)
+				}
+			default:
+				requireBlockedCall(t, out)
 			}
 			good := v.FillPath(cue.ParsePath("witness"), tt.good).LookupPath(cue.ParsePath("out"))
 			if got, err := good.MarshalJSON(); err != nil || string(got) != tt.want {

@@ -1,0 +1,29 @@
+// Paper example 014: Quantified results and nested rank
+
+#noformat
+#paper: 14
+#mode: evaluation
+
+-- paper.cue.txt --
+constant(A): func(x: A) -> (forall B func(B) -> A):
+    func(_) -> A: x
+seven: constant[int](7)
+a: seven[string]("ignored")     // 7
+b: seven[bool](true)            // 7
+
+consume: func(k: func(forall A func(A) -> A) -> int) -> int: k(id)
+use: consume(func(p: forall A func(A) -> A) -> int: p[int](8)) // 8
+-- in.cue --
+@test(json, 7, at="a")
+@test(json, 7, at="b")
+@test(json, 8, at="use")
+
+id(A): func(x: A) -> A: x
+constant(A): func(x: A) -> (forall B func(B) -> A):
+    func(_) -> A: x
+seven: constant[int](7)
+a: seven[string]("ignored")     // 7
+b: seven[bool](true)            // 7
+
+consume: func(k: func(forall A func(A) -> A) -> int) -> int: k(id)
+use: consume(func(p: forall A func(A) -> A) -> int: p[int](8)) // 8

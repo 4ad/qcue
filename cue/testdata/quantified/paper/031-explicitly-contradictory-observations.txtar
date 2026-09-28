@@ -1,0 +1,35 @@
+// Paper example 031: Explicitly contradictory observations
+
+#noformat
+#paper: 31
+#mode: evaluation
+
+-- paper.cue.txt --
+f: (func(int) -> int) & (func(int) -> bool)  // rejected by relevance
+g: func(int) -> _|_                         // rejected by relevance
+h: (func(number) -> int) & (func(int) -> bool) // rejected on int
+three: (func(int) -> (0 | 1)) &
+       (func(int) -> (1 | 2)) &
+       (func(int) -> (0 | 2))               // rejected jointly
+callback: func((func(int) -> int) &
+              (func(int) -> bool)) -> string // rejected in parameter
+alternative: (func(int) -> _|_) |
+             (func(int) -> int)             // first arm rejected under its guard
+-- in.cue --
+@test(validate, blocked, at="f")
+@test(validate, blocked, at="g")
+@test(validate, blocked, at="h")
+@test(validate, blocked, at="three")
+@test(validate, blocked, at="callback")
+@test(validate, blocked, at="alternative")
+
+f: (func(int) -> int) & (func(int) -> bool)  // rejected by relevance
+g: func(int) -> _|_                         // rejected by relevance
+h: (func(number) -> int) & (func(int) -> bool) // rejected on int
+three: (func(int) -> (0 | 1)) &
+       (func(int) -> (1 | 2)) &
+       (func(int) -> (0 | 2))               // rejected jointly
+callback: func((func(int) -> int) &
+              (func(int) -> bool)) -> string // rejected in parameter
+alternative: (func(int) -> _|_) |
+             (func(int) -> int)             // first arm rejected under its guard

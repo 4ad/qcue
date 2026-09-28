@@ -1,0 +1,52 @@
+// Paper example 035: Equivalent arrangements of constraints
+
+#noformat
+#paper: 35
+#mode: evaluation
+
+-- paper.cue.txt --
+one: {f: func(x: int) -> (int & >0): x & >0}
+two: {
+    f: func(int) -> (int & >0)
+    f: func(x: int) -> _: x & >0
+}
+three: {
+    f: func(x: int) -> int: x & >0
+    f: func(int) -> >0
+}
+four: {
+    f: func(int) -> int
+    f: func(x: int) -> >0: x & >0
+}
+five: {
+    f: func(int) -> int
+    f: func(int) -> >0
+    f: func(x: int) -> _: x & >0
+}
+-- in.cue --
+@test(validate, concrete, at="one")
+@test(validate, concrete, at="two")
+@test(validate, concrete, at="three")
+@test(validate, concrete, at="four")
+@test(validate, concrete, at="five")
+@test(json, [3,3,3,3,3], at="results")
+
+one: {f: func(x: int) -> (int & >0): x & >0}
+two: {
+    f: func(int) -> (int & >0)
+    f: func(x: int) -> _: x & >0
+}
+three: {
+    f: func(x: int) -> int: x & >0
+    f: func(int) -> >0
+}
+four: {
+    f: func(int) -> int
+    f: func(x: int) -> >0: x & >0
+}
+five: {
+    f: func(int) -> int
+    f: func(int) -> >0
+    f: func(x: int) -> _: x & >0
+}
+results: [one.f(3), two.f(3), three.f(3), four.f(3), five.f(3)]

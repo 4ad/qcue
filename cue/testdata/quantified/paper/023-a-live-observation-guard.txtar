@@ -1,0 +1,24 @@
+// Paper example 023: A live observation guard
+
+#noformat
+#paper: 23
+#mode: evaluation
+
+-- paper.cue.txt --
+limit: int
+f: func(x: int & >limit & <10) -> _|_: _|_
+// Pending: the result is empty; the domain depends on limit.
+
+// Separate possible refinements:
+// limit: 10     // empty domain: relevance demand discharged
+// limit: 0      // witness x = 1: relevant interface rejected
+-- in.cue --
+@test(validate, blocked, at="f")
+
+limit: int
+f: func(x: int & >limit & <10) -> _|_: _|_
+// Pending: the result is empty; the domain depends on limit.
+
+// Separate possible refinements:
+// limit: 10     // empty domain: relevance demand discharged
+// limit: 0      // witness x = 1: relevant interface rejected

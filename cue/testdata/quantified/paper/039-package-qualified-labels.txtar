@@ -1,0 +1,18 @@
+// Paper example 039: Package-qualified labels
+
+#noformat
+#paper: 39
+#mode: evaluation
+
+-- paper.cue.txt --
+package internal
+measure: func(_value: int @go(Int), unit!: string) -> int: _value
+inside: measure(_value: 7, unit: "ms")
+// Other packages can supply the positional slot, not this hidden label.
+-- in.cue --
+package internal
+@test(json, 7, at="inside")
+
+measure: func(_value: int @go(Int), unit!: string) -> int: _value
+inside: measure(_value: 7, unit: "ms")
+// Other packages can supply the positional slot, not this hidden label.

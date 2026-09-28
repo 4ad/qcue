@@ -1,0 +1,24 @@
+// Paper example 013: A universally quantified parameter
+
+#noformat
+#paper: 13
+#mode: evaluation
+
+-- paper.cue.txt --
+useBoth: func(p: forall A func(A) -> A) -> [int, string]: [
+    p[int](7), p[string]("seven"),
+]
+ok: useBoth(id)                 // [7, "seven"]
+onlyInt: func(x: int) -> int: x
+bad: useBoth(onlyInt)            // rejected: universal callback required
+-- in.cue --
+@test(json, [7,"seven"], at="ok")
+@test(validate, blocked, at="bad")
+
+id(A): func(x: A) -> A: x
+useBoth: func(p: forall A func(A) -> A) -> [int, string]: [
+    p[int](7), p[string]("seven"),
+]
+ok: useBoth(id)                 // [7, "seven"]
+onlyInt: func(x: int) -> int: x
+bad: useBoth(onlyInt)            // rejected: universal callback required

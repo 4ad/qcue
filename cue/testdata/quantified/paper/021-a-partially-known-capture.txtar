@@ -1,0 +1,18 @@
+// Paper example 021: A partially known capture
+
+#noformat
+#paper: 21
+#mode: evaluation
+
+-- paper.cue.txt --
+factor: int
+scale: func(x: int) -> int: factor * x  // certified with a live capture
+factor: 3
+answer: scale(4)                       // 12
+-- in.cue --
+@test(json, 12, at="answer")
+
+factor: int
+scale: func(x: int) -> int: factor * x  // certified with a live capture
+factor: 3
+answer: scale(4)                       // 12

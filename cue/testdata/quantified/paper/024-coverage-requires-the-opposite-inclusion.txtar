@@ -1,0 +1,19 @@
+// Paper example 024: Coverage requires the opposite inclusion
+
+#noformat
+#paper: 24
+#mode: evaluation
+
+-- paper.cue.txt --
+Small: int
+local: func(x: Small) -> int: x + 1
+consumer: func(g: func(int) -> int) -> int: g(2)
+a: consumer(local)                      // coverage goal pending
+-- in.cue --
+@test(validate, blocked, at="a")
+@test(validate, at="local")
+
+Small: int
+local: func(x: Small) -> int: x + 1
+consumer: func(g: func(int) -> int) -> int: g(2)
+a: consumer(local)                      // coverage goal pending

@@ -1,0 +1,31 @@
+// Paper example 015: An impredicative instance
+
+#noformat
+#paper: 15
+#mode: evaluation
+
+-- paper.cue.txt --
+let Identity = forall A func(A) -> A
+again: id[Identity](id)
+a: again[int](3)                // 3
+b: again[string]("three")       // "three"
+ids: [...Identity]
+ids: [id, again]
+c: ids[0][bool](true)           // true
+bad: id[Identity](onlyInt)       // rejected: onlyInt lacks Identity
+-- in.cue --
+@test(json, 3, at="a")
+@test(json, "three", at="b")
+@test(json, true, at="c")
+@test(validate, blocked, at="bad")
+
+id(A): func(x: A) -> A: x
+onlyInt: func(x: int) -> int: x
+let Identity = forall A func(A) -> A
+again: id[Identity](id)
+a: again[int](3)                // 3
+b: again[string]("three")       // "three"
+ids: [...Identity]
+ids: [id, again]
+c: ids[0][bool](true)           // true
+bad: id[Identity](onlyInt)       // rejected: onlyInt lacks Identity

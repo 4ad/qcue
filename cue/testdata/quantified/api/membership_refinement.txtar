@@ -5,6 +5,8 @@
 a:   {x: int}
 f:   func() -> a: {x: 1}
 out: f()
+checked: func() -> a: {x: 1} & a
+safe: checked()
 -- equal.cue --
 a: {x: 1}
 -- different.cue --

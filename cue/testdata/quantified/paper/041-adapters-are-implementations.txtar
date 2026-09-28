@@ -1,0 +1,21 @@
+// Paper example 041: Adapters are implementations
+
+#noformat
+#paper: 41
+#mode: evaluation
+
+-- paper.cue.txt --
+raw: func(_~n: int) -> int: n + 1
+named: func(x: int) -> int: raw(x)
+configured: func(x: int = 2) -> int: raw(x)
+a: named(x: 2)              // 3
+b: configured()            // 3
+-- in.cue --
+@test(json, 3, at="a")
+@test(json, 3, at="b")
+
+raw: func(_~n: int) -> int: n + 1
+named: func(x: int) -> int: raw(x)
+configured: func(x: int = 2) -> int: raw(x)
+a: named(x: 2)              // 3
+b: configured()            // 3

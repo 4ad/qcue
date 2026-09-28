@@ -1,0 +1,23 @@
+// Paper example 007: Bounded selection
+
+#noformat
+#paper: 7
+#mode: evaluation
+
+-- paper.cue.txt --
+min(A: number): func(x: A, y: A) -> A: {
+    if x <= y {out: x}
+    if x > y  {out: y}
+}.out
+m: min[int & >=10](12, 20)      // 12
+same(A: number): func(x: A) -> A: x + 1 // rejected
+-- in.cue --
+@test(json, 12, at="m")
+@test(validate, blocked, at="same")
+
+min(A: number): func(x: A, y: A) -> A: {
+    if x <= y {out: x}
+    if x > y  {out: y}
+}.out
+m: min[int & >=10](12, 20)      // 12
+same(A: number): func(x: A) -> A: x + 1 // rejected

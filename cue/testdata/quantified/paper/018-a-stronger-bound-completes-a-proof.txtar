@@ -1,0 +1,23 @@
+// Paper example 018: A stronger bound completes a proof
+
+#noformat
+#paper: 18
+#mode: evaluation
+
+-- paper.cue.txt --
+A: number
+f: func(x: A) -> int: x      // body goal pending
+
+// A later file adds:
+A: int                      // body goal can now be proved
+answer: f(2)                // 2
+-- in.cue --
+@test(json, 2, at="answer")
+@test(validate, at="f")
+
+A: number
+f: func(x: A) -> int: x      // body goal pending
+
+// A later file adds:
+A: int                      // body goal can now be proved
+answer: f(2)                // 2

@@ -1,0 +1,56 @@
+// Paper example 038: Slot binding and omission
+
+#noformat
+#paper: 38
+#mode: compile-error
+#error: positional argument after labeled argument
+
+-- paper.cue.txt --
+sum: func(a: int, b: int) -> int: a + b
+p: sum(2, 3)                  // 5
+q: sum(a: 2, b: 3)            // 5
+r: sum(2, b: 3)               // 5
+key: func(a!: int, note?: string) -> int: a
+k: key(a: 4)                  // 4; note absent
+n: key(a: 4, note: "audit")   // 4
+badKey: key(4)                // rejected: a is name-only
+scale: func(_~value: int, _: int) -> int: value * 2
+s: scale(5, 99)               // 10
+badLabel: scale(value: 5, 99)  // rejected: label and order
+bad1: sum(1, a: 1)            // duplicate binding
+bad2: sum(1, 2, 3)            // surplus argument
+bad3: sum(a: 1, b: 2, c: 3)   // unknown label
+bad4: sum(1)                  // missing argument
+pending: sum(_, 2)            // supplied but incomplete
+-- invalid.cue.txt --
+scale: func(_~value: int, _: int) -> int: value * 2
+badLabel: scale(value: 5, 99)
+-- in.cue --
+@test(json, 5, at="p")
+@test(json, 5, at="q")
+@test(json, 5, at="r")
+@test(json, 4, at="k")
+@test(json, 4, at="n")
+@test(json, 10, at="s")
+@test(validate, conflict, at="badKey")
+@test(validate, conflict, at="bad1")
+@test(validate, conflict, at="bad2")
+@test(validate, conflict, at="bad3")
+@test(validate, conflict, at="bad4")
+@test(validate, concrete, incomplete, at="pending")
+
+sum: func(a: int, b: int) -> int: a + b
+p: sum(2, 3)                  // 5
+q: sum(a: 2, b: 3)            // 5
+r: sum(2, b: 3)               // 5
+key: func(a!: int, note?: string) -> int: a
+k: key(a: 4)                  // 4; note absent
+n: key(a: 4, note: "audit")   // 4
+badKey: key(4)                // rejected: a is name-only
+scale: func(_~value: int, _: int) -> int: value * 2
+s: scale(5, 99)               // 10
+bad1: sum(1, a: 1)            // duplicate binding
+bad2: sum(1, 2, 3)            // surplus argument
+bad3: sum(a: 1, b: 2, c: 3)   // unknown label
+bad4: sum(1)                  // missing argument
+pending: sum(_, 2)            // supplied but incomplete
