@@ -166,8 +166,56 @@ Bodyless declarations supply conditional invocation evidence and result
 constraints. They do not materialize an implementation. The paper's native
 adapter example is tested as a conditional declaration: logical rejection is
 available, while execution remains incomplete without a linked implementation.
-Known builtins have explicit successful-result rules; a foreign signature alone
-does not supply arbitrary implementation evidence.
+Every registered native builtin supplies an implementation-owned parameter and
+successful-result contract. The checker uses that contract for direct calls,
+aliased calls, and attached function interfaces. Native arguments must be
+covered by the declared parameter descriptions, including labels and defaults;
+an incompatible argument cannot become an empty packet that proves any result.
+Client annotations remain independent obligations. A foreign function with no
+native contract still needs linked implementation evidence.
+
+## Builtins and operators
+
+Native result kinds are conservative bounds on successful returns. Generated
+checking signatures additionally retain Go container elements, nested maps and
+lists, and converted record fields, including optional JSON fields. Frozen
+package declarations retain their own lexical environments. This checking
+evidence is separate from runtime argument constraints: it must not complete
+an unknown argument or change an incomplete native call into a value. Bare
+validators support their ordinary call forms; implicit validator constructors
+check the saved arguments and describe inhabitants of the validated parameter's
+type. These contracts do not promise success, termination, or concrete operands.
+
+The structural primitives have additional rules. `len` preserves known length
+bounds. `close` preserves input constraints while adding closedness where its
+record description is known; a rigid or live input retains its identity.
+`and` meets the guaranteed list prefix, and `or` joins every possible element,
+including an open tail. These same rules check attached universal interfaces.
+
+```cue
+merge(A): func(xs: [A, ...A]) -> A: and(xs)
+x: merge([{a: 1}, {b: 1}]) // {a: 1, b: 1}
+choose(A): func(xs: [...A]) -> A: or(xs)
+```
+
+The nonempty input in `merge` is necessary: `and([])` returns `_`, which does
+not belong to every `A`. Thus `func(xs: [...A]) -> A: and(xs)` remains unproved.
+An optional tail cannot narrow the result of a conjunction because it may be
+absent. The empty disjunction has no successful result; accepting its partial
+result contract does not materialize a runtime value.
+
+Every unary and binary operator checks its operand domains. Alternative
+operands are checked independently, with source failures kept distinct from
+unsupported operations. Regex matching, structural equality, string and bytes
+operations, symbolic bounds, and interpolation participate in the same rules.
+Numeric operations use upper bounds without claiming to preserve an arbitrary
+numeric subtype. For example, `+x` preserves `A: number`, but `-x` need not.
+
+List indexing with an integer index retains all possible element types; an
+out-of-range index can fail. Finite record-label alternatives each require a
+known field. List and bytes slicing check their bounds and preserve available
+element information. Comparisons of open record descriptions yield Boolean
+results without treating those descriptions as complete singleton values.
 
 ## Validation, refinement, and export
 
@@ -212,9 +260,12 @@ versions remain in `paper_history`.
 
 API regressions exercise later refinement, observation triggers, independent
 coverage, packet isolation, strict operands, closure identity, and repeated
-export. Kernel tests inspect refutation support and resume real proofs after
-budget exhaustion. [Independent oracles](oracle.md) cover finite semantics and
-preservation separately from these example tests.
+export. The native inventory test checks every registered builtin, rejects
+incompatible argument slots and unproved results, and checks validator forms.
+Operator matrices cover accepted and rejected operand domains; execution tests
+check the resulting values. Kernel tests inspect refutation support and resume
+real proofs after budget exhaustion. [Independent oracles](oracle.md) cover
+finite semantics and preservation separately from these example tests.
 
 ```sh
 go test ./cue ./internal/core/...

@@ -55,3 +55,4 @@ Later refinement and source round trips are also tested by
 | 46 | [Conditional certificates and native checks](046-conditional-certificates-and-native-checks.txtar) |
 | 47 | [Finite iteration and repeated invocation](047-finite-iteration-and-repeated-invocation.txtar) |
 | 48 | [Direct contradictions and residual equations](048-direct-contradictions-and-residual-equations.txtar) |
+| 49 | [Native folds and operand evidence](049-native-folds-and-operand-evidence.txtar) |

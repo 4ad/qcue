@@ -618,6 +618,38 @@ successful data observations, retaining the source's packet and validation
 demands. Failure retains its branch and scope.
 \end{assumption}
 
+For a registered native builtin, its implementation-owned descriptor supplies
+this primitive evidence. Its parameter constraints establish operand coverage;
+its result kind bounds every successful return. More precise native signatures
+retain container elements and converted record fields, including optional
+presence. This evidence does not add runtime constraints that could materialize
+an incomplete operand. Frozen package declarations retain their lexical scopes.
+Package labels and defaults belong to this protocol. Attaching a client arrow
+creates a separate proof goal
+and cannot strengthen the implementation's evidence by assertion. A foreign
+function without such a primitive contract requires independent linking
+evidence. Validator constructors check their saved arguments and describe
+inhabitants of the validated slot's type.
+
+Some primitives admit more precise structural rules. The conjunction of a
+nonempty list of $A$-values has result $A$, and a disjunction of $A$-values has
+result $A$ on every successful return. A conjunction's optional tail cannot
+supply a mandatory result constraint. In particular, \code{and([])} is
+$\top$, so the unconstrained finite-list domain does not justify the universal
+arrow $\forall A.\List(A)\to A$ for \code{and}. The nonempty-list domain
+does. The empty disjunction has no successful result. Length retains proved
+bounds; closing a record preserves its input constraints. A rigid predicate
+is proof data, and executing it as a concrete record must not manufacture a
+failure certificate.
+
+Operator rules likewise establish operand coverage before deriving a result.
+Arithmetic, ordered comparison, Boolean connectives, regex matching,
+interpolation, and equality use their enabled base-language domains. Each
+alternative must support the operation. Integer list indexing and slicing are
+partial computations that retain the possible element predicates; record
+selection requires field evidence. Open structural descriptions cannot be
+executed as completed singleton values to prove an equality result.
+
 Proof decorations may record type abstraction $\Lambda\alpha.e$ and
 instantiation $e[T]$. Their \emph{erasure} removes the decorations:
 $\erase{\Lambda\alpha.e}=\erase e$ and $\erase{e[T]}=\erase e$.
@@ -2391,6 +2423,26 @@ refutations. A local propagator can retain the ungrounded arithmetic cycle;
 a stronger checked arithmetic proof can refute it directly. The ground
 constraint exposes the inconsistency to elementary propagation. An unresolved
 residual continues to carry those equations.
+\end{minipage}\par
+
+\par\addvspace{6pt}\noindent
+\begin{minipage}{\linewidth}
+\setlength{\parskip}{2pt}
+\example{Native folds and operand evidence}\label{ex:native-folds}
+\begin{lstlisting}
+merge(A): func(xs: [A, ...A]) -> A: and(xs)
+x: merge([{a: 1}, {b: 1}]) // {a: 1, b: 1}
+choose(A): func(xs: [...A]) -> A: or(xs)
+y: choose(["ok"])
+first(A): func(xs: [...A], i: int) -> A: xs[i]
+z: first([1, 2], 1)        // 2
+\end{lstlisting}
+The guaranteed head of \code{merge}'s input proves its result type. Replacing
+\code{[A, ...A]} by \code{[...A]} loses that proof because \code{and([])}
+returns \code{_}. Neither the result annotation nor a successful nonempty call
+repairs the universal claim. The empty cases of \code{choose} and
+\code{first} have no successful result. Their input domains remain admitted
+by their partial contracts; evaluation still retains any unresolved demand.
 \end{minipage}\par
 
 \section{Related designs}

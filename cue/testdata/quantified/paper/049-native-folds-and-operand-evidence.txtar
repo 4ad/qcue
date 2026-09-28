@@ -1,0 +1,27 @@
+// Paper example 049: Native folds and operand evidence
+
+#noformat
+#paper: 49
+#mode: evaluation
+
+-- paper.cue.txt --
+merge(A): func(xs: [A, ...A]) -> A: and(xs)
+x: merge([{a: 1}, {b: 1}]) // {a: 1, b: 1}
+choose(A): func(xs: [...A]) -> A: or(xs)
+y: choose(["ok"])
+first(A): func(xs: [...A], i: int) -> A: xs[i]
+z: first([1, 2], 1)        // 2
+-- in.cue --
+@test(validate, at="merge")
+@test(validate, at="choose")
+@test(validate, at="first")
+@test(json, {a: 1, b: 1}, at="x")
+@test(json, "ok", at="y")
+@test(json, 2, at="z")
+
+merge(A): func(xs: [A, ...A]) -> A: and(xs)
+x: merge([{a: 1}, {b: 1}]) // {a: 1, b: 1}
+choose(A): func(xs: [...A]) -> A: or(xs)
+y: choose(["ok"])
+first(A): func(xs: [...A], i: int) -> A: xs[i]
+z: first([1, 2], 1)        // 2
