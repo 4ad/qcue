@@ -28,35 +28,23 @@ import (
 // Unsupported proofs remain blocked; successful concrete calls and the
 // target annotation itself are not evidence of universal conformance.
 func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
 	return p.validateFunction(ctx, f)
 }
 
-// Evaluation during a proof must retain the same active dependencies and
-// budget. A fresh certifier could let a callback obligation justify itself.
-func (p *certifier) enter() func() {
-	check, inclusion := p.ctx.CheckFunction, p.ctx.ProveInclusion
-	application := p.ctx.CheckApplication
-	argument := p.ctx.CheckArgument
-	source := p.ctx.CheckSourceOperations
-	p.ctx.CheckSourceOperations = nil
-	p.ctx.CheckFunction = p.validateFunction
-	p.ctx.ProveInclusion = p.proveInclusion
-	p.ctx.CheckApplication = p.validateApplication
-	p.ctx.CheckArgument = func(env *adt.Environment, expr adt.Expr) adt.Value {
-		return p.constructorEvidence(p.expr(env, expr))
-	}
-	return func() {
-		p.ctx.CheckFunction, p.ctx.ProveInclusion = check, inclusion
-		p.ctx.CheckApplication = application
-		p.ctx.CheckArgument = argument
-		p.ctx.CheckSourceOperations = source
-	}
+// A derivation evaluates descriptions under its own assumption store. The
+// evaluator hooks remain installed throughout: their dispatch consults this
+// store, so nested reductions use the same hypotheses and accounted work.
+// Entering a store never establishes any of its pending propositions.
+func (p *inference) enter() func() {
+	previous := p.ctx.Inference
+	p.ctx.Inference = p
+	return func() { p.ctx.Inference = previous }
 }
 
-func newCertifier(ctx *adt.OpContext) *certifier {
-	return &certifier{ctx: ctx,
+func newInference(ctx *adt.OpContext) *inference {
+	return &inference{ctx: ctx, support: &assumptionStore{},
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope),
 		projections:  make(map[*adt.Vertex]map[adt.Feature]adt.Value),
 		constructors: make(map[*adt.Vertex]adt.Expr),
@@ -66,9 +54,9 @@ func newCertifier(ctx *adt.OpContext) *certifier {
 }
 
 // Reuse the current proof context when validating captured composites.
-// Starting another certifier would forget active proof dependencies and
+// Starting another inference would forget active proof dependencies and
 // permit cycles through records or lists to justify their own annotations.
-func (p *certifier) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
+func (p *inference) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
 	if !p.implementation(f) {
 		if p.failure != nil {
 			return p.failure
@@ -97,9 +85,10 @@ type proofBinding struct {
 	expr adt.Expr
 }
 
-type certifier struct {
-	ctx    *adt.OpContext
-	active []*adt.FuncValue
+type inference struct {
+	support *assumptionStore
+	ctx     *adt.OpContext
+	active  []*adt.FuncValue
 	// A recursive implementation can use its declared contracts while all
 	// their bodies are being checked. These hypotheses never survive a
 	// failed implementation proof or justify an unrelated stronger view.
@@ -145,7 +134,7 @@ type proofAttempt struct {
 	required  map[*adt.FuncValue]bool
 }
 
-func (p *certifier) useHypothesis(f *adt.FuncValue) {
+func (p *inference) useHypothesis(f *adt.FuncValue) {
 	for _, a := range p.attempts {
 		if a.inherited[f] {
 			a.required[f] = true
@@ -153,18 +142,22 @@ func (p *certifier) useHypothesis(f *adt.FuncValue) {
 	}
 }
 
-func (p *certifier) step() bool {
+func (p *inference) step() bool {
 	if p.ctx.Cancelled() != nil {
 		return false
 	}
 	if p.remaining == 0 {
 		return false
 	}
+	if p.ctx.Propagation != nil && !p.ctx.Propagation.Charge(1) {
+		p.remaining = 0
+		return false
+	}
 	p.remaining--
 	return true
 }
 
-func (p *certifier) schema(env *adt.Environment, x adt.Expr) adt.Value {
+func (p *inference) schema(env *adt.Environment, x adt.Expr) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -173,6 +166,18 @@ func (p *certifier) schema(env *adt.Environment, x adt.Expr) adt.Value {
 	}
 	if env == nil {
 		env = &adt.Environment{Vertex: &adt.Vertex{BaseValue: &adt.StructMarker{}}}
+	}
+	// A predicate abbreviation is substitution, not a fresh data cell. Read
+	// its expression in the declaration scope before ordinary vertex
+	// evaluation can turn a live membership into only its upper bound.
+	if alias, ok := x.(*adt.LetReference); ok && alias.IsPredicate {
+		for range alias.UpCount {
+			if env == nil {
+				return nil
+			}
+			env = env.Up
+		}
+		return p.schema(env, alias.X)
 	}
 	v, ok := p.ctx.Evaluate(env, x)
 	if !ok || v == nil {
@@ -202,7 +207,7 @@ func (p *certifier) schema(env *adt.Environment, x adt.Expr) adt.Value {
 	return v
 }
 
-func (p *certifier) includes(want, got adt.Value) bool {
+func (p *inference) includes(want, got adt.Value) bool {
 	if want == nil || got == nil {
 		return false
 	}
@@ -217,7 +222,7 @@ func (p *certifier) includes(want, got adt.Value) bool {
 			return false
 		}
 	}
-	s := &subsumer{ctx: p.ctx, certifier: p}
+	s := &subsumer{ctx: p.ctx, inference: p}
 	return s.values(want, got)
 }
 
@@ -225,7 +230,7 @@ func (p *certifier) includes(want, got adt.Value) bool {
 // inventories of its nested fields. Recover those checked member descriptions
 // for packet and singleton proofs, without closing an arbitrary input record or a local
 // binding whose context deliberately permits refinement.
-func (p *certifier) constructorEvidence(value adt.Value) adt.Value {
+func (p *inference) constructorEvidence(value adt.Value) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -264,7 +269,7 @@ func (p *certifier) constructorEvidence(value adt.Value) adt.Value {
 	return out
 }
 
-func (p *certifier) frame(up *adt.Environment, values map[adt.Feature]adt.Value) *adt.Environment {
+func (p *inference) frame(up *adt.Environment, values map[adt.Feature]adt.Value) *adt.Environment {
 	// The proof frame is never passed to the runtime evaluator as a packet.
 	// References to these fields are synthesized by expr below.
 	env := &adt.Environment{Up: up, Vertex: &adt.Vertex{BaseValue: &adt.StructMarker{}}}
@@ -276,7 +281,7 @@ func (p *certifier) frame(up *adt.Environment, values map[adt.Feature]adt.Value)
 // conditional hypotheses, while supplied implementations require their own
 // proofs. Concrete closure validation separately discharges these links and
 // requires every runtime capture to be complete.
-func (p *certifier) captured(v adt.Value) adt.Value {
+func (p *inference) captured(v adt.Value) adt.Value {
 	if !p.captureType(v, make(map[adt.Value]bool)) {
 		return nil
 	}
@@ -310,7 +315,7 @@ func capturedInventory(v *adt.Vertex, seen map[*adt.Vertex]*adt.Vertex) *adt.Ver
 	return out
 }
 
-func (p *certifier) captureType(v adt.Value, seen map[adt.Value]bool) bool {
+func (p *inference) captureType(v adt.Value, seen map[adt.Value]bool) bool {
 	if v == nil || !p.step() {
 		return false
 	}
@@ -362,11 +367,14 @@ func (p *certifier) captureType(v adt.Value, seen map[adt.Value]bool) bool {
 	return true
 }
 
-func (p *certifier) implementation(f *adt.FuncValue) bool {
+func (p *inference) implementation(f *adt.FuncValue) bool {
 	clauses := f.Obligations()
 	if p.recursing(f) {
 		return p.recursiveContracts(f, clauses)
 	}
+	savedSupport := p.support
+	p.support = &assumptionStore{parent: savedSupport}
+	defer func() { p.support = savedSupport }()
 	saved := p.hypotheses
 	p.hypotheses = maps.Clone(saved)
 	p.hypotheses[f] = true
@@ -383,7 +391,7 @@ func (p *certifier) implementation(f *adt.FuncValue) bool {
 	return true
 }
 
-func (p *certifier) recursing(f *adt.FuncValue) bool {
+func (p *inference) recursing(f *adt.FuncValue) bool {
 	for _, active := range p.active {
 		if active.Fn == f.Fn {
 			if same, known := adt.SameFunctionInstance(p.ctx, active, f); same || !known {
@@ -398,7 +406,7 @@ func (p *certifier) recursing(f *adt.FuncValue) bool {
 // certificate. Each declaration in a recursive dependency must still pass
 // its body proof. A recursive reference can use only contracts implied by
 // that declaration, with independently established runtime identity.
-func (p *certifier) recursiveContracts(f *adt.FuncValue, targets []adt.FuncType) bool {
+func (p *inference) recursiveContracts(f *adt.FuncValue, targets []adt.FuncType) bool {
 	for _, active := range p.implementing {
 		if active.Fn != f.Fn {
 			continue
@@ -432,7 +440,7 @@ func (p *certifier) recursiveContracts(f *adt.FuncValue, targets []adt.FuncType)
 // Saved arguments require their own implementation proofs and admission by
 // one executable view. The original body proof still introduces arbitrary
 // admitted arguments; these values cannot specialize away an obligation.
-func (p *certifier) savedPacket(f *adt.FuncValue) bool {
+func (p *inference) savedPacket(f *adt.FuncValue) bool {
 	if !f.IsPartial() {
 		return true
 	}
@@ -455,7 +463,7 @@ func (p *certifier) savedPacket(f *adt.FuncValue) bool {
 				continue
 			}
 			want := p.schema(instance.Env, instance.Fn.Params[i].Value)
-			if want == nil || !p.proveInclusion(p.ctx, want, value) {
+			if want == nil || !(&subsumer{ctx: p.ctx, inference: p}).packetMember(want, value) {
 				admitted = false
 				break
 			}
@@ -470,7 +478,13 @@ func (p *certifier) savedPacket(f *adt.FuncValue) bool {
 // A saved source constructor has an exact inventory. Evaluating it as a
 // predicate would permit additional fields and lose evidence of an absent
 // optional argument field. Other saved values retain their capture checks.
-func (p *certifier) boundArgument(env *adt.Environment, expr adt.Expr) adt.Value {
+func (p *inference) boundArgument(env *adt.Environment, expr adt.Expr) adt.Value {
+	if v, ok := expr.(*adt.Vertex); ok && p.constructors[v] != nil {
+		// Symbolic partial application has already checked this constructor.
+		// Preserve its source description as well as its exact inventory;
+		// packet completion may add fields unless the source closed them.
+		return v
+	}
 	switch expr.(type) {
 	case *adt.StructLit, *adt.ListLit:
 		return p.expr(env, expr)
@@ -478,7 +492,7 @@ func (p *certifier) boundArgument(env *adt.Environment, expr adt.Expr) adt.Value
 	return p.captured(p.schema(env, expr))
 }
 
-func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool) {
+func (p *inference) deriveFunction(f *adt.FuncValue, target adt.FuncType) (proved bool) {
 	if !p.step() || f.Fn.Body == nil || len(p.active) >= 256 {
 		return false
 	}
@@ -528,6 +542,9 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 			p.completed[key] = proofCertificate{required: required, result: result}
 		}
 	}()
+	savedSupport := p.support
+	p.support = &assumptionStore{parent: savedSupport}
+	defer func() { p.support = savedSupport }()
 	savedHypotheses := p.hypotheses
 	p.hypotheses = maps.Clone(p.hypotheses)
 	defer func() { p.hypotheses = savedHypotheses }()
@@ -594,7 +611,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 	// Prove coverage without using the implementation's result annotation.
 	a, b := *target.Fn, *source.Fn
 	a.Ret, b.Ret = nil, nil
-	if !s.capabilitySignature(adt.FuncType{Fn: &a, Env: target.Env}, adt.FuncType{Fn: &b, Env: source.Env}) {
+	if !p.coverage(adt.FuncType{Fn: &a, Env: target.Env}, adt.FuncType{Fn: &b, Env: source.Env}) {
 		return false
 	}
 	matches := adt.MatchFuncValueParams(target.Fn, &adt.FuncValue{Fn: source.Fn})
@@ -609,10 +626,10 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 			}
 			v := p.boundArgument(env, expr)
 			want := p.schema(source.Env, arg.Value)
-			if want == nil || v == nil || !p.proveInclusion(p.ctx, want, v) {
+			if want == nil || v == nil || !(&subsumer{ctx: p.ctx, inference: p}).packetMember(want, v) {
 				return false
 			}
-			values[arg.Local] = v
+			values[arg.Local] = p.sourceMeet(v, want)
 		}
 	}
 	for i, j := range matches {
@@ -693,7 +710,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 // conformance hypothesis. Ordinary named functions must have their bodies
 // checked before a call can use their result annotations. This prevents
 // circular annotation proofs.
-func (p *certifier) assume(v adt.Value, seen map[adt.Value]bool) {
+func (p *inference) assume(v adt.Value, seen map[adt.Value]bool) {
 	if v == nil || seen[v] {
 		return
 	}
@@ -725,7 +742,7 @@ func (p *certifier) assume(v adt.Value, seen map[adt.Value]bool) {
 	}
 }
 
-func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
+func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -1259,7 +1276,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 // not become an empty predicate that an unused alias argument can conceal.
 // Literal function bodies have their own parameter scopes and are checked by
 // the implementation rule even if the abbreviation never uses its argument.
-func (p *certifier) typeOperations(env *adt.Environment, expr adt.Expr) bool {
+func (p *inference) typeOperations(env *adt.Environment, expr adt.Expr) bool {
 	ok := true
 	seen := make(map[adt.Node]bool)
 	var visitor walk.Visitor
@@ -1391,7 +1408,7 @@ func (p *certifier) typeOperations(env *adt.Environment, expr adt.Expr) bool {
 // its operands are concrete. A proof may retain an unresolved conjunction,
 // but it must preserve an established empty completion predicate. Each source
 // operand must have its own derivation before this operation is used.
-func (p *certifier) eagerMeet(a, b adt.Value) adt.Value {
+func (p *inference) eagerMeet(a, b adt.Value) adt.Value {
 	if !p.step() || a == nil || b == nil {
 		return nil
 	}
@@ -1405,7 +1422,7 @@ func (p *certifier) eagerMeet(a, b adt.Value) adt.Value {
 // Type elimination distributes through alternative subjects. For a
 // conjunction it uses the clauses admitting the type argument, retaining
 // all of their consequences rather than arbitrarily selecting one clause.
-func (p *certifier) selectType(value, argument adt.Value) adt.Value {
+func (p *inference) selectType(value, argument adt.Value) adt.Value {
 	if !p.step() || argument == nil {
 		return nil
 	}
@@ -1446,7 +1463,7 @@ func (p *certifier) selectType(value, argument adt.Value) adt.Value {
 // does not make an undeclared field accessible. List indexes instead denote
 // partial computations: an out-of-range index fails, and a homogeneous tail
 // constrains any successful selection without promising that it is present.
-func (p *certifier) project(value adt.Value, label adt.Feature) adt.Value {
+func (p *inference) project(value adt.Value, label adt.Feature) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -1513,7 +1530,7 @@ func (p *certifier) project(value adt.Value, label adt.Feature) adt.Value {
 
 // Negation reverses ordered interval endpoints, while preserving numeric
 // kinds, exclusions, and unions. This is a proof for the whole input domain.
-func (p *certifier) negateNumber(v adt.Value) adt.Value {
+func (p *inference) negateNumber(v adt.Value) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -1569,7 +1586,7 @@ func (p *certifier) negateNumber(v adt.Value) adt.Value {
 // Translation by a constant preserves numeric interval predicates. This
 // proves operations such as a nonnegative counter's successor without
 // testing concrete examples or discarding its lower bound.
-func (p *certifier) translateNumber(v adt.Value, n *adt.Num, op adt.Op) adt.Value {
+func (p *inference) translateNumber(v adt.Value, n *adt.Num, op adt.Op) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -1597,12 +1614,12 @@ func (p *certifier) translateNumber(v adt.Value, n *adt.Num, op adt.Op) adt.Valu
 	return &adt.BasicType{K: v.Kind() | n.Kind()}
 }
 
-func (p *certifier) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
+func (p *inference) call(env *adt.Environment, call *adt.CallExpr) adt.Value {
 	callee := adt.Unwrap(p.expr(env, call.Fun))
 	return p.apply(env, callee, call)
 }
 
-func (p *certifier) apply(env *adt.Environment, callee adt.Value, call *adt.CallExpr) adt.Value {
+func (p *inference) apply(env *adt.Environment, callee adt.Value, call *adt.CallExpr) adt.Value {
 	if callee == nil {
 		return nil
 	}
@@ -1661,7 +1678,7 @@ func (p *certifier) apply(env *adt.Environment, callee adt.Value, call *adt.Call
 	return result
 }
 
-func (p *certifier) partialCall(callee adt.Value, packet adt.FuncType) adt.Value {
+func (p *inference) partialCall(callee adt.Value, packet adt.FuncType) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -1703,7 +1720,7 @@ func (p *certifier) partialCall(callee adt.Value, packet adt.FuncType) adt.Value
 	return nil
 }
 
-func (p *certifier) callValue(callee adt.Value, target adt.FuncType) adt.Value {
+func (p *inference) callValue(callee adt.Value, target adt.FuncType) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -1766,7 +1783,7 @@ func (p *certifier) callValue(callee adt.Value, target adt.FuncType) adt.Value {
 // belong to one clause uniformly. Split them under the proof's work budget,
 // prove every packet family, and join the guaranteed results. This makes
 // overload coverage independent of intersection order.
-func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.FuncType, function *adt.FuncValue, start int) adt.Value {
+func (p *inference) callPackets(target adt.FuncType, sources, results []adt.FuncType, function *adt.FuncValue, start int) adt.Value {
 	if !p.step() {
 		return nil
 	}
@@ -1792,7 +1809,7 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 		sources = function.CallClausesFor(p.ctx, target)
 		results = function.ResultClausesFor(p.ctx, target)
 	}
-	s := &subsumer{ctx: p.ctx, certifier: p}
+	s := &subsumer{ctx: p.ctx, inference: p}
 	admit := func(source adt.FuncType, activation bool) (adt.FuncType, bool) {
 		if len(adt.FunctionTypeParameters(source)) != 0 {
 			var b *adt.Bottom
@@ -1811,6 +1828,10 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 	admitted := false
 	var consequences []adt.Value
 	addResult := func(source adt.FuncType) {
+		if failure := p.packetFailure(target, source); failure != nil {
+			consequences = append(consequences, failure)
+			return
+		}
 		if result := p.schema(source.Env, source.Fn.Ret); result != nil {
 			consequences = append(consequences, result)
 		}
@@ -1864,6 +1885,10 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 		var alternatives []adt.Value
 		for _, source := range sources {
 			if source, ok := admit(source, true); ok {
+				if failure := p.packetFailure(target, source); failure != nil {
+					alternatives = append(alternatives, failure)
+					continue
+				}
 				if result := p.schema(source.Env, source.Fn.Ret); result != nil {
 					alternatives = append(alternatives, result)
 				}
@@ -1886,7 +1911,7 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 	return p.meetResults(consequences)
 }
 
-func (p *certifier) meetResults(consequences []adt.Value) adt.Value {
+func (p *inference) meetResults(consequences []adt.Value) adt.Value {
 	if len(consequences) == 0 {
 		return nil
 	}
@@ -1907,7 +1932,7 @@ func proofUnion(values []adt.Value) adt.Value {
 // Every operational list is finite. Iterating its element predicate proves
 // a finite comprehension uniformly without testing a representative list.
 // Conditions may suppress elements; they must themselves be total booleans.
-func (p *certifier) comprehension(env *adt.Environment, comp *adt.Comprehension) (adt.Value, bool) {
+func (p *inference) comprehension(env *adt.Environment, comp *adt.Comprehension) (adt.Value, bool) {
 	if comp.Fallback != nil {
 		return nil, false
 	}
@@ -1955,4 +1980,44 @@ func (p *certifier) comprehension(env *adt.Environment, comp *adt.Comprehension)
 		}
 	}
 	return p.expr(env, comp.Value), false
+}
+
+// packetFailure derives an ordinary contradiction of fresh activation cells.
+// This is independent of a body or coverage theorem. In particular a bodyless
+// declaration still rejects a contradictory packet before materialization.
+func (p *inference) packetFailure(packet, source adt.FuncType) *adt.Bottom {
+	matches := adt.MatchFuncValueParams(packet.Fn, &adt.FuncValue{Fn: source.Fn})
+	for i, j := range matches {
+		if j < 0 {
+			continue // Protocol evidence is produced by the separate rule.
+		}
+		got, ok := packet.Fn.Params[i].Value.(adt.Value)
+		if !ok {
+			got = p.schema(packet.Env, packet.Fn.Params[i].Value)
+		}
+		want, ok := source.Fn.Params[j].Value.(adt.Value)
+		if !ok {
+			want = p.schema(source.Env, source.Fn.Params[j].Value)
+		}
+		if kind, ok := want.(*adt.BasicType); ok && got != nil &&
+			got.Kind() != adt.BottomKind && got.Kind()&^kind.K == 0 {
+			if got.Kind()&(adt.StructKind|adt.ListKind) == 0 {
+				continue // The kind theorem already excludes a packet conflict.
+			}
+		}
+		got = p.bindingDescription(got)
+		if got == nil || want == nil || packetHasFunction(want, make(map[adt.Value]bool)) {
+			continue
+		}
+		meet := p.sourceMeet(got, want)
+		if refuted(meet) {
+			return adt.Unwrap(meet).(*adt.Bottom)
+		}
+		if v, ok := meet.(*adt.Vertex); ok {
+			if b := adt.Validate(p.ctx, v, &adt.ValidateConfig{}); b != nil && !b.IsIncomplete() {
+				return b
+			}
+		}
+	}
+	return nil
 }

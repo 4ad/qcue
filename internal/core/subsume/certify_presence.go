@@ -24,7 +24,7 @@ import (
 // An occurrence test may inspect an optional slot without reading its absent
 // value. Its identity includes the lexical binding: two optional parameters
 // with the same type need not be present together.
-func (p *certifier) presenceCondition(env *adt.Environment, expr adt.Expr) (checkedCondition, bool) {
+func (p *inference) presenceCondition(env *adt.Environment, expr adt.Expr) (checkedCondition, bool) {
 	binary, ok := expr.(*adt.BinaryExpr)
 	if !ok || (binary.Op != adt.EqualOp && binary.Op != adt.NotEqualOp) {
 		return checkedCondition{}, false
@@ -71,7 +71,7 @@ func (p *certifier) presenceCondition(env *adt.Environment, expr adt.Expr) (chec
 // Give a branch its own proof environments. Mutating a shared scope would
 // leak presence to a sibling branch or a cached closure proof. New scopes also
 // keep refinements alive in closures constructed inside the checked branch.
-func (p *certifier) presenceBranch(env *adt.Environment, condition checkedCondition, yes bool) *adt.Environment {
+func (p *inference) presenceBranch(env *adt.Environment, condition checkedCondition, yes bool) *adt.Environment {
 	if condition.optional == nil {
 		return env
 	}

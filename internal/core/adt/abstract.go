@@ -53,14 +53,11 @@ func (r *AbstractResult) validate(c *OpContext, v Value) *Bottom {
 }
 
 func (f *FuncValue) abstractCall(c *OpContext, call *CallExpr, state Flags) Value {
-	if c.CheckApplication == nil {
-		return &Bottom{Src: call.Source(), Code: BlockedError,
-			Err: c.Newf("function application checker is not configured")}
-	}
-	description, b := c.CheckApplication(c, c.Env(0), f, call)
-	if b != nil {
+	goal := c.invocationEvidence(f, call)
+	if b := goal.Diagnostic(c, call); b != nil {
 		return b
 	}
+	description := goal.Value
 	// Checking an application may establish result constraints, including
 	// a derived empty result. It never supplies the missing implementation.
 	pending := &AbstractResult{Src: call.Source()}

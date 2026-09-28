@@ -40,12 +40,12 @@ func (e *RelevanceError) Error() string { return "interface relevance blocked: "
 // use-site instances and synthesized computation types are not source roots.
 // Nested interfaces are separate roots checked by the source traversal.
 func CheckArrowRelevance(ctx *adt.OpContext, clauses []adt.FuncType) *RelevanceError {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
 	return (&relevanceChecker{p: p}).arrows(clauses)
 }
 
-type relevanceChecker struct{ p *certifier }
+type relevanceChecker struct{ p *inference }
 
 type observation struct {
 	domain []adt.Value

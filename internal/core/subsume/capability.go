@@ -46,8 +46,8 @@ func (s *subsumer) capabilityValues(a, b *adt.FuncValue) bool {
 		return true
 	}
 	targets := a.Obligations()
-	if s.certifier != nil && !adt.IsFuncType(b) {
-		if !s.certifier.implementation(b) {
+	if s.inference != nil && !adt.IsFuncType(b) {
+		if !s.inference.implementation(b) {
 			return false
 		}
 		for _, target := range targets {
@@ -61,7 +61,7 @@ func (s *subsumer) capabilityValues(a, b *adt.FuncValue) bool {
 					break
 				}
 			}
-			if !proved && !s.certifier.function(b, target) {
+			if !proved && !s.inference.function(b, target) {
 				return false
 			}
 		}
@@ -158,29 +158,31 @@ func (s *subsumer) packetSignature(target, source adt.FuncType, activation bool)
 }
 
 func (s *subsumer) packetMember(want, got adt.Value) bool {
+	// A fresh packet meets a live predicate. Its current fields can demand
+	// independent callable proofs, but compatibility here is not reverse
+	// inclusion into the live coordinate (the coverage rule remains strict).
+	if live, ok := adt.Unwrap(want).(*adt.LiveType); ok {
+		want = live.Upper
+	}
+	// A source computation already refuted by ordinary constraints cannot
+	// produce a bad argument. Retain its failure instead of turning it into
+	// missing conformance evidence.
+	if refuted(got) {
+		return true
+	}
+	if v, ok := got.(*adt.Vertex); ok {
+		if b := adt.Validate(s.ctx, v, &adt.ValidateConfig{}); b != nil && !b.IsIncomplete() {
+			return true
+		}
+	}
 	if packetHasFunction(want, make(map[adt.Value]bool)) {
 		return s.values(want, got)
 	}
-	if s.certifier != nil {
-		got = s.certifier.bindingDescription(got)
-		if got == nil {
-			return false
-		}
-	}
-	// The activation retains the meet and its demanded validations. No
-	// inclusion theorem follows from this ordinary first-order constraint.
-	if want.Kind()&got.Kind() == 0 && got.Kind() != adt.BottomKind {
-		return false
-	}
-	meet := unifyValue(s.ctx, want, got)
-	if v, ok := meet.(*adt.Vertex); ok {
-		v.Finalize(s.ctx)
-		if err := adt.Validate(s.ctx, v, &adt.ValidateConfig{}); err != nil && !err.IsIncomplete() {
-			return false
-		}
-	}
-	b, failed := adt.Unwrap(meet).(*adt.Bottom)
-	return !failed || b.IsIncomplete() || got.Kind() == adt.BottomKind
+	// First-order slots install constraints in a fresh activation. They
+	// require no implication from the argument's present approximation.
+	// Even disjoint predicates are an enabled, failing computation: their
+	// contradiction is produced by the packet meet, not proof search.
+	return true
 }
 
 func packetHasFunction(value adt.Value, seen map[adt.Value]bool) bool {

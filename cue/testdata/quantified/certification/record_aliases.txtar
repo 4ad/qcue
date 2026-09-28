@@ -2,10 +2,13 @@
 // Their uses still constrain the corresponding fields, including nested ones.
 
 -- in.cue --
-@test(json, [3, 4, 5, 6], at="out")
-@test(validate, blocked, at="wrong")
-@test(validate, blocked, at="missing")
-@test(validate, blocked, at="wrongNested")
+@test(validate, concrete, incomplete, at="out")
+@test(json, 3, at="out[0]")
+@test(json, 5, at="out[2]")
+@test(json, 6, at="out[3]")
+@test(validate, conflict, at="wrong")
+@test(validate, concrete, incomplete, at="missing")
+@test(validate, conflict, at="wrongNested")
 
 get: func(r: {let N = int, a: N}) -> int: r.a
 nested: func(r: {let N = int, v: {a: N}}) -> int: r.v.a

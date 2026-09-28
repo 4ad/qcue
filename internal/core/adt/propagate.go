@@ -47,6 +47,8 @@ type Evidence struct {
 	Wait  Suspension
 	Value Value
 	Err   *Bottom
+	// Support is the kernel-checked derivation and its undischarged hypotheses.
+	Support any
 }
 
 // Goal is a scoped proposition and its accumulated evidence. Its key includes
@@ -143,7 +145,12 @@ func (p *Propagation) run(g *Goal) {
 	g.Evidence = result
 	if result.State != Pending {
 		for dependent := range g.dependents {
-			p.enqueue(dependent)
+			// An active requester consumes this result on return from
+			// Require. Re-enqueuing it would repeat completed premises and
+			// manufacture work without any new information.
+			if !dependent.active {
+				p.enqueue(dependent)
+			}
 		}
 	}
 }
@@ -215,4 +222,26 @@ func (p *Propagation) Residual() []*Goal {
 		}
 	}
 	return out
+}
+
+// Diagnostic exposes unfinished or rejected checking without treating it as
+// semantic emptiness. The source graph and the goal remain available to a
+// later refinement or an additional work allowance.
+func (g *Goal) Diagnostic(c *OpContext, source Node) *Bottom {
+	if g.Err != nil {
+		return g.Err
+	}
+	if g.State != Established && g.State != Quiet {
+		return &Bottom{Src: source.Source(), Code: BlockedError,
+			Err: c.Newf("function invocation awaits evidence")}
+	}
+	return nil
+}
+
+func (c *OpContext) invocationEvidence(f Value, call *CallExpr) *Goal {
+	if c.CallEvidence != nil {
+		return c.CallEvidence(c, c.Env(0), f, call)
+	}
+	return &Goal{Evidence: Evidence{Err: &Bottom{Src: call.Source(), Code: BlockedError,
+		Err: c.Newf("function propagation is not configured")}}}
 }

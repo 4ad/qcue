@@ -2,13 +2,16 @@
 // evaluated projection or the called body would discard an invalid operation.
 
 -- in.cue --
-@test(json, [0, 0, 0, 0], at="out")
-@test(validate, blocked, at="discardedField")
-@test(validate, blocked, at="discardedLet")
-@test(validate, blocked, at="badAlternative")
-@test(validate, blocked, at="badDefaultAlternative")
-@test(validate, blocked, at="badPartial")
-@test(validate, blocked, at="unknown")
+@test(validate, concrete, incomplete, at="out")
+@test(json, 0, at="out[0]")
+@test(json, 0, at="out[2]")
+@test(json, 0, at="out[3]")
+@test(validate, concrete, at="discardedField")
+@test(validate, concrete, at="discardedLet")
+@test(validate, concrete, at="badAlternative")
+@test(validate, concrete, at="badDefaultAlternative")
+@test(validate, concrete, incomplete, at="badPartial")
+@test(validate, concrete, incomplete, at="unknown")
 @test(validate, blocked, at="badCallback")
 @test(json, [true, true], at="failed")
 

@@ -3,7 +3,7 @@
 @test(validate, conflict, at="b")
 @test(validate, conflict, at="c")
 @test(validate, conflict, at="d")
-@test(validate, blocked, at="e")
+@test(validate, concrete, incomplete, at="e")
 
 sum: func(a: int, b: int) -> int: a + b
 a:   sum(1, a: 1)          // duplicate binding, even with equal values

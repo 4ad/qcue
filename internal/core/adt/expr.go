@@ -2025,9 +2025,10 @@ func (x *FuncValue) Kind() Kind { return FuncKind }
 // to env.Up, preserving the documented scoping (e.g. `b: a` refers to an
 // outer `a`, not the sibling parameter).
 //
-// Each parameter retains its live constraint on the activation. A checked
-// inclusion may represent membership by evidence; otherwise its conjunct
-// propagates in the packet. Result annotations are body goals, never filters.
+// Each parameter retains its live constraint on the activation. A proved
+// inclusion justifies removing a redundant meet on this same source graph.
+// Otherwise the constraint propagates, including through returned packets.
+// Result annotations are body goals, never filters.
 //
 // The default, legacy constraint, and body conjuncts carry ci, which includes the
 // anchor's cycle reference, so recursive calls in either the body or a
@@ -2378,20 +2379,16 @@ func (x *FuncValue) bindCall(c *OpContext, call *CallExpr) (bindings []funcArg, 
 }
 
 func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
-	checked := x.Fn != nil && x.Fn.Body != nil && capabilityMode(x.Fn, x.Types)
-	inCheckedScope := false
+	var evidence *Goal
 	for env := c.Env(0); env != nil; env = env.Up {
-		inCheckedScope = inCheckedScope || env.checkedCalls
-	}
-	if checked && !inCheckedScope {
-		if c.CheckApplication == nil {
-			return &Bottom{Src: call.Source(), Code: BlockedError,
-				Err: c.Newf("function application checker is not configured")}
+		if g := env.Invocation; g != nil && g.State == Established {
+			evidence = g
+			break
 		}
-		// Check the source application, including every retained body
-		// contract, before binding a partial packet or executing code.
-		// Memoization and a successful result cannot replace that proof.
-		if _, b := c.CheckApplication(c, c.Env(0), x, call); b != nil {
+	}
+	if x.Fn != nil && x.Fn.Body != nil && capabilityMode(x.Fn, x.Types) && evidence == nil {
+		evidence = c.invocationEvidence(x, call)
+		if b := evidence.Diagnostic(c, call); b != nil {
 			return b
 		}
 	}
@@ -2598,7 +2595,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	for _, a := range arcs {
 		a.Parent = activation
 	}
-	bodyEnv := &Environment{Up: x.Env, Vertex: activation, checkedCalls: checked}
+	bodyEnv := &Environment{Up: x.Env, Vertex: activation, Invocation: evidence}
 	bodyCI := c.ci
 	if recursive {
 		// This activation's finite descent discharges the call-cycle edge.
@@ -3031,11 +3028,7 @@ func (x *CallExpr) evaluate(c *OpContext, state Flags) Value {
 
 func (builtin *Builtin) rawCall(c *OpContext, call *CallExpr, state Flags) Value {
 	if builtin.capabilityMode() {
-		if c.CheckApplication == nil {
-			return &Bottom{Src: call.Source(), Code: BlockedError,
-				Err: c.Newf("builtin application checker is not configured")}
-		}
-		if _, b := c.CheckApplication(c, c.Env(0), builtin, call); b != nil {
+		if b := c.invocationEvidence(builtin, call).Diagnostic(c, call); b != nil {
 			return b
 		}
 	}

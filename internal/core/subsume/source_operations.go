@@ -24,8 +24,13 @@ import (
 // constraints keep their existing semantics; quantified calls require the
 // same certificates as observed applications.
 func ValidateSourceOperations(ctx *adt.OpContext, env *adt.Environment, expr adt.Expr) *adt.Bottom {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
+	return p.validateSourceOperations(env, expr)
+}
+
+func (p *inference) validateSourceOperations(env *adt.Environment, expr adt.Expr) *adt.Bottom {
+	ctx := p.ctx
 	if p.sourceOperations(env, expr) {
 		return nil
 	}
@@ -36,7 +41,7 @@ func ValidateSourceOperations(ctx *adt.OpContext, env *adt.Environment, expr adt
 		Err: ctx.NewPosf(adt.Pos(expr), "source operation remains unproved")}
 }
 
-func (p *certifier) sourceOperations(env *adt.Environment, expr adt.Expr) bool {
+func (p *inference) sourceOperations(env *adt.Environment, expr adt.Expr) bool {
 	ok := true
 	seen := make(map[adt.Node]bool)
 	visitor := walk.Visitor{}
@@ -160,7 +165,7 @@ func (p *certifier) sourceOperations(env *adt.Environment, expr adt.Expr) bool {
 
 // Calls see all refinements of their record's fields, including contracts
 // and implementations supplied in separate record conjuncts.
-func (p *certifier) sourceRecordOperations(record *proofRecord) bool {
+func (p *inference) sourceRecordOperations(record *proofRecord) bool {
 	for _, label := range record.labels {
 		bindings := record.scope.bindings[label]
 		for _, binding := range bindings {
@@ -174,7 +179,7 @@ func (p *certifier) sourceRecordOperations(record *proofRecord) bool {
 
 // Data-only comprehensions retain ordinary CUE evaluation. A comprehension
 // containing a user call needs its iteration scopes checked before projection.
-func (p *certifier) sourceComprehension(env *adt.Environment, comp *adt.Comprehension) bool {
+func (p *inference) sourceComprehension(env *adt.Environment, comp *adt.Comprehension) bool {
 	calls := false
 	visitor := walk.Visitor{Before: func(node adt.Node) bool {
 		if calls || node == nil {

@@ -18,7 +18,7 @@ import "cuelang.org/go/internal/core/adt"
 
 // Test-only entry point for deterministic proof-work assertions.
 func ValidateFunctionBudget(ctx *adt.OpContext, f *adt.FuncValue, budget int) (*adt.Bottom, int) {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
 	p.remaining = budget
 	b := p.validateFunction(ctx, f)

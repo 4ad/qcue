@@ -135,9 +135,16 @@ func (packet callPacket) typeAdmission(c *OpContext, clause FuncType) (FuncType,
 			return clause, false
 		}
 		want, ok := c.Evaluate(clause.Env, clause.Fn.Params[i].Value)
-		if !ok || c.ProveInclusion == nil || !c.ProveInclusion(c, want, value) {
+		if !ok || c.ProveInclusion == nil {
 			return clause, false
 		}
+		if c.ProveInclusion(c, want, value) {
+			continue
+		}
+		if capabilityHasCallable(want, make(map[Value]bool)) {
+			return clause, false
+		}
+
 	}
 	return clause, true
 }

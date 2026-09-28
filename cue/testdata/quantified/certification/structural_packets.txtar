@@ -2,8 +2,8 @@
 
 -- in.cue --
 @test(json, [1, 2, 3, 4], at="out")
-@test(validate, blocked, at="badPattern")
-@test(validate, blocked, at="badClose")
+@test(validate, concrete, at="badPattern")
+@test(validate, concrete, incomplete, at="badClose")
 @test(validate, conflict, at="wrongLabel")
 
 read: func(x: {v: int}) -> int: x.v

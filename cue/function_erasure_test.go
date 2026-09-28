@@ -72,26 +72,34 @@ out: f("{}")`},
 	})
 }
 
-// Parameter predicates must not manufacture a packet either, even if the
-// body ignores it. Defaults belong to the implementation's omission protocol;
-// defaults inside a predicate cannot select an argument on the caller's behalf.
-func TestQuantifiedArgumentErasure(t *testing.T) {
-	for _, tt := range []struct{ name, predicate, argument string }{
-		{"field", `{a: 1}`, `{}`},
-		{"nested", `{n: {a: 1}}`, `{n: {}}`},
-		{"list", `[{a: 1}]`, `[{}]`},
-		{"choice", `1`, `1 | 2`},
-		{"default", `*1 | int`, `int`},
-		{"cycle", `{a: 1}`, `{a: self.a}`},
+// A call allocates a fresh constrained packet. Constraints can complete its
+// fields and select compatible alternatives without changing the source cell.
+// Direct, named and saved bindings retain the same demands.
+func TestQuantifiedArgumentConstraints(t *testing.T) {
+	for _, tt := range []struct{ name, predicate, argument, want string }{
+		{"field", `{a: 1}`, `{}`, `{"a":1}`},
+		{"nested", `{n: {a: 1}}`, `{n: {}}`, `{"n":{"a":1}}`},
+		{"list", `[{a: 1}]`, `[{}]`, `[{"a":1}]`},
+		{"choice", `1`, `1 | 2`, `1`},
+		{"default", `*1 | int`, `int`, ""},
+		{"cycle", `{a: 1}`, `{a: self.a}`, `{"a":1}`},
 	} {
 		for _, body := range []string{"x", "0"} {
 			for _, call := range []string{"f(arg)", "f(arg, ...)()", "f(x: arg)"} {
 				t.Run(tt.name+"/"+body+"/"+call, func(t *testing.T) {
-					v := semanticValue(t, fmt.Sprintf("f: func(x: (%s)) -> _: %s\narg: %s\nout: %s",
-						tt.predicate, body, tt.argument, call))
+					v := semanticValue(t, fmt.Sprintf("f: func(x: (%s)) -> _: %s\narg: %s\nout: %s", tt.predicate, body, tt.argument, call))
 					out := v.LookupPath(cue.ParsePath("out"))
-					if _, err := out.MarshalJSON(); err == nil {
-						t.Fatal("parameter predicate manufactured an admitted packet")
+					want := tt.want
+					if want != "" && body == "0" {
+						want = "0"
+					}
+					got, err := out.MarshalJSON()
+					if want == "" {
+						if err == nil {
+							t.Fatal("an incomplete supplied packet was discarded")
+						}
+					} else if err != nil || string(got) != want {
+						t.Fatalf("packet result: %s, %v; want %s", got, err, want)
 					}
 				})
 			}
@@ -127,10 +135,9 @@ func TestQuantifiedCallErasureIdentity(t *testing.T) {
 	}
 }
 
-// Empty packets, omission defaults, and captured empty records supply no
-// inhabitants of A. Different admitted selections must stay observationally
-// identical, including when checked views are conjoined in either order.
-func TestQuantifiedCallErasureConstant(t *testing.T) {
+// No-input constants retain their own source graph. Returning a defaulted
+// packet instead preserves the constraints on its currently absent fields.
+func TestQuantifiedCallPacketConstant(t *testing.T) {
 	for _, selection := range []string{"f[1]", "f[2]", "f[1] & f[2]", "f[2] & f[1]"} {
 		for _, implementation := range []string{
 			`func() -> {}: {}`,
@@ -138,15 +145,18 @@ func TestQuantifiedCallErasureConstant(t *testing.T) {
 			`func(x: {v?: A} = {}) -> _: (func() -> _: x)()`,
 		} {
 			v := semanticValue(t, "f(A): "+implementation+"\ng: "+selection+"\nout: g() & {v: true}")
-			semanticJSON(t, v, "out", `{"v":true}`)
+			if implementation == `func() -> {}: {}` {
+				semanticJSON(t, v, "out", `{"v":true}`)
+			} else if v.LookupPath(cue.ParsePath("out")).Validate(cue.Concrete(true)) == nil {
+				t.Fatal("a returned packet lost its optional constraint")
+			}
 		}
 	}
 }
 
-// Erasure includes negative information and future refinements, not just JSON
-// fields. An absent optional field or pattern in a contract cannot become a
-// constraint on the returned record or on data captured by a returned closure.
-func TestQuantifiedCallErasureRefinement(t *testing.T) {
+// Returning a packet retains optional fields, patterns and definitions.
+// Future refinement observes the same constraints after a nested call.
+func TestQuantifiedCallPacketRefinement(t *testing.T) {
 	for _, predicate := range []string{`{a?: A}`, `{[string]: A}`, `{#T: A}`} {
 		argument := "{}"
 		if predicate == "{#T: A}" {
@@ -164,8 +174,15 @@ out: [f[1](%s), f[2](%s)]
 					if argument != "{}" {
 						refinement = "{#T: 3}"
 					}
-					if err := out.Unify(out.Context().CompileString(refinement)).Validate(cue.Concrete(true)); err != nil {
-						t.Fatalf("selected predicate leaked into the value: %v", err)
+					if err := out.Unify(out.Context().CompileString(refinement)).Validate(cue.Concrete(true)); err == nil {
+						t.Fatal("returned packet lost its selected predicate")
+					}
+					allowed := fmt.Sprintf("{a: %d}", i+1)
+					if argument != "{}" {
+						allowed = fmt.Sprintf("{#T: %d}", i+1)
+					}
+					if err := out.Unify(out.Context().CompileString(allowed)).Validate(cue.Concrete(true)); err != nil {
+						t.Fatalf("compatible refinement: %v", err)
 					}
 				}
 			})
@@ -220,7 +237,7 @@ out: g(1)`,
 // packet has two presence bits and fields drawn from a finite alphabet; a
 // predicate has two presence requirements and sets of permitted field values.
 // Expectations use only those bits and sets, never CUE unification or proofs.
-func TestQuantifiedCallErasureMembershipModel(t *testing.T) {
+func TestQuantifiedCallPacketMembershipModel(t *testing.T) {
 	width := 2
 	if extendedQuantifiedOracle(t) {
 		width = 3
@@ -261,7 +278,7 @@ func TestQuantifiedCallErasureMembershipModel(t *testing.T) {
 						if err != nil {
 							t.Fatal(err)
 						}
-						for _, program := range []string{
+						for mode, program := range []string{
 							"out: (func(p: " + predicate + ") -> _: p)(" + string(data) + ")",
 							"out: (func() -> " + predicate + ": " + string(data) + ")()",
 							"f: (func(p: " + predicate + ") -> _: p) & (func(" + predicate + ") -> " + predicate + ")\nout: f(" + string(data) + ")",
@@ -273,12 +290,36 @@ func TestQuantifiedCallErasureMembershipModel(t *testing.T) {
 							cases++
 							out := ctx.CompileString(program).LookupPath(cue.ParsePath("out"))
 							got, err := out.MarshalJSON()
-							if admitted {
-								if err != nil || string(got) != string(data) {
-									t.Fatalf("admitted packet changed: got %s, %v; want %s\n%s", got, err, data, program)
+							wantData, complete := data, admitted
+							if mode != 1 {
+								completed := make(map[string]int)
+								complete = true
+								for i, actual := range []int{x, y} {
+									mask := []int{maskX, maskY}[i]
+									label := []string{"x", "y"}[i]
+									if actual >= 0 {
+										complete = complete && mask&(1<<actual) != 0
+										completed[label] = actual
+									} else if optional&(1<<i) == 0 {
+										count, sole := 0, 0
+										for n := range width {
+											if mask&(1<<n) != 0 {
+												count++
+												sole = n
+											}
+										}
+										complete = complete && count == 1
+										completed[label] = sole
+									}
 								}
-							} else if err == nil || out.Validate() == nil {
-								t.Fatalf("contract must reject this complete packet: got %s, %v\n%s", got, err, program)
+								wantData, _ = json.Marshal(completed)
+							}
+							if complete {
+								if err != nil || string(got) != string(wantData) {
+									t.Fatalf("packet result: got %s, %v; want %s\n%s", got, err, wantData, program)
+								}
+							} else if err == nil || out.Validate(cue.Concrete(true)) == nil {
+								t.Fatalf("unresolved or conflicting packet completed: got %s, %v\n%s", got, err, program)
 							}
 						}
 						// These original unrestricted identities promised the

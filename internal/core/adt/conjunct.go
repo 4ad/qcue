@@ -665,6 +665,13 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 			n.insertValueConjunct(env, v, id)
 			return
 		}
+	case *LiveType:
+		// A live description constrains the current packet as well as
+		// retaining a dependency on the original coordinate. Reading its
+		// upper approximation as a validator alone would lose new fields
+		// and refinements supplied by the parameter description.
+		n.scheduleConjunct(MakeConjunct(x.Env, x.Ref.X, id), id)
+		return
 	}
 
 	if !n.updateNodeType(v.Kind(), v, id) {

@@ -145,6 +145,10 @@ type OpContext struct {
 	// evaluating this source graph. Proof production and data evaluation
 	// share its worklist; a suspended goal is not an acceptance phase.
 	Propagation *Propagation
+	// Inference identifies the scoped assumption store of the current
+	// derivation. It is owned by the installed propagation engine; adt does
+	// not interpret it or use it as permission to execute an operation.
+	Inference any
 	// ProveInclusion establishes that every inhabitant of the second
 	// predicate satisfies the first. False means unproved, not disjoint.
 	// The runtime installs it to keep the evaluator independent of the
@@ -153,16 +157,16 @@ type OpContext struct {
 
 	// CheckFunction and CheckBuiltin independently discharge conformance
 	// obligations of runtime arguments before a call can forget its packet.
-	// Proof procedures may temporarily replace these hooks to retain their
-	// active dependencies and work budget across evaluator callbacks.
+	// The propagation engine retains their scoped dependencies and work
+	// allowance across evaluator callbacks.
 	CheckFunction   func(*OpContext, *FuncValue) *Bottom
 	CheckBuiltin    func(*OpContext, *Builtin) *Bottom
 	CheckInterfaces func(*OpContext, *Vertex) *Bottom
 
-	// CheckApplication derives the result interface from the supplied source
-	// packet. A declaration without an implementation may use this derivation
-	// as a conditional hypothesis, but cannot synthesize an execution witness.
-	CheckApplication func(*OpContext, *Environment, Value, *CallExpr) (Value, *Bottom)
+	// CallEvidence links an invocation to its retained core, protocol and
+	// observation premises. A pending goal can carry a result description;
+	// it cannot enable execution or stand in for a completed value.
+	CallEvidence func(*OpContext, *Environment, Value, *CallExpr) *Goal
 
 	// CheckSourceOperations checks source calls before a projection can
 	// discard their enclosing constructor. It never executes those calls.

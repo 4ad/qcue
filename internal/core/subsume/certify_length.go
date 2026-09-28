@@ -19,7 +19,7 @@ import "cuelang.org/go/internal/core/adt"
 // length retains the size guaranteed by a checked argument's field or element
 // inventory. An open record can have additional fields by width subtyping;
 // hidden fields, definitions, and absent optionals do not increase its minimum.
-func (p *certifier) length(value adt.Value) adt.Value {
+func (p *inference) length(value adt.Value) adt.Value {
 	if !p.step() || value == nil {
 		return nil
 	}

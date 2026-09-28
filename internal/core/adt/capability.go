@@ -143,14 +143,14 @@ func (f *FuncValue) ResidualSignature() *Function {
 	return fn
 }
 
-// A checked function scope already has a derivation for every source term.
+// An enabled activation retains the derivation covering its source terms.
 // Other projections must retain the obligations of discarded constructors.
 func (c *OpContext) checkSourceOperations(expr Expr) *Bottom {
 	if c.CheckSourceOperations == nil {
 		return nil
 	}
 	for env := c.Env(0); env != nil; env = env.Up {
-		if env.checkedCalls {
+		if env.Invocation != nil && env.Invocation.State == Established {
 			return nil
 		}
 	}

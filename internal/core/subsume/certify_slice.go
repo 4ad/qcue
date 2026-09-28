@@ -19,7 +19,7 @@ import "cuelang.org/go/internal/core/adt"
 // A slice is partial: bounds and subject must be independently well typed,
 // while invalid bounds may fail. Known list bounds preserve the fixed prefix;
 // unknown bounds retain a homogeneous approximation of all possible elements.
-func (p *certifier) slice(env *adt.Environment, x *adt.SliceExpr) adt.Value {
+func (p *inference) slice(env *adt.Environment, x *adt.SliceExpr) adt.Value {
 	if x.Stride != nil {
 		return nil
 	}
@@ -38,7 +38,7 @@ func (p *certifier) slice(env *adt.Environment, x *adt.SliceExpr) adt.Value {
 	return p.sliceValue(value, lo, hi)
 }
 
-func (p *certifier) sliceValue(value, low, high adt.Value) adt.Value {
+func (p *inference) sliceValue(value, low, high adt.Value) adt.Value {
 	if !p.step() {
 		return nil
 	}

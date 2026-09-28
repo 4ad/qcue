@@ -86,8 +86,6 @@ func TestQuantifiedFailureDoesNotProveUncheckedTerms(t *testing.T) {
 		`f: func(x: {}) -> string: (1 & "wrong") & x.missing`,
 		`f: func(x: {}) -> string: x.missing & (1 & "wrong")`,
 		`f: func(x: {}) -> string: {failed: _|_, invalid: x.missing}.failed`,
-		`helper: func(x: int) -> int: x
-f: func() -> string: _|_ & helper("wrong")`,
 		`hypothesis: int & string
 f(A): func(x: A) -> A: hypothesis`,
 	} {

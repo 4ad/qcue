@@ -115,7 +115,8 @@ out:g[int](1)(2)`, "2", true},
 g:func()->int:f(func(x:int,y:int)->int:y)(2)
 out:g()`, "2", true},
 		{"bad_argument", `f:func(x:int,y:int)->int:y
-g:func(x:string)->(func(int)->int):f(x,...)`, "", false},
+g:func(x:string)->(func(int)->int):f(x,...)
+out:g("bad")(1)==_|_`, "true", true},
 		{"bad_result", `f:func(x:int,y:int)->int:y
 g:func(x:int)->(func(int)->string):f(x,...)`, "", false},
 		{"bad_label", `f:func(x:int,y:int)->int:y

@@ -24,8 +24,13 @@ func ValidateInterfaces(ctx *adt.OpContext, value *adt.Vertex) *adt.Bottom {
 	if value == nil {
 		return nil
 	}
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
+	return p.validateInterfaces(value)
+}
+
+func (p *inference) validateInterfaces(value *adt.Vertex) *adt.Bottom {
+	ctx := p.ctx
 	r := &relevanceChecker{p: p}
 	if err := r.description(value, make(map[adt.Value]bool)); err != nil {
 		source := err.source
@@ -51,6 +56,9 @@ func (r *relevanceChecker) description(value adt.Value, seen map[adt.Value]bool)
 		return nil
 	}
 	seen[value] = true
+	if vertex, ok := value.(*adt.Vertex); ok && r.p.ctx.Propagation != nil {
+		r.p.ctx.Propagation.Observe(vertex)
+	}
 	switch x := adt.Unwrap(value).(type) {
 	case *adt.Bottom:
 		// Refuted enclosing data removes the observation, including an

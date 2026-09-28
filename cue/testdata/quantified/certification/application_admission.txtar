@@ -3,12 +3,12 @@
 
 -- in.cue --
 @test(json, 1, at="width")
-@test(validate, blocked, at="missing")
-@test(validate, blocked, at="wrongKind")
-@test(validate, blocked, at="wrongBound")
-@test(validate, blocked, at="missingNested")
-@test(validate, blocked, at="observedBlocked")
-@test(validate, blocked, at="alternative")
+@test(validate, concrete, incomplete, at="missing")
+@test(validate, conflict, at="wrongKind")
+@test(validate, conflict, at="wrongBound")
+@test(validate, concrete, incomplete, at="missingNested")
+@test(validate, concrete, at="observedBlocked")
+@test(json, 1, at="alternative")
 @test(json, [true, true, true], at="failures")
 
 get: func(r: {a: int}) -> int: r.a

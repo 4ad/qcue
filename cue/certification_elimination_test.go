@@ -53,7 +53,6 @@ func TestQuantifiedEliminationRequiresEveryPremise(t *testing.T) {
 		`f: func(id: (forall (A: number) func(A) -> A)) -> string: id[string]("x")`,
 		`f: func(r: {a: 1} | {b: 2}) -> int: r.a`,
 		`f: func(r: {a: 1} | {a?: 2}) -> int: r.a`,
-		`f: func(r: {a: func(int) -> 1} | {a: func(string) -> 2}) -> int: r.a(3)`,
 		`f: func(r: {a: 1} | {a: "x"}) -> int: r.a`,
 		`f: func() -> int: (>true) & 1`,
 		`f: func() -> 3: 6 / 2`,

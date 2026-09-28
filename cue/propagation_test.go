@@ -147,3 +147,48 @@ func TestPropagationObservationRefinement(t *testing.T) {
 		}
 	}
 }
+
+func TestPropagationPacketIsolation(t *testing.T) {
+	for _, call := range []string{"f(arg)", "f(arg, ...)()", "f(x: arg)"} {
+		for _, body := range []string{"x", "0"} {
+			ctx := cuecontext.New()
+			v := ctx.CompileString("arg:{}\nf:func(x:{a:1})->_:" + body + "\nout:" + call)
+			if err := v.LookupPath(cue.ParsePath("out")).Validate(cue.Concrete(true)); err != nil {
+				t.Fatalf("%s returning %s: %v", call, body, err)
+			}
+			if v.LookupPath(cue.ParsePath("arg.a")).Exists() {
+				t.Fatal("packet completion wrote back into its source")
+			}
+			for _, a := range []int{1, 2} {
+				r := v.FillPath(cue.ParsePath("arg.a"), a)
+				err := r.LookupPath(cue.ParsePath("out")).Validate(cue.Concrete(true))
+				if (err == nil) != (a == 1) {
+					t.Fatalf("%s returning %s, later arg.a=%d: %v", call, body, a, err)
+				}
+			}
+		}
+	}
+}
+
+// Every source below retains its old regression: a contradictory packet must
+// fail. The packet meet is now an executable constraint, so the partial body's
+// result theorem can be proved independently of that demanded failure.
+func TestPropagationContradictoryPackets(t *testing.T) {
+	for _, tt := range []struct{ source, call string }{
+		{`let identity = func(x: int) -> int: x
+f: func(x: string) -> int: identity(x)`, `f("bad")`},
+		{`helper: func(x: int) -> int: x
+f: func() -> string: _|_ & helper("wrong")`, `f()`},
+		{`f: func(r: {a: func(int) -> 1} | {a: func(string) -> 2}) -> int: r.a(3)`, `f({a:func(x:string)->2:2})`},
+		{`f:func(x:int)->int:f("bad")`, `f(1)`},
+		{`f:func()->(func(int)->int):{g:{impl:func(x:int)->int:g("bad")}.impl}.g`, `f()(1)`},
+	} {
+		v := cuecontext.New().CompileString(tt.source + "\nout:" + tt.call)
+		if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); err != nil {
+			t.Fatalf("partial body: %v\n%s", err, tt.source)
+		}
+		if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
+			t.Fatalf("contradictory packet completed: %s", tt.call)
+		}
+	}
+}

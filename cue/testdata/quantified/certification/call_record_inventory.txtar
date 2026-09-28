@@ -3,9 +3,9 @@
 
 -- in.cue --
 @test(json, [3, 4, 5], at="out")
-@test(validate, blocked, at="extra")
-@test(validate, blocked, at="wrongHidden")
-@test(validate, blocked, at="missingHidden")
+@test(validate, conflict, at="extra")
+@test(validate, conflict, at="wrongHidden")
+@test(validate, concrete, incomplete, at="missingHidden")
 
 #Closed: {r: {a: int}}
 read: func(x: #Closed) -> int: x.r.a

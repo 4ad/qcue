@@ -33,7 +33,7 @@ type proofRecord struct {
 // Every field expression keeps its own lexical scope, while references to the
 // unified subject see all its declarations. Only source fields contribute:
 // result annotations cannot supply a missing capture or its type.
-func (p *certifier) recordMeet(bindings []proofBinding) (adt.Value, bool) {
+func (p *inference) recordMeet(bindings []proofBinding) (adt.Value, bool) {
 	record := p.prepareRecord(bindings)
 	if record == nil {
 		return nil, false
@@ -63,7 +63,7 @@ func (p *certifier) recordMeet(bindings []proofBinding) (adt.Value, bool) {
 // evaluating their terms. Reuse that context when locating the annotated
 // implementation behind a projection, so recursive references can tie the
 // same function knot as a direct function declaration.
-func (p *certifier) prepareRecord(bindings []proofBinding) *proofRecord {
+func (p *inference) prepareRecord(bindings []proofBinding) *proofRecord {
 	if len(bindings) == 0 || !p.step() {
 		return nil
 	}
@@ -117,7 +117,7 @@ func (p *certifier) prepareRecord(bindings []proofBinding) *proofRecord {
 	return record
 }
 
-func (p *certifier) functionBinding(binding proofBinding, seen map[proofBinding]bool) *adt.FuncValue {
+func (p *inference) functionBinding(binding proofBinding, seen map[proofBinding]bool) *adt.FuncValue {
 	if seen[binding] || !p.step() {
 		return nil
 	}
@@ -148,7 +148,7 @@ func (p *certifier) functionBinding(binding proofBinding, seen map[proofBinding]
 	return nil
 }
 
-func (p *certifier) recordBinding(binding proofBinding, seen map[proofBinding]bool) *proofRecord {
+func (p *inference) recordBinding(binding proofBinding, seen map[proofBinding]bool) *proofRecord {
 	if seen[binding] || !p.step() {
 		return nil
 	}
@@ -173,7 +173,7 @@ func (p *certifier) recordBinding(binding proofBinding, seen map[proofBinding]bo
 	return p.prepareRecord([]proofBinding{binding})
 }
 
-func (p *certifier) referenceBindings(env *adt.Environment, ref *adt.FieldReference) []proofBinding {
+func (p *inference) referenceBindings(env *adt.Environment, ref *adt.FieldReference) []proofBinding {
 	for range ref.UpCount {
 		if env == nil {
 			return nil
@@ -191,7 +191,7 @@ func (p *certifier) referenceBindings(env *adt.Environment, ref *adt.FieldRefere
 	return nil
 }
 
-func (p *certifier) bindingMeet(bindings []proofBinding) adt.Value {
+func (p *inference) bindingMeet(bindings []proofBinding) adt.Value {
 	if value, handled := p.recordMeet(bindings); handled {
 		return value
 	}
@@ -215,7 +215,7 @@ func (p *certifier) bindingMeet(bindings []proofBinding) adt.Value {
 
 // This collection rule covers fixed record constructors and abbreviations.
 // Other operands keep their independent expression and source-meet rules.
-func (p *certifier) recordParts(binding proofBinding) ([]proofBinding, bool) {
+func (p *inference) recordParts(binding proofBinding) ([]proofBinding, bool) {
 	if !p.step() {
 		return nil, false
 	}

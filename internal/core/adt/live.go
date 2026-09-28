@@ -29,6 +29,10 @@ func (*LiveReference) declNode()          {}
 func (*LiveReference) elemNode()          {}
 func (x *LiveReference) evaluate(c *OpContext, state Flags) Value {
 	v, complete := c.Evaluate(c.Env(0), x.X)
+	if vertex, ok := v.(*Vertex); ok && c.Propagation != nil {
+		c.Propagation.Observe(vertex)
+		c.Propagation.Observe(vertex.DerefValue())
+	}
 	if !complete {
 		return v
 	}

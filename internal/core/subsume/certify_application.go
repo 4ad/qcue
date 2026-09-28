@@ -20,12 +20,12 @@ import "cuelang.org/go/internal/core/adt"
 // interfaces. Its result describes successful computation, independently of
 // whether a linked implementation can execute the call.
 func ValidateApplication(ctx *adt.OpContext, env *adt.Environment, f adt.Value, call *adt.CallExpr) (adt.Value, *adt.Bottom) {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
 	return p.validateApplication(ctx, env, f, call)
 }
 
-func (p *certifier) validateApplication(ctx *adt.OpContext, env *adt.Environment, f adt.Value, call *adt.CallExpr) (adt.Value, *adt.Bottom) {
+func (p *inference) validateApplication(ctx *adt.OpContext, env *adt.Environment, f adt.Value, call *adt.CallExpr) (adt.Value, *adt.Bottom) {
 	// A bodyless declaration is a conditional import hypothesis. Supplied
 	// bodies still pass their independent implementation checks in apply.
 	p.assume(f, make(map[adt.Value]bool))

@@ -54,7 +54,7 @@ f:func()->int:n+1`, false, false},
 		{"refuted_data", `n:int&string
 f:func()->int:n`, false, false},
 		{"bad_import_packet", `g:func(int)->int
-f:func()->int:g("bad")`, false, false},
+f:func()->int:g("bad")`, true, false},
 		{"bad_implementation", `g:func(x:int)->int:"bad"
 f:func()->int:g(1)`, false, false},
 		{"bad_record_implementation", `r:{g:func(x:int)->int:"bad"}

@@ -59,9 +59,9 @@ g: func(x: int) -> int: x`, `f`, `g`, false},
 	}
 }
 
-// A bodyless call must prove packet admission before using the result
-// contract. Retain the original out-of-domain calls as blocked judgments;
-// admitted calls still expose the contradiction with their string result.
+// A bodyless hypothesis supplies a result consequence under its constrained
+// packet. Missing fields can acquire the parameter constraint, but no
+// execution witness is manufactured by that successful logical propagation.
 func TestQuantifiedBoundaryAbstractAdmission(t *testing.T) {
 	for _, label := range []string{"a", "_a"} {
 		for _, context := range []string{`%s`, `{nested: %s}`, `[%s]`} {
@@ -69,8 +69,8 @@ func TestQuantifiedBoundaryAbstractAdmission(t *testing.T) {
 				packet string
 				member bool
 			}{
-				{`{}`, false},
-				{fmt.Sprintf(`{%s?: 1}`, label), false},
+				{`{}`, true},
+				{fmt.Sprintf(`{%s?: 1}`, label), true},
 				{fmt.Sprintf(`{%s: 2}`, label), false},
 				{fmt.Sprintf(`{%s: 1}`, label), true},
 				{fmt.Sprintf(`{%s: 1, extra: 2}`, label), true},
@@ -85,7 +85,7 @@ func TestQuantifiedBoundaryAbstractAdmission(t *testing.T) {
 					}
 					_, vertex := value.ToInternal(out)
 					bottom := adt.CombineErrors(nil, vertex.Bottom(), vertex.ChildErrors)
-					if bottom == nil || (tc.member && bottom.IsIncomplete()) || (!tc.member && bottom.Code != adt.BlockedError) {
+					if bottom == nil || bottom.IsIncomplete() {
 						t.Fatalf("admitted=%v: unexpected diagnostic: %v", tc.member, bottom)
 					}
 					if err := v.LookupPath(cue.ParsePath("call")).Validate(); (err == nil) != tc.member {
@@ -181,8 +181,9 @@ out: f(zero)
 	v := semanticValue(t, `
 id(A): func(x: A) -> A: x
 bad: func() -> string: id[int]("x")
+out: bad()
 `)
-	if err := v.Validate(cue.Concrete(true)); err == nil {
+	if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
 		t.Fatal("universal obligation reopened a selected call domain")
 	}
 	v = semanticValue(t, `

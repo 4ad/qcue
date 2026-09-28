@@ -55,7 +55,7 @@ type conditionalRecordState struct {
 // guards on the same scalar. All conditions and bodies are checked before
 // excluding an impossible region. A projected field must consequently be
 // present in every surviving record shape.
-func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit, comps []*adt.Comprehension) adt.Value {
+func (p *inference) conditionalRecord(env *adt.Environment, base *adt.StructLit, comps []*adt.Comprehension) adt.Value {
 	initial := conditionalRecordState{
 		fields: make(map[adt.Feature]adt.Value),
 		region: make(map[conditionSubject]adt.Value),
@@ -179,7 +179,7 @@ func (p *certifier) conditionalRecord(env *adt.Environment, base *adt.StructLit,
 	return proofUnion(results)
 }
 
-func (p *certifier) addConditionalFields(state conditionalRecordState, value adt.Value) ([]conditionalRecordState, bool) {
+func (p *inference) addConditionalFields(state conditionalRecordState, value adt.Value) ([]conditionalRecordState, bool) {
 	if !p.step() {
 		return nil, false
 	}
@@ -226,7 +226,7 @@ func (p *certifier) addConditionalFields(state conditionalRecordState, value adt
 	return []conditionalRecordState{state}, true
 }
 
-func (p *certifier) condition(env *adt.Environment, expr adt.Expr) (checkedCondition, bool) {
+func (p *inference) condition(env *adt.Environment, expr adt.Expr) (checkedCondition, bool) {
 	if unary, ok := expr.(*adt.UnaryExpr); ok && unary.Op == adt.NotOp {
 		inner, ok := p.condition(env, unary.X)
 		inner.yes, inner.no = inner.no, inner.yes
@@ -308,7 +308,7 @@ func (p *certifier) condition(env *adt.Environment, expr adt.Expr) (checkedCondi
 // Recognize stable local scalar bindings and the length of a stable binding.
 // Unsupported expressions remain independent Boolean conditions; they can
 // still use an explicit else, but cannot establish cross-condition coverage.
-func (p *certifier) conditionScalar(env *adt.Environment, expr adt.Expr) (conditionSubject, adt.Value, bool) {
+func (p *inference) conditionScalar(env *adt.Environment, expr adt.Expr) (conditionSubject, adt.Value, bool) {
 	key := conditionSubject{}
 	value := p.expr(env, expr)
 	if call, ok := expr.(*adt.CallExpr); ok {

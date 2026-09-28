@@ -17,7 +17,7 @@ package subsume
 import "cuelang.org/go/internal/core/adt"
 
 func CheckArrowRelevanceBudget(ctx *adt.OpContext, clauses []adt.FuncType, budget int) (*RelevanceError, int) {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
 	p.remaining = budget
 	err := (&relevanceChecker{p: p}).arrows(clauses)
@@ -26,7 +26,7 @@ func CheckArrowRelevanceBudget(ctx *adt.OpContext, clauses []adt.FuncType, budge
 
 // Test exact negative guards independently of the enclosing arrow search.
 func RelevanceRegionCovered(ctx *adt.OpContext, positive []adt.Value, negative [][]adt.Value) bool {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
 	return (&relevanceChecker{p: p}).covered(positive, negative)
 }

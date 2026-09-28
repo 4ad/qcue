@@ -23,7 +23,7 @@ import (
 // rigidly and adds instances justified by independently stated sibling domains.
 // It never chooses an instance merely to make a generic result empty.
 func CheckDeclarationRelevance(ctx *adt.OpContext, clauses []adt.FuncType) *RelevanceError {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
 	r := &relevanceChecker{p: p}
 	prepared, err := r.declarations(clauses)

@@ -80,12 +80,12 @@ func Value(ctx *adt.OpContext, a, b adt.Value) errors.Error {
 // argument needs an independent proof of its implementation's contracts.
 // Failure retains the original inclusion obligation in the evaluator.
 func ProveInclusion(ctx *adt.OpContext, bound, argument adt.Value) bool {
-	p := newCertifier(ctx)
+	p := newInference(ctx)
 	defer p.enter()()
 	return p.proveInclusion(ctx, bound, argument)
 }
 
-func (p *certifier) proveInclusion(ctx *adt.OpContext, bound, argument adt.Value) bool {
+func (p *inference) proveInclusion(ctx *adt.OpContext, bound, argument adt.Value) bool {
 	if !p.step() {
 		return false
 	}
@@ -94,7 +94,7 @@ func (p *certifier) proveInclusion(ctx *adt.OpContext, bound, argument adt.Value
 			v.Finalize(ctx)
 		}
 	}
-	s := &subsumer{ctx: ctx, certifier: p}
+	s := &subsumer{ctx: ctx, inference: p}
 	return s.values(bound, argument)
 }
 
@@ -119,7 +119,7 @@ func isBottom(x adt.Node) bool {
 type subsumer struct {
 	ctx       *adt.OpContext
 	errs      errors.Error
-	certifier *certifier
+	inference *inference
 
 	Profile
 

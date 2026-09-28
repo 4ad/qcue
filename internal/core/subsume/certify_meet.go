@@ -20,7 +20,7 @@ import "cuelang.org/go/internal/core/adt"
 // initializer's exact constructor inventory therefore cannot become a
 // capture invariant. Retain its declared fields and callable evidence, but
 // not the synthetic closedness used for a direct constructor result.
-func (p *certifier) bindingDescription(value adt.Value) adt.Value {
+func (p *inference) bindingDescription(value adt.Value) adt.Value {
 	if value == nil || !p.step() {
 		return nil
 	}
@@ -71,7 +71,7 @@ func (p *certifier) bindingDescription(value adt.Value) adt.Value {
 // Source unification combines constructor descriptions before assigning the
 // result a static field inventory. Exact inventories used for width and
 // presence proofs must not make {a: 1} & {b: true} an empty computation.
-func (p *certifier) sourceMeet(a, b adt.Value) adt.Value {
+func (p *inference) sourceMeet(a, b adt.Value) adt.Value {
 	left, right := p.sourceDescription(a), p.sourceDescription(b)
 	value := p.eagerMeet(left, right)
 	if value == nil || refuted(value) {
@@ -148,7 +148,7 @@ func (p *certifier) sourceMeet(a, b adt.Value) adt.Value {
 	return p.schema(nil, &adt.Conjunction{Values: []adt.Value{a, b}})
 }
 
-func (p *certifier) sourceDescription(value adt.Value) adt.Value {
+func (p *inference) sourceDescription(value adt.Value) adt.Value {
 	if value == nil || !p.step() {
 		return nil
 	}
@@ -221,7 +221,7 @@ func (p *certifier) sourceDescription(value adt.Value) adt.Value {
 
 // A literal arrow in a source meet is an annotation of the other operand.
 // It cannot introduce an executable import hypothesis by itself.
-func (p *certifier) functionAnnotation(env *adt.Environment, expr adt.Expr) (adt.Value, bool) {
+func (p *inference) functionAnnotation(env *adt.Environment, expr adt.Expr) (adt.Value, bool) {
 	body := expr
 	if q, ok := body.(*adt.Quantified); ok {
 		body = q.Body
@@ -236,7 +236,7 @@ func (p *certifier) functionAnnotation(env *adt.Environment, expr adt.Expr) (adt
 	return p.schema(env, expr), true
 }
 
-func (p *certifier) assertFunction(value, annotation adt.Value) adt.Value {
+func (p *inference) assertFunction(value, annotation adt.Value) adt.Value {
 	if value == nil || annotation == nil || value.Kind() != adt.FuncKind {
 		return nil
 	}

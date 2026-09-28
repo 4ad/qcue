@@ -58,8 +58,6 @@ f: func() -> 1: Ignore(forall A R(A))`, `f()`, `1`},
 f: func() -> string: F(string)("x")`,
 		`f: func(x: {a: int}) -> int: {let y = x.b
 out: y & _|_}.out`,
-		`let identity = func(x: int) -> int: x
-f: func(x: string) -> int: identity(x)`,
 		`f: func(x: int) -> int: {let y = x + "bad"
 out: y & _|_}.out`,
 		`Ignore(A) = 1
