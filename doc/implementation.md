@@ -87,6 +87,21 @@ an alias still retains its live coordinate. Equal current record data does not
 prove inclusion into an open result description: future constraints may add
 fields. Concrete scalar and closed scalar-list singletons admit stronger facts.
 
+Required field descriptions are available before their values are supplied.
+For example, `z!: int` supports the body proof of `func(x: int) -> int: x+z`,
+but the closure and its calls still demand a supplied, valid `z`. Lexical
+references and selections use the same description lookup. Optional fields
+remain unavailable until presence is established.
+
+Record meets collect all source declarations into a common field scope before
+checking methods. References inside a copied record see its sibling refinements;
+external references keep their original scope. This also applies through named
+records, embeddings, and aliases. Presence and live description dependencies
+survive collection. For closed records, the checker replays the source's
+structural operators through the evaluator with checked field summaries, so
+definitions and embeddings retain ordinary CUE closedness. Unsupported record
+forms keep the existing conservative proof path.
+
 ## One propagation graph
 
 The implementation retains the paper's five components:
@@ -167,6 +182,10 @@ undischarged proof obligations.
 can be refined later. A derived scalar is not permission to forget its argument
 packet or live result constraint. Source reconstruction retains code origins,
 lexical substitutions, captured values, defaults, and original obligations.
+Shared code declarations may be hoisted, but environments containing exposed
+captures are instantiated in their lexical records. Export and reimport must
+preserve independent refinement of copies, including templates with required
+captures that have not yet been supplied.
 Standalone closure export fails explicitly when a required capture cannot be
 represented faithfully. JSON output has no representation for a function or an
 unresolved implementation.

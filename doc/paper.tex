@@ -588,11 +588,26 @@ or an explicit hypothesis to be discharged at linking. This distinction allows
 a body to be checked using a partial capture while retaining the work required
 to obtain its value.
 
+Description lookup is distinct from materialization. A required declaration
+\code{z!: int} establishes an integer bound in every successful completion
+without supplying a value for \code{z}. Both a lexical reference and a field
+selection may use that bound in a body proof. Neither operation discharges the
+runtime presence and validation demands. An optional declaration alone does
+not establish that its field is available.
+
 The core contains variables, literals, closures, strict application and let,
 records, tuples, selection, Boolean conditionals, meet, assertions, primitives,
 and $\Fail$. It executes completed subjects of the source graph. In particular,
 source unification of open records shares a common completion before the core
 performs its completed-value check.
+The source checker therefore collects the declarations of a record meet before
+checking its fields. Internal references are rebound to that common subject;
+external references retain their lexical coordinates. Named descriptions,
+embeddings, and abbreviations preserve this rule. Collection retains required
+and optional presence, definition boundaries, and source observations. A
+description's current fields do not by themselves establish an exact inventory.
+In particular, checking a method before collecting its sibling refinements
+would demand a theorem about an operand that the source never executes alone.
 
 \begin{assumption}[Primitive and completion interface]\label{ass:operations}
 A primitive supplies a packet interface, a successful-result interface, and
@@ -1794,11 +1809,24 @@ factor: int
 scale: func(x: int) -> int: factor * x  // certified with a live capture
 factor: 3
 answer: scale(4)                       // 12
+
+_f: {
+    z!: int
+    f: func(x: int, y: int) -> int: x + y + z
+}
+bar: (_f & {z: 10}).f(100, 1000)        // 1110
 \end{lstlisting}
 The multiplication proof uses the integer bound on \code{factor}. Completing
 the multiplication also needs its value. Once that value is supplied the result
 is $12$, with the capture dependency retained. A later contradiction in the
 capture therefore remains a contradiction of the demanded computation.
+The required capture in \code{_f} likewise supplies a body-proof premise before
+it supplies a runtime value. The meet completes a fresh instance whose method
+sees \code{z: 10}; it does not fill the prototype. A call through the unrefined
+prototype remains incomplete. Separate instances retain independent captures.
+Source export may share their code origin, but must instantiate each live
+capture environment in its lexical record so later copying and refinement
+continue to rebind it.
 \end{minipage}\par
 
 \par\addvspace{6pt}\noindent

@@ -9,10 +9,23 @@ factor: int
 scale: func(x: int) -> int: factor * x  // certified with a live capture
 factor: 3
 answer: scale(4)                       // 12
+
+_f: {
+    z!: int
+    f: func(x: int, y: int) -> int: x + y + z
+}
+bar: (_f & {z: 10}).f(100, 1000)        // 1110
 -- in.cue --
 @test(json, 12, at="answer")
+@test(json, 1110, at="bar")
 
 factor: int
 scale: func(x: int) -> int: factor * x  // certified with a live capture
 factor: 3
 answer: scale(4)                       // 12
+
+_f: {
+    z!: int
+    f: func(x: int, y: int) -> int: x + y + z
+}
+bar: (_f & {z: 10}).f(100, 1000)        // 1110
