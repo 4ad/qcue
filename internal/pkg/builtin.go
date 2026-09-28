@@ -46,7 +46,10 @@ type Builtin struct {
 	Name string
 	// Signature is an optional precise native type used by the checker.
 	// It does not add runtime constraints that could complete an argument.
-	Signature   string
+	Signature string
+	// Refinements describe results on narrower domains, without excluding
+	// the other calls admitted by Signature.
+	Refinements []string
 	Pkg         adt.Feature
 	Params      []Param
 	Result      adt.Kind
@@ -97,29 +100,18 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) (*adt.Verte
 		} else {
 			native := ToBuiltin(&b)
 			if b.Signature != "" {
-				expr, err := mustParseConstBuiltin(ctx, b.Name, b.Signature)
+				t, err := nativeSignature(ctx, obj, native, b.Signature)
 				if err != nil {
 					return nil, err
 				}
-				env := &adt.Environment{Vertex: obj}
-				for {
-					q, ok := expr.(*adt.Quantified)
-					if !ok {
-						break
-					}
-					env = q.CheckingScope(ctx, env)
-					expr = q.Body
+				native.Signature = &t
+			}
+			for _, signature := range b.Refinements {
+				t, err := nativeSignature(ctx, obj, native, signature)
+				if err != nil {
+					return nil, err
 				}
-				fn, ok := expr.(*adt.Function)
-				if !ok {
-					panic(fmt.Errorf("native signature for %s.%s is not a function", importPath, b.Name))
-				}
-				if err := adt.CheckBuiltinTightening(ctx, fn, native); err != nil {
-					panic(err.Err)
-				}
-				native.Signature = &adt.FuncType{
-					Fn: fn, Env: env,
-				}
+				native.Refinements = append(native.Refinements, t)
 			}
 			v = native
 		}
@@ -176,6 +168,30 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) (*adt.Verte
 	}
 
 	return obj, nil
+}
+
+func nativeSignature(ctx *adt.OpContext, obj *adt.Vertex, b *adt.Builtin, source string) (adt.FuncType, errors.Error) {
+	expr, err := mustParseConstBuiltin(ctx, b.Name, source)
+	if err != nil {
+		return adt.FuncType{}, err
+	}
+	env := &adt.Environment{Vertex: obj}
+	for {
+		q, ok := expr.(*adt.Quantified)
+		if !ok {
+			break
+		}
+		env = q.CheckingScope(ctx, env)
+		expr = q.Body
+	}
+	fn, ok := expr.(*adt.Function)
+	if !ok {
+		panic(fmt.Errorf("native signature for %s is not a function", b.Name))
+	}
+	if err := adt.CheckBuiltinTightening(ctx, fn, b); err != nil {
+		panic(err.Err)
+	}
+	return adt.FuncType{Fn: fn, Env: env}, nil
 }
 
 // ToBuiltin converts a Builtin into an adt.Builtin.

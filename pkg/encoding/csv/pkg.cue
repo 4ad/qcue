@@ -23,7 +23,7 @@
 package csv
 
 // Encode encode the given list of lists to CSV.
-Encode: func(x: _) -> string
+Encode: func(x: [...[..._]]) -> string
 
 // Decode reads in a csv into a list of lists.
 Decode: func(r: bytes | string) -> [...[...string]]

@@ -2946,14 +2946,6 @@ func (x *CallExpr) evaluate(c *OpContext, state Flags) Value {
 			return nil
 		}
 		if x.hasArgLabels() {
-			// The legacy validator-constructor form leaves raw slot zero for
-			// the value validated later. Its argument list is not represented
-			// by an attached function type, so applying full-call labels here
-			// could silently bind a constructor argument to the wrong raw slot.
-			if f.IsValidator(len(x.Args)) {
-				c.AddErrf("labeled arguments are not supported for validator constructor %s", x.Fun)
-				return nil
-			}
 			// A labeled argument binds through the parameter names of
 			// the builtin's declared signature; the call proceeds with
 			// the arguments in positional order.
@@ -3305,6 +3297,9 @@ type Builtin struct {
 	// precisely than their kind masks. It is implementation-owned evidence
 	// for checking, and does not add runtime argument or result constraints.
 	Signature *FuncType
+	// Refinements provide additional successful-result evidence for narrower
+	// input domains. They never restrict the native's admitted call domain.
+	Refinements []FuncType
 
 	// NonConcrete should be set to true if a builtin supports non-concrete
 	// arguments. By default, all arguments are checked to be concrete.
@@ -3403,7 +3398,7 @@ func (x *Builtin) BareValidator() *BuiltinValidator {
 // IsValidator reports whether b should be interpreted as a Validator for the
 // given number of arguments.
 func (b *Builtin) IsValidator(numArgs int) bool {
-	return numArgs == len(b.Params)-1 &&
+	return numArgs >= 0 && numArgs == len(b.Params)-1 &&
 		b.Result&^BoolKind == 0 &&
 		b.Params[numArgs].Default() == nil
 }

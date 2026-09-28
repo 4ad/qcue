@@ -47,9 +47,11 @@ func (r *cancelCompileRuntime) ConfigureOpCtx(ctx *adt.OpContext) {
 
 func TestBuiltinCompilationCancellation(t *testing.T) {
 	for name, p := range map[string]*pkg.Package{
-		"CUE":       {CUE: "value: 1"},
-		"constant":  {Native: []*pkg.Builtin{{Name: "Value", Const: "42"}}},
-		"signature": {Native: []*pkg.Builtin{{Name: "Value", Signature: "func() -> int", Result: adt.IntKind}}},
+		"CUE":               {CUE: "value: 1"},
+		"constant":          {Native: []*pkg.Builtin{{Name: "Value", Const: "42"}}},
+		"signature":         {Native: []*pkg.Builtin{{Name: "Value", Signature: "func() -> int", Result: adt.IntKind}}},
+		"generic signature": {Native: []*pkg.Builtin{{Name: "Value", Signature: "forall(A) func([...A]) -> [...A]", Params: []pkg.Param{{Kind: adt.ListKind}}, Result: adt.ListKind}}},
+		"refinement":        {Native: []*pkg.Builtin{{Name: "Value", Refinements: []string{"func() -> (int & >=0)"}, Result: adt.IntKind}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancelCause(context.Background())
@@ -88,9 +90,11 @@ func (c *cancelParseContext) Err() error {
 
 func TestBuiltinParsingCancellation(t *testing.T) {
 	for name, p := range map[string]*pkg.Package{
-		"CUE":       {CUE: "value: 1"},
-		"constant":  {Native: []*pkg.Builtin{{Name: "Value", Const: "42"}}},
-		"signature": {Native: []*pkg.Builtin{{Name: "Value", Signature: "func() -> int", Result: adt.IntKind}}},
+		"CUE":               {CUE: "value: 1"},
+		"constant":          {Native: []*pkg.Builtin{{Name: "Value", Const: "42"}}},
+		"signature":         {Native: []*pkg.Builtin{{Name: "Value", Signature: "func() -> int", Result: adt.IntKind}}},
+		"generic signature": {Native: []*pkg.Builtin{{Name: "Value", Signature: "forall(A) func([...A]) -> [...A]", Params: []pkg.Param{{Kind: adt.ListKind}}, Result: adt.ListKind}}},
+		"refinement":        {Native: []*pkg.Builtin{{Name: "Value", Refinements: []string{"func() -> (int & >=0)"}, Result: adt.IntKind}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancelCause(context.Background())

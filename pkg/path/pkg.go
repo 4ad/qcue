@@ -79,6 +79,21 @@ var p = &pkg.Package{
 		Unix:    "unix"
 		Windows: "windows"
 		Plan9:   "plan9"
+		#OS: "unix" | "windows" | "plan9" | "aix" | "android" | "darwin" | "dragonfly" | "freebsd" | "hurd" | "illumos" | "ios" | "js" | "linux" | "nacl" | "netbsd" | "openbsd" | "solaris" | "zos"
+		Match: func(pattern: string, name: string, os: string = "unix") -> bool
+		Clean: func(path: string, os: string = "unix") -> string
+		ToSlash: func(path: string, os: string) -> string
+		FromSlash: func(path: string, os: string) -> string
+		SplitList: func(path: string, os: string) -> [...]
+		Split: func(path: string, os: string = "unix") -> [...]
+		Join: func(elem: [...], os: string = "unix") -> string
+		Ext: func(path: string, os: string = "unix") -> string
+		Resolve: func(dir: string, sub: string, os: string = "unix") -> string
+		Rel: func(basepath: string, targpath: string, os: string = "unix") -> string
+		Base: func(path: string, os: string = "unix") -> string
+		Dir: func(path: string, os: string = "unix") -> string
+		IsAbs: func(path: string, os: string = "unix") -> bool
+		VolumeName: func(path: string, os: string = "windows") -> string
 	}`,
 	Native: []*pkg.Builtin{{
 		Name:      "Split",

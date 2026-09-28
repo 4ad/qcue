@@ -222,18 +222,18 @@ import "strings"
 
 out: strings.MinRunes(s: 3)
 `,
-			err: "labeled arguments are not supported for validator constructor strings.MinRunes",
+			err: "unknown argument s in call to strings.MinRunes",
 		},
 		{
-			name: "validator constructor rejects full-call trailing label",
+			name: "validator constructor checks labeled trailing argument",
 			in: `
 @experiment(functions,quantified=false)
 
 import "strings"
 
-out: strings.MinRunes(min: 3)
+out: "ab" & strings.MinRunes(min: 3)
 `,
-			err: "labeled arguments are not supported for validator constructor strings.MinRunes",
+			err: "does not satisfy strings.MinRunes",
 		},
 		{
 			name: "different attached contract labels conflict",

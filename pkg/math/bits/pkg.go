@@ -41,7 +41,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "At",
+		Name:      "At",
+		Signature: "func(x: int, i: int) -> 0 | 1",
 		Params: []pkg.Param{
 			{Kind: adt.IntKind},
 			{Kind: adt.IntKind},
@@ -120,7 +121,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "OnesCount",
+		Name:      "OnesCount",
+		Signature: "func(x: int) -> int & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.IntKind},
 		},
@@ -132,7 +134,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Len",
+		Name:      "Len",
+		Signature: "func(x: int) -> int & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.IntKind},
 		},

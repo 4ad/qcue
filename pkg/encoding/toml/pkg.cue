@@ -23,7 +23,7 @@
 package toml
 
 // Marshal returns the TOML encoding of v.
-Marshal: func(v: _) -> string
+Marshal: func(v: {...}) -> string
 
 // Unmarshal parses the TOML to a CUE expression.
-Unmarshal: func(data: bytes | string) -> _
+Unmarshal: func(data: bytes | string) -> {...}

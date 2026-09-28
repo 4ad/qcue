@@ -79,7 +79,8 @@ var p = &pkg.Package{
 		Name:  "IntSize",
 		Const: "64",
 	}, {
-		Name: "ParseUint",
+		Name:      "ParseUint",
+		Signature: "func(s: string, base: int, bitSize: int) -> int & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.IntKind},
@@ -119,7 +120,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "FormatFloat",
+		Name:      "FormatFloat",
+		Signature: "func(f: number, fmtVal: string | int, prec: int, bitSize: int) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 			{Kind: adt.TopKind},

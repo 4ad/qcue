@@ -143,6 +143,24 @@ func (b *Builtin) CheckingType(c *OpContext) FuncType {
 	if signature == nil || len(FunctionTypeParameters(*signature)) == 0 {
 		return FuncType{Fn: protocol}
 	}
+	return b.checkingType(protocol, *signature)
+}
+
+// CheckingRefinements returns conditional native result contracts with the
+// same call protocol as the primary signature. Their domains are checked
+// independently before their result evidence can be used.
+func (b *Builtin) CheckingRefinements(c *OpContext) []FuncType {
+	var results []FuncType
+	if len(b.self().Refinements) != 0 {
+		protocol := b.Protocol(c)
+		for _, signature := range b.self().Refinements {
+			results = append(results, b.checkingType(protocol, signature))
+		}
+	}
+	return results
+}
+
+func (b *Builtin) checkingType(protocol *Function, signature FuncType) FuncType {
 	fn := *signature.Fn
 	fn.Params = slices.Clone(protocol.Params)
 	for i, index := range matchBuiltinParamsWith(signature.Fn, b, b.declaredTypes()) {

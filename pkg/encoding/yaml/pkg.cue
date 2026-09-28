@@ -23,16 +23,16 @@
 package yaml
 
 // Marshal returns the YAML encoding of v.
-Marshal: func(v: _) -> string
+Marshal: func(v: null | bool | number | string | bytes | [...] | {...}) -> string
 
 // MarshalStream returns the YAML encoding of v.
-MarshalStream: func(v: _) -> string
+MarshalStream: func(v: [...]) -> string
 
 // Unmarshal parses the YAML to a CUE expression.
-Unmarshal: func(data: bytes | string) -> _
+Unmarshal: func(data: bytes | string) -> null | bool | number | string | bytes | [...] | {...}
 
 // UnmarshalStream parses the YAML to a CUE list expression on success.
-UnmarshalStream: func(data: bytes | string) -> _
+UnmarshalStream: func(data: bytes | string) -> [...]
 
 // Validate validates YAML and confirms it is an instance of schema.
 // If the YAML source is a stream, every object must match v.

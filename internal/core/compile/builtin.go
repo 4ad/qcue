@@ -354,15 +354,15 @@ var testExperiment = &adt.Builtin{
 //	MinRunes: func(min: int) -> validator(string) |
 //	          func(s: string, min: int) -> bool
 //
-// A call currently evaluates to top: holding a builtin to its declared
-// validator form is future work, so for now the type former documents
-// without constraining.
+// A constructed validator describes inhabitants of T. The predicate itself
+// is retained by the builtin validator value and checked when it is applied;
+// this type former preserves its domain without executing that predicate.
 var validatorBuiltin = &adt.Builtin{
 	Name:        "validator",
 	Params:      []adt.Param{topParam},
 	Result:      adt.TopKind,
 	NonConcrete: true,
 	Func: func(call adt.BuiltinCallContext) adt.Expr {
-		return &adt.Top{}
+		return call.Value(0)
 	},
 }

@@ -34,14 +34,14 @@
 package strings
 
 // ByteAt reports the ith byte of the underlying byte slice.
-ByteAt: func(b: bytes | string, i: int) -> int
+ByteAt: func(b: bytes | string, i: int) -> int & >=0 & <=255
 
 // ByteSlice reports the bytes of the underlying byte slice from the start
 // index up to but not including the end index.
 ByteSlice: func(b: bytes | string, start: int, end: int) -> bytes
 
 // Runes returns the Unicode code points of the given string.
-Runes: func(s: string) -> [...int]
+Runes: func(s: string) -> [...(int & >=0 & <=0x10ffff)]
 
 // Repeat returns a new string consisting of count copies of the string s.
 Repeat: func(s: string, count: int) -> string
@@ -74,11 +74,11 @@ SliceRunes: func(s: string, start: int, end: int) -> string
 // Compare is included only for symmetry with package bytes.
 // It is usually clearer and always faster to use the built-in
 // string comparison operators ==, <, >, and so on.
-Compare: func(a: string, b: string) -> int
+Compare: func(a: string, b: string) -> -1 | 0 | 1
 
 // Count counts the number of non-overlapping instances of substr in s.
 // If substr is an empty string, Count returns 1 + the number of Unicode code points in s.
-Count: func(s: string, substr: string) -> int
+Count: func(s: string, substr: string) -> int & >=0
 
 // Contains reports whether substr is within s.
 Contains: func(s: string, substr: string) -> bool
@@ -87,16 +87,16 @@ Contains: func(s: string, substr: string) -> bool
 ContainsAny: func(s: string, chars: string) -> bool
 
 // LastIndex returns the index of the last instance of substr in s, or -1 if substr is not present in s.
-LastIndex: func(s: string, substr: string) -> int
+LastIndex: func(s: string, substr: string) -> int & >=-1
 
 // IndexAny returns the index of the first instance of any Unicode code point
 // from chars in s, or -1 if no Unicode code point from chars is present in s.
-IndexAny: func(s: string, chars: string) -> int
+IndexAny: func(s: string, chars: string) -> int & >=-1
 
 // LastIndexAny returns the index of the last instance of any Unicode code
 // point from chars in s, or -1 if no Unicode code point from chars is
 // present in s.
-LastIndexAny: func(s: string, chars: string) -> int
+LastIndexAny: func(s: string, chars: string) -> int & >=-1
 
 // SplitN slices s into substrings separated by sep and returns a slice of
 // the substrings between those separators.
@@ -206,4 +206,4 @@ TrimSuffix: func(s: string, suffix: string) -> string
 Replace: func(s: string, old: string, new: string, n: int) -> string
 
 // Index returns the index of the first instance of substr in s, or -1 if substr is not present in s.
-Index: func(s: string, substr: string) -> int
+Index: func(s: string, substr: string) -> int & >=-1

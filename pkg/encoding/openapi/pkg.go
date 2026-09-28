@@ -15,7 +15,8 @@ var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
 	Native: []*pkg.Builtin{{
-		Name: "MarshalSchema",
+		Name:      "MarshalSchema",
+		Signature: "func(config: {version: string, selfContained?: bool, expandReferences?: bool, info?: _}, schema: _ @schema()) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.TopKind},

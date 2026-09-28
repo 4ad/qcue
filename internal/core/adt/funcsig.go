@@ -837,9 +837,9 @@ func BuiltinParamLabelIndex(b *Builtin, label Feature) (int, bool) {
 // bind. A label placed at different positions makes the attached signatures
 // incompatible; the negative map entry remains a defensive check at the call
 // boundary.
-// A builtin with no attached types supports no labels at all — its
-// parameters have no names — which keeps hand-registered packages such
-// as path at the pre-existing error.
+// A builtin with no attached types supports no labels: its parameters have
+// no names. Validator constructors bind only the trailing raw slots, leaving
+// slot zero for the value validated later.
 func bindBuiltinArgs(c *OpContext, b *Builtin, call *CallExpr) ([]Expr, bool) {
 	if len(b.protocolTypes()) == 0 {
 		c.AddErrf("labeled arguments are not supported for builtin %s: it declares no parameter names",
@@ -849,8 +849,12 @@ func bindBuiltinArgs(c *OpContext, b *Builtin, call *CallExpr) ([]Expr, bool) {
 
 	byLabel, _ := builtinParamLabels(b.protocolTypes())
 
-	bound := make([]Expr, len(b.Params))
-	labeled := make([]bool, len(b.Params))
+	offset := 0
+	if b.IsValidator(len(call.Args)) {
+		offset = 1
+	}
+	bound := make([]Expr, len(b.Params)-offset)
+	labeled := make([]bool, len(bound))
 	n := 0 // number of positions bound
 	high := -1
 	bind := func(pos int, arg Expr, label Feature) bool {
@@ -880,6 +884,7 @@ func bindBuiltinArgs(c *OpContext, b *Builtin, call *CallExpr) ([]Expr, bool) {
 		if i < len(call.ArgLabels) && call.ArgLabels[i] != InvalidLabel {
 			label := call.ArgLabels[i]
 			pos, ok := byLabel[label]
+			pos -= offset
 			if !ok || pos < 0 {
 				c.AddErrf("unknown argument %s in call to %s",
 					label.SelectorString(c), b.qualifiedName(c))

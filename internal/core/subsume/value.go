@@ -57,24 +57,15 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		// Check based on first value.
 
 	case *adt.Conjunction:
-		if _, ok := adt.Unwrap(a).(*adt.Conjunction); ok {
+		switch adt.Unwrap(a).(type) {
+		case *adt.Conjunction, *adt.Disjunction:
+			// Check compound targets against the complete source predicate.
+			// In particular, (A & B) belongs to (A & B) | C even when
+			// neither A nor B alone is contained in that union.
 			break
+		default:
+			return s.conjunctionSource(a, b)
 		}
-		if bound, ok := a.(*adt.BoundValue); ok && b.Kind() == adt.IntKind {
-			for _, term := range b.Values {
-				if source, ok := adt.Unwrap(term).(*adt.BoundValue); ok {
-					if rounded := integerBound(source); rounded != nil && s.bound(bound, rounded) {
-						return true
-					}
-				}
-			}
-		}
-		for _, y := range b.Values {
-			if s.values(a, y) {
-				return true
-			}
-		}
-		return false
 
 	case *adt.Disjunction:
 		if _, ok := a.(*adt.Disjunction); ok {
@@ -272,6 +263,24 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 
 	case *adt.NodeLink:
 		return deref(x) == deref(b)
+	}
+	return false
+}
+
+func (s *subsumer) conjunctionSource(a adt.Value, b *adt.Conjunction) bool {
+	if bound, ok := a.(*adt.BoundValue); ok && b.Kind() == adt.IntKind {
+		for _, term := range b.Values {
+			if source, ok := adt.Unwrap(term).(*adt.BoundValue); ok {
+				if rounded := integerBound(source); rounded != nil && s.bound(bound, rounded) {
+					return true
+				}
+			}
+		}
+	}
+	for _, y := range b.Values {
+		if s.values(a, y) {
+			return true
+		}
 	}
 	return false
 }

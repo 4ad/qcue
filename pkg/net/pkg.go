@@ -16,7 +16,7 @@ var _ = adt.TopKind // in case the adt package isn't used
 var p = &pkg.Package{
 	Native: []*pkg.Builtin{{
 		Name:      "SplitHostPort",
-		Signature: "func(s: string) -> [...string]",
+		Signature: "func(s: string) -> [string, string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -28,7 +28,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "JoinHostPort",
+		Name:      "JoinHostPort",
+		Signature: "func(host: string | bytes | [...int], port: string | bytes | int) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.TopKind},
@@ -60,7 +61,7 @@ var p = &pkg.Package{
 		Const: "16",
 	}, {
 		Name:      "ParseIP",
-		Signature: "func(s: string) -> [...int]",
+		Signature: "func(s: string) -> ([int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255] | [int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255])",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -72,7 +73,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IPv4",
+		Name:      "IPv4",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -84,7 +86,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IPv6",
+		Name:      "IPv6",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -96,7 +99,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IP",
+		Name:      "IP",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -108,7 +112,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IPCIDR",
+		Name:      "IPCIDR",
+		Signature: "func(ip: string | bytes) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -120,7 +125,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "LoopbackIP",
+		Name:      "LoopbackIP",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -132,7 +138,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "MulticastIP",
+		Name:      "MulticastIP",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -144,7 +151,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "InterfaceLocalMulticastIP",
+		Name:      "InterfaceLocalMulticastIP",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -156,7 +164,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "LinkLocalMulticastIP",
+		Name:      "LinkLocalMulticastIP",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -168,7 +177,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "LinkLocalUnicastIP",
+		Name:      "LinkLocalUnicastIP",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -180,7 +190,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "GlobalUnicastIP",
+		Name:      "GlobalUnicastIP",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -192,7 +203,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "UnspecifiedIP",
+		Name:      "UnspecifiedIP",
+		Signature: "func(ip: string | bytes | [...int]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -205,7 +217,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "ToIP4",
-		Signature: "func(ip: _) -> [...int]",
+		Signature: "func(ip: string | bytes | [...int]) -> [int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255]",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -218,7 +230,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "ToIP16",
-		Signature: "func(ip: _) -> [...int]",
+		Signature: "func(ip: string | bytes | [...int]) -> [int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255]",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -230,7 +242,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IPString",
+		Name:      "IPString",
+		Signature: "func(ip: string | bytes | [...int]) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -242,7 +255,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "AddIP",
+		Name:      "AddIP",
+		Signature: "func(ip: string | bytes | [...int], offset: int) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.IntKind},
@@ -255,7 +269,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "AddIPCIDR",
+		Name:      "AddIPCIDR",
+		Signature: "func(ip: string | bytes, offset: int) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.IntKind},
@@ -269,7 +284,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "ParseCIDR",
-		Signature: "func(s: string) -> {\"prefix_mask\": string, \"prefix_len\": int, \"prefix_addr\": string, \"broadcast_addr\"?: string}",
+		Signature: "func(s: string) -> {prefix_mask: string, prefix_len: int & >=0 & <=128, prefix_addr: string, broadcast_addr?: string}",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -281,7 +296,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "InCIDR",
+		Name:      "InCIDR",
+		Signature: "func(ip: string | bytes | [...int], cidr: string | bytes) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.TopKind},
@@ -294,7 +310,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "CompareIP",
+		Name:      "CompareIP",
+		Signature: "func(ip1: string | bytes | [...int], ip2: string | bytes | [...int]) -> -1 | 0 | 1",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.TopKind},

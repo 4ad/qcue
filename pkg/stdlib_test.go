@@ -21,8 +21,11 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
+	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/parser"
@@ -174,6 +177,16 @@ func TestDefsMatchRegisteredPackages(t *testing.T) {
 				if !isFunc {
 					continue
 				}
+				if !bare {
+					// Published contracts must be justified by the native's
+					// checking evidence, including generic relationships and
+					// conditional result refinements, not just matching arity.
+					program := strings.Replace(string(src), "package "+f.PackageName(),
+						"package "+f.PackageName()+"\nimport native "+strconv.Quote(ip), 1)
+					program += "\nchecked: native." + name + " & " + name
+					v := ctx.CompileString(program).LookupPath(cue.ParsePath("checked"))
+					qt.Check(t, qt.IsNil(v.Validate()), qt.Commentf("%s: unsupported published contract", name))
+				}
 				// The validator form follows the intent the Go source
 				// declares, so it may only be declared for a builtin
 				// the evaluator does treat as a validator, whether bare
@@ -187,9 +200,8 @@ func TestDefsMatchRegisteredPackages(t *testing.T) {
 					qt.Commentf("%s: declared parameters vs builtin parameters", name)) {
 					continue
 				}
-				if bare || ip == "path" {
-					// Bare validators have no callable runtime signature, and path
-					// remains hand-registered without generated call forms.
+				if bare {
+					// Bare validators have no callable runtime signature.
 					qt.Check(t, qt.HasLen(builtin.Types, 0),
 						qt.Commentf("%s: unexpected generated runtime signature", name))
 				} else if qt.Check(t, qt.HasLen(builtin.Types, 1),
@@ -267,6 +279,9 @@ func signatureForms(v ast.Expr) (callForm *ast.Func, validatorForm bool) {
 		return signatureForms(q.Body)
 	}
 	bin, ok := v.(*ast.BinaryExpr)
+	if ok && bin.Op == token.AND {
+		return signatureForms(bin.X)
+	}
 	if !ok || bin.Op != token.OR {
 		f, _ := v.(*ast.Func)
 		return f, false

@@ -57,7 +57,7 @@ Above: 1
 
 // Jacobi returns the Jacobi symbol (x/y), either +1, -1, or 0.
 // The y argument must be an odd integer.
-Jacobi: func(x: int, y: int) -> int
+Jacobi: func(x: int, y: int) -> -1 | 0 | 1
 
 // MaxBase is the largest number base accepted for string conversions.
 MaxBase: 62
@@ -113,7 +113,7 @@ MultipleOf: (func(y: number) -> validator(number)) | (func(x: number, y: number)
 // Abs returns the absolute value of x.
 //
 // Special case: Abs(±Inf) = +Inf
-Abs: func(x: number) -> number
+Abs: (func(x: number) -> (number & >=0)) & (func(x: int) -> (int & >=0))
 
 // Acosh returns the inverse hyperbolic cosine of x.
 //
@@ -122,7 +122,7 @@ Abs: func(x: number) -> number
 // 	Acosh(+Inf) = +Inf
 // 	Acosh(x) = NaN if x < 1
 // 	Acosh(NaN) = NaN
-Acosh: func(x: number) -> number
+Acosh: func(x: number) -> number & >=0
 
 // Asin returns the arcsine, in radians, of x.
 //
@@ -137,7 +137,7 @@ Asin: func(x: number) -> number
 // Special case is:
 //
 // 	Acos(x) = NaN if x < -1 or x > 1
-Acos: func(x: number) -> number
+Acos: func(x: number) -> number & >=0
 
 // Asinh returns the inverse hyperbolic sine of x.
 //
@@ -243,7 +243,7 @@ Copysign: func(x: number, y: number) -> number
 // 	Dim(+Inf, +Inf) = NaN
 // 	Dim(-Inf, -Inf) = NaN
 // 	Dim(x, NaN) = Dim(NaN, x) = NaN
-Dim: func(x: number, y: number) -> number
+Dim: func(x: number, y: number) -> number & >=0
 
 // Erf returns the error function of x.
 //
@@ -252,7 +252,7 @@ Dim: func(x: number, y: number) -> number
 // 	Erf(+Inf) = 1
 // 	Erf(-Inf) = -1
 // 	Erf(NaN) = NaN
-Erf: func(x: number) -> number
+Erf: func(x: number) -> number & >=-1 & <=1
 
 // Erfc returns the complementary error function of x.
 //
@@ -261,7 +261,7 @@ Erf: func(x: number) -> number
 // 	Erfc(+Inf) = 0
 // 	Erfc(-Inf) = 2
 // 	Erfc(NaN) = NaN
-Erfc: func(x: number) -> number
+Erfc: func(x: number) -> number & >=0 & <=2
 
 // Erfinv returns the inverse error function of x.
 //
@@ -292,12 +292,12 @@ Erfcinv: func(x: number) -> number
 //
 // Very large values overflow to 0 or +Inf.
 // Very small values underflow to 1.
-Exp: func(x: number) -> number
+Exp: func(x: number) -> number & >=0
 
 // Exp2 returns 2**x, the base-2 exponential of x.
 //
 // Special cases are the same as Exp.
-Exp2: func(x: number) -> number
+Exp2: func(x: number) -> number & >=0
 
 // Expm1 returns e**x - 1, the base-e exponential of x minus 1.
 // It is more accurate than Exp(x) - 1 when x is near zero.
@@ -309,7 +309,7 @@ Exp2: func(x: number) -> number
 // 	Expm1(NaN) = NaN
 //
 // Very large values overflow to -1 or +Inf.
-Expm1: func(x: number) -> number
+Expm1: func(x: number) -> number & >=-1
 
 // Gamma returns the Gamma function of x.
 //
@@ -332,7 +332,7 @@ Gamma: func(x: number) -> number
 // 	Hypot(p, ±Inf) = +Inf
 // 	Hypot(NaN, q) = NaN
 // 	Hypot(p, NaN) = NaN
-Hypot: func(p: number, q: number) -> number
+Hypot: func(p: number, q: number) -> number & >=0
 
 // J0 returns the order-zero Bessel function of the first kind.
 //
@@ -446,7 +446,7 @@ Logb: func(x: number) -> number
 // 	Ilogb(±Inf) = MaxInt32
 // 	Ilogb(0) = MinInt32
 // 	Ilogb(NaN) = MaxInt32
-Ilogb: func(x: number) -> int
+Ilogb: func(x: number) -> int & >=-9223372036854775808 & <=9223372036854775807
 
 // Mod returns the floating-point remainder of x/y.
 // The magnitude of the result is less than y and its
@@ -488,7 +488,7 @@ Mod: func(x: number, y: number) -> number
 Pow: func(x: number, y: number) -> number
 
 // Pow10 returns 10**n, the base-10 exponential of n.
-Pow10: func(n: int) -> number
+Pow10: func(n: int) -> number & >=0
 
 // Remainder returns the IEEE 754 floating-point remainder of x/y.
 //
@@ -510,7 +510,7 @@ Signbit: validator(number) | (func(x: number) -> bool)
 //
 // 	Cos(±Inf) = NaN
 // 	Cos(NaN) = NaN
-Cos: func(x: number) -> number
+Cos: func(x: number) -> number & >=-1 & <=1
 
 // Sin returns the sine of the radian argument x.
 //
@@ -519,7 +519,7 @@ Cos: func(x: number) -> number
 // 	Sin(±0) = ±0
 // 	Sin(±Inf) = NaN
 // 	Sin(NaN) = NaN
-Sin: func(x: number) -> number
+Sin: func(x: number) -> number & >=-1 & <=1
 
 // Sinh returns the hyperbolic sine of x.
 //
@@ -537,7 +537,7 @@ Sinh: func(x: number) -> number
 // 	Cosh(±0) = 1
 // 	Cosh(±Inf) = +Inf
 // 	Cosh(NaN) = NaN
-Cosh: func(x: number) -> number
+Cosh: func(x: number) -> number & >=1
 
 // Sqrt returns the square root of x.
 //
@@ -547,7 +547,7 @@ Cosh: func(x: number) -> number
 // 	Sqrt(±0) = ±0
 // 	Sqrt(x < 0) = NaN
 // 	Sqrt(NaN) = NaN
-Sqrt: func(x: number) -> number
+Sqrt: func(x: number) -> number & >=0
 
 // Tan returns the tangent of the radian argument x.
 //
@@ -565,4 +565,4 @@ Tan: func(x: number) -> number
 // 	Tanh(±0) = ±0
 // 	Tanh(±Inf) = ±1
 // 	Tanh(NaN) = NaN
-Tanh: func(x: number) -> number
+Tanh: func(x: number) -> number & >=-1 & <=1

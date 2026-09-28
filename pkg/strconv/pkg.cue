@@ -76,7 +76,7 @@ ParseNumber: func(s: string) -> number
 IntSize: 64
 
 // ParseUint is like [ParseInt] but for unsigned numbers.
-ParseUint: func(s: string, base: int, bitSize: int) -> int
+ParseUint: func(s: string, base: int, bitSize: int) -> int & >=0
 
 // ParseInt interprets a string s in the given base (0, 2 to 36) and
 // bit size and returns the corresponding value i.
@@ -120,7 +120,7 @@ Atoi: func(s: string) -> int
 // zeros are removed).
 // The special precision -1 uses the smallest number of digits
 // necessary such that ParseFloat will return f exactly.
-FormatFloat: func(f: number, fmtVal: _, prec: int, bitSize: int) -> string
+FormatFloat: func(f: number, fmtVal: string | int, prec: int, bitSize: int) -> string
 
 // FormatUint returns the string representation of i in the given base,
 // for 2 <= base <= 62. The result uses:

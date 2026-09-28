@@ -78,6 +78,9 @@ func main() {
 	if errCount > 0 {
 		os.Exit(1)
 	}
+	if err := checkNativeMetadata(pkgs); err != nil {
+		log.Fatal(err)
+	}
 	// Sort the Go packages by import path; otherwise adding a new builtin package
 	// puts it at the very end of the list the first time it is getting added to register.go,
 	// as it's not imported by the root package yet. Sorting ensures consistent output.
@@ -481,8 +484,8 @@ func (g *goEmitter) constant(obj *types.Const, value string) {
 
 // function emits a function's builtin implementation, and its derived
 // signature for the package's CUE blob. The blob carries the call form
-// alone: the validator form of the definition files is documentation,
-// and its validator(T) type former does not yet constrain. A bare
+// alone: the validator constructor saves the trailing native arguments and
+// derives its domain from the validated slot. A bare
 // validator gets no blob signature at all — its kind is that of the
 // value it validates rather than func, so no function type can unify
 // with it.
@@ -503,6 +506,9 @@ func (g *goEmitter) function(fn *types.Func) {
 	fmt.Fprintf(g.w, "Name: %q,\n", fn.Name())
 	if precise := deriveCallForm(fn, true); precise != deriveCallForm(fn, false) {
 		fmt.Fprintf(g.w, "Signature: %q,\n", precise)
+	}
+	if refinements := nativeRefinements[strings.TrimPrefix(fn.Pkg().Path(), pkgParent+"/")+"."+fn.Name()]; len(refinements) != 0 {
+		fmt.Fprintf(g.w, "Refinements: %#v,\n", refinements)
 	}
 
 	needCallContext := false
@@ -776,8 +782,8 @@ func (g *goEmitter) adtKind(typ types.Type) string {
 // native slots in both forms. Authored definitions may state further refinements
 // not expressible in Go signatures.
 func deriveCallForm(fn *types.Func, precise bool) string {
-	if precise && fn.Pkg().Path() == pkgParent+"/list" {
-		if signature := listSignatures[fn.Name()]; signature != "" {
+	if precise {
+		if signature := nativeSignatures[nativeName(fn)]; signature != "" {
 			return signature
 		}
 	}
@@ -785,26 +791,175 @@ func deriveCallForm(fn *types.Func, precise bool) string {
 	params := sign.Params()
 	defParams := make([]string, params.Len())
 	for i := range defParams {
-		defParams[i] = defParam(fn.Name(), params.At(i), precise)
+		defParams[i] = defParam(fn, params.At(i), precise)
 	}
 	result := cueKindResultType(sign.Results().At(0).Type())
 	if precise {
 		result = cueResultType(sign.Results().At(0).Type())
+		if refined := nativeResults[nativeName(fn)]; refined != "" {
+			result = refined
+		}
 	}
 	return fmt.Sprintf("func(%s) -> %s", strings.Join(defParams, ", "), result)
 }
 
 // These contracts express relationships erased by Go's []cue.Value API.
 // They are checking evidence only; runtime argument completion is unchanged.
-var listSignatures = map[string]string{
-	"Drop":    "forall(A) func(x: [...A], n: int) -> [...A]",
-	"Repeat":  "forall(A) func(x: [...A], count: int) -> [...A]",
-	"Concat":  "forall(A) func(a: [...[...A]]) -> [...A]",
-	"Take":    "forall(A) func(x: [...A], n: int) -> [...A]",
-	"Slice":   "forall(A) func(x: [...A], i: int, j: int) -> [...A]",
-	"Reverse": "forall(A) func(x: [...A]) -> [...A]",
-	"Max":     "forall(A: number) func(xs: [...A]) -> A",
-	"Min":     "forall(A: number) func(xs: [...A]) -> A",
+var nativeSignatures = map[string]string{
+	"list.Drop":        "forall(A) func(x: [...A], n: int) -> [...A]",
+	"list.Repeat":      "forall(A) func(x: [...A], count: int) -> [...A]",
+	"list.Concat":      "forall(A) func(a: [...[...A]]) -> [...A]",
+	"list.Take":        "forall(A) func(x: [...A], n: int) -> [...A]",
+	"list.Slice":       "forall(A) func(x: [...A], i: int, j: int) -> [...A]",
+	"list.Reverse":     "forall(A) func(x: [...A]) -> [...A]",
+	"list.Max":         "forall(A: number) func(xs: [...A]) -> A",
+	"list.Min":         "forall(A: number) func(xs: [...A]) -> A",
+	"list.Sort":        "forall(A) func(list: [...A], cmp: {x: _, y: _, less: bool}) -> [...A]",
+	"list.SortStable":  "forall(A) func(list: [...A], cmp: {x: _, y: _, less: bool}) -> [...A]",
+	"list.SortStrings": "forall(A: string) func(a: [...A]) -> [...A]",
+}
+
+func nativeName(fn *types.Func) string {
+	return strings.TrimPrefix(fn.Pkg().Path(), pkgParent+"/") + "." + fn.Name()
+}
+
+// A renamed native or argument must not silently drop a checking contract.
+// Verify metadata against the loaded Go declarations before writing files.
+func checkNativeMetadata(pkgs []*packages.Package) error {
+	functions := make(map[string]*types.Func)
+	for _, p := range pkgs {
+		if p.Types == nil {
+			continue
+		}
+		for _, name := range p.Types.Scope().Names() {
+			if fn, ok := p.Types.Scope().Lookup(name).(*types.Func); ok && fn.Exported() {
+				functions[nativeName(fn)] = fn
+			}
+		}
+	}
+	names := make(map[string]bool)
+	for name := range nativeSignatures {
+		names[name] = true
+	}
+	for name := range nativeResults {
+		names[name] = true
+	}
+	for name := range nativeRefinements {
+		names[name] = true
+	}
+	for name := range nativeParams {
+		names[name] = true
+	}
+	for name := range names {
+		fn := functions[name]
+		if fn == nil {
+			return fmt.Errorf("checking metadata refers to unknown native %s", name)
+		}
+		for label := range nativeParams[name] {
+			found := false
+			for param := range fn.Signature().Params().Variables() {
+				found = found || param.Name() == label
+			}
+			if !found {
+				return fmt.Errorf("checking metadata for %s refers to unknown parameter %s", name, label)
+			}
+		}
+	}
+	return nil
+}
+
+// Implementation facts that Go's representation types cannot express. Input
+// descriptions retain ordinary partial-call domains; result descriptions
+// describe every successful return, including edge cases such as underflow.
+var nativeResults = map[string]string{
+	"encoding/json.Unmarshal":       "null | bool | number | string | [...] | {...}",
+	"encoding/yaml.Unmarshal":       "null | bool | number | string | bytes | [...] | {...}",
+	"encoding/json.UnmarshalStream": "[...]",
+	"encoding/yaml.UnmarshalStream": "[...]",
+	"encoding/toml.Unmarshal":       "{...}",
+	"math.Abs":                      "number & >=0",
+	"math.Acosh":                    "number & >=0",
+	"math.Acos":                     "number & >=0",
+	"math.Cosh":                     "number & >=1",
+	"math.Dim":                      "number & >=0",
+	"math.Erf":                      "number & >=-1 & <=1",
+	"math.Erfc":                     "number & >=0 & <=2",
+	"math.Exp":                      "number & >=0",
+	"math.Exp2":                     "number & >=0",
+	"math.Expm1":                    "number & >=-1",
+	"math.Hypot":                    "number & >=0",
+	"math.Pow10":                    "number & >=0",
+	"math.Cos":                      "number & >=-1 & <=1",
+	"math.Sin":                      "number & >=-1 & <=1",
+	"math.Sqrt":                     "number & >=0",
+	"math.Tanh":                     "number & >=-1 & <=1",
+	"math.Jacobi":                   "-1 | 0 | 1",
+	"math/bits.At":                  "0 | 1",
+	"math/bits.OnesCount":           "int & >=0",
+	"math/bits.Len":                 "int & >=0",
+	"strings.ByteAt":                "int & >=0 & <=255",
+	"strings.Runes":                 "[...(int & >=0 & <=0x10ffff)]",
+	"strings.Compare":               "-1 | 0 | 1",
+	"strings.Count":                 "int & >=0",
+	"strings.Index":                 "int & >=-1",
+	"strings.LastIndex":             "int & >=-1",
+	"strings.IndexAny":              "int & >=-1",
+	"strings.LastIndexAny":          "int & >=-1",
+	"strconv.ParseUint":             "int & >=0",
+	"net.SplitHostPort":             "[string, string]",
+	"net.CompareIP":                 "-1 | 0 | 1",
+	"net.ParseIP":                   "(" + nativeTuple("int & >=0 & <=255", 4) + " | " + nativeTuple("int & >=0 & <=255", 16) + ")",
+	"net.ToIP4":                     nativeTuple("int & >=0 & <=255", 4),
+	"net.ToIP16":                    nativeTuple("int & >=0 & <=255", 16),
+	"net.ParseCIDR":                 "{prefix_mask: string, prefix_len: int & >=0 & <=128, prefix_addr: string, broadcast_addr?: string}",
+	"time.Split":                    "{year: int, month: int & >=1 & <=12, day: int & >=1 & <=31, hour: int & >=0 & <=23, minute: int & >=0 & <=59, second: int & >=0 & <=59, nanosecond: int & >=0 & <1000000000}",
+	"uuid.ToInt":                    "int & >=0",
+	"uuid.Variant":                  "int & >=0 & <=4",
+	"uuid.Version":                  "int & >=0 & <=15",
+}
+
+func nativeTuple(element string, length int) string {
+	return "[" + strings.TrimSuffix(strings.Repeat(element+", ", length), ", ") + "]"
+}
+
+var nativeParams = map[string]map[string]string{
+	"encoding/json.Marshal":          {"v": "null | bool | number | string | bytes | [...] | {...}"},
+	"encoding/yaml.Marshal":          {"v": "null | bool | number | string | bytes | [...] | {...}"},
+	"encoding/openapi.MarshalSchema": {"config": "{version: string, selfContained?: bool, expandReferences?: bool, info?: _}"},
+	"encoding/csv.Encode":            {"x": "[...[..._]]"},
+	"encoding/json.MarshalStream":    {"v": "[...]"},
+	"encoding/yaml.MarshalStream":    {"v": "[...]"},
+	"encoding/toml.Marshal":          {"v": "{...}"},
+	"list.IsSorted":                  {"cmp": "{x: _, y: _, less: bool}"},
+	"net.JoinHostPort":               {"host": "string | bytes | [...int]", "port": "string | bytes | int"},
+	"net.IPv4":                       {"ip": "string | bytes | [...int]"},
+	"net.IPv6":                       {"ip": "string | bytes | [...int]"},
+	"net.IP":                         {"ip": "string | bytes | [...int]"},
+	"net.IPCIDR":                     {"ip": "string | bytes"},
+	"net.LoopbackIP":                 {"ip": "string | bytes | [...int]"},
+	"net.MulticastIP":                {"ip": "string | bytes | [...int]"},
+	"net.InterfaceLocalMulticastIP":  {"ip": "string | bytes | [...int]"},
+	"net.LinkLocalMulticastIP":       {"ip": "string | bytes | [...int]"},
+	"net.LinkLocalUnicastIP":         {"ip": "string | bytes | [...int]"},
+	"net.GlobalUnicastIP":            {"ip": "string | bytes | [...int]"},
+	"net.UnspecifiedIP":              {"ip": "string | bytes | [...int]"},
+	"net.ToIP4":                      {"ip": "string | bytes | [...int]"},
+	"net.ToIP16":                     {"ip": "string | bytes | [...int]"},
+	"net.IPString":                   {"ip": "string | bytes | [...int]"},
+	"net.AddIP":                      {"ip": "string | bytes | [...int]"},
+	"net.AddIPCIDR":                  {"ip": "string | bytes"},
+	"net.InCIDR":                     {"ip": "string | bytes | [...int]", "cidr": "string | bytes"},
+	"net.CompareIP":                  {"ip1": "string | bytes | [...int]", "ip2": "string | bytes | [...int]"},
+	"strconv.FormatFloat":            {"fmtVal": "string | int"},
+	"text/tabwriter.Write":           {"data": "string | bytes | [...(string | bytes)]"},
+}
+
+// Refinements add conditional evidence without shrinking the primary domain.
+var nativeRefinements = map[string][]string{
+	"math.Abs":     {"func(x: int) -> (int & >=0)"},
+	"list.Sum":     {"func(xs: [...int]) -> int"},
+	"list.Product": {"func(xs: [...int]) -> int"},
+	"list.Range":   {"func(start: int, limit: int, step: int) -> [...int]"},
 }
 
 // bareValidator reports whether the builtin registers as a bare
@@ -851,18 +1006,21 @@ func paramHasDefault(funcName string, param *types.Var) bool {
 // typed pkg.Schema in Go, so deliberately accepting a non-concrete value —
 // carries the @schema() attribute, which the definition files declare as
 // well.
-func defParam(funcName string, param *types.Var, precise bool) string {
+func defParam(fn *types.Func, param *types.Var, precise bool) string {
 	name := param.Name()
 	typ := cueKindType(param.Type())
 	if precise {
 		typ = cueType(param.Type())
+		if refined := nativeParams[nativeName(fn)][name]; refined != "" {
+			typ = refined
+		}
 	}
 	switch param.Type().String() {
 	case "cuelang.org/go/internal/pkg.Schema":
 		typ += " @schema()"
 	case "cuelang.org/go/pkg/path.OS":
 		name = "os"
-		if paramHasDefault(funcName, param) {
+		if paramHasDefault(fn.Name(), param) {
 			// A parameter default is declared with "=" after the
 			// constraint; a default mark in the constraint is rejected.
 			typ += ` = "unix"`
@@ -895,6 +1053,30 @@ func cueResultType(typ types.Type) string {
 		return "bytes"
 	}
 	switch t := typ.(type) {
+	case *types.Basic:
+		// Native integer results cannot exceed their Go representation.
+		// Inputs keep the logical CUE int domain: representation failures
+		// remain ordinary partial-call failures at the native boundary.
+		width := 0
+		switch t.Kind() {
+		case types.Int8, types.Uint8:
+			width = 8
+		case types.Int16, types.Uint16:
+			width = 16
+		case types.Int32, types.Uint32:
+			width = 32
+		case types.Int, types.Int64, types.Uint, types.Uint64, types.Uintptr:
+			width = 64
+		}
+		if width != 0 {
+			max := new(big.Int).Lsh(big.NewInt(1), uint(width))
+			if t.Info()&types.IsUnsigned != 0 {
+				return "int & >=0 & <=" + max.Sub(max, big.NewInt(1)).String()
+			}
+			max.Rsh(max, 1)
+			min := new(big.Int).Neg(max)
+			return "int & >=" + min.String() + " & <=" + max.Sub(max, big.NewInt(1)).String()
+		}
 	case *types.Slice:
 		return cueListType(cueResultType(t.Elem()))
 	case *types.Map:

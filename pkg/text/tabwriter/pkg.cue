@@ -24,4 +24,4 @@ package tabwriter
 
 // Write formats text in columns. See golang.org/pkg/text/tabwriter for more
 // info.
-Write: func(data: _) -> string
+Write: func(data: string | bytes | [...(string | bytes)]) -> string

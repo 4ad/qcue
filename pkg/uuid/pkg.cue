@@ -44,13 +44,13 @@ URN: func(x: string) -> string
 FromInt: func(i: int) -> string
 
 // ToInt represents a UUID string as a 128-bit value.
-ToInt: func(x: string) -> int
+ToInt: func(x: string) -> int & >=0
 
 // Variant reports the UUID variant.
-Variant: func(x: string) -> int
+Variant: func(x: string) -> int & >=0 & <=4
 
 // Version reports the UUID version.
-Version: func(x: string) -> int
+Version: func(x: string) -> int & >=0 & <=15
 
 // SHA1 generates a version 5 UUID based on the supplied name space and data.
 SHA1: func(space: string, data: bytes | string) -> string

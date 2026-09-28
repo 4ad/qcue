@@ -65,7 +65,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Marshal",
+		Name:      "Marshal",
+		Signature: "func(v: null | bool | number | string | bytes | [...] | {...}) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -77,7 +78,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "MarshalStream",
+		Name:      "MarshalStream",
+		Signature: "func(v: [...]) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -89,7 +91,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "UnmarshalStream",
+		Name:      "UnmarshalStream",
+		Signature: "func(data: bytes|string) -> [...]",
 		Params: []pkg.Param{
 			{Kind: adt.BytesKind | adt.StringKind},
 		},
@@ -101,7 +104,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Unmarshal",
+		Name:      "Unmarshal",
+		Signature: "func(b: bytes|string) -> null | bool | number | string | [...] | {...}",
 		Params: []pkg.Param{
 			{Kind: adt.BytesKind | adt.StringKind},
 		},

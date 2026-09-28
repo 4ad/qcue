@@ -24,11 +24,11 @@ package hex
 
 // EncodedLen returns the length of an encoding of n source bytes.
 // Specifically, it returns n * 2.
-EncodedLen: func(n: int) -> int
+EncodedLen: func(n: int) -> int & >=-9223372036854775808 & <=9223372036854775807
 
 // DecodedLen returns the length of a decoding of x source bytes.
 // Specifically, it returns x / 2.
-DecodedLen: func(x: int) -> int
+DecodedLen: func(x: int) -> int & >=-9223372036854775808 & <=9223372036854775807
 
 // Decode returns the bytes represented by the hexadecimal string s.
 //

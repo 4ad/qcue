@@ -51,8 +51,22 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 	if primitive == nil {
 		return false
 	}
+	if b.IsValidator(len(target.Fn.Params)) {
+		constructor := *primitive
+		constructor.Params = primitive.Params[1:]
+		constructor.Ret = primitive.Params[0].Value
+		return s.capabilitySignature(target, adt.FuncType{Fn: &constructor, Env: source.Env})
+	}
+	if isListComparerBuiltin(s.ctx, b) {
+		return s.builtinBodyCapability(target, b, source)
+	}
 	if s.capabilitySignature(target, source) {
 		return true
+	}
+	for _, refined := range b.CheckingRefinements(s.ctx) {
+		if s.capabilitySignature(target, refined) {
+			return true
+		}
 	}
 	if b.Package == adt.InvalidLabel {
 		switch b.Name {
@@ -60,17 +74,7 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 			// Check the same argument-dependent rule used by direct calls
 			// under the target's rigid packet. This adapter is proof syntax
 			// only; it neither changes the builtin's protocol nor executes it.
-			p := s.inference
-			if p == nil {
-				p = newInference(s.ctx)
-			}
-			defer p.enter()()
-			call := &adt.CallExpr{Fun: b.Implementation()}
-			for _, param := range primitive.Params {
-				call.Args = append(call.Args, &adt.FieldReference{Label: param.Local})
-			}
-			primitive.Body = call
-			return p.function(&adt.FuncValue{Fn: primitive}, target)
+			return s.builtinBodyCapability(target, b, source)
 		}
 	}
 	// A singleton packet can be checked exhaustively. This is a proof over
@@ -114,4 +118,19 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 	}
 	want, ok := s.evalFuncConstraint(target.Env, target.Fn.Ret)
 	return ok && s.values(want, result)
+}
+
+func (s *subsumer) builtinBodyCapability(target adt.FuncType, b *adt.Builtin, source adt.FuncType) bool {
+	p := s.inference
+	if p == nil {
+		p = newInference(s.ctx)
+	}
+	defer p.enter()()
+	primitive := *source.Fn
+	call := &adt.CallExpr{Fun: b.Implementation()}
+	for _, param := range primitive.Params {
+		call.Args = append(call.Args, &adt.FieldReference{Label: param.Local})
+	}
+	primitive.Body = call
+	return p.function(&adt.FuncValue{Fn: &primitive, Env: source.Env}, target)
 }

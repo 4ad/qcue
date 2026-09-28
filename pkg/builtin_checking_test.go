@@ -57,45 +57,25 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 				ctx := eval.NewContext(r, nil)
 				protocol := b.Protocol(ctx)
 				var params, args []string
-				for i, param := range b.Params {
+				var paramKinds []adt.Kind
+				for i, param := range protocol.Params {
 					name := fmt.Sprintf("a%d", i)
-					typ := builtinKindSyntax(param.Kind())
-					if _, basic := protocol.Params[i].Value.(*adt.BasicType); !basic {
-						root := &adt.Environment{Vertex: &adt.Vertex{BaseValue: &adt.StructMarker{}}}
-						constraint, complete := ctx.Evaluate(root, protocol.Params[i].Value)
-						if !complete || constraint == nil {
-							t.Fatal("incomplete native parameter type")
-						}
-						constraint = adt.Unwrap(constraint)
-						if union, ok := constraint.(*adt.Disjunction); ok {
-							copy := *union
-							copy.NumDefaults, copy.HasDefaults = 0, false
-							constraint = &copy
-						}
-						expr, err := export.Value(r, "", constraint)
-						if err != nil {
-							t.Fatal(err)
-						}
-						text, formatErr := format.Node(expr)
-						if formatErr != nil {
-							t.Fatal(formatErr)
-						}
-						typ = string(text)
-					}
+					typ, kind := builtinConstraintSyntax(t, ctx, r, param.Value)
+					paramKinds = append(paramKinds, kind)
 					params = append(params, name+": "+typ)
 					args = append(args, name)
 				}
-				resultType := builtinKindSyntax(b.Result)
+				resultType, _ := builtinConstraintSyntax(t, ctx, r, protocol.Ret)
 				if b.Result == adt.BottomKind {
 					resultType = "_"
 				}
-				source := fmt.Sprintf("import native %q\nf: func(%s) -> %s: native.%s(%s)",
+				source := fmt.Sprintf("import native %q\nf: func(%s) -> (%s): native.%s(%s)",
 					ip, strings.Join(params, ", "), resultType, b.Name, strings.Join(args, ", "))
 				v := cuecontext.New().CompileString(source)
 				if err := v.Validate(); err != nil {
 					t.Fatalf("%s\n%v", source, err)
 				}
-				for i, param := range b.Params {
+				for i, kind := range paramKinds {
 					// Change each constrained slot independently. Top slots
 					// have no incompatible kind to test.
 					for _, wrong := range []struct {
@@ -105,7 +85,7 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 						{adt.NullKind, "null"}, {adt.BoolKind, "true"},
 						{adt.IntKind, "0"}, {adt.StringKind, `"wrong"`},
 					} {
-						if param.Kind()&wrong.kind != 0 {
+						if kind&wrong.kind != 0 {
 							continue
 						}
 						badArgs := append([]string(nil), args...)
@@ -130,7 +110,7 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 				// A correct broad return must not let the same call prove a singleton.
 				// Bottom-returning natives have no successful result to contradict it.
 				if b.Result != adt.BottomKind {
-					source = strings.Replace(source, " -> "+builtinKindSyntax(b.Result)+":", " -> {impossible: 42}:", 1)
+					source = strings.Replace(source, " -> ("+resultType+"):", " -> {impossible: 42}:", 1)
 					bad := cuecontext.New().CompileString(source)
 					if err := bad.LookupPath(cue.ParsePath("f")).Validate(); err == nil {
 						t.Fatalf("unproved result accepted: %s", source)
@@ -139,6 +119,33 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 			})
 		}
 	}
+}
+
+func builtinConstraintSyntax(t *testing.T, ctx *adt.OpContext, r *runtime.Runtime, value adt.Expr) (string, adt.Kind) {
+	t.Helper()
+	root := &adt.Environment{Vertex: &adt.Vertex{BaseValue: &adt.StructMarker{}}}
+	constraint, complete := ctx.Evaluate(root, value)
+	if !complete || constraint == nil {
+		t.Fatal("incomplete native checking type")
+	}
+	constraint = adt.Unwrap(constraint)
+	if basic, ok := constraint.(*adt.BasicType); ok {
+		return builtinKindSyntax(basic.K), basic.K
+	}
+	if union, ok := constraint.(*adt.Disjunction); ok {
+		copy := *union
+		copy.NumDefaults, copy.HasDefaults = 0, false
+		constraint = &copy
+	}
+	expr, err := export.All.Value(r, "", constraint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, formatErr := format.Node(expr)
+	if formatErr != nil {
+		t.Fatal(formatErr)
+	}
+	return string(text), constraint.Kind()
 }
 
 func builtinKindSyntax(k adt.Kind) string {

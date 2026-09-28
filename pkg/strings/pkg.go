@@ -15,7 +15,8 @@ var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
 	Native: []*pkg.Builtin{{
-		Name: "ByteAt",
+		Name:      "ByteAt",
+		Signature: "func(b: bytes|string, i: int) -> int & >=0 & <=255",
 		Params: []pkg.Param{
 			{Kind: adt.BytesKind | adt.StringKind},
 			{Kind: adt.IntKind},
@@ -43,7 +44,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "Runes",
-		Signature: "func(s: string) -> [...int]",
+		Signature: "func(s: string) -> [...(int & >=0 & <=0x10ffff)]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -132,7 +133,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Compare",
+		Name:      "Compare",
+		Signature: "func(a: string, b: string) -> -1 | 0 | 1",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -145,7 +147,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Count",
+		Name:      "Count",
+		Signature: "func(s: string, substr: string) -> int & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -184,7 +187,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "LastIndex",
+		Name:      "LastIndex",
+		Signature: "func(s: string, substr: string) -> int & >=-1",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -197,7 +201,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IndexAny",
+		Name:      "IndexAny",
+		Signature: "func(s: string, chars: string) -> int & >=-1",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -210,7 +215,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "LastIndexAny",
+		Name:      "LastIndexAny",
+		Signature: "func(s: string, chars: string) -> int & >=-1",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -450,7 +456,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Index",
+		Name:      "Index",
+		Signature: "func(s: string, substr: string) -> int & >=-1",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},

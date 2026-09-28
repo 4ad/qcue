@@ -20,6 +20,98 @@ import (
 	"cuelang.org/go/internal/core/adt"
 )
 
+func isListComparerBuiltin(c *adt.OpContext, b *adt.Builtin) bool {
+	return b.Package != adt.InvalidLabel && b.Package.StringValue(c) == "list" &&
+		(b.Name == "Sort" || b.Name == "SortStable" || b.Name == "IsSorted")
+}
+
+// The list sorting primitives invoke a record template by supplying x and y.
+// Check that template under exactly the element descriptions the native can
+// supply. Checking its uninstantiated comparisons would reject idiomatic
+// comparers such as list.Ascending, whose number|string fields become concrete
+// only when the native supplies an element pair.
+func (p *inference) listComparerArguments(env *adt.Environment, callee adt.Value, call *adt.CallExpr) (map[int]adt.Value, bool) {
+	b, ok := callee.(*adt.Builtin)
+	if !ok || !isListComparerBuiltin(p.ctx, b) || len(call.Args) != 2 {
+		return nil, false
+	}
+	slots := [2]int{-1, -1}
+	next := 0
+	for i := range call.Args {
+		label := adt.InvalidLabel
+		if i < len(call.ArgLabels) {
+			label = call.ArgLabels[i]
+		}
+		if label == adt.InvalidLabel {
+			for next < len(slots) && slots[next] >= 0 {
+				next++
+			}
+			if next == len(slots) {
+				return nil, true
+			}
+			slots[next] = i
+		} else {
+			index, ok := adt.BuiltinParamLabelIndex(b, label)
+			if !ok || index >= len(slots) || slots[index] >= 0 {
+				return nil, true
+			}
+			slots[index] = i
+		}
+	}
+	listIndex, comparerIndex := slots[0], slots[1]
+	if listIndex < 0 || comparerIndex < 0 || listIndex == comparerIndex {
+		return nil, true
+	}
+	list := p.expr(env, call.Args[listIndex])
+	if list == nil || list.Kind() != adt.ListKind {
+		return nil, true
+	}
+	element := p.listFold(list, false)
+	if element == nil {
+		return nil, true
+	}
+	if comparer := p.expr(env, call.Args[comparerIndex]); comparer != nil {
+		for _, name := range []string{"x", "y"} {
+			bound := p.project(comparer, p.ctx.StringLabel(name))
+			if bound == nil || !p.includes(bound, element) {
+				return nil, true
+			}
+		}
+		return map[int]adt.Value{listIndex: list, comparerIndex: comparer}, true
+	}
+	bindings := []proofBinding{{env: env, expr: call.Args[comparerIndex]}}
+	record := p.prepareRecord(bindings)
+	if record == nil {
+		// Imported templates retain their original declaration scopes.
+		// Inspect those declarations without materializing the comparator.
+		if v, ok := p.schema(env, call.Args[comparerIndex]).(*adt.Vertex); ok {
+			bindings = nil
+			for _, c := range v.Conjuncts {
+				bindings = append(bindings, proofBinding{c.Env, c.Expr()})
+			}
+			record = p.prepareRecord(bindings)
+		}
+	}
+	if record == nil {
+		return nil, true
+	}
+	packet := &adt.StructLit{}
+	for _, name := range []string{"x", "y"} {
+		label := p.ctx.StringLabel(name)
+		bound := p.expr(record.env, &adt.FieldReference{Label: label})
+		if bound == nil || !p.includes(bound, element) {
+			return nil, true
+		}
+		packet.Decls = append(packet.Decls, &adt.Field{Label: label, Value: element})
+	}
+	bindings = append(bindings, proofBinding{expr: packet})
+	comparer, ok := p.recordMeet(bindings)
+	if !ok || comparer == nil || refuted(comparer) {
+		return nil, true
+	}
+	return map[int]adt.Value{listIndex: list, comparerIndex: comparer}, true
+}
+
 // listFold describes successful results of and/or. An optional tail contributes
 // to a union, but cannot narrow a conjunction: it may have no elements at all.
 // In particular, and([]) is top, so [...A] alone cannot prove result A.
@@ -92,12 +184,7 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 	if f.IsValidator(len(target.Fn.Params)) {
 		// The implicit validator constructor saves the trailing slots;
 		// its successful inhabitants have the validated slot's type.
-		// This form has no argument labels or partial-call protocol.
-		for _, param := range target.Fn.Params {
-			if param.Label != adt.InvalidLabel {
-				return nil
-			}
-		}
+		// Labels select only those trailing slots, just as at runtime.
 		protocol := *source.Fn
 		protocol.Params = protocol.Params[1:]
 		protocol.Ret = nil
@@ -124,7 +211,8 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 		return nil
 	}
 	sources := []adt.FuncType{source}
-	results := append(slices.Clone(sources), f.AdditionalTypes()...)
+	results := append(slices.Clone(sources), f.CheckingRefinements(p.ctx)...)
+	results = append(results, f.AdditionalTypes()...)
 	result := p.callPackets(target, sources, results, nil, 0)
 	if result == nil || refuted(result) || f.Package != adt.InvalidLabel {
 		return result
@@ -136,7 +224,7 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 		return p.listFold(target.Fn.Params[0].Value.(adt.Value), f.Name == "and")
 	case "close":
 		return p.closeResult(f, target.Fn.Params[0].Value.(adt.Value))
-	case "__reclose", "__closeAll", "testExperiment":
+	case "__reclose", "__closeAll", "testExperiment", "validator":
 		return target.Fn.Params[0].Value.(adt.Value)
 	}
 	return result

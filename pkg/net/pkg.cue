@@ -39,14 +39,14 @@ package net
 //
 // A literal IPv6 address in hostport must be enclosed in square brackets, as in
 // "[::1]:80", "[::1%lo0]:80".
-SplitHostPort: func(s: string) -> [...string]
+SplitHostPort: func(s: string) -> [string, string]
 
 // JoinHostPort combines host and port into a network address of the
 // form "host:port". If host contains a colon, as found in literal
 // IPv6 addresses, then JoinHostPort returns "[host]:port".
 //
 // See func Dial for a description of the host and port parameters.
-JoinHostPort: func(host: #IP, port: string | bytes | int) -> string
+JoinHostPort: func(host: string | bytes | [...int], port: string | bytes | int) -> string
 
 // FQDN reports whether is a valid fully qualified domain name.
 //
@@ -63,7 +63,7 @@ IPv6len: 16
 // or IPv6 ("2001:db8::68") form.
 // If s is not a valid textual representation of an IP address,
 // ParseIP returns an error.
-ParseIP: func(s: string) -> [...int]
+ParseIP: func(s: string) -> ([int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255] | [int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255])
 
 // IPv4 reports whether ip is a valid IPv4 address.
 //
@@ -115,11 +115,11 @@ UnspecifiedIP: validator(#IP) | (func(ip: #IP) -> bool)
 
 // ToIP4 converts a given IP address, which may be a string or a list, to its
 // 4-byte representation.
-ToIP4: func(ip: #IP) -> [...int]
+ToIP4: func(ip: string | bytes | [...int]) -> [int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255]
 
 // ToIP16 converts a given IP address, which may be a string or a list, to its
 // 16-byte representation.
-ToIP16: func(ip: #IP) -> [...int]
+ToIP16: func(ip: string | bytes | [...int]) -> [int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255, int & >=0 & <=255]
 
 // IPString returns the string form of the IP address ip. It returns one of 4 forms:
 //
@@ -127,22 +127,22 @@ ToIP16: func(ip: #IP) -> [...int]
 // - dotted decimal ("192.0.2.1"), if ip is an IPv4 or IP4-mapped IPv6 address
 // - IPv6 ("2001:db8::1"), if ip is a valid IPv6 address
 // - the hexadecimal form of ip, without punctuation, if no other cases apply
-IPString: func(ip: #IP) -> string
+IPString: func(ip: string | bytes | [...int]) -> string
 
 // AddIP adds a numerical offset to a given IP address.
 // The address can be provided as a string, byte array, or CIDR subnet notation.
 // It returns the resulting IP address or CIDR subnet notation as a string.
-AddIP: func(ip: #IP, offset: int) -> string
+AddIP: func(ip: string | bytes | [...int], offset: int) -> string
 
 // AddIPCIDR adds a numerical offset to a given CIDR subnet
 // string, returning a CIDR string.
-AddIPCIDR: func(ip: #CIDR, offset: int) -> string
+AddIPCIDR: func(ip: string | bytes, offset: int) -> string
 
 // ParseCIDR parses a CIDR notation string and returns its components:
 // prefix_mask (e.g. "255.255.255.0"), prefix_len (e.g. 24),
 // prefix_addr (e.g. "10.20.30.0"), and broadcast_addr (e.g. "10.20.30.255").
 // broadcast_addr is only set for IPv4 CIDRs.
-ParseCIDR: func(s: string) -> {prefix_mask: string, prefix_len: int, prefix_addr: string, broadcast_addr?: string}
+ParseCIDR: func(s: string) -> {prefix_mask: string, prefix_len: int & >=0 & <=128, prefix_addr: string, broadcast_addr?: string}
 
 // InCIDR reports whether an IP address is contained a CIDR subnet string.
 InCIDR: (func(cidr: #CIDR) -> validator(#IP)) | (func(ip: #IP, cidr: #CIDR) -> bool)
@@ -152,7 +152,7 @@ InCIDR: (func(cidr: #CIDR) -> validator(#IP)) | (func(ip: #IP, cidr: #CIDR) -> b
 // IPv4 addresses sort before IPv6 addresses.
 //
 // The addresses may be strings or lists of bytes.
-CompareIP: func(ip1: #IP, ip2: #IP) -> int
+CompareIP: func(ip1: string | bytes | [...int], ip2: string | bytes | [...int]) -> -1 | 0 | 1
 
 // PathEscape escapes the string so it can be safely placed inside a URL path
 // segment, replacing special characters (including /) with %XX sequences as

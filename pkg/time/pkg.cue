@@ -59,7 +59,7 @@ FormatDuration: func(d: int) -> string
 // decimal numbers, each with optional fraction and a unit suffix,
 // such as "300ms", "-1.5h" or "2h45m".
 // Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-ParseDuration: func(s: string) -> int
+ParseDuration: func(s: string) -> int & >=-9223372036854775808 & <=9223372036854775807
 
 ANSIC: "Mon Jan _2 15:04:05 2006"
 
@@ -187,11 +187,11 @@ Unix: func(sec: int, nsec: int) -> string
 
 // ToUnix returns the given time value as a Unix time in seconds
 // elapsed since January 1, 1970 UTC.
-ToUnix: func(value: string) -> int
+ToUnix: func(value: string) -> int & >=-9223372036854775808 & <=9223372036854775807
 
 // ToUnixNano returns the given time value as a Unix time in nanoseconds
 // elapsed since January 1, 1970 UTC.
-ToUnixNano: func(value: string) -> int
+ToUnixNano: func(value: string) -> int & >=-9223372036854775808 & <=9223372036854775807
 
 // Split parses a time string into its individual parts.
-Split: func(t: string) -> {year: int, month: int, day: int, hour: int, minute: int, second: int, nanosecond: int}
+Split: func(t: string) -> {year: int, month: int & >=1 & <=12, day: int & >=1 & <=31, hour: int & >=0 & <=23, minute: int & >=0 & <=59, second: int & >=0 & <=59, nanosecond: int & >=0 & <1000000000}

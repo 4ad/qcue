@@ -57,7 +57,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "ParseDuration",
+		Name:      "ParseDuration",
+		Signature: "func(s: string) -> int & >=-9223372036854775808 & <=9223372036854775807",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -229,7 +230,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "ToUnix",
+		Name:      "ToUnix",
+		Signature: "func(value: string) -> int & >=-9223372036854775808 & <=9223372036854775807",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -241,7 +243,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "ToUnixNano",
+		Name:      "ToUnixNano",
+		Signature: "func(value: string) -> int & >=-9223372036854775808 & <=9223372036854775807",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -254,7 +257,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "Split",
-		Signature: "func(t: string) -> {\"year\": int, \"month\": int, \"day\": int, \"hour\": int, \"minute\": int, \"second\": int, \"nanosecond\": int}",
+		Signature: "func(t: string) -> {year: int, month: int & >=1 & <=12, day: int & >=1 & <=31, hour: int & >=0 & <=23, minute: int & >=0 & <=59, second: int & >=0 & <=59, nanosecond: int & >=0 & <1000000000}",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},

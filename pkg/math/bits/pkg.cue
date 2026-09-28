@@ -29,7 +29,7 @@ Lsh: func(x: int, n: int) -> int
 Rsh: func(x: int, n: int) -> int
 
 // At returns the value of the i'th bit of x.
-At: func(x: int, i: int) -> int
+At: func(x: int, i: int) -> 0 | 1
 
 // Set sets and returns x with x's i'th bit set to b (0 or 1).
 // That is, if b is 1 Set returns x with its i'th bit set;
@@ -49,8 +49,8 @@ Xor: func(a: int, b: int) -> int
 Clear: func(a: int, b: int) -> int
 
 // OnesCount returns the number of one bits ("population count") in x.
-OnesCount: func(x: int) -> int
+OnesCount: func(x: int) -> int & >=0
 
 // Len returns the length of the absolute value of x in bits. The bit length
 // of 0 is 0.
-Len: func(x: int) -> int
+Len: func(x: int) -> int & >=0

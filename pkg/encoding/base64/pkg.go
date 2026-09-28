@@ -15,7 +15,8 @@ var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
 	Native: []*pkg.Builtin{{
-		Name: "EncodedLen",
+		Name:      "EncodedLen",
+		Signature: "func(encoding: _, n: int) -> int & >=-9223372036854775808 & <=9223372036854775807",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.IntKind},
@@ -28,7 +29,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "DecodedLen",
+		Name:      "DecodedLen",
+		Signature: "func(encoding: _, x: int) -> int & >=-9223372036854775808 & <=9223372036854775807",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.IntKind},

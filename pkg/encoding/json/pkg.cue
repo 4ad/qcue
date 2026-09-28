@@ -50,16 +50,16 @@ Indent: func(src: bytes | string, prefix: string, indent: string) -> string
 HTMLEscape: func(src: bytes | string) -> string
 
 // Marshal returns the JSON encoding of v.
-Marshal: func(v: _) -> string
+Marshal: func(v: null | bool | number | string | bytes | [...] | {...}) -> string
 
 // MarshalStream turns a list into a stream of JSON objects.
-MarshalStream: func(v: _) -> string
+MarshalStream: func(v: [...]) -> string
 
 // UnmarshalStream parses the JSON to a CUE instance.
-UnmarshalStream: func(data: bytes | string) -> _
+UnmarshalStream: func(data: bytes | string) -> [...]
 
 // Unmarshal parses the JSON-encoded data.
-Unmarshal: func(b: bytes | string) -> _
+Unmarshal: func(b: bytes | string) -> null | bool | number | string | [...] | {...}
 
 // Validate validates JSON and confirms it matches the constraints
 // specified by v.

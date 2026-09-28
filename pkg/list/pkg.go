@@ -216,8 +216,9 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name:      "Product",
-		Signature: "func(xs: [...number]) -> number",
+		Name:        "Product",
+		Signature:   "func(xs: [...number]) -> number",
+		Refinements: []string{"func(xs: [...int]) -> int"},
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -229,8 +230,9 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name:      "Range",
-		Signature: "func(start: number, limit: number, step: number) -> [...number]",
+		Name:        "Range",
+		Signature:   "func(start: number, limit: number, step: number) -> [...number]",
+		Refinements: []string{"func(start: int, limit: int, step: int) -> [...int]"},
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 			{Kind: adt.NumberKind},
@@ -244,8 +246,9 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name:      "Sum",
-		Signature: "func(xs: [...number]) -> number",
+		Name:        "Sum",
+		Signature:   "func(xs: [...number]) -> number",
+		Refinements: []string{"func(xs: [...int]) -> int"},
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -257,7 +260,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Sort",
+		Name:      "Sort",
+		Signature: "forall(A) func(list: [...A], cmp: {x: _, y: _, less: bool}) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.TopKind},
@@ -270,7 +274,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "SortStable",
+		Name:      "SortStable",
+		Signature: "forall(A) func(list: [...A], cmp: {x: _, y: _, less: bool}) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.TopKind},
@@ -284,7 +289,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "SortStrings",
-		Signature: "func(a: [...string]) -> [...string]",
+		Signature: "forall(A: string) func(a: [...A]) -> [...A]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -296,7 +301,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IsSorted",
+		Name:      "IsSorted",
+		Signature: "func(list: [...], cmp: {x: _, y: _, less: bool}) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.TopKind},

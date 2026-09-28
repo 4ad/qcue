@@ -33,7 +33,7 @@ package list
 // results in
 //
 // 	[3, 4]
-Drop: forall(A) func(x: [...A], n: int) -> [...A]
+Drop: forall (A) func(x: [...A], n: int) -> [...A]
 
 // FlattenN reports a flattened sequence of the list xs by expanding any elements
 // depth levels deep. If depth is negative all elements are expanded.
@@ -56,14 +56,14 @@ FlattenN: func(xs: _, depth: int) -> [...]
 // results in
 //
 // 	[1, 2, 1, 2]
-Repeat: forall(A) func(x: [...A], count: int) -> [...A]
+Repeat: forall (A) func(x: [...A], count: int) -> [...A]
 
 // Concat takes a list of lists and concatenates them.
 //
 // Concat([a, b, c]) is equivalent to
 //
 // 	[for x in a {x}, for x in b {x}, for x in c {x}]
-Concat: forall(A) func(a: [...[...A]]) -> [...A]
+Concat: forall (A) func(a: [...[...A]]) -> [...A]
 
 // Take reports the prefix of length n of list x, or x itself if n > len(x).
 //
@@ -74,7 +74,7 @@ Concat: forall(A) func(a: [...[...A]]) -> [...A]
 // results in
 //
 // 	[1, 2]
-Take: forall(A) func(x: [...A], n: int) -> [...A]
+Take: forall (A) func(x: [...A], n: int) -> [...A]
 
 // Slice extracts the consecutive elements from list x starting from position i
 // up till, but not including, position j, where 0 <= i < j <= len(x).
@@ -86,7 +86,7 @@ Take: forall(A) func(x: [...A], n: int) -> [...A]
 // results in
 //
 // 	[2, 3]
-Slice: forall(A) func(x: [...A], i: int, j: int) -> [...A]
+Slice: forall (A) func(x: [...A], i: int, j: int) -> [...A]
 
 // Reverse reverses a list.
 //
@@ -97,7 +97,7 @@ Slice: forall(A) func(x: [...A], i: int, j: int) -> [...A]
 // results in
 //
 // 	[4, 3, 2, 1]
-Reverse: forall(A) func(x: [...A]) -> [...A]
+Reverse: forall (A) func(x: [...A]) -> [...A]
 
 // MinItems reports whether a has at least n items.
 MinItems: (func(n: int) -> validator([...])) | (func(list: [...], n: int) -> bool)
@@ -123,13 +123,13 @@ MatchN: (func(n: _ @schema(), matchValue: _ @schema()) -> validator([...])) | (f
 Avg: func(xs: [...number]) -> number
 
 // Max returns the maximum value of a non empty list xs.
-Max: forall(A: number) func(xs: [...A]) -> A
+Max: forall (A: number) func(xs: [...A]) -> A
 
 // Min returns the minimum value of a non empty list xs.
-Min: forall(A: number) func(xs: [...A]) -> A
+Min: forall (A: number) func(xs: [...A]) -> A
 
 // Product returns the product of a non empty list xs.
-Product: func(xs: [...number]) -> number
+Product: (func(xs: [...number]) -> number) & (func(xs: [...int]) -> int)
 
 // Range generates a list of numbers using a start value, a limit value, and a
 // step value.
@@ -141,10 +141,10 @@ Product: func(xs: [...number]) -> number
 // results in
 //
 // 	[0, 2, 4]
-Range: func(start: number, limit: number, step: number) -> [...number]
+Range: (func(start: number, limit: number, step: number) -> [...number]) & (func(start: int, limit: int, step: int) -> [...int])
 
 // Sum returns the sum of a list non empty xs.
-Sum: func(xs: [...number]) -> number
+Sum: (func(xs: [...number]) -> number) & (func(xs: [...int]) -> int)
 
 // Sort sorts data while keeping the original order of equal elements.
 // It does O(n*log(n)) comparisons.
@@ -157,18 +157,18 @@ Sum: func(xs: [...number]) -> number
 // 	Sort([2, 3, 1], list.Ascending)
 //
 // 	Sort([{a: 2}, {a: 3}, {a: 1}], {x: {}, y: {}, less: x.a < y.a})
-Sort: func(list: [...], cmp: Comparer) -> [...]
+Sort: forall (A) func(list: [...A], cmp: {x: _, y: _, less: bool}) -> [...A]
 
 // Deprecated: use [Sort], which is always stable
-SortStable: func(list: [...], cmp: Comparer) -> [...]
+SortStable: forall (A) func(list: [...A], cmp: {x: _, y: _, less: bool}) -> [...A]
 
 // SortStrings sorts a list of strings in increasing order.
-SortStrings: func(a: [...string]) -> [...string]
+SortStrings: forall (A: string) func(a: [...A]) -> [...A]
 
 // IsSorted tests whether a list is sorted.
 //
 // See Sort for an example comparator.
-IsSorted: func(list: [...], cmp: Comparer) -> bool
+IsSorted: func(list: [...], cmp: {x: _, y: _, less: bool}) -> bool
 
 // IsSortedStrings tests whether a list is a sorted list of strings.
 IsSortedStrings: validator([...string]) | (func(a: [...string]) -> bool)

@@ -15,7 +15,8 @@ var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
 	Native: []*pkg.Builtin{{
-		Name: "Marshal",
+		Name:      "Marshal",
+		Signature: "func(v: null | bool | number | string | bytes | [...] | {...}) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -27,7 +28,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "MarshalStream",
+		Name:      "MarshalStream",
+		Signature: "func(v: [...]) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -39,7 +41,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Unmarshal",
+		Name:      "Unmarshal",
+		Signature: "func(data: bytes|string) -> null | bool | number | string | bytes | [...] | {...}",
 		Params: []pkg.Param{
 			{Kind: adt.BytesKind | adt.StringKind},
 		},
@@ -51,7 +54,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "UnmarshalStream",
+		Name:      "UnmarshalStream",
+		Signature: "func(data: bytes|string) -> [...]",
 		Params: []pkg.Param{
 			{Kind: adt.BytesKind | adt.StringKind},
 		},

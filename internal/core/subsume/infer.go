@@ -1438,6 +1438,17 @@ func (p *inference) project(value adt.Value, label adt.Feature) adt.Value {
 		return p.project(x.Bound, label)
 	case *adt.LiveType:
 		return p.project(x.Upper, label)
+	case *adt.Conjunction:
+		// Any conjunct can supply a field; all descriptions of that field
+		// constrain its result. Symbolic record meets retain this form when
+		// a rigid input is refined by a comparator template, for example.
+		var fields []adt.Value
+		for _, term := range x.Values {
+			if field := p.project(term, label); field != nil {
+				fields = append(fields, field)
+			}
+		}
+		return p.meetResults(fields)
 	}
 	if union, ok := adt.Unwrap(value).(*adt.Disjunction); ok {
 		var alternatives []adt.Value
@@ -1585,8 +1596,16 @@ func (p *inference) apply(env *adt.Environment, callee adt.Value, call *adt.Call
 	}
 	packet := &adt.Function{}
 	args := make([]adt.Value, len(call.Args))
+	contextual, handled := p.listComparerArguments(env, callee, call)
+	if handled && contextual == nil {
+		return nil
+	}
 	for i, arg := range call.Args {
-		args[i] = p.constructorEvidence(p.expr(env, arg))
+		value := contextual[i]
+		if value == nil {
+			value = p.expr(env, arg)
+		}
+		args[i] = p.constructorEvidence(value)
 		if args[i] == nil {
 			return nil
 		}

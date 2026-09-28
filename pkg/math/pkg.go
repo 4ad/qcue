@@ -51,7 +51,8 @@ var p = &pkg.Package{
 		Name:  "Above",
 		Const: "1",
 	}, {
-		Name: "Jacobi",
+		Name:      "Jacobi",
+		Signature: "func(x: int, y: int) -> -1 | 0 | 1",
 		Params: []pkg.Param{
 			{Kind: adt.IntKind},
 			{Kind: adt.IntKind},
@@ -140,7 +141,9 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Abs",
+		Name:        "Abs",
+		Signature:   "func(x: number) -> number & >=0",
+		Refinements: []string{"func(x: int) -> (int & >=0)"},
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -152,7 +155,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Acosh",
+		Name:      "Acosh",
+		Signature: "func(x: number) -> number & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -176,7 +180,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Acos",
+		Name:      "Acos",
+		Signature: "func(x: number) -> number & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -295,7 +300,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Dim",
+		Name:      "Dim",
+		Signature: "func(x: number, y: number) -> number & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 			{Kind: adt.NumberKind},
@@ -308,7 +314,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Erf",
+		Name:      "Erf",
+		Signature: "func(x: number) -> number & >=-1 & <=1",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -320,7 +327,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Erfc",
+		Name:      "Erfc",
+		Signature: "func(x: number) -> number & >=0 & <=2",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -356,7 +364,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Exp",
+		Name:      "Exp",
+		Signature: "func(x: number) -> number & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -368,7 +377,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Exp2",
+		Name:      "Exp2",
+		Signature: "func(x: number) -> number & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -380,7 +390,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Expm1",
+		Name:      "Expm1",
+		Signature: "func(x: number) -> number & >=-1",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -404,7 +415,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Hypot",
+		Name:      "Hypot",
+		Signature: "func(p: number, q: number) -> number & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 			{Kind: adt.NumberKind},
@@ -564,7 +576,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Ilogb",
+		Name:      "Ilogb",
+		Signature: "func(x: number) -> int & >=-9223372036854775808 & <=9223372036854775807",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -602,7 +615,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Pow10",
+		Name:      "Pow10",
+		Signature: "func(n: int) -> number & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.IntKind},
 		},
@@ -639,7 +653,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Cos",
+		Name:      "Cos",
+		Signature: "func(x: number) -> number & >=-1 & <=1",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -651,7 +666,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Sin",
+		Name:      "Sin",
+		Signature: "func(x: number) -> number & >=-1 & <=1",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -675,7 +691,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Cosh",
+		Name:      "Cosh",
+		Signature: "func(x: number) -> number & >=1",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -687,7 +704,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Sqrt",
+		Name:      "Sqrt",
+		Signature: "func(x: number) -> number & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},
@@ -711,7 +729,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Tanh",
+		Name:      "Tanh",
+		Signature: "func(x: number) -> number & >=-1 & <=1",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},

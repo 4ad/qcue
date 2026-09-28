@@ -63,7 +63,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "ToInt",
+		Name:      "ToInt",
+		Signature: "func(x: string) -> int & >=0",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -75,7 +76,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Variant",
+		Name:      "Variant",
+		Signature: "func(x: string) -> int & >=0 & <=4",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -87,7 +89,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Version",
+		Name:      "Version",
+		Signature: "func(x: string) -> int & >=0 & <=15",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},

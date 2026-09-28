@@ -38,7 +38,7 @@ f:func(n:int)->string:strings.MinRunes(n)`, true},
 		{"validator_constructor_bad_input", `import "strings"
 f:func(n:string)->string:strings.MinRunes(n)`, false},
 		{"validator_constructor_bad_label", `import "strings"
-f:func(n:int)->string:strings.MinRunes(min:n)`, false},
+f:func(n:int)->string:strings.MinRunes(s:n)`, false},
 		{"validator_constructor_bad_result", `import "strings"
 f:func(n:int)->int:strings.MinRunes(n)`, false},
 		{"validator_constructor_list", `import "list"
