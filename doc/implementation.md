@@ -185,6 +185,9 @@ an unknown argument or change an incomplete native call into a value. Bare
 validators support their ordinary call forms; implicit validator constructors
 check the saved arguments and describe inhabitants of the validated parameter's
 type. These contracts do not promise success, termination, or concrete operands.
+Bare validators also accept the parameter labels in their public signatures,
+including explicit partial calls. Those labels come from native metadata and
+do not add runtime constraints or make a constructed validator callable.
 
 For implementation-declared pure natives, finite concrete input descriptions
 also provide exact successful results. This covers scalar alternatives and
@@ -309,8 +312,9 @@ API regressions exercise later refinement, observation triggers, independent
 coverage, packet isolation, strict operands, closure identity, and repeated
 export. The native inventory test checks every registered builtin, rejects
 incompatible argument slots and unproved results, and checks validator forms
-and explicit partial calls. Error-only Go validators return `true` on success
-and retain failures as errors; their checking signatures describe that result.
+and explicit partial calls, with positional and reordered named arguments.
+Error-only Go validators return `true` on success and retain failures as errors;
+their checking signatures describe that result.
 Operator matrices cover accepted and rejected operand domains; execution tests
 check the resulting values. Kernel tests inspect refutation support and resume
 real proofs after budget exhaustion. [Independent oracles](oracle.md) cover

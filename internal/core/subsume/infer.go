@@ -1763,11 +1763,6 @@ func (p *inference) partialCall(callee adt.Value, packet adt.FuncType) adt.Value
 
 func (p *inference) callValue(callee adt.Value, target adt.FuncType) adt.Value {
 	if validator, ok := callee.(*adt.BuiltinValidator); ok && validator.Src == nil {
-		for _, param := range target.Fn.Params {
-			if param.Label != adt.InvalidLabel {
-				return nil
-			}
-		}
 		callee = validator.Builtin
 	}
 	if !p.step() {

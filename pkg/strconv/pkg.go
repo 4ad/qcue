@@ -28,7 +28,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "ParseBool",
+		Name:      "ParseBool",
+		Signature: "func(str: string) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -235,7 +236,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IsPrint",
+		Name:      "IsPrint",
+		Signature: "func(r: int) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.IntKind},
 		},
@@ -247,7 +249,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IsGraphic",
+		Name:      "IsGraphic",
+		Signature: "func(r: int) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.IntKind},
 		},

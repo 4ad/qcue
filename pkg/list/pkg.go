@@ -139,7 +139,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "UniqueItems",
+		Name:      "UniqueItems",
+		Signature: "func(a: [...]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},

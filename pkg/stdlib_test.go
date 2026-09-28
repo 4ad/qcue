@@ -28,9 +28,11 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/core/eval"
 	"cuelang.org/go/internal/core/runtime"
 	"cuelang.org/go/pkg"
 	"github.com/go-quicktest/qt"
@@ -177,13 +179,19 @@ func TestDefsMatchRegisteredPackages(t *testing.T) {
 				if !isFunc {
 					continue
 				}
-				if !bare {
+				{
 					// Published contracts must be justified by the native's
 					// checking evidence, including generic relationships and
 					// conditional result refinements, not just matching arity.
 					program := strings.Replace(string(src), "package "+f.PackageName(),
 						"package "+f.PackageName()+"\nimport native "+strconv.Quote(ip), 1)
-					program += "\nchecked: native." + name + " & " + name
+					if bare {
+						callType, err := format.Node(sig)
+						qt.Assert(t, qt.IsNil(err))
+						program += "\nchecked: native." + name + "(...) & (" + string(callType) + ")"
+					} else {
+						program += "\nchecked: native." + name + " & " + name
+					}
 					v := ctx.CompileString(program).LookupPath(cue.ParsePath("checked"))
 					qt.Check(t, qt.IsNil(v.Validate()), qt.Commentf("%s: unsupported published contract", name))
 				}
@@ -200,15 +208,20 @@ func TestDefsMatchRegisteredPackages(t *testing.T) {
 					qt.Commentf("%s: declared parameters vs builtin parameters", name)) {
 					continue
 				}
+				var runtimeParams []adt.FuncParam
 				if bare {
-					// Bare validators have no callable runtime signature.
+					// Bare validators retain their callable labels in native
+					// metadata, without attaching runtime constraints.
 					qt.Check(t, qt.HasLen(builtin.Types, 0),
 						qt.Commentf("%s: unexpected generated runtime signature", name))
+					runtimeParams = builtin.Protocol(eval.NewContext(r, nil)).Params
 				} else if qt.Check(t, qt.HasLen(builtin.Types, 1),
 					qt.Commentf("%s: generated runtime signatures", name)) {
 					runtimeSig := builtin.Types[0].Fn
 					qt.Assert(t, qt.IsNotNil(runtimeSig))
-					runtimeParams := runtimeSig.Params
+					runtimeParams = runtimeSig.Params
+				}
+				if runtimeParams != nil {
 					if qt.Check(t, qt.HasLen(runtimeParams, len(params)),
 						qt.Commentf("%s: authored vs generated runtime parameters", name)) {
 						for i, p := range params {

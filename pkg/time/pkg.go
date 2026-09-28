@@ -34,7 +34,8 @@ var p = &pkg.Package{
 		Name:  "Hour",
 		Const: "3600000000000",
 	}, {
-		Name: "Duration",
+		Name:      "Duration",
+		Signature: "func(s: string) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -167,7 +168,8 @@ var p = &pkg.Package{
 		Name:  "Saturday",
 		Const: "6",
 	}, {
-		Name: "Time",
+		Name:      "Time",
+		Signature: "func(s: string) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},

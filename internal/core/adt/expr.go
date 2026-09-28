@@ -2990,11 +2990,17 @@ func (x *CallExpr) evaluate(c *OpContext, state Flags) Value {
 			return f.Builtin.FunctionValue(c).call(c, x, state)
 		}
 		if x.hasArgLabels() {
-			// A bare validator's argument is the value it validates; its
-			// declared signature names at most that one parameter, so a
-			// labeled call has no position left to select.
-			c.AddErrf("labeled arguments are not supported for validator %s", x.Fun)
-			return nil
+			if f.Src != nil {
+				c.AddErrf("cannot call previously called validator %s", x.Fun)
+				return nil
+			}
+			args, ok := bindBuiltinArgs(c, f.Builtin, x)
+			if !ok {
+				return nil
+			}
+			x2 := *x
+			x2.Args, x2.ArgLabels = args, nil
+			return f.Builtin.rawCall(c, &x2, state)
 		}
 		// We allow a validator that takes no arguments except the validated
 		// value to be called with zero arguments.

@@ -16,7 +16,8 @@ var _ = adt.TopKind // in case the adt package isn't used
 var p = &pkg.Package{
 	Pure: true,
 	Native: []*pkg.Builtin{{
-		Name: "Valid",
+		Name:      "Valid",
+		Signature: "func(data: bytes|string) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.BytesKind | adt.StringKind},
 		},

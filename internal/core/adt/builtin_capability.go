@@ -24,6 +24,16 @@ func (b *Builtin) FreezeSignature() {
 
 func (b *Builtin) declaredTypes() []FuncType { return b.self().declared }
 
+// Bare validators have no attached runtime function signature. Their native
+// checking signature still names the callable slots; reading those names does
+// not install its constraints on an incomplete runtime argument.
+func (b *Builtin) paramLabels(types []FuncType) (map[Feature]int, Feature) {
+	if len(types) == 0 && b.self().Signature != nil {
+		types = []FuncType{*b.self().Signature}
+	}
+	return builtinParamLabels(types)
+}
+
 func (b *Builtin) isDeclaredType(t FuncType) bool {
 	// Imports may reevaluate the same package declaration in a fresh
 	// environment, particularly with structure sharing disabled. Its code
@@ -85,7 +95,7 @@ func (b *Builtin) Protocol(c *OpContext) *Function {
 	case BottomKind:
 		f.Ret = &Bottom{Code: EvalError, Err: c.Newf("builtin has no successful result")}
 	}
-	labels, _ := builtinParamLabels(b.declaredTypes())
+	labels, _ := b.paramLabels(b.declaredTypes())
 	contracts := b.declaredTypes()
 	signature := b.self().Signature
 	if signature != nil {

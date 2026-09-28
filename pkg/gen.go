@@ -508,7 +508,7 @@ func (g *goEmitter) function(fn *types.Func) {
 	defer fmt.Fprintf(g.w, "}")
 
 	fmt.Fprintf(g.w, "Name: %q,\n", fn.Name())
-	if precise := deriveCallForm(fn, true); precise != deriveCallForm(fn, false) {
+	if precise := deriveCallForm(fn, true); bareValidator(fn) || precise != deriveCallForm(fn, false) {
 		fmt.Fprintf(g.w, "Signature: %q,\n", precise)
 	}
 	if refinements := nativeRefinements[strings.TrimPrefix(fn.Pkg().Path(), pkgParent+"/")+"."+fn.Name()]; len(refinements) != 0 {

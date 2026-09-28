@@ -43,7 +43,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "FQDN",
+		Name:      "FQDN",
+		Signature: "func(s: string) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -373,7 +374,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "URL",
+		Name:      "URL",
+		Signature: "func(s: string) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -385,7 +387,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "AbsURL",
+		Name:      "AbsURL",
+		Signature: "func(s: string) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},

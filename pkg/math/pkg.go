@@ -642,7 +642,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Signbit",
+		Name:      "Signbit",
+		Signature: "func(x: number) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 		},

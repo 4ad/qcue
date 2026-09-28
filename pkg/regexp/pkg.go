@@ -130,7 +130,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Valid",
+		Name:      "Valid",
+		Signature: "func(pattern: string) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},

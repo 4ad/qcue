@@ -57,6 +57,7 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 				ctx := eval.NewContext(r, nil)
 				protocol := b.Protocol(ctx)
 				var params, args []string
+				var labels []string
 				var paramKinds []adt.Kind
 				for i, param := range protocol.Params {
 					name := fmt.Sprintf("a%d", i)
@@ -64,6 +65,10 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 					paramKinds = append(paramKinds, kind)
 					params = append(params, name+": "+typ)
 					args = append(args, name)
+					if param.Label == adt.InvalidLabel {
+						t.Fatalf("parameter %d has no declared label", i)
+					}
+					labels = append(labels, param.Label.SelectorString(r))
 				}
 				resultType, _ := builtinConstraintSyntax(t, ctx, r, protocol.Ret)
 				if b.Result == adt.BottomKind {
@@ -80,6 +85,24 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 					ip, strings.Join(params, ", "), resultType, b.Name, partialArgs)
 				if err := cuecontext.New().CompileString(partial).Validate(); err != nil {
 					t.Fatalf("native partial application: %s\n%v", partial, err)
+				}
+				// Reverse the source order so positional binding cannot
+				// accidentally stand in for label resolution.
+				namedArgs := func(args []string) string {
+					var named []string
+					for i := len(args) - 1; i >= 0; i-- {
+						named = append(named, labels[i]+": "+args[i])
+					}
+					return strings.Join(named, ", ")
+				}
+				if len(args) != 0 {
+					for _, suffix := range []string{")", ", ...)()"} {
+						named := fmt.Sprintf("import native %q\nf: func(%s) -> (%s): native.%s(%s%s",
+							ip, strings.Join(params, ", "), resultType, b.Name, namedArgs(args), suffix)
+						if err := cuecontext.New().CompileString(named).Validate(); err != nil {
+							t.Fatalf("named native call: %s\n%v", named, err)
+						}
+					}
 				}
 				for i, kind := range paramKinds {
 					// Change each constrained slot independently. Top slots
@@ -106,6 +129,13 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 							ip, strings.Join(params, ", "), b.Name, strings.Join(badArgs, ", "))
 						if err := cuecontext.New().CompileString(partial).Validate(); err == nil {
 							t.Fatalf("invalid saved argument accepted: %s", partial)
+						}
+						for _, suffix := range []string{")", ", ...)()"} {
+							named := fmt.Sprintf("import native %q\nf: func(%s) -> _: native.%s(%s%s",
+								ip, strings.Join(params, ", "), b.Name, namedArgs(badArgs), suffix)
+							if cuecontext.New().CompileString(named).Validate() == nil {
+								t.Fatalf("invalid named argument accepted: %s", named)
+							}
 						}
 						break
 					}

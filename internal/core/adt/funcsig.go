@@ -659,7 +659,7 @@ func CheckBuiltinTightening(c *OpContext, typ *Function, b *Builtin) *Bottom {
 // resolved, and it is left pending rather than rejected; the check is repeated
 // with all labels as further signatures arrive (see [checkBuiltinSignatures]).
 func checkBuiltinTightening(c *OpContext, typ *Function, b *Builtin, types []FuncType) *Bottom {
-	byLabel, _ := builtinParamLabels(types)
+	byLabel, _ := b.paramLabels(types)
 	labelsKnown := len(byLabel) > 0
 	pending := false
 	covered := make([]bool, len(b.Params))
@@ -763,7 +763,7 @@ func matchBuiltinParams(x *Function, b *Builtin) []int {
 // matchBuiltinParamsWith is [matchBuiltinParams] with the labels taken from
 // types instead of the signatures recorded on b.
 func matchBuiltinParamsWith(x *Function, b *Builtin, types []FuncType) []int {
-	byLabel, _ := builtinParamLabels(types)
+	byLabel, _ := b.paramLabels(types)
 	matches := make([]int, len(x.Params))
 	for i := range matches {
 		matches[i] = -1
@@ -819,7 +819,7 @@ func checkBuiltinParamLabels(c *OpContext, types []FuncType) *Bottom {
 // on b's attached signatures. It is exported for structural subsumption
 // checks.
 func BuiltinParamLabelIndex(b *Builtin, label Feature) (int, bool) {
-	byLabel, _ := builtinParamLabels(b.protocolTypes())
+	byLabel, _ := b.paramLabels(b.protocolTypes())
 	i, ok := byLabel[label]
 	return i, ok && i >= 0
 }
@@ -837,17 +837,16 @@ func BuiltinParamLabelIndex(b *Builtin, label Feature) (int, bool) {
 // bind. A label placed at different positions makes the attached signatures
 // incompatible; the negative map entry remains a defensive check at the call
 // boundary.
-// A builtin with no attached types supports no labels: its parameters have
-// no names. Validator constructors bind only the trailing raw slots, leaving
-// slot zero for the value validated later.
+// Native checking metadata supplies labels for bare validators. Validator
+// constructors bind only the trailing raw slots, leaving slot zero for the
+// value validated later.
 func bindBuiltinArgs(c *OpContext, b *Builtin, call *CallExpr) ([]Expr, bool) {
-	if len(b.protocolTypes()) == 0 {
+	byLabel, _ := b.paramLabels(b.protocolTypes())
+	if len(byLabel) == 0 {
 		c.AddErrf("labeled arguments are not supported for builtin %s: it declares no parameter names",
 			b.qualifiedName(c))
 		return nil, false
 	}
-
-	byLabel, _ := builtinParamLabels(b.protocolTypes())
 
 	offset := 0
 	if b.IsValidator(len(call.Args)) {
