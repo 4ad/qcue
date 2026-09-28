@@ -35,15 +35,16 @@ func (p *inference) enter() func() {
 func newInference(ctx *adt.OpContext) *inference {
 	return &inference{ctx: ctx, support: &assumptionStore{},
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope),
-		projections:    make(map[*adt.Vertex]map[adt.Feature]adt.Value),
-		constructors:   make(map[*adt.Vertex]adt.Expr),
-		memberships:    make(map[adt.Value][]*adt.LiveType),
-		grounded:       make(map[*adt.Vertex]bool),
-		savedValues:    make(map[adt.Value]bool),
-		comparers:      make(map[adt.Value]proofBinding),
-		comparerProofs: make(map[comparerProofKey]proofCertificate),
-		records:        make(map[proofRecordKey]*proofRecord),
-		completed:      make(map[proofKey]proofCertificate), refutations: make(map[proofKey]*refutation), remaining: 10000}
+		projections:       make(map[*adt.Vertex]map[adt.Feature]adt.Value),
+		constructors:      make(map[*adt.Vertex]adt.Expr),
+		memberships:       make(map[adt.Value][]*adt.LiveType),
+		grounded:          make(map[*adt.Vertex]bool),
+		savedValues:       make(map[adt.Value]bool),
+		nativeSavedValues: make(map[adt.Value]bool),
+		comparers:         make(map[adt.Value]proofBinding),
+		comparerProofs:    make(map[comparerProofKey]proofCertificate),
+		records:           make(map[proofRecordKey]*proofRecord),
+		completed:         make(map[proofKey]proofCertificate), refutations: make(map[proofKey]*refutation), remaining: 10000}
 }
 
 // Reuse the current proof context when validating captured composites.
@@ -114,6 +115,10 @@ type inference struct {
 	// Re-reading these as concrete captures could turn an open list or
 	// record description into the inventory of its visible prefix.
 	savedValues map[adt.Value]bool
+	// Native slot projection preserves the exact inventories established by
+	// its first admission pass; ordinary source binding retains its separate
+	// refinement policy.
+	nativeSavedValues map[adt.Value]bool
 	// A comparator saved by a native is a template, not a completed record.
 	// Its storage description must be checked against the original source
 	// each time a native invocation supplies a list element domain.

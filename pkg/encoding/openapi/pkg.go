@@ -17,7 +17,7 @@ var p = &pkg.Package{
 	Pure: true,
 	Native: []*pkg.Builtin{{
 		Name:      "MarshalSchema",
-		Signature: "func(config: {version: string, selfContained?: bool, expandReferences?: bool, info?: _}, schema: _ @schema()) -> string",
+		Signature: "func(config: {version: string, selfContained?: bool, expandReferences?: bool, info?: {...}}, schema: _ @schema()) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.TopKind},

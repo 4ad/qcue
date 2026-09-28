@@ -70,8 +70,21 @@ func MarshalSchema(config cue.Value, schema pkg.Schema) (string, error) {
 }
 
 func marshalSchema(_ *adt.OpContext, config cue.Value, schema pkg.Schema) (string, error) {
-	selfContained, _ := config.LookupPath(selfContainedPath).Bool()
-	expandReferences, _ := config.LookupPath(expandReferencesPath).Bool()
+	option := func(path cue.Path) (bool, error) {
+		v := config.LookupPath(path)
+		if !v.Exists() {
+			return false, nil
+		}
+		return v.Bool()
+	}
+	selfContained, err := option(selfContainedPath)
+	if err != nil {
+		return "", err
+	}
+	expandReferences, err := option(expandReferencesPath)
+	if err != nil {
+		return "", err
+	}
 
 	version, err := config.LookupPath(cue.ParsePath("version")).String()
 	if err != nil {
@@ -85,6 +98,11 @@ func marshalSchema(_ *adt.OpContext, config cue.Value, schema pkg.Schema) (strin
 	}
 
 	if info := config.LookupPath(infoPath); info.Exists() {
+		// Serialization wraps errors for display. Check data completeness
+		// here so an unresolved field keeps its original error code.
+		if err := info.Validate(cue.Concrete(true)); err != nil {
+			return "", err
+		}
 		c.Info = info
 	}
 

@@ -86,9 +86,18 @@ func ConfigurePropagation(ctx *adt.OpContext) {
 	}
 	ctx.CheckArgument = func(native *adt.Builtin, slot int, env *adt.Environment, expr adt.Expr) adt.Value {
 		if p, ok := ctx.Inference.(*inference); ok {
-			value := p.bindingDescription(p.nativeArgument(native, slot, env, expr))
-			if value != nil && native != nil {
-				p.savedValues[value] = true
+			value := p.nativeArgument(native, slot, env, expr)
+			if native != nil {
+				// Native admission needs a constructor's known field
+				// inventory, including absent optional configuration fields.
+				// This is checking evidence, not a saved runtime snapshot.
+				value = p.constructorEvidence(value)
+				if value != nil {
+					p.savedValues[value] = true
+					p.nativeSavedValues[value] = true
+				}
+			} else if !p.nativeSavedValues[value] {
+				value = p.bindingDescription(value)
 			}
 			return value
 		}

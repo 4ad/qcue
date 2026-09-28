@@ -54,7 +54,7 @@ package openapi
 // 	    version: string
 // 	  }
 // 	}
-MarshalSchema: func(config: {version: string, selfContained?: bool, expandReferences?: bool, info?: _}, schema: _ @schema()) -> string
+MarshalSchema: func(config: {version: string, selfContained?: bool, expandReferences?: bool, info?: {...}}, schema: _ @schema()) -> string
 
 // #Config represents options for generating OpenAPI.
 #Config: {

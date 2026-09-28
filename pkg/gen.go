@@ -967,7 +967,7 @@ var nativeParams = map[string]map[string]string{
 	"encoding/base64.Decode":         {"encoding": "null"},
 	"encoding/json.Marshal":          {"v": "null | bool | number | string | bytes | [...] | {...}"},
 	"encoding/yaml.Marshal":          {"v": "null | bool | number | string | bytes | [...] | {...}"},
-	"encoding/openapi.MarshalSchema": {"config": "{version: string, selfContained?: bool, expandReferences?: bool, info?: _}"},
+	"encoding/openapi.MarshalSchema": {"config": "{version: string, selfContained?: bool, expandReferences?: bool, info?: {...}}"},
 	"encoding/csv.Encode":            {"x": "[...[...(null | bool | number | string | bytes | [...] | {...})]]"},
 	"encoding/json.MarshalStream":    {"v": "[...]"},
 	"encoding/yaml.MarshalStream":    {"v": "[...]"},

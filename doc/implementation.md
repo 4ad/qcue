@@ -212,6 +212,12 @@ Manual conversion adapters also declare their accepted input domains. Base64
 operations require the supported `null` encoding selector. Template data and
 CSV cells admit scalar data, lists, and records; function values do not acquire
 serialization support from a broad Go `cue.Value` parameter.
+OpenAPI metadata must be a record. Its configuration flags and metadata, and
+network addresses assembled from list elements, retain incomplete errors until
+their inputs are supplied. Native argument admission can use a constructor's
+known field inventory to establish that optional configuration fields are
+absent. This evidence does not freeze the saved argument: later additions are
+checked again against the native contract.
 
 Generic native functions support explicit type arguments, such as
 `list.Reverse[int]`, as well as inferred instances. Selected views retain the
