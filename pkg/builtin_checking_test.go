@@ -82,6 +82,38 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 				if err := v.Validate(); err != nil {
 					t.Fatalf("%s\n%v", source, err)
 				}
+				for i, param := range b.Params {
+					// Change each constrained slot independently. Top slots
+					// have no incompatible kind to test.
+					for _, wrong := range []struct {
+						kind  adt.Kind
+						value string
+					}{
+						{adt.NullKind, "null"}, {adt.BoolKind, "true"},
+						{adt.IntKind, "0"}, {adt.StringKind, `"wrong"`},
+					} {
+						if param.Kind()&wrong.kind != 0 {
+							continue
+						}
+						badArgs := append([]string(nil), args...)
+						badArgs[i] = wrong.value
+						badSource := fmt.Sprintf("import native %q\nf: func(%s) -> _: native.%s(%s)",
+							ip, strings.Join(params, ", "), b.Name, strings.Join(badArgs, ", "))
+						bad := cuecontext.New().CompileString(badSource)
+						if err := bad.Validate(); err == nil {
+							t.Fatalf("invalid argument accepted: %s", badSource)
+						}
+						break
+					}
+				}
+				if b.IsValidator(len(b.Params) - 1) {
+					constructor := fmt.Sprintf("import native %q\nf: func(%s) -> %s: native.%s(%s)",
+						ip, strings.Join(params[1:], ", "), builtinKindSyntax(b.Params[0].Kind()),
+						b.Name, strings.Join(args[1:], ", "))
+					if err := cuecontext.New().CompileString(constructor).Validate(); err != nil {
+						t.Fatalf("%s\n%v", constructor, err)
+					}
+				}
 				// A correct broad return must not let the same call prove a singleton.
 				// Bottom-returning natives have no successful result to contradict it.
 				if b.Result != adt.BottomKind {

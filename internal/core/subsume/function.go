@@ -378,6 +378,11 @@ func (s *subsumer) funcConstraint(envA *adt.Environment, xa adt.Expr, envB *adt.
 // evalFuncConstraint evaluates a compiled signature constraint in its
 // closure environment.
 func (s *subsumer) evalFuncConstraint(env *adt.Environment, x adt.Expr) (adt.Value, bool) {
+	if env == nil {
+		// Native contracts have no lexical captures, but structural
+		// descriptions still need a root when evaluated.
+		env = &adt.Environment{Vertex: &adt.Vertex{BaseValue: &adt.StructMarker{}}}
+	}
 	v, complete := s.ctx.Evaluate(env, x)
 	if vertex, ok := v.(*adt.Vertex); ok {
 		vertex.Finalize(s.ctx)

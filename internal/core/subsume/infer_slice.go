@@ -42,6 +42,12 @@ func (p *inference) sliceValue(value, low, high adt.Value) adt.Value {
 	if !p.step() {
 		return nil
 	}
+	switch x := adt.Unwrap(value).(type) {
+	case *adt.RigidType:
+		return p.sliceValue(x.Bound, low, high)
+	case *adt.LiveType:
+		return p.sliceValue(x.Upper, low, high)
+	}
 	if union, ok := adt.Unwrap(value).(*adt.Disjunction); ok {
 		var out []adt.Value
 		for _, branch := range union.Values {

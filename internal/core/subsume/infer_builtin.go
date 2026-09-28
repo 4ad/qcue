@@ -14,7 +14,11 @@
 
 package subsume
 
-import "cuelang.org/go/internal/core/adt"
+import (
+	"slices"
+
+	"cuelang.org/go/internal/core/adt"
+)
 
 // listFold describes successful results of and/or. An optional tail contributes
 // to a union, but cannot narrow a conjunction: it may have no elements at all.
@@ -72,4 +76,92 @@ func (p *inference) listFold(value adt.Value, conjunction bool) adt.Value {
 		return &adt.Bottom{Code: adt.EvalError, Err: p.ctx.Newf("empty list in call to or")}
 	}
 	return proofUnion(elements)
+}
+
+// builtinCall uses one protocol for direct calls, aliases, and primitive
+// capability proofs. Argument-dependent results retain the checked packet.
+func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
+	// Primitive successful-result rules and packet coverage are separate
+	// obligations.
+	// Use the same protocol as builtin capability inclusion, including
+	// its label and omission rules.
+	source := adt.FuncType{Fn: primitiveContract(p.ctx, f)}
+	if source.Fn == nil || ValidateBuiltin(p.ctx, f) != nil {
+		return nil
+	}
+	if f.IsValidator(len(target.Fn.Params)) {
+		// The implicit validator constructor saves the trailing slots;
+		// its successful inhabitants have the validated slot's type.
+		// This form has no argument labels or partial-call protocol.
+		for _, param := range target.Fn.Params {
+			if param.Label != adt.InvalidLabel {
+				return nil
+			}
+		}
+		protocol := *source.Fn
+		protocol.Params = protocol.Params[1:]
+		protocol.Ret = nil
+		if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol}) {
+			return nil
+		}
+		result := f.Params[0].Value
+		if basic, ok := result.(*adt.BasicType); ok {
+			switch basic.K {
+			case adt.StructKind:
+				return p.schema(nil, &adt.StructLit{})
+			case adt.ListKind:
+				return p.schema(nil, &adt.ListLit{Elems: []adt.Elem{&adt.Ellipsis{}}})
+			}
+		}
+		return result
+	}
+	// Native slots consume values of their declared types. Unlike a CUE
+	// activation, a native call cannot constrain an ill-typed argument
+	// into an empty packet and use that contradiction as result evidence.
+	protocol := *source.Fn
+	protocol.Ret = nil
+	if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol}) {
+		return nil
+	}
+	sources := []adt.FuncType{source}
+	results := append(slices.Clone(sources), f.AdditionalTypes()...)
+	result := p.callPackets(target, sources, results, nil, 0)
+	if result == nil || refuted(result) || f.Package != adt.InvalidLabel {
+		return result
+	}
+	switch f.Name {
+	case "len":
+		return p.length(target.Fn.Params[0].Value.(adt.Value))
+	case "and", "or":
+		return p.listFold(target.Fn.Params[0].Value.(adt.Value), f.Name == "and")
+	case "close":
+		return p.closeResult(f, target.Fn.Params[0].Value.(adt.Value))
+	case "__reclose", "__closeAll", "testExperiment":
+		return target.Fn.Params[0].Value.(adt.Value)
+	}
+	return result
+}
+
+func (p *inference) closeResult(b *adt.Builtin, value adt.Value) adt.Value {
+	if !p.step() {
+		return nil
+	}
+	switch x := adt.Unwrap(value).(type) {
+	case *adt.RigidType, *adt.LiveType:
+		// Closing only narrows the input. A rigid or live predicate cannot be
+		// executed as a concrete record: that would create a spurious failure
+		// and prove arbitrary result annotations by explosion.
+		return value
+	case *adt.Disjunction:
+		var results []adt.Value
+		for _, branch := range x.Values {
+			result := p.closeResult(b, branch)
+			if result == nil {
+				return nil
+			}
+			results = append(results, result)
+		}
+		return proofUnion(results)
+	}
+	return p.schema(nil, &adt.CallExpr{Fun: b.Implementation(), Args: []adt.Expr{value}})
 }

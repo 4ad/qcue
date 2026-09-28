@@ -54,6 +54,25 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 	if s.capabilitySignature(target, source) {
 		return true
 	}
+	if b.Package == adt.InvalidLabel {
+		switch b.Name {
+		case "and", "or", "len", "close":
+			// Check the same argument-dependent rule used by direct calls
+			// under the target's rigid packet. This adapter is proof syntax
+			// only; it neither changes the builtin's protocol nor executes it.
+			p := s.inference
+			if p == nil {
+				p = newInference(s.ctx)
+			}
+			defer p.enter()()
+			call := &adt.CallExpr{Fun: b.Implementation()}
+			for _, param := range primitive.Params {
+				call.Args = append(call.Args, &adt.FieldReference{Label: param.Local})
+			}
+			primitive.Body = call
+			return p.function(&adt.FuncValue{Fn: primitive}, target)
+		}
+	}
 	// A singleton packet can be checked exhaustively. This is a proof over
 	// its entire domain, not a successful sample of an infinite predicate.
 	// First establish the full protocol and argument coverage independently

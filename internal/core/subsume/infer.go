@@ -775,8 +775,11 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return nil
 	case *adt.BoundExpr:
 		v := p.expr(env, x.Expr)
-		if v == nil || !adt.IsConcrete(v) {
+		if v == nil {
 			return nil
+		}
+		if refuted(v) {
+			return v
 		}
 		switch x.Op {
 		case adt.LessThanOp, adt.LessEqualOp, adt.GreaterThanOp, adt.GreaterEqualOp:
@@ -788,13 +791,23 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				return nil
 			}
 		case adt.NotEqualOp:
-			if v.Kind()&(adt.NumberKind|adt.StringKind|adt.BytesKind|adt.BoolKind|adt.NullKind) != v.Kind() {
+			if v.Kind()&(adt.NumberKind|adt.StringKind|adt.BytesKind|adt.BoolKind|adt.NullKind|adt.StructKind|adt.ListKind) != v.Kind() {
 				return nil
 			}
 		default:
 			return nil
 		}
-		return p.schema(nil, &adt.BoundExpr{Src: x.Src, Op: x.Op, Expr: v})
+		if adt.IsConcrete(v) && v.Kind()&(adt.StructKind|adt.ListKind) == 0 {
+			return p.schema(nil, &adt.BoundExpr{Src: x.Src, Op: x.Op, Expr: v})
+		}
+		kind := (&adt.BoundValue{Op: x.Op, Value: v}).Kind()
+		switch kind {
+		case adt.StructKind:
+			return p.schema(nil, &adt.StructLit{})
+		case adt.ListKind:
+			return p.schema(nil, &adt.ListLit{Elems: []adt.Elem{&adt.Ellipsis{}}})
+		}
+		return &adt.BasicType{K: kind}
 	case *adt.Builtin:
 		return x
 	case *adt.LabelReference:
@@ -961,15 +974,7 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				Err: p.ctx.NewPosf(adt.Pos(x), "erased type parameter cannot be used as a runtime index")}
 			return nil
 		}
-		n, ok := adt.Unwrap(p.expr(env, x.Index)).(*adt.Num)
-		if !ok {
-			return nil
-		}
-		i, err := n.X.Int64()
-		if err != nil || i < 0 {
-			return nil
-		}
-		return p.project(v, adt.MakeIntLabel(adt.IntLabel, i))
+		return p.index(v, p.expr(env, x.Index))
 	case *adt.Function:
 		// Use the source descriptor, including its explicit interface root.
 		// A local constructor still needs an implementation. Conditional
@@ -1164,7 +1169,7 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 	case *adt.Interpolation:
 		for _, part := range x.Parts {
 			v := p.expr(env, part)
-			if v == nil || v.Kind()&(adt.NumberKind|adt.StringKind|adt.BoolKind) != v.Kind() {
+			if v == nil || v.Kind()&(adt.NumberKind|adt.StringKind|adt.BytesKind|adt.BoolKind) != v.Kind() {
 				return nil
 			}
 		}
@@ -1209,77 +1214,8 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		if a == nil || b == nil {
 			return nil
 		}
-		ka, kb := a.Kind(), b.Kind()
-		ground := func() adt.Value {
-			if !adt.IsConcrete(a) || !adt.IsConcrete(b) {
-				return nil
-			}
-			return adt.BinOp(p.ctx, x, x.Op, adt.Unwrap(a), adt.Unwrap(b))
-		}
-		switch x.Op {
-		case adt.AndOp:
-			// Both operands have their own derivation. Their meet constrains
-			// successful results even when they conflict; it is an operation
-			// in the source body, never a filter supplied by an annotation.
-			return p.sourceMeet(a, b)
-		case adt.AddOp, adt.SubtractOp, adt.MultiplyOp, adt.FloatQuotientOp:
-			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
-				if v := ground(); v != nil {
-					return v
-				}
-				if x.Op == adt.AddOp || x.Op == adt.SubtractOp {
-					if n, ok := adt.Unwrap(b).(*adt.Num); ok {
-						return p.schema(nil, p.translateNumber(a, n, x.Op))
-					}
-					if n, ok := adt.Unwrap(a).(*adt.Num); ok && x.Op == adt.AddOp {
-						return p.schema(nil, p.translateNumber(b, n, x.Op))
-					}
-				}
-				kind := ka | kb
-				if x.Op == adt.FloatQuotientOp {
-					kind = adt.NumberKind
-				}
-				return &adt.BasicType{K: kind}
-			}
-			if x.Op == adt.AddOp && ka == kb && (ka == adt.StringKind || ka == adt.BytesKind) {
-				if v := ground(); v != nil {
-					return v
-				}
-				return &adt.BasicType{K: ka}
-			}
-			if x.Op == adt.MultiplyOp &&
-				(ka == adt.IntKind && (kb == adt.StringKind || kb == adt.BytesKind) ||
-					kb == adt.IntKind && (ka == adt.StringKind || ka == adt.BytesKind)) {
-				if v := ground(); v != nil {
-					return v
-				}
-				return &adt.BasicType{K: (ka | kb) &^ adt.IntKind}
-			}
-		case adt.EqualOp, adt.NotEqualOp:
-			if ka == kb && ka&(adt.NumberKind|adt.StringKind|adt.BytesKind|adt.BoolKind|adt.NullKind) == ka ||
-				ka&adt.NumberKind == ka && kb&adt.NumberKind == kb {
-				if v := ground(); v != nil {
-					return v
-				}
-				return &adt.BasicType{K: adt.BoolKind}
-			}
-		case adt.LessThanOp, adt.LessEqualOp, adt.GreaterThanOp, adt.GreaterEqualOp:
-			if ka&adt.NumberKind == ka && kb&adt.NumberKind == kb ||
-				ka == kb && (ka == adt.StringKind || ka == adt.BytesKind) {
-				if v := ground(); v != nil {
-					return v
-				}
-				return &adt.BasicType{K: adt.BoolKind}
-			}
-		case adt.BoolAndOp, adt.BoolOrOp:
-			if ka == adt.BoolKind && kb == adt.BoolKind {
-				if v := ground(); v != nil {
-					return v
-				}
-				return &adt.BasicType{K: adt.BoolKind}
-			}
-		}
-		return nil
+		return p.binary(x, a, b)
+
 	case *adt.CallExpr:
 		return p.call(env, x)
 	case adt.Value:
@@ -1679,19 +1615,7 @@ func (p *inference) apply(env *adt.Environment, callee adt.Value, call *adt.Call
 			}
 		}
 	}
-	if builtin, ok := callee.(*adt.Builtin); ok && result != nil &&
-		builtin.Package == adt.InvalidLabel {
-		switch builtin.Name {
-		case "len":
-			result = p.length(args[0])
-		case "and", "or":
-			result = p.listFold(args[0], builtin.Name == "and")
-		case "close":
-			// Apply the primitive to the checked description, retaining its
-			// field constraints while adding the explicit source closedness.
-			result = p.schema(nil, &adt.CallExpr{Fun: builtin.Implementation(), Args: []adt.Expr{args[0]}})
-		}
-	}
+
 	// The call rule establishes the successful result's interface. Retain
 	// that evidence for higher-order elimination, including a quantified
 	// callback returned by an explicitly impredicative instance.
@@ -1781,30 +1705,12 @@ func (p *inference) callValue(callee adt.Value, target adt.FuncType) adt.Value {
 		}
 		source = adt.FuncType{Fn: f.ResidualSignature(), Env: f.Env}
 	case *adt.Builtin:
-		// Primitive successful-result rules and packet coverage are separate
-		// obligations.
-		// Use the same protocol as builtin capability inclusion, including
-		// its label and omission rules.
-		source.Fn = primitiveContract(p.ctx, f)
-		if source.Fn == nil || ValidateBuiltin(p.ctx, f) != nil {
-			return nil
-		}
-		// Native slots consume values of their declared types. Unlike a CUE
-		// activation, a native call cannot constrain an ill-typed argument
-		// into an empty packet and use that contradiction as result evidence.
-		protocol := *source.Fn
-		protocol.Ret = nil
-		if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol}) {
-			return nil
-		}
+		return p.builtinCall(f, target)
 	default:
 		return nil
 	}
 	sources := []adt.FuncType{source}
 	results := sources
-	if builtin, ok := callee.(*adt.Builtin); ok {
-		results = append(slices.Clone(sources), builtin.AdditionalTypes()...)
-	}
 	if f, ok := callee.(*adt.FuncValue); ok {
 		if p.hypotheses[f] {
 			p.useHypothesis(f)

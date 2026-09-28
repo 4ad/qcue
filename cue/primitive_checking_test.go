@@ -25,6 +25,27 @@ func TestPrimitiveDefinitionChecking(t *testing.T) {
 		name, source string
 		valid        bool
 	}{
+		{"and_capability", `f:and & (forall(A) func([A,...A])->A)`, true},
+		{"and_false_capability", `f:and & (forall(A) func([...A])->A)`, false},
+		{"or_capability", `f:or & (forall(A) func([...A])->A)`, true},
+		{"len_capability", `f:len & (func(string)->(int&>=0))`, true},
+		{"close_capability", `f:close & (func({a:int})->{a:int})`, true},
+
+		{"validator_constructor", `import "strings"
+f:func(n:int)->string:strings.MinRunes(n)`, true},
+		{"validator_constructor_bad_input", `import "strings"
+f:func(n:string)->string:strings.MinRunes(n)`, false},
+		{"validator_constructor_bad_label", `import "strings"
+f:func(n:int)->string:strings.MinRunes(min:n)`, false},
+		{"validator_constructor_bad_result", `import "strings"
+f:func(n:int)->int:strings.MinRunes(n)`, false},
+		{"validator_constructor_list", `import "list"
+f:func(n:int)->[...]:list.MinItems(n)`, true},
+		{"bare_validator_constructor", `import "encoding/json"
+f:func()->(string|bytes):json.Valid()`, true},
+		{"close_generic", `f(A:{a:int}):func(x:A)->A:close(x)`, true},
+		{"close_generic_bad_result", `f(A:{a:int}):func(x:A)->string:close(x)`, false},
+
 		{"and_nonempty", `f(A):func(xs:[A,...A])->A:and(xs)`, true},
 		{"and_maybe_empty", `f(A):func(xs:[...A])->A:and(xs)`, false},
 		{"and_empty", `f:func()->_:and([])`, true},
