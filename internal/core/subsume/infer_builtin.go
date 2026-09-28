@@ -70,7 +70,21 @@ func (p *inference) listComparerArguments(env *adt.Environment, callee adt.Value
 	if element == nil {
 		return nil, true
 	}
+	shape, shaped := p.nativeListShape(list)
+	unused := shaped && shape.tail == nil && len(shape.prefix) < 2
+	if unused {
+		// Sorting fewer than two elements never invokes the template.
+		// Check its expressions under the empty comparison domain, while
+		// retaining the native setup requirement that less is present.
+		element = &adt.Bottom{Code: adt.EvalError, Err: p.ctx.Newf("empty comparison domain")}
+	}
 	if comparer := p.expr(env, call.Args[comparerIndex]); comparer != nil {
+		if unused {
+			if p.project(comparer, p.ctx.StringLabel("less")) == nil {
+				return nil, true
+			}
+			return map[int]adt.Value{listIndex: list, comparerIndex: p.unusedListComparer()}, true
+		}
 		for _, name := range []string{"x", "y"} {
 			bound := p.project(comparer, p.ctx.StringLabel(name))
 			if bound == nil || !p.includes(bound, element) {
@@ -95,21 +109,38 @@ func (p *inference) listComparerArguments(env *adt.Environment, callee adt.Value
 	if record == nil {
 		return nil, true
 	}
+	if mode, present := record.scope.presence[p.ctx.StringLabel("less")]; unused && (!present || mode == adt.ArcOptional) {
+		return nil, true
+	}
 	packet := &adt.StructLit{}
 	for _, name := range []string{"x", "y"} {
 		label := p.ctx.StringLabel(name)
 		bound := p.expr(record.env, &adt.FieldReference{Label: label})
-		if bound == nil || !p.includes(bound, element) {
+		if !unused && (bound == nil || !p.includes(bound, element)) {
 			return nil, true
 		}
 		packet.Decls = append(packet.Decls, &adt.Field{Label: label, Value: element})
 	}
 	bindings = append(bindings, proofBinding{expr: packet})
 	comparer, ok := p.recordMeet(bindings)
-	if !ok || comparer == nil || refuted(comparer) {
+	if !ok || comparer == nil || !unused && refuted(comparer) {
 		return nil, true
 	}
+	if unused {
+		comparer = p.unusedListComparer()
+	}
 	return map[int]adt.Value{listIndex: list, comparerIndex: comparer}, true
+}
+
+// This is evidence for a template with no invocation packets. Its result
+// cannot affect the native call; it is not evidence about a comparator used
+// with two or more elements, or about the standalone template's field values.
+func (p *inference) unusedListComparer() adt.Value {
+	return p.schema(nil, &adt.StructLit{Decls: []adt.Decl{
+		&adt.Field{Label: p.ctx.StringLabel("x"), Value: &adt.Top{}},
+		&adt.Field{Label: p.ctx.StringLabel("y"), Value: &adt.Top{}},
+		&adt.Field{Label: p.ctx.StringLabel("less"), Value: &adt.BasicType{K: adt.BoolKind}},
+	}})
 }
 
 // listFold describes successful results of and/or. An optional tail contributes
@@ -214,7 +245,16 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 	results := append(slices.Clone(sources), f.CheckingRefinements(p.ctx)...)
 	results = append(results, f.AdditionalTypes()...)
 	result := p.callPackets(target, sources, results, nil, 0)
-	if result == nil || refuted(result) || f.Package != adt.InvalidLabel {
+	if result == nil || refuted(result) {
+		return result
+	}
+	if f.Package != adt.InvalidLabel {
+		if precise := p.nativeListResult(f, target, &protocol); precise != nil {
+			if p.includes(result, precise) {
+				return precise
+			}
+			return p.eagerMeet(result, precise)
+		}
 		return result
 	}
 	switch f.Name {

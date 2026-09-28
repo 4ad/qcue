@@ -45,7 +45,7 @@ Drop: forall (A) func(x: [...A], n: int) -> [...A]
 // results in
 //
 // 	[1, [2, 3], [], 4]
-FlattenN: func(xs: _, depth: int) -> [...]
+FlattenN: func(xs: [...], depth: int) -> [...]
 
 // Repeat returns a new list consisting of count copies of list x.
 //

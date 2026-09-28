@@ -44,6 +44,14 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		// structural equivalence or return an error.
 		return !b.IsIncomplete()
 	}
+	// A field or list element can carry an abstract predicate directly.
+	// Its upper bound supplies structural evidence without replacing the
+	// predicate's identity. Going straight to listVertices would instead
+	// inspect the empty wrapper's arcs and lose that bound.
+	switch value := adt.Unwrap(y).(type) {
+	case *adt.RigidType, *adt.LiveType:
+		return s.values(x, value)
+	}
 
 	ctx := s.ctx
 

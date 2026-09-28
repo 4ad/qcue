@@ -58,7 +58,7 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 		return s.capabilitySignature(target, adt.FuncType{Fn: &constructor, Env: source.Env})
 	}
 	if isListComparerBuiltin(s.ctx, b) {
-		return s.builtinBodyCapability(target, b, source)
+		return s.builtinBodyCapability(target, b)
 	}
 	if s.capabilitySignature(target, source) {
 		return true
@@ -68,13 +68,16 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 			return true
 		}
 	}
+	if isListShapeBuiltin(s.ctx, b) {
+		return s.builtinBodyCapability(target, b)
+	}
 	if b.Package == adt.InvalidLabel {
 		switch b.Name {
 		case "and", "or", "len", "close":
 			// Check the same argument-dependent rule used by direct calls
 			// under the target's rigid packet. This adapter is proof syntax
 			// only; it neither changes the builtin's protocol nor executes it.
-			return s.builtinBodyCapability(target, b, source)
+			return s.builtinBodyCapability(target, b)
 		}
 	}
 	// A singleton packet can be checked exhaustively. This is a proof over
@@ -120,17 +123,20 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 	return ok && s.values(want, result)
 }
 
-func (s *subsumer) builtinBodyCapability(target adt.FuncType, b *adt.Builtin, source adt.FuncType) bool {
+func (s *subsumer) builtinBodyCapability(target adt.FuncType, b *adt.Builtin) bool {
 	p := s.inference
 	if p == nil {
 		p = newInference(s.ctx)
 	}
 	defer p.enter()()
-	primitive := *source.Fn
+	// This adapter has the raw native slots, without a universal telescope
+	// of its own. Its body instantiates the native's checking scheme under
+	// the target packet, which may introduce a different number of binders.
+	primitive := *b.Protocol(s.ctx)
 	call := &adt.CallExpr{Fun: b.Implementation()}
 	for _, param := range primitive.Params {
 		call.Args = append(call.Args, &adt.FieldReference{Label: param.Local})
 	}
 	primitive.Body = call
-	return p.function(&adt.FuncValue{Fn: &primitive, Env: source.Env}, target)
+	return p.function(&adt.FuncValue{Fn: &primitive}, target)
 }

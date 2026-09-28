@@ -186,6 +186,22 @@ validators support their ordinary call forms; implicit validator constructors
 check the saved arguments and describe inhabitants of the validated parameter's
 type. These contracts do not promise success, termination, or concrete operands.
 
+Native checking signatures can retain universal input-output relationships and
+conditional result refinements. For example, `math.Abs` admits every number
+while preserving integer results for integer inputs. Such a refinement adds
+result evidence after its narrower domain is covered; it does not restrict the
+primary call domain. Published package interfaces are checked against this
+implementation-owned evidence.
+
+List transformations additionally preserve known tuple positions and length
+bounds. `FlattenN` uses the supplied depth, while `Take` and `Drop` account for
+clamping at the actual input length. An open tail contributes possible elements
+without promising that any are present. Large finite shape expansions can fall
+back to the generic element contract within the proof budget. Sort templates
+are checked with `x` and `y` supplied by the input element description; a known
+empty or singleton list has no comparator invocation. These rules also check
+attached interfaces and do not execute symbolic inputs as concrete lists.
+
 The structural primitives have additional rules. `len` preserves known length
 bounds. `close` preserves input constraints while adding closedness where its
 record description is known; a rigid or live input retains its identity.

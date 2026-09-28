@@ -29,7 +29,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "FlattenN",
+		Name:      "FlattenN",
+		Signature: "func(xs: [...], depth: int) -> [...]",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.IntKind},

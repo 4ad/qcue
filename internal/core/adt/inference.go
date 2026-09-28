@@ -211,6 +211,22 @@ func (s *typeInference) collect(env *Environment, pattern Expr, value Value, cov
 	if b, ok := Unwrap(value).(*Bottom); ok && b.IsIncomplete() {
 		return
 	}
+	switch pattern.(type) {
+	case *ListLit, *StructLit:
+		// A structural pattern can learn member predicates from an abstract
+		// input's upper bound. Keep the abstract identity for a direct type
+		// reference; replacing it there would lose relationships such as
+		// forall(A) func(A) -> A. The final membership check still proves
+		// the chosen instance against the original input, not this bound.
+		switch x := Unwrap(value).(type) {
+		case *RigidType:
+			s.collect(env, pattern, x.Bound, covariant)
+			return
+		case *LiveType:
+			s.collect(env, pattern, x.Upper, covariant)
+			return
+		}
+	}
 	switch p := pattern.(type) {
 	case *BinaryExpr:
 		if p.Op == AndOp && covariant {

@@ -931,6 +931,7 @@ var nativeParams = map[string]map[string]string{
 	"encoding/yaml.MarshalStream":    {"v": "[...]"},
 	"encoding/toml.Marshal":          {"v": "{...}"},
 	"list.IsSorted":                  {"cmp": "{x: _, y: _, less: bool}"},
+	"list.FlattenN":                  {"xs": "[...]"},
 	"net.JoinHostPort":               {"host": "string | bytes | [...int]", "port": "string | bytes | int"},
 	"net.IPv4":                       {"ip": "string | bytes | [...int]"},
 	"net.IPv6":                       {"ip": "string | bytes | [...int]"},
