@@ -245,3 +245,129 @@ out:g()
 		}
 	}
 }
+
+func TestStdlibPartialIntermediateInterfaces(t *testing.T) {
+	for _, tc := range []struct {
+		name, declaration, call, badCall string
+	}{
+		{"successive", `first:strings.Replace(n:1,...)
+view:first & (func(new!:string,old!:string,s!:string)->string)
+saved:view(old:"a",...)`, `saved(s:"aa",new:"b")`, `saved(s:"aa",new:1)`},
+		{"merged", `first:strings.Replace(n:1,...)
+view:first & (func(new!:string,old!:string,s!:string)->string)
+saved:strings.Replace(old:"a",n:1,...) & view(old:"a",...)`, `saved(s:"aa",new:"b")`, `saved(s:"aa",new:1)`},
+		{"reverse_merge", `first:strings.Replace(n:1,...)
+view:first & (func(new!:string,old!:string,s!:string)->string)
+saved:view(old:"a",...) & strings.Replace(old:"a",n:1,...)`, `saved(s:"aa",new:"b")`, `saved(s:"aa",new:1)`},
+		{"positional", `first:strings.Replace(n:1,...)
+view:first & (func(string,string,string)->string)
+saved:strings.Replace(old:"a",n:1,...) & view(old:"a",...)`, `saved(s:"aa",new:"b")`, `saved(s:"aa",new:1)`},
+		{"multiple_interfaces", `first:strings.Replace(n:1,...)
+view:first & (func(new!:string,old!:string,s!:string)->string)
+second:view(s:"aa",...) & (func(new!:string,old!:string)->string)
+saved:strings.Replace(old:"a",s:"aa",n:1,...) & second(old:"a",...)`, `saved(new:"b")`, `saved(new:1)`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := cuecontext.New()
+			v := ctx.CompileString("import \"strings\"\n" + tc.declaration + "\nout:" + tc.call)
+			for _, opts := range [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}, nil, {cue.Raw()}, {cue.Final()}} {
+				if err := v.Validate(); err != nil {
+					t.Fatal(err)
+				}
+				semanticJSON(t, v, "out", `"ba"`)
+				bad := v.Unify(ctx.CompileString("saved:_\nbad:" + tc.badCall))
+				if bad.Validate() == nil {
+					t.Fatal("saved native accepted an incompatible remaining argument")
+				}
+				source, err := format.Node(v.Syntax(opts...))
+				if err != nil {
+					t.Fatal(err)
+				}
+				v = ctx.CompileBytes(source)
+				if err := v.Validate(); err != nil {
+					t.Fatalf("%s\n%v", source, err)
+				}
+			}
+		})
+	}
+}
+
+func TestStdlibPartialIntermediateRefinement(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`import "strings"
+count:int
+first:strings.Replace(n:count,...)
+view:first & (func(new!:"b",old!:"a",s!:"aa")->"ba")
+saved:strings.Replace(old:"a",n:count,...) & view(old:"a",...)
+out:saved(s:"aa",new:"b")`)
+	for _, opts := range [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}} {
+		good := v.FillPath(cue.ParsePath("count"), 1)
+		if err := good.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		semanticJSON(t, good, "out", `"ba"`)
+		if err := v.FillPath(cue.ParsePath("count"), 2).Validate(); err == nil {
+			t.Fatal("saved native lost its intermediate result obligation")
+		}
+		source, err := format.Node(v.Syntax(opts...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		v = ctx.CompileBytes(source)
+	}
+}
+
+func TestStdlibPartialIntermediateGeneric(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`import "list"
+first:list.Slice(i:1,...)
+view:first & (forall(A) func(j!:int,x!:[...A])->[...A])
+saved:list.Slice(i:1,j:2,...) & view(j:2,...)
+out:[saved(x:[0,1,2]),saved(x:["a","b","c"])]`)
+	for _, opts := range [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}} {
+		if err := v.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		semanticJSON(t, v, "out", `[[1],["b"]]`)
+		if err := v.Unify(ctx.CompileString("saved:_\nbad:saved(x:42)")).Validate(); err == nil {
+			t.Fatal("saved generic native accepted an incompatible argument")
+		}
+		source, err := format.Node(v.Syntax(opts...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		v = ctx.CompileBytes(source)
+		if err := v.Validate(); err != nil {
+			t.Fatalf("%s\n%v", source, err)
+		}
+	}
+}
+
+func TestStdlibPartialIntermediateObligations(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`import "strings"
+a:string
+b:string
+first:strings.Replace(n:1,...)
+left:first & (func(new!:"b",old!:"a",s!:"aa")->a)
+right:first & (func(new!:"b",old!:"a",s!:"aa")->b)
+saved:strings.Replace(n:1,old:"a",...) & left(old:"a",...) & right(old:"a",...)
+out:saved(s:"aa",new:"b")`)
+	for _, opts := range [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}} {
+		good := v.FillPath(cue.ParsePath("a"), "ba").FillPath(cue.ParsePath("b"), "ba")
+		if err := good.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		semanticJSON(t, good, "out", `"ba"`)
+		for _, field := range []string{"a", "b"} {
+			if err := v.FillPath(cue.ParsePath(field), "wrong").Validate(); err == nil {
+				t.Fatalf("saved native lost its %s result obligation", field)
+			}
+		}
+		source, err := format.Node(v.Syntax(opts...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		v = ctx.CompileBytes(source)
+	}
+}

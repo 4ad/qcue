@@ -238,8 +238,11 @@ the implicit validator constructor is a separate call form. Saved arguments
 remain live until supplied values make execution possible. Export preserves
 their captures, selected views, and pending equality obligations. Interfaces
 on a full packet remain before argument saving; residual interfaces retain
-their saved-slot coordinates. Closed signatures without lexical dependencies
-or implementation identities are emitted once instead of accumulating copied
+their saved-slot coordinates. When identity merging recovers an interface from
+an intermediate stage, export reconstructs that stage before saving its later
+arguments. Each such argument retains its original lexical environment.
+Closed signatures without lexical dependencies or implementation identities
+are emitted once instead of accumulating copied
 closure environments across round trips.
 Private capture fields introduced by an earlier export retain references to
 public fields while their values remain unresolved. Forwarding preserves every
@@ -259,8 +262,12 @@ domain and callback hypotheses, and resumed proofs reread live captures.
 Templates produced by the same factory compare their code and free captures;
 unused factory arguments and local comparison operands do not determine their
 identity. Private names for saved templates export their original source in
-its lexical environments. Each runtime comparison resolves that source into
-a fresh field set before supplying its operands.
+its lexical environments. Shared templates use one local field in the exported
+native expression, preserving both their identity and independent refinement
+of copied records. Repeated native clauses are deduplicated only when their
+runtime identities, rendered source, and reference bindings agree.
+Each runtime comparison resolves that source into a fresh field set before
+supplying its operands.
 Sorting preserves incomplete comparison errors so later refinement can supply
 missing operands. Constructing an
 `IsSorted` validator checks the template without invoking a comparison; its

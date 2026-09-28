@@ -263,33 +263,7 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 		}
 
 	case *adt.CallExpr:
-		a := []ast.Expr{}
-		labels := []ast.Label(nil)
-		for _, arg := range x.Args {
-			v := e.innerExpr(env, arg)
-			if v == nil {
-				e.innerExpr(env, arg)
-				panic("")
-			}
-			a = append(a, v)
-		}
-		if x.ArgLabels != nil {
-			labels = make([]ast.Label, len(x.ArgLabels))
-			for i, label := range x.ArgLabels {
-				if label != adt.InvalidLabel {
-					labels[i] = ast.NewIdent(label.IdentString(e.ctx))
-				}
-			}
-		}
-		fun := e.innerExpr(env, x.Fun)
-		call := &ast.CallExpr{Fun: fun, Args: a, ArgLabels: labels}
-		if x.Partial {
-			// The position is synthetic, but must be set for the
-			// formatter to render the "..." marking the partial
-			// application.
-			call.Ellipsis = token.Blank.Pos()
-		}
-		return call
+		return e.callExpr(env, x, nil)
 
 	case *adt.DisjunctionExpr:
 		a := []ast.Expr{}
@@ -313,6 +287,37 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 	default:
 		panic(fmt.Sprintf("unknown field %T", x))
 	}
+}
+
+func (e *exporter) callExpr(env *adt.Environment, x *adt.CallExpr, a []ast.Expr) ast.Expr {
+	labels := []ast.Label(nil)
+	if a == nil {
+		for _, arg := range x.Args {
+			v := e.innerExpr(env, arg)
+			if v == nil {
+				e.innerExpr(env, arg)
+				panic("")
+			}
+			a = append(a, v)
+		}
+	}
+	if x.ArgLabels != nil {
+		labels = make([]ast.Label, len(x.ArgLabels))
+		for i, label := range x.ArgLabels {
+			if label != adt.InvalidLabel {
+				labels[i] = ast.NewIdent(label.IdentString(e.ctx))
+			}
+		}
+	}
+	fun := e.innerExpr(env, x.Fun)
+	call := &ast.CallExpr{Fun: fun, Args: a, ArgLabels: labels}
+	if x.Partial {
+		// The position is synthetic, but must be set for the
+		// formatter to render the "..." marking the partial
+		// application.
+		call.Ellipsis = token.Blank.Pos()
+	}
+	return call
 }
 
 // sortBinaryTree converte x to a binary tree and sorts it's elements

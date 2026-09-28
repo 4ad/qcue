@@ -414,7 +414,19 @@ func (e *exporter) builtin(x *adt.Builtin) ast.Expr {
 // Emit that implementation once, followed by the original type selections.
 // Printing a separate body for each clause would create distinct closures on
 // reimport; printing only the selected body would lose universal obligations.
-func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
+func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) (result ast.Expr) {
+	if f.NativeBuiltin() != nil && e.nativeTemplates == nil {
+		scope := &nativeTemplateScope{cells: make(map[*adt.Vertex]*ast.Field)}
+		e.nativeTemplates = scope
+		defer func() {
+			e.nativeTemplates = nil
+			if len(scope.fields) != 0 {
+				name := e.uniqueAlias("CUEValue")
+				scope.fields = append(scope.fields, &ast.Field{Label: ast.NewIdent(name), Value: result})
+				result = ast.NewSel(&ast.StructLit{Elts: scope.fields}, name)
+			}
+		}()
+	}
 	if env, call, extra := f.NativeBinding(); call != nil {
 		previous := e.inlineNativeCaptures
 		e.inlineNativeCaptures = true
@@ -430,15 +442,24 @@ func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
 	}
 	if views, extra := f.CallViews(); len(views) != 0 {
 		var x ast.Expr
+		var natives []nativeClause
 		for _, view := range views {
-			y := &ast.ParenExpr{X: e.quantifiedFuncValue(view)}
+			syntax := e.quantifiedFuncValue(view)
+			if view.NativeBuiltin() != nil {
+				clause := nativeClause{view, syntax}
+				if e.hasNativeClause(natives, clause) {
+					continue
+				}
+				natives = append(natives, clause)
+			}
+			y := &ast.ParenExpr{X: syntax}
 			if x == nil {
 				x = y
 			} else {
 				x = &ast.BinaryExpr{X: x, Op: token.AND, Y: y}
 			}
 		}
-		return e.withFuncTypes(x, extra)
+		return e.withFuncTypes(x, extra, natives...)
 	}
 	if b := f.NativeBuiltin(); b != nil {
 		var x ast.Expr = e.builtin(b)
@@ -476,6 +497,14 @@ func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
 	return e.withFuncTypes(x, types)
 }
 
+// Shared private templates belong to the exported native expression's scope.
+// Keeping them local preserves exposed captures when the containing record
+// is copied, while one field per schema cell preserves template identity.
+type nativeTemplateScope struct {
+	fields []ast.Decl
+	cells  map[*adt.Vertex]*ast.Field
+}
+
 // Native templates consume schema source, including uninvoked local fields.
 // A private name for such a template must be unfolded in its original scopes,
 // while ordinary private arguments still require completed runtime captures.
@@ -484,15 +513,14 @@ func (e *exporter) nativeBinding(env *adt.Environment, call *adt.CallExpr) ast.E
 	if !ok {
 		return e.expr(env, call)
 	}
-	copy := *call
-	copy.Args = slices.Clone(call.Args)
+	args := make([]ast.Expr, len(call.Args))
 	bound := make([]bool, len(subject.Fn.Params))
 	for slot := range bound {
 		_, saved := subject.BoundArgument(slot)
 		bound[slot] = saved != nil
 	}
 	next := 0
-	for i, arg := range copy.Args {
+	for i, arg := range call.Args {
 		label := adt.InvalidLabel
 		if i < len(call.ArgLabels) {
 			label = call.ArgLabels[i]
@@ -502,6 +530,7 @@ func (e *exporter) nativeBinding(env *adt.Environment, call *adt.CallExpr) ast.E
 			var found bool
 			slot, found = adt.BuiltinParamLabelIndex(subject.NativeBuiltin(), label)
 			if !found {
+				args[i] = e.innerExpr(env, arg)
 				continue
 			}
 		} else {
@@ -514,39 +543,58 @@ func (e *exporter) nativeBinding(env *adt.Environment, call *adt.CallExpr) ast.E
 		if slot >= 0 && slot < len(bound) {
 			bound[slot] = true
 		}
-		if !subject.NativeTemplateArgument(e.ctx, slot) {
-			continue
+		if subject.NativeTemplateArgument(e.ctx, slot) {
+			args[i] = e.nativeTemplate(env, arg)
+		} else {
+			args[i] = e.innerExpr(env, arg)
 		}
-		ref, ok := arg.(adt.Resolver)
-		if !ok {
-			continue
+	}
+	return e.callExpr(env, call, args)
+}
+
+func (e *exporter) nativeTemplate(env *adt.Environment, arg adt.Expr) ast.Expr {
+	if group, ok := arg.(*adt.ConjunctGroup); ok && len(*group) == 1 {
+		env, arg = (*group)[0].EnvExpr()
+	}
+	ref, ok := arg.(adt.Resolver)
+	if !ok {
+		return e.innerExpr(env, arg)
+	}
+	root := arg
+base:
+	for {
+		switch r := root.(type) {
+		case *adt.SelectorExpr:
+			root = r.X
+		case *adt.IndexExpr:
+			root = r.X
+		default:
+			break base
 		}
-		root := arg
-	base:
-		for {
-			switch r := root.(type) {
-			case *adt.SelectorExpr:
-				root = r.X
-			case *adt.IndexExpr:
-				root = r.X
-			default:
-				break base
-			}
-		}
-		if _, imported := root.(*adt.ImportReference); imported {
-			continue // The import already reconstructs this template.
-		}
-		cell, _ := e.ctx.Lookup(env, ref)
-		if cell == nil || e.exposed[cell] {
-			continue
-		}
+	}
+	if _, imported := root.(*adt.ImportReference); imported {
+		return e.innerExpr(env, arg) // The import reconstructs this template.
+	}
+	cell, _ := e.ctx.Lookup(env, ref)
+	if cell == nil || e.exposed[cell] {
+		return e.innerExpr(env, arg)
+	}
+	cell = cell.DerefValue()
+	scope := e.nativeTemplates
+	field := scope.cells[cell]
+	if field == nil {
 		group := adt.ConjunctGroup(slices.Collect(cell.LeafConjuncts()))
 		if len(group) == 0 {
 			return e.quantifiedExportError("saved native template source is unavailable")
 		}
-		copy.Args[i] = &group
+		field = &ast.Field{Label: ast.NewIdent(e.uniqueAlias("CUETemplate")), Value: &ast.ParenExpr{}}
+		scope.cells[cell] = field
+		scope.fields = append(scope.fields, field)
+		field.Value.(*ast.ParenExpr).X = e.expr(env, &group)
 	}
-	return e.expr(env, &copy)
+	id := ast.NewIdent(field.Label.(*ast.Ident).Name)
+	id.Node = field.Value
+	return id
 }
 
 // withFuncTypes renders the function types a function value, function type,
@@ -555,7 +603,7 @@ func (e *exporter) nativeBinding(env *adt.Environment, call *adt.CallExpr) ast.E
 // constraints as the value it represents. Each function literal is
 // parenthesized: an unparenthesized signature would otherwise absorb the &
 // operand into its result or body expression when parsed back.
-func (e *exporter) withFuncTypes(x ast.Expr, types []adt.FuncType) ast.Expr {
+func (e *exporter) withFuncTypes(x ast.Expr, types []adt.FuncType, natives ...nativeClause) ast.Expr {
 	if len(types) == 0 {
 		return x
 	}
@@ -565,6 +613,13 @@ func (e *exporter) withFuncTypes(x ast.Expr, types []adt.FuncType) ast.Expr {
 	closed := make(map[string]bool)
 	for _, t := range types {
 		y := e.funcTypeSrc(t)
+		if value := t.Inhabitant(); value != nil && value.NativeBuiltin() != nil {
+			clause := nativeClause{value, y}
+			if e.hasNativeClause(natives, clause) {
+				continue
+			}
+			natives = append(natives, clause)
+		}
 		if scopeIndependentSignature(t) {
 			// Callback boundaries can retain several copies of the same
 			// closed predicate. They impose one obligation; emitting each
@@ -583,6 +638,57 @@ func (e *exporter) withFuncTypes(x ast.Expr, types []adt.FuncType) ast.Expr {
 		x = &ast.BinaryExpr{Op: token.AND, X: x, Y: y}
 	}
 	return x
+}
+
+type nativeClause struct {
+	value  *adt.FuncValue
+	syntax ast.Expr
+}
+
+func (e *exporter) hasNativeClause(clauses []nativeClause, clause nativeClause) bool {
+	for _, prior := range clauses {
+		if same, known := adt.SameFunctionInstance(e.ctx, clause.value, prior.value); same && known && sameNativeSyntax(clause.syntax, prior.syntax) {
+			return true
+		}
+	}
+	return false
+}
+
+// Reconstructed native clauses can arrive both through an interface's saved
+// packet and through an identity peer. Deduplicate only identical syntax with
+// the same reference bindings, after checking the native descriptors' runtime
+// identity. Fresh source function bodies retain their distinct code origins.
+func sameNativeSyntax(a, b ast.Expr) bool {
+	refs := func(x ast.Expr) ([]ast.Node, []string, bool) {
+		var nodes []ast.Node
+		var imports []string
+		ok := true
+		ast.Walk(x, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.Func:
+				ok = ok && n.Body == nil
+			case *ast.Ident:
+				if spec, imported := n.Node.(*ast.ImportSpec); imported {
+					imports = append(imports, spec.Path.Value)
+				} else {
+					nodes = append(nodes, n.Node, n.Scope)
+				}
+			}
+			return ok
+		}, nil)
+		return nodes, imports, ok
+	}
+	x, xi, xok := refs(a)
+	y, yi, yok := refs(b)
+	if !xok || !yok || !slices.Equal(x, y) || !slices.Equal(xi, yi) {
+		return false
+	}
+	ax, err := format.Node(a)
+	if err != nil {
+		return false
+	}
+	by, err := format.Node(b)
+	return err == nil && string(ax) == string(by)
 }
 
 // Only syntax without lexical references or implementation identities can

@@ -147,6 +147,13 @@ cmp:{x:int,y:int,less:x+n<y+n}
 out:list.Sort(cmp:cmp,...)
 }.out
 sort:make(3) & make(3)`,
+		`make:func(n:int)->func([...int])->[...int]:{
+cmp:{x:int,y:int,less:x+n<y+n}
+first:list.Sort[int](...)
+view:first & (func(cmp!:{x:int,y:int,less:bool},list!:[...int])->[...int])
+out:list.Sort[int](cmp:cmp,...) & view(cmp:cmp,...)
+}.out
+sort:make(3)`,
 		`wrap:func(f:func([...int])->[...int])->func([...int])->[...int]:func(xs:[...int])->[...int]:f(xs)
 sort:wrap(list.Sort(cmp:list.Ascending,...))`,
 		`make:func(n:int)->func([...int])->[...int]:list.Sort(cmp:{x:int,y:int,less:x+n<y+n},...)
@@ -199,6 +206,69 @@ out: wrap(sort)([3,1,2])
 		}
 		v = ctx.CompileBytes(source)
 		if err := v.Err(); err != nil {
+			t.Fatalf("%s\n%v", source, err)
+		}
+	}
+}
+
+func TestStdlibPartialIntermediateComparer(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`import "list"
+make:func(n:int)->func()->[...int]:{
+cmp:{x:int,y:int,less:x+n<y+n}
+first:list.Sort[int](list:[3,1,2],...)
+view:first & (func(cmp!:{x:int,y:int,less:bool})->[...int])
+out:list.Sort[int](list:[3,1,2],cmp:cmp,...) & view(cmp:cmp,...)
+}.out
+saved:make(3)
+out:saved()`)
+	for _, opts := range [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}, nil, {cue.Raw()}, {cue.Final()}} {
+		if err := v.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		semanticJSON(t, v, "out", `[1,2,3]`)
+		source, err := format.Node(v.Syntax(opts...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		v = ctx.CompileBytes(source)
+		if err := v.Validate(); err != nil {
+			t.Fatalf("%s\n%v", source, err)
+		}
+	}
+}
+
+func TestStdlibSharedComparerCaptures(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`import "list"
+template:{
+reverse:bool
+sort:{
+cmp:{x:int,y:int,less:(x<y)!=reverse}
+first:list.Sort[int](...)
+view:first & (func(cmp!:{x:int,y:int,less:bool},list!:[...int])->[...int])
+out:list.Sort[int](cmp:cmp,...) & view(cmp:cmp,...)
+}.out
+out:sort([3,1,2])
+}
+a:template
+b:template`)
+	for _, opts := range [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}} {
+		if err := v.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		filled := v.FillPath(cue.ParsePath("a.reverse"), false).FillPath(cue.ParsePath("b.reverse"), true)
+		semanticJSON(t, filled, "a.out", `[1,2,3]`)
+		semanticJSON(t, filled, "b.out", `[3,2,1]`)
+		if _, err := v.LookupPath(cue.ParsePath("template.out")).MarshalJSON(); err == nil {
+			t.Fatal("export completed a template's live capture")
+		}
+		source, err := format.Node(v.Syntax(opts...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		v = ctx.CompileBytes(source)
+		if err := v.Validate(); err != nil {
 			t.Fatalf("%s\n%v", source, err)
 		}
 	}

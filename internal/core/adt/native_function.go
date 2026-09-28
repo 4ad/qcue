@@ -79,6 +79,13 @@ func (f *FuncValue) NativeBinding() (*Environment, *CallExpr, []FuncType) {
 				subject = &copy
 				continue
 			}
+			if projected := f.nativeResidualInterface(t); projected != nil {
+				// An identity merge can recover a clause from an intermediate
+				// packet absent from this binding's provenance. Reconstruct
+				// that branch at its original stage before saving more slots.
+				extra = append(extra, FuncType{Fn: projected.Fn, Env: projected.Env, inhabitant: projected})
+				continue
+			}
 			extra = append(extra, t)
 		}
 	}
@@ -87,6 +94,32 @@ func (f *FuncValue) NativeBinding() (*Environment, *CallExpr, []FuncType) {
 		extra = append(extra, FuncType{Fn: peer.Fn, Env: peer.Env, inhabitant: peer})
 	}
 	return b.env, &call, extra
+}
+
+// nativeResidualInterface transports an earlier residual clause to this
+// binding mask without changing the packet described by its signature.
+func (f *FuncValue) nativeResidualInterface(t FuncType) *FuncValue {
+	if t.partial == nil {
+		return nil
+	}
+	call := &CallExpr{Partial: true}
+	for i, param := range f.Fn.Params {
+		env, expr := f.BoundArgument(i)
+		if _, saved := t.partial.BoundArgument(i); saved != nil || expr == nil {
+			continue
+		}
+		// Newly saved expressions can originate in different lexical
+		// environments. Preserve each source separately during export.
+		group := ConjunctGroup{MakeRootConjunct(env, expr)}
+		call.Args = append(call.Args, &group)
+		call.ArgLabels = append(call.ArgLabels, param.Label)
+	}
+	if len(call.Args) == 0 {
+		return nil
+	}
+	subject := *t.partial
+	subject.Types = mergeFuncTypes(subject.Types, []FuncType{t})
+	return subject.bindNativeArguments(f.args, f.Env, call)
 }
 
 // FunctionValue exposes a native's own checking scheme to function type

@@ -382,6 +382,7 @@ type exporter struct {
 	closures             *closureGraph
 	inlineFreeRefs       bool
 	inlineNativeCaptures bool
+	nativeTemplates      *nativeTemplateScope
 	quantifierOrigins    map[quantifierOriginKey]*ast.LetClause
 	quantifierCode       map[*adt.Function]quantifierOriginKey
 	originDecls          []ast.Decl
