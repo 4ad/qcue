@@ -4,6 +4,10 @@ The corpus exercises universal descriptions, functions, call packets, live
 references, proof obligations, and later refinement. The ordinary evaluator
 runner discovers executable txtar archives automatically.
 
+The [explainer](../../../doc/explainer.md) introduces the language for
+experienced CUE users, with a section-by-section mapping from the paper
+examples below.
+
 - [Paper examples](paper/) preserve every current listing verbatim.
   `TestQuantifiedPaperIndex` compares the catalogue with `doc/paper.tex`.
 - [Historical examples](paper_history/) retain earlier examples that still
