@@ -4,7 +4,7 @@ exec cue vet structural.cue
 exec cue vet -c structural.cue
 ! stderr .
 
-# Integer interval proofs certify the former residual example statically.
+# Integer interval proofs prove the former residual example from its bounds.
 exec cue vet residual.cue
 ! stderr .
 exec cue vet -c residual.cue
@@ -17,9 +17,9 @@ stdout '^0$'
 
 # Allowing incomplete data does not waive a supplied body's type proof.
 ! exec cue vet blocked.cue
-stderr 'wrong: function conformance remains unproved'
+stderr 'wrong: function requirement refuted by a checked counterexample'
 ! exec cue vet -c=false blocked.cue
-stderr 'wrong: function conformance remains unproved'
+stderr 'wrong: function requirement refuted by a checked counterexample'
 
 # The proof request is no longer an independent option.
 ! exec cue vet --verify-functions structural.cue
@@ -37,9 +37,9 @@ exec cue vet -c nested.cue
 
 # All nested errors retain their paths, including later siblings.
 ! exec cue vet -c nested_invalid.cue
-stderr 'box.f: function conformance remains unproved'
-stderr 'box.g: function conformance remains unproved'
-stderr 'items.0: function conformance remains unproved'
+stderr 'box.f: function requirement refuted by a checked counterexample'
+stderr 'box.g: function requirement refuted by a checked counterexample'
+stderr 'items.0: function requirement refuted by a checked counterexample'
 
 -- structural.cue --
 package proof

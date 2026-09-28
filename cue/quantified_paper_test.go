@@ -30,7 +30,7 @@ import (
 
 // Semantic assertions live beside their CUE programs in the ordinary txtar
 // corpus. This small index test ensures no paper listing silently disappears,
-// including D exclusions, syntax templates, and deliberate formation errors.
+// including pseudocode, syntax templates, and deliberate formation errors.
 func TestQuantifiedPaperIndex(t *testing.T) {
 	paper, err := os.ReadFile("../doc/paper.tex")
 	if err != nil {

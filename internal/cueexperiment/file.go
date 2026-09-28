@@ -109,11 +109,11 @@ type File struct {
 	// Proposal: https://cuelang.org/issue/4484
 	Functions bool `experiment:"preview:v0.0.0,default:v0.0.0"`
 
-	// Quantified enables predicative higher-rank quantifiers and opaque
-	// existential modules, including the capability semantics of functions.
+	// Quantified enables universal types, polymorphic functions, and
+	// propagation over live descriptions and independent capability goals.
 	// Like functions, it is available and enabled by default at every language
 	// version in this fork, with explicit opt-outs supported.
-	// See doc/paper.tex, profiles S_H and A.
+	// See doc/paper.tex, version 9.
 	Quantified bool `experiment:"preview:v0.0.0,default:v0.0.0"`
 }
 

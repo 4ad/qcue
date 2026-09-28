@@ -300,7 +300,7 @@ func New(args []string) (*Command, error) {
 	cmd := &cobra.Command{
 		Use: "cue",
 		// TODO: the short help text below seems to refer to `cue cmd`, like helpTemplate.
-		Short: "cue evaluates CUE with higher-rank quantifiers and opaque packages.",
+		Short: "cue evaluates CUE with universal types and live constraint propagation.",
 
 		// We print errors ourselves in Main, which allows for ErrPrintedError.
 		// Similarly, we don't want to print the entire help text on any error.

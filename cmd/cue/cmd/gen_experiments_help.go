@@ -313,8 +313,8 @@ Experiments in the default stage can be disabled for a file:
 	@experiment(quantified=false)
 
 Functions and the quantified extension are enabled by default at every CUE
-language version in this fork. The quantified extension implements
-S_H (higher-rank quantifiers) and A (opaque existential packages). To use the
+language version in this fork. The quantified extension implements universal
+types and constraint propagation over live descriptions. To use the
 previous function experiment's semantics, use:
 
 	@experiment(functions,quantified=false)

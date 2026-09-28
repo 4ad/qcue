@@ -32,10 +32,10 @@ By default, vet ensures that the result of validation is concrete
 by reporting an error if any resulting regular fields have non-concrete values.
 Use -c=false to not require concreteness, or -c to show these error messages.
 
-For quantified functions, concrete validation includes conformance to their
-declared contracts for all admitted inputs. Unproved contracts are incomplete,
-even when individual calls produce concrete results. With -c=false, unresolved
-contracts may be retained for further refinement, like other incomplete values.
+For quantified functions, validation requires evidence for declared contracts,
+including uncalled bodies and independent calling capabilities. Unproved goals
+remain residual constraints and are reported even with -c=false. Concrete
+validation additionally requires completed data and linked implementations.
 
 vet can also validate non-CUE files in these file formats:
 

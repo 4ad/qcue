@@ -9,7 +9,7 @@ stderr 'function conformance remains unproved'
 ! exec cue eval -c invalid.cue
 stderr 'h: function conformance remains unproved'
 
-# Eval must enforce the same static obligations as vet and CUE export.
+# Eval must enforce the same retained obligations as vet and CUE export.
 ! exec cue vet -c=false invalid.cue
 stderr 'h: function conformance remains unproved'
 ! exec cue export --out cue invalid.cue
@@ -18,13 +18,13 @@ stderr 'h: function conformance remains unproved'
 # The boundary checks nested bodies and every surviving alternative.
 ! exec cue eval nested.cue
 stderr 'box.h: function conformance remains unproved'
-stderr 'items.0: function conformance remains unproved'
-stderr 'choice: function conformance remains unproved'
+stderr 'items.0: function requirement refuted by a checked counterexample'
+stderr 'choice.*: function requirement refuted by a checked counterexample'
 ! stdout .
 
 # Interface admission is mandatory even without an implementation.
 ! exec cue eval interface.cue
-stderr 'interface relevance blocked'
+stderr 'interface relevance rejected'
 ! stdout .
 
 # Incomplete data and named unlinked imports remain valid hypotheses.

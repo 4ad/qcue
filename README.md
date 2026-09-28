@@ -1,18 +1,19 @@
 # Quantified CUE
 
 Quantified CUE (`qcue`) is a fork of [CUE](https://github.com/cue-lang/cue) that
-adds quantifiers, polymorphic functions, and opaque existential packages to
-CUE's constraint language.
+adds universal types and polymorphic functions whose constraints propagate
+alongside ordinary CUE data constraints.
 
-Universal quantification describes a single value that satisfies a contract
-for every admissible type, including polymorphic functions and callbacks.
-Opaque existential packages hide a representation type behind an interface,
-allowing abstract data types and modules to be passed as values.
+Descriptions may refer to open terms and remain linked to them under later
+refinement. Function bodies and calling capabilities have independent proof
+goals; calls allocate fresh constrained packets and retain their validation
+dependencies. Evaluation can establish facts needed by a proof, and a proof
+can enable further evaluation.
 
-The implementation supports fragments of the proposal's predicative
-higher-rank profile (`S_H`) and abstraction profile (`A`). The proposal also
-describes features outside these implemented fragments. Quantifiers are
-enabled by default for every CUE language version in this fork.
+The implementation follows the propagator design in version 9 of the paper.
+Universal types include higher-rank and impredicative instances. Existentials,
+opaque packages, and dependent value binders are no longer language features.
+Quantifiers are enabled by default for every CUE language version in this fork.
 
 This repository contains the language implementation, the `cue` command, and
 the Go API under the existing `cuelang.org/go` module path.

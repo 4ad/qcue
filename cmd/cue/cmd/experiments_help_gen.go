@@ -50,8 +50,8 @@ Experiments in the default stage can be disabled for a file:
 	@experiment(quantified=false)
 
 Functions and the quantified extension are enabled by default at every CUE
-language version in this fork. The quantified extension implements
-S_H (higher-rank quantifiers) and A (opaque existential packages). To use the
+language version in this fork. The quantified extension implements universal
+types and constraint propagation over live descriptions. To use the
 previous function experiment's semantics, use:
 
 	@experiment(functions,quantified=false)
@@ -68,11 +68,11 @@ Available per-file experiments:
     Proposal: https://cuelang.org/issue/4484
 
   quantified (preview: v0.0.0, default: v0.0.0)
-    quantified enables predicative higher-rank quantifiers and opaque
-    existential modules, including the capability semantics of functions.
+    quantified enables universal types, polymorphic functions, and
+    propagation over live descriptions and independent capability goals.
     Like functions, it is available and enabled by default at every language
     version in this fork, with explicit opt-outs supported.
-    See doc/paper.tex, profiles S_H and A.
+    See doc/paper.tex, version 9.
 
   structcmp (preview: v0.14.0, stable: v0.15.0)
     structcmp enables comparison of structs. This also defines the ==

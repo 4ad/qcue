@@ -1,186 +1,107 @@
 # Quantified CUE semantic oracles
 
-These tests compare the implementation with small independent mathematical
-models, and check that specified program transformations preserve observations.
-The default suite remains small. The extended suite enlarges the finite
-universes and runs coverage-guided fuzzing with replayable minimized failures.
+These tests compare the implementation with independent finite mathematical
+models and check preservation under source transformations. The default suite
+is bounded; the extended suite increases finite universes and runs native Go
+fuzzing. The models do not call implementation inference or subsumption helpers
+to compute their expected results.
 
-## Coverage and interpretation
+## Models
 
-| Model | Default suite | Extended suite |
-| --- | --- | --- |
-| Binary finite quantifiers on two values | All 1,024 cases, retained from the original suite | Same |
-| Binary finite quantifiers on three values | Generated samples and a three-value distinguishing property | All 131,072 cases |
-| Three finite quantifiers on two values | Generated samples | All 131,072 cases |
-| Dependent finite domains | 480 cases covering every prefix/domain combination in the vocabulary | 122,880 cases, also exhausting all ternary Boolean relations on two values |
-| Dependent subtype bounds | All 512 chains of subsets of `{0,1,2}` | Same |
-| Record membership | 2,592 cases on two values | 25,088 cases on three values |
-| Call boundary membership and erasure | 1,296 cases on two values | 12,544 cases on three values |
-| Packet-domain intersection | 28,561 ordered row pairs, 12 packet shapes each | 16,875,664 ordered row pairs, 32 packet shapes each |
-| Seeded random finite models | 128 | 4,096 |
-| Generated preservation transformations | 48 models × 10 transformations | 512 models × 10 transformations |
-| Feature combinations | 128 sampled combinations, with positive and negative controls | All 6,272 combinations in the defined vocabulary |
-| Composite transport/refinement | All 576 finite cases | Same, plus native fuzzing |
+The finite Boolean oracle folds relations with Go conjunction and disjunction,
+including empty domains, every quantifier order, and domains depending on prior
+finite assignments. A separate renderer elaborates the finite assignments into
+ordinary Boolean CUE formulas. This preserves the original mathematical tests
+without reintroducing removed value-binder syntax. Cardinality and duality
+properties check the model itself; a three-value property distinguishes its
+larger universe from the two-value one.
 
-The packet counts correspond to 342,732 and 540,021,248 packet comparisons.
-The tests precompute independent admission bitsets rather than rerunning the
-oracle for every pair. They also check the parameter mapping of every admitted
-symbolic family on both sides; agreement on the set of packet shapes alone
-would miss a wrongly connected transport slot. The extended rows have up to
-three parameters and three labels, including positional/name-only modes,
-omission, defaults, reordered parameters and duplicate-binding rejection.
+The default suite retains all 1,024 original two-variable cases. Extended runs
+exhaust the 131,072 cases in each larger independent-domain vocabulary and
+122,880 dependent-domain cases. Direct subtype-bound tests separately exercise
+all 512 subset chains over `{0,1,2}` using universal type parameters.
 
-The finite-quantifier oracle folds Boolean relations with Go conjunction and
-disjunction. It includes every quantifier order and every independent subdomain,
-including empty domains. No CUE inference, normalization, binding or subsumption
-helper computes the expected answer. The renderer is separate from the model.
-Known cardinality and quantifier-duality properties check the model itself.
-One property specifically requires three values: for every `x,y`, a value
-exists that differs from both.
+Record models cover required and optional fields, regular and qualified labels,
+conjunction order, compatible incomplete constraints, and later refinement.
+The call-packet model independently computes completion of supplied fields under
+parameter constraints. Direct calls, attached contracts, and saved partial
+packets must produce that completed packet. In contrast, a return annotation
+must prove the independently constructed body; it cannot add a missing field.
+Contradictory packets fail, while ambiguous demanded packets remain incomplete.
 
-Dependent finite domains can contain preceding values or exclude them. The
-innermost range can refer to both enclosing binders. Direct dependent
-value-range syntax is outside the implemented profile, so these tests use its
-finite guarded elaboration over a nonempty literal universe. This exercises
-scope and witness dependence without pretending profile D is implemented.
-Dependent subtype chains `B: A, C: B` are tested directly through explicit
-selection and every admitted concrete argument. Admitting a type selection is
-not itself proof of its entire retained infinite universal contract.
+The packet-domain model compares 28,561 ordered protocol pairs over 12 packet
+shapes in the default suite. The extended vocabulary compares 16,875,664 pairs
+over 32 shapes. Independent admission bitsets and slot mappings check positional
+and named bindings, omissions, defaults, reordered slots, and duplicate-binding
+rejection. This model concerns universal calling capability, independently of
+call-local data completion.
 
-The finite Boolean fragment has exact answers: both ordinary validation and
-concrete observation must match the oracle. Incompleteness fails those tests.
-The membership model distinguishes conflict, compatible incomplete descriptions,
-and complete membership. Required/optional presence, all four field classes,
-and both conjunction orders are retained from the original model.
+Feature combinations use identity implementations, whose valid promises are
+finite-set inclusions. The switches cover hidden fields, record/list nesting,
+partial application, declaration order and alpha renaming, export/reimport,
+and invoking versus ignoring a callback. Positive and negative controls remain;
+the removed opaque-package dimension is no longer generated.
 
-The call boundary model treats a supplied packet or computed result as an
-independent runtime value. It checks required and optional presence and finite
-field membership through parameter annotations, return annotations, attached
-contracts, and partial calls. Every admitted call must return exactly the model's
-packet; every excluded complete packet must give a definite conflict. This
-distinguishes checking an output from constructing one with its annotation.
-
-Feature combinations use identity implementations, whose membership in
-`D -> R` is exactly finite-set inclusion `D ⊆ R`. The seven independent switches
-cover hidden fields, record/list nesting, partial application, opaque packages,
-declaration order and alpha renaming, consumer export/reimport, and invoking
-versus ignoring the callback. Explicit selection, dependent type bounds,
-copying, public alias equations, and rejection of distinct public identities
-are checked along these paths. The private implementation deliberately shares
-code across distinct public exports.
-
-Opaque transport still has a documented proof limit when overlapping branches
-perform different transports. This matrix uses identity transport on finite
-scalar unions, for which every valid case must now certify and execute. Its
-former residual allowance has been removed. The extended matrix produces 2,432
-established cases, 3,840 rejected invalid promises, and no residual cases. Invalid
-promises may never certify or produce an unchecked result; rejecting all inputs
-or regressing valid cases to unknown fails the suite.
+Boundary regressions retain predicate constraints, scope, runtime closure
+identity, selected domains, and complete callback intersections. Live-input
+refinement and explicit assertions also have direct API and paper-example
+coverage. Removed existential package and transport operations are covered by
+parser rejection tests rather than a simulated compatibility layer.
 
 ## Preservation and shrinking
 
-Finite-model transformations include alpha renaming under hostile outer names,
-reordering Boolean factors and domain alternatives, redundant/reordered meets,
-record and list copies, `Unify`, `FillPath`, and both ordinary and final source
-export followed by compilation in a fresh context. Each transformed result is
-checked against the independent oracle, not just against the original CUE
-result. Two identically wrong evaluations therefore do not make a test pass.
+Transformations include Boolean regrouping and reordering, redundant meets,
+record and list copies, `Unify`, `FillPath`, and ordinary and final source export
+followed by compilation. Each transformed result is compared with the independent
+oracle, not merely with the original evaluator result.
 
-Failures include CUE input and model parameters; preservation failures also
-identify the transformation needed to reproduce the observation. Greedy
-semantic shrinking removes relation tuples, domain members and dependencies
-while preserving the actual mismatch. Feature failures additionally remove
-feature switches; packet failures remove parameters. These are local reductions,
-not claims of globally minimal programs. Five native Go fuzz targets add
-coverage-guided generation and automatic corpus minimization:
+Failures report the generated source and model parameters. Semantic shrinking
+removes relation tuples, domain members, dependencies, feature switches, or
+packet parameters while preserving the mismatch. These are local reductions,
+not claims of globally minimal programs. Native Go fuzzing supplies additional
+coverage-guided generation and corpus minimization:
 
 - `FuzzQuantifiedFiniteOracle`
 - `FuzzQuantifiedPreservation`
 - `FuzzQuantifiedFeatureCombinations`
-- `FuzzQuantifiedTransportBoundary`
 - `FuzzQuantifiedPacketDomain` (in `internal/core/adt`)
 
-Normal tests use a fixed seed, printed with `-v`. Set
-`CUE_QUANTIFIED_ORACLE_SEED` to a decimal or hexadecimal integer for another
-reproducible run. Native fuzz exploration uses Go's own generator; its saved
-corpus input is the reproducer. A failing corpus file under `testdata/fuzz` is
-replayed by ordinary `go test`. Keep the minimized input and add a readable
-semantic regression when repairing a failure.
+Ordinary tests use a fixed seed, printed with `-v`.
+`CUE_QUANTIFIED_ORACLE_SEED` selects another reproducible sample. Native fuzzing
+uses Go's generator; a saved corpus input is its reproducer and is replayed by
+ordinary `go test`. Keep minimized failures and add readable regressions when
+repairing them.
 
-## Running and scheduling
-
-From the repository root:
+## Running
 
 ```sh
-# Fast oracle suite, including all existing semantic preservation checks.
+# Default finite models and preservation checks.
 tools/test-quantified-oracles.sh fast
 
-# Extended exhaustive models followed by five 30-second fuzz runs.
+# Extended exhaustive models followed by four 30-second fuzz runs.
 tools/test-quantified-oracles.sh extended
 
-# Longer fuzzing and a different deterministic model sample.
+# A different deterministic seed and longer fuzzing.
 CUE_QUANTIFIED_ORACLE_SEED=0x1234 CUE_QUANTIFIED_FUZZ_TIME=5m \
   tools/test-quantified-oracles.sh extended
 
-# A particular extended model without fuzzing.
+# One extended model.
 CUE_QUANTIFIED_ORACLE=extended go test ./cue \
   -run '^TestQuantifiedOracleExhaustive$' -count=1 -v
 
-# Replay a native fuzz failure (replace HASH with the saved corpus filename).
+# Replay a saved fuzz case.
 go test ./cue -run 'FuzzQuantifiedFiniteOracle/HASH' -count=1 -v
 
-# Full repository regression suite; includes the fast tests and fuzz seeds.
 go test ./...
 ```
 
 `CUE_QUANTIFIED_FUZZ_WORKERS` controls native fuzz parallelism (default 2).
-The script has finite test timeouts and exits on the first failed command.
-Invalid mode names fail instead of silently skipping the extended suite.
+The runner has finite timeouts and stops on failure. The
+[workflow](../.github/workflows/quantified-oracles.yml) runs the fast suite on
+pushes and pull requests, schedules the extended suite weekly, and supports
+manual dispatch with a seed. Logs and minimized failures are retained as
+artifacts when that workflow is installed on the default branch.
 
-The [GitHub workflow](../.github/workflows/quantified-oracles.yml) runs the fast
-suite on pushes and pull requests. It schedules the extended runner weekly,
-Mondays at 03:17 UTC, and supports manual dispatch with an optional seed.
-Scheduled runs use their run number as the deterministic
-sample seed. Logs and minimized failing corpus files are retained as artifacts.
-This configuration takes effect when it reaches the repository's default branch
-and Actions is enabled; adding the file locally does not activate a remote run.
-It uses the documented interfaces of [checkout](https://github.com/actions/checkout),
-[setup-go](https://github.com/actions/setup-go), and
-[upload-artifact](https://github.com/actions/upload-artifact).
-
-## Finding from the larger oracle
-
-Three-valued, three-binder randomized cases exposed a finite-normalization
-blow-up. Distinct scoped pending alternatives formed an exponential Cartesian
-product even when their evaluated results were equal. The finite evaluator now
-finalizes each assignment and deduplicates proved-equal ground data only when
-its captures are immutable finite binder assignments. It preserves ordinary
-captured witnesses, callable contracts, optional constraints, patterns, open
-list tails, and retained introductions. The slow generated inputs are permanent
-regressions and fuzz seeds; refinement tests check that normalization retains
-optional-field, pattern and list-element correlations.
-
-These suites establish results for the finite vocabularies and supported
-observations described above. They do not exhaust all three-valued ternary
-relations, unrestricted dependent types, arbitrary program syntax, or every
-possible interaction of the extension.
-
-
-## Boundary preservation model
-
-[quantified_boundaries_test.go](../cue/quantified_boundaries_test.go) checks
-predicate and witness preservation, scope, runtime equality through nesting,
-original-packet admission, sorted seals, constructive existential elimination,
-and complete callback intersections.
-Positive controls accompany rejected cases; a finite identity-function model
-computes overload coverage and result inclusion from sets of scalars.
-
-A separate transport model enumerates 576 cases. Its expected answer depends
-only on a finite scalar set, whether a field is supplied, whether an extra field
-is supplied, and whether the row is closed. It then applies the same constraints
-through records, nested records, lists, direct operations, and callbacks.
-Every operation must certify; every independently admitted packet must execute;
-every invalid refinement must conflict. Pattern, optional, definition, API
-refinement, label-alias, and abstract escape regressions accompany this model.
-`FuzzQuantifiedTransportBoundary` varies the model inputs and minimizes failures.
-Both runner modes include all `TestQuantifiedBoundary` tests.
+These suites establish results for their finite vocabularies and observations.
+They do not establish completeness of arbitrary proof search or enumerate every
+interaction of open constraints and higher-rank types.

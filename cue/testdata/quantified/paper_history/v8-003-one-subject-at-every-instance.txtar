@@ -16,4 +16,3 @@ impossibleRecord(n in 0 | 1): {
 
 empty(A): [...A]                 // []
 impossible(A): A                 // _|_
-

@@ -1,548 +1,204 @@
 # Quantified CUE: implementation and use
 
-This implementation supports fragments of profiles **S_H** (impredicative
-higher-rank quantification) and **A** (opaque existential packages) in
-[the proposal](paper.pdf) ([LaTeX source](paper.tex)). The `quantified` experiment
-is **enabled by default at every language version** in this fork, including
-modules pinned to older versions, standalone files, and Go API calls.
-
-Build and install from this checkout:
+This fork implements the constraint-propagation design in version 9 of the
+[paper](paper.pdf) ([source](paper.tex)). Universal types and functions are
+available by default at every CUE language version, including standalone files
+and Go API calls. The module path remains `cuelang.org/go`.
 
 ```sh
 go install ./cmd/cue
 cue version
 ```
 
-The executable is `cue`, so it can directly replace an upstream `cue` binary.
-Its version output identifies the build, supported CUE language version, S_H and A
-extensions, and default activation. The CLI library keeps the import path
-`cuelang.org/go/cmd/cue/cmd`.
+The executable is `cue`. Its version and experiment help identify universal
+types and live constraint propagation. `@experiment(quantified)` remains an
+optional explicit enablement. `@experiment(quantified=false)` selects the
+underlying function experiment; `@experiment(functions=false,quantified=false)`
+disables both extensions.
 
-The experiment includes function syntax and the proposal's capability semantics.
-The explicit `@experiment(quantified)` attribute remains accepted but is not
-required. To use the previous experimental function semantics in a file, write
-`@experiment(quantified=false)`. Function syntax is also enabled by default at
-every language version, and explicit `@experiment(functions)` and
-`@experiment(quantified)` attributes remain accepted in older modules.
-To opt out of both extensions, use
-`@experiment(functions=false,quantified=false)`.
+Existentials, opaque packages, `seal`, `open` package elimination, value-range
+binders, and universe-level syntax have been removed. A type parameter may
+still have a subtype bound referring to an earlier type parameter.
 
-General value-dependent binders and the dependent profile **D** are out of scope.
-Finite literal value ranges, such as `exists (n in 1 | 2)`, are supported as finite
-unions or intersections.
-Expansion has a work budget shared by nested and deferred finite bodies.
-Exhaustion retains the complete scoped predicate and leaves validation
-incomplete; it never publishes a truncated union or intersection. Constant
-literal bodies avoid the product after checking the ranges for emptiness.
-
-For a new module, use `cue mod init example.com/quantified`. Existing modules
-can use these extensions without changing their language version.
-
-## Quantifiers and type application
-
-A quantified declaration constrains **one subject** at every type instance:
+## Universal subjects and abbreviations
 
 ```cue
 id(A): func(x: A) -> A: x
 out: [id(3), id[string]("hello")]
-```
-
-`id(A): ...`, `id: forall A ...`, and `id: func<A>(...) -> ...` introduce lexical
-universal binders. `forall` and `exists` can occur inside signatures and records.
-Prefer the declaration shorthand `id(A): ...` in examples and ordinary code;
-explicit quantifiers remain useful for nested expressions and elaborations.
-Quantifier blocks at the beginning of a record bind the rest of that record.
-Binder names may be shadowed; identity follows their declarations, not spelling.
-
-`A: number` is a subtype bound. All type binders range over one impredicative
-sort, also spelled `A in Type`. A quantified type can itself be an instance
-argument, including the identity's own quantified interface. Bound checking
-and lexical escape checks still apply; scope dependencies are not universe
-levels. The sort has no runtime representation.
-
-For source compatibility, the previously accepted `A in Type(n)` syntax
-denotes this same sort. Its nonnegative integer literal retains the old syntax
-validation but places no restriction on instance types. New code can omit the
-sort or write `Type` directly.
-
-A parametric alias abbreviates a description and creates no subject:
-
-```cue
 Box(A) = {value: A}
 item: Box(int) & {value: 3}
 ```
 
-In contrast, `box(A): {value: A}` requires one value belonging to every admissible
-`A`, including the empty type, and is contradictory. `empty(A): [...A]` describes
-the empty list. Type selection also applies to quantified composite subjects:
-`module[int].operation(...)` retains the module's data and universal obligations.
-Selecting a function instance likewise retains its original universal contract;
-certifying one selected instance cannot certify an invalid generic body.
-Selection also considers universal clauses attached to a separately supplied
-implementation. Each selection consumes one binder of the selected clauses;
-the implementation's original call protocol and universal obligations remain.
-Conjoining distinct checked views of the same closure retains their admitted
-call domains: `id[int] & id[string]` supports both instances in either order.
-The body runs once, and every applicable view's result obligation is checked.
-This does not weaken the explicit argument check on `id[int]` alone.
-Calls with empty containers or unused binders can infer the empty predicate,
-provided the selected instance admits every supplied argument.
-Inference keeps lower and upper constraints separate, reverses variance at
-callback inputs, and propagates requirements through dependent subtype bounds.
-Data fields are collected before instantiating callbacks, including callbacks
-nested in records and lists. A chosen instance must admit every supplied slot.
-A failed candidate remains incomplete unless an independent necessary bound or
-declared bound excludes every instance; guarded clauses cannot disappear
-because one guess failed. This remains a sufficient, incomplete inference rule.
+`id(A): ...`, `id: forall A ...`, and `id: func<A>(...) -> ...` introduce
+universal binders. Binder identity is lexical; shadowing does not identify two
+parameters with the same spelling. `A: number` supplies a subtype bound.
+Quantified types may themselves be instance arguments, including polymorphic
+callbacks. Explicit selection retains the implementation's original universal
+obligations and the selected view's calling domain.
 
-Type-sorted names denote predicates. An ordinary refinable field used in a
-signature denotes its eventual singleton. For example, `x: int` and
-`f: func(x) -> string` describe a function that accepts the particular eventual
-value of `x`. The current approximation `int` cannot discharge that obligation.
-For records and lists, the singleton includes the entire eventual data shape;
-it is not an open structural predicate that admits additional fields.
-Ordinary and parametric aliases decode their constituent references in the
-context of each use. Predicate and runtime uses have separate caches, while lexical
-binder identities and function code origins remain shared. Unresolved singleton
-constraints inside unused record arguments also keep a call incomplete.
+An alias such as `Box` is a description abbreviation and creates no subject.
+In contrast, `box(A): {value: A}` requires one subject to satisfy every instance,
+including the empty type. Quantified records and lists retain shared subjects,
+scopes, and their original obligations through projection and selection.
 
-Erased type parameters may appear in signatures, type selections, and seal
-witnesses. They cannot supply runtime return values, arguments, defaults, or
-ordinary data indexes. A bound such as `A: int` does not make `A` an integer
-argument. The compiler rejects these runtime uses, including indirect uses
-through local aliases. The check follows free dependencies and nested argument
-substitutions. Index guards belong to each alias use: checking an erased argument
-does not invalidate a separate fixed integer index through the same template.
-Finite literal value binders retain their selected values as runtime captures
-and are distinct from erased type binders. Type application and sealing share
-the same sorted witness check: value witnesses must belong to their range; type
-witnesses must satisfy their subtype bounds. A mixed seal creates
-opaque carriers only for its type witnesses.
+Inference collects lower and upper requirements with the appropriate variance.
+Repeated variables, nested callbacks, dependent subtype bounds, empty lists,
+and multiple selected views have regression coverage. Inference is sufficient
+rather than complete: an unsuccessful candidate leaves an obligation pending.
+Type parameters are erased proof variables and cannot be returned as runtime
+values or used as ordinary data operands.
 
-## Functions, refinement, and checking
-
-The finite arrow-region service in `internal/core/subsume/relevance.go`
-checks a conjunction of explicit clauses in supplied checking scopes. It
-enumerates closed packet protocols, including labeled, optional, and defaulted
-slots; groups equal domains; and checks joint result intersections. Exact
-negative guards use finite kind/literal and constant-interval differences.
-Unsupported complements retain conservative guards. The declaration service
-opens universals rigidly and structurally matches their domains against
-independent sibling domains, checking repeated variables, bounds, and packet
-coverage before adding an instance. Alias-expanded dependencies distinguish
-generic domains from vacuous floated binders. Recursive source-interface
-traversal remains an obligation of its caller. These services are separate
-from the current evaluator checks; their diagnostics are not CUE values and
-cannot act as semantic bottom.
-The service shares the 10,000-step proof budget and blocks on exhaustion.
-An independent finite Boolean oracle covers all triples of Boolean arrows.
-Function descriptors retain explicit declaration clauses in their original
-scopes, separately from selected call views and inferred obligations. Direct
-selection, partial application, and composite projection preserve that source
-description. An additional annotation contributes a new explicit clause;
-expanding a parametric alias also retains its supplied specialization.
-
-Conjoining function contracts retains every guarded capability clause. An
-implementation keeps its original labels, defaults, omitted-argument behavior,
-and extra-argument policy. Definition checking proves each result implication
-under its admitted packets. Call checking uses the original supplied packet,
-before implementation defaults supply omitted slots. Abstract application
-retains missing execution as a link obligation and propagates independently
-admitted result clauses.
-
-Implemented calls evaluate arguments and bodies independently of annotations.
-A strict source derivation must establish packet compatibility and implementation
-conformance before execution; a compatible unification or a successful trial
-proves neither. Annotations then erase: they cannot add fields, solve `self`
-references, choose alternatives or defaults, filter results, or leave optional
-fields and patterns on returned data. A missing proof blocks the application.
-Ordinary constraints written in the body and declared omission defaults remain
-part of the implementation, and a checked computation may fail or diverge.
-
-This boundary enforces type erasure operationally, in addition to the
-compiler's ban on using type parameters as runtime values. Changing an admitted
-type selection cannot change what the body computes. Successful instance
-checks still do not certify the universal implementation. Existential
-membership evidence is retained separately for opening; source export
-re-establishes it through an identity call without adding data constraints.
-The explicit `@experiment(quantified=false)` compatibility profile retains
-the older relational function semantics.
-
-For callable domains, including callbacks inside records or lists, applicability
-requires independent conformance evidence from the original argument.
-Static call checking also discharges the actual packet's callable membership
-obligations before execution or reuse of a cached result. Ignoring a callback, or
-calling it on one successful input, cannot discharge its universal contract.
-These checks include hidden runtime fields in packets, captured records and
-package implementations. Host schema validation of undemanded definitions and
-absent optional fields remains separate from runtime conformance.
-
-Builtins obey the same rule. Their package declarations define their original
-protocol; adding a client contract cannot install a default or rename a slot.
-Attached contracts require an independent conformance proof. The current rules
-cover `len`, `close`, and the string primitives `ToUpper`, `ToLower`, `ToTitle`,
-`Compare`, `Contains`, `ContainsAny`, `HasPrefix`, and `HasSuffix`. Supported
-inclusion proofs and exhaustive singleton scalar packets can discharge a clause;
-other builtin promises remain blocked. Source export retains client clauses.
-
-Concrete closures compare by code origin, captured runtime values, and bound
-partial arguments. Type arguments are erased. Two different bodies are different
-implementations, even if they happen to return equal results on tested inputs.
-Two copies of one closure retain their identity. Unknown capture equality stays
-incomplete until refinement settles it.
-Adding contracts to a captured function does not change its runtime identity,
-including when it is nested in a captured record, list, or partial argument.
-Those contracts remain separate validation obligations. Data `==` and `!=` use
-the same recursive runtime comparison through container and opaque boundaries;
-nesting cannot make erased selections or redundant contracts observable.
-The same runtime identity governs singleton membership and abstract-value
-equality, recursively through records, lists, and builtins. An opaque meet keeps
-both private constraint graphs and their validation obligations. Constraint
-equality used for graph deduplication still distinguishes retained contracts.
-
-Higher-rank callback contracts can be checked with rigid type variables. A
-polymorphic callback can be instantiated independently at its uses; a monomorphic
-callback is not silently generalized. Ground calls support finite list
-comprehensions and recursive calls with a demonstrated decrease in one fixed
-finite list argument. Other recursive calls retain cycle or incomplete errors.
-Finite acyclic chains of captured closures can execute and be certified even
-when their distinct instances share one function literal.
-
-Validation distinguishes retaining constraints from requiring a complete value:
-
-| Request | Meaning |
-| --- | --- |
-| `value.Validate()` | Report data contradictions and require relevance and strict conformance proofs for supplied function bodies; permit typed, unlinked imports and incomplete data. |
-| `value.Validate(cue.Concrete(true))` | Also require materialized values, complete runtime captures, and linked function implementations. |
-
-`cue eval` performs ordinary validation before printing, including the proofs
-for uncalled bodies. For example, `h(A): func(x: A) -> {a: 1}: x` is blocked:
-an arbitrary `A` does not establish the required result field. Writing
-`x & {a: 1}` in the body supplies an explicit assertion and can establish that
-result on success. `cue eval -c` additionally requires concrete validation;
-`cue eval -i` explicitly requests diagnostic output with validation bypassed.
-
-In the Go API, `Value.Err()` reports evaluation errors, not static acceptance.
-A closure can have no evaluation error while its body lacks a conformance
-proof. Call `Value.Validate()` before accepting a value; a successful
-`CompileString`, `Eval`, or `Syntax` operation does not replace that check.
-Static diagnostics leave the value available for refinement and inspection.
-
-`cue vet file.cue` requires concrete validation. An unproved function contract
-blocks ordinary validation as well; there is no separate verification flag.
-`cue vet -c=false` permits incomplete data and unlinked declarations for further
-refinement, while supplied implementations still need their static proofs. Definitions and absent optional fields remain schemas until demanded
-as ordinary values, following CUE's usual concreteness rules.
-
-The conformance checker handles annotated structural bodies, higher-rank
-arguments, records, lists, projections, finite comprehensions, supported pure
-primitives, and defaults proved to belong to the argument domain. Partial
-closures retain the original implementation obligations; attached residual
-contracts are checked using the saved argument slots. Static captures may
-remain typed data constraints or named unlinked imports. Supplied bound and
-captured callbacks require their own proofs, including callbacks inside
-composites. Unlinked callback interfaces provide conditional hypotheses;
-concrete closure validation still requires their implementations and runtime
-capture values. Refuted captured data cannot justify a body proof.
-Every saved argument must also belong to its parameter's required domain; a
-callback's own valid annotation is insufficient. This check is separate from
-the universal proof of the original implementation and residual contracts.
-An implementation supplies the remaining row of an open signature, preserving
-required parameters and omission defaults. A bodyless open signature retains
-an unresolved row. The checker does not use a target annotation as evidence for
-itself. Knowing a closure's code and captures, or successfully evaluating one
-call, does not discharge its declared contract.
-Calls within certified bodies use the remaining protocol of a partial closure.
-They consider the whole available arrow intersection, including finite unions
-of admitted input packets, while keeping original obligations separate from a
-selected view's available domain. Definition fields and absent optional fields
-do not introduce executable callback hypotheses.
-Primitive proof rules check the actual labels, arity, and omission policy before
-using a known successful-result rule. Certified additional primitive contracts
-retain their applicable result consequences; annotations do not filter execution.
-Explicit type applications inside bodies check the selected argument's bound
-and retain the original universal obligation. A checked call's result carries
-its callable evidence into later selections and applications, including
-impredicative instances. Record projection and callback application check every
-incoming union branch; an absent or optional field cannot justify selection.
-Alias applications share the evaluator's lexical substitution and bound checks.
-Their arguments are checked before normalization, including operations and
-function bodies in unused arguments. An invalid computation cannot be hidden
-by an abbreviation that discards its argument. Local and captured `let`
-expressions retain the surrounding proof scope and callable evidence.
-Fixed and homogeneous list indexes constrain successful selections and permit
-out-of-range failure. List slices preserve fixed elements for known bounds and
-homogeneous element predicates for dynamic bounds. Bytes slices preserve the
-bytes kind and exact ground results. Every bound must have an integer type;
-invalid bounds may produce a checked failing computation.
-Enabled ground arithmetic, scalar comparisons, Boolean
-operations, concatenation, and string/bytes repetition retain their exact
-results, including CUE's numeric representation. Both operands are checked
-before an operation can introduce a failing computation.
-Explicit body meets run the same eager refutation service as relevance.
-Constructor descriptions remain separate from the exact field inventories
-used by the proof. A source meet combines record fields before deriving its
-result inventory, including records nested in lists and records; synthetic
-typing closedness cannot invent a failure. Explicit `close` constraints are
-preserved when schema evaluation returns a shared wrapper.
-Known kind, interval, field, and list conflicts constrain that computation's
-successful results to bottom; they do not refute the closure constructing it.
-This also certifies failing instances selected from an accepted generic meet.
-Numeric translation by a constant preserves supported bounds.
-Boolean negation and numeric signs are also certified. Numeric negation
-preserves unions and exclusions and reverses strict and non-strict bounds.
-Constructed records carry their exact field set during proof. For finite
-conditional records, every condition and body is checked, and
-the checker retains each surviving field-presence branch. Guards on the same
-scalar binding or its length share finite literal and interval constraints;
-unrelated bindings remain independent even when their types are equal. A
-selection must be available in every surviving shape. An explicit `else`
-also supplies a complementary branch. These rules certify the existing
-structurally recursive fold without requiring a termination proof.
-Package clients can be checked by opening the admitted interface under a fresh
-abstract carrier,
-using its operation contracts as hypotheses, and checking that the carrier
-cannot escape.
-
-Certification shares one bounded proof context through nested evaluator calls.
-Completed proofs are reusable only when their inherited hypotheses are still
-available. Recursive implementations may use their own declared contracts
-under the partial-correctness fixed-point rule, while every body's obligations
-are checked. Runtime descriptor identity and protocol inclusion must both be
-established; a recursive dependency cannot justify a stronger callback demand.
-These temporary hypotheses and dependent cached proofs cannot escape a failed
-checking scope. Local annotated function bindings can refer to themselves or
-each other while their bodies are checked; ordinary cyclic data supplies no
-such hypothesis. The work budget
-bounds repeated proof expansion as well as depth. Exhaustion reports
-a blocked static judgment and leaves the original obligations available for
-another checking attempt.
-
-Optional parameter presence tests refine the corresponding branch without
-leaking presence to sibling branches. Unproved arithmetic implications,
-optional record-field presence refinements, arbitrary quantified Boolean inclusion, and general
-existential witness synthesis remain incomplete. Effect annotations are retained
-and compared as capabilities, but implementation proofs for functions marked
-with effects or `extern` remain unsupported. An `extern` declaration does not
-supply an implementation or execute foreign code by itself. Pure certification
-cannot assume a checked callback is pure. Two effectful clauses with disjoint result
-types are not contradictory solely on that basis when they admit a shared effect.
-
-Quantified checking currently consists of finite literal enumeration, extremal
-instances for covariant data, distribution through conjunction and fixed record
-fields, and rigid-variable proofs for supported arrows. General universal
-Boolean predicates, such as `forall A ((func(A) -> A) | (func() -> int))`, remain
-exact residual obligations. The current checker has no general decision rule
-for these predicates, even when a supplied implementation happens to satisfy
-one branch uniformly. Parsing and retaining such a predicate does not imply
-that concrete validation can discharge it. See the
-[checking-fragment regressions](../cue/testdata/quantified/certification/quantified_fragment.txtar).
-
-## Opaque packages
-
-Sealing supplies an explicit private representation and creates a fresh abstract
-carrier. Opening introduces a local abstract type and a view of the declared
-interface:
+## Live descriptions and fresh packets
 
 ```cue
-#Counter: exists State {
-    zero: State
-    next: func(State) -> State
-    read: func(State) -> int
-}
-
-counter: seal #Counter with (State = int) {
-    zero: 0
-    next: func(x: int) -> int: x + 1
-    read: func(x: int) -> int: x
-}
-
-out: (open counter as (S, C) {
-    result: C.read(C.next(C.zero))
-}).result
+Live: int
+scale: func(x: Live) -> int: 2 * x
+answer: scale(2)
 ```
 
-The result is `1`. The private representation is accessible only through the
-boundary adapters. Those adapters transport records, lists, generic operations,
-unions, and higher-order callbacks. Union branches are matched in the source
-representation before transport; overlapping branches remain incomplete when
-they would expose different public values. Optional and pattern fields follow
-the interface. Private implementation fields are not implicitly exported.
-This projection applies only to the module's root interface. Ordinary open-record
-arguments and results retain their extra data fields, including inside nested
-records and lists; hidden and definition labels keep their package identity.
-Adapters transport the abstract occurrences within these values. A scoped
-transport plan supplies both execution and totality certification. Identity
-branches retain their entire constraint graph. Changing composite branches
-retain the original graph behind an inverse-image predicate, preserving
-closedness, correlations, optional restrictions, and patterns under later
-refinement. Definitions and absent optional fields undergo predicate transport.
-Unchanged pattern regions also retain their visible lexical dependencies and
-label bindings, so scope and sort checks cannot lose them.
-Omission passes through an adapter, so the private implementation chooses its
-own default rather than receiving the interface's default as an argument.
-Independent nested packages pass through by identity, preserving their seals
-and private validation obligations. A nested public interface that depends on
-the outer carrier requires a stronger transport rule and remains incomplete.
-The dependency check includes definitions, optional fields, patterns, and free
-references of residual quantifiers. Another seal binds its own witness only;
-free outer abstract dependencies cannot escape behind it. Repackaging an outer
-representation as a private witness behind an independent interface is allowed.
+`Live` is an open description coordinate. Its integer upper bound proves the
+arithmetic body; it does not prove that every integer belongs to `Live`.
+The call creates a fresh packet constrained by both `2` and `Live`. Refining
+`Live` to `>=0` preserves `answer: 4`; refining it to `>2` refutes that invocation.
+The packet never writes `2` back into the declaration.
 
-Transporting a callback inward and back outward through the same interface
-preserves its observable closure identity. The adapters remain in place for
-execution and validation; identity comparison recognizes inverse transports
-without removing their contracts or identifying independent operation handles.
+Parameter constraints can complete an open record or select a compatible data
+alternative. They remain attached to saved partial arguments and ignored
+operands. A contradictory packet is an ordinary failing computation. An
+unfinished demanded packet remains incomplete, even when the body is constant.
+Higher-order packet components also require independent implementation and
+coverage evidence; conjoining an arrow cannot manufacture that evidence.
 
-Concrete validation certifies opaque operations by proving the private
-implementation and its interface contract, then checking that transport is
-total for the supported schema. This includes monomorphic structural operations,
-callbacks, and unions whose source branches have disjoint kinds. Unknown generic
-transport, recursive schemas, and overlapping transports can still leave an
-operation incomplete even when individual concrete calls succeed.
-An operation with an arrow intersection retains every clause and environment.
-Calls select an admitted transport view and enforce all applicable result
-promises. Independent private proofs are insufficient when public domains
-overlap: the transports must agree as well. Disjoint domains, or a supported
-proof of transport agreement, make the intersection checkable. Unknown guards
-and transport agreement remain incomplete. Partial overloaded operations
-currently require a common packet coordinate system; differing rows remain
-incomplete. Whole-interface metadata also participates in adapter caching and
-recognition of inverse callback transports.
-Concrete validation also traverses private representation values, including
-functions nested inside records or lists. Hiding a function behind an abstract
-carrier does not discharge its conformance obligations.
+```cue
+R: int
+same: func(x: R) -> R: x
+constant: func() -> R: 2
+checked: func(x: int) -> R: x & R
+```
 
-Copies preserve seal identity and exported aliasing. Executing a new seal creates
-a distinct carrier, even when its representation is the same. Abstract values
-cannot be interchanged between carriers or escape an opening, including through
-later calls of returned closures. A closed existential package can leave the
-scope. The initial opaque profile uses unbounded representation binders; a
-transparent bound would expose extra representation structure.
-Delayed escape checks persist through optional fields, disjunctions, patterns,
-and open list tails, including values materialized by later API refinement.
-Escape checks also follow singleton witnesses, every retained function or
-builtin clause, and generic bounds. A returned closure can retain private
-runtime captures behind an ordinary public signature; its later results still
-undergo the scope check.
-Membership in another instance of an existential interface checks its captured
-predicates against the same sealed witness; sharing a template is insufficient.
-Every conjunct of a refined interface is retained during sealing and opening.
-Unsupported additional existential proofs remain incomplete. Transparent
-existential membership preserves the candidate's own shape and closedness:
-missing refinable fields remain incomplete, while fields forbidden by a closed
-candidate establish a contradiction. It cannot certify a missing field by
-checking a separate, augmented record.
+The first and third bodies have result evidence. `constant` remains pending
+until the store proves the opposite inclusion, for example by adding `R: 2`.
+Adding `R: >2` instead supplies a result counterexample. A result annotation is
+a proof goal and cannot construct fields, choose alternatives, or solve cycles
+in the body. The explicit assertion in `checked` is an executable constraint.
 
-The current `open` operation supports record-shaped interfaces with one
-unbounded representation binder. Multi-carrier, bounded, and scalar existential
-packages cannot yet be opened. For an admitted transparent covariant record,
-opening constructs the same greatest admissible type witness used by its
-membership rule. Repeated opening of a shared subject preserves that witness.
-Certification of a client also checks that this witness construction has total
-public transport; it cannot assume every existential member was explicitly
-sealed. Noncovariant transparent descriptions still require a supplied witness;
-general existential witness synthesis remains unsupported.
+A fixed alias such as `let Fixed = int` is a fixed predicate. A reference inside
+an alias still retains its live coordinate. Equal current record data does not
+prove inclusion into an open result description: future constraints may add
+fields. Concrete scalar and closed scalar-list singletons admit stronger facts.
 
-Opaque values and package operations cannot be serialized as their private
-implementations. Observe ordinary data through public operations before exporting
-JSON. Source export preserves supported generic functions and concrete captures.
-Shared function literals are emitted once, with separate arguments for erased
-predicates and runtime captures, so recompilation preserves closure identity.
-Declared parameter and field constraints are retained as erased metadata and
-emitted on capture fields when that syntax respects erasure. Lexical aliases
-and local type fields retain their scopes through repeated export. Refinable
-local captures expose their declared open descriptions to body checking;
-their initial constructor inventories cannot prove data closedness after
-another record conjunct adds fields. Generic data captures that would put an
-arbitrary predicate into executable field syntax still use the prior encoding;
-preserving their strict certificates requires a further export rule.
-Finite concrete capture graphs may contain other implemented functions.
-Runtime captures retain hidden fields observable by the code, including fields
-inside records and lists. A hidden label from another package that cannot be
-rebound faithfully makes independent export incomplete.
-Residual quantifiers retain selected arguments, outer predicates, and local
-binder scopes. These rules apply to both ordinary and final source export;
-unsupported captures, independent partial closures, retained transport
-predicates without an interface codec, and opaque operations report
-incompleteness rather than being replaced with a weaker description.
-Sealed packages also report incomplete source export when their visible
-interface contains only ordinary data; export cannot erase their seal identity.
-Singleton membership and closure capture equality likewise retain seal identity,
-including packages whose interface is empty or contains only ordinary data.
+## One propagation graph
 
-Captured predicates always export in schema mode, including with `cue.Final()`:
-definition closedness, optional and required fields, patterns, and defaults
-remain constraints on future calls. Both implementations and bodyless contracts
-carry their lexical dependencies. Parametric and ordinary aliases retain their
-declarations and bounds, with renamed bindings to avoid destination capture.
-Unknown runtime witnesses make independent export incomplete.
-Opened type names remain lexical export dependencies even though they are
-erased from runtime captures. Neither source nor final export may emit a free
-abstract name or silently acquire a binding from the destination scope.
+The implementation retains the paper's five components:
 
-Evaluated source export also retains quantified scalar, record and list introductions,
-their selected telescopes, refinements, and shared copies. New type selections
-after recompilation preserve the original selection interface. A graph that
-exports both a composite introduction and a separate method from that same
-introduction currently reports incomplete export: emitting independent code
-origins would change closure identity. Incompatible lexical origins that would
-require the same unsupported code projection are also rejected explicitly.
-Projected methods from selected records and fixed lists retain their remaining
-method telescope through export and reimport, including separately supplied
-implementations. Original universal clauses remain proof obligations and cannot
-restart a consumed binder. Scalar normalization, call-result detachment, and graph deduplication likewise
-retain the introduction's binder and selection information. Passing a
-quantified scalar or list through an identity call cannot erase its remaining
-telescope or restart a consumed binder.
+| Component | Representation |
+| --- | --- |
+| Exact source relation | Vertices, conjuncts, environments, activation packets, and original expressions |
+| Facts and bounds | Scoped descriptions, live references, membership facts, and synthesized body summaries |
+| Certificates | Function/body derivations, separate coverage goals, and explicit hypothesis support |
+| Obligations and observations | Retained goals, live-vertex dependencies, and relevance traversal triggers |
+| Enabled work | The propagation queue and its shared work allowance |
 
-## Implementation map and regression coverage
+Evaluation and proof production use the same graph. Evaluation may establish a
+capture or description bound needed by a proof. A grounded core derivation,
+protocol proof, and current observation pass enable an invocation. Activations
+retain that evidence; there is no static-phase flag or replacement of evaluator
+hooks with a second checker.
 
-[The oracle guide](oracle.md) documents independent finite models and semantic
-preservation checks. The implementation and its regression coverage are
-organized as follows:
+Each derivation has an assumption store. Queued work restores the store in which
+it was installed. A callback assumption can justify a client body, but must be
+discharged by the supplied callback's own certificate when linking the packet.
+A body cannot use its pending result annotation as its own premise. Checked
+inductive rules justify recursive partial-correctness proofs; membership in a
+worklist cycle alone supplies no proof.
 
-- `cue/ast`, `cue/parser`, and `cue/format` define lexical syntax and its round
-  trips. `internal/core/compile` records binder identity and runtime captures.
-- `internal/core/adt/quantified.go`, `subject.go`, and `witness.go`
-  handle type instances, shared subjects, sort checks, and correlated values.
-- `internal/core/adt/capability.go`, `closure.go`, `abstract.go`, and `recursion.go`
-  implement call obligations, operational identity, symbolic calls, and checked
-  finite-list descent.
-- `internal/core/adt/call_admission.go`, `call_contract.go`, and
-  `runtime_identity.go` share original-packet admission, available call clauses,
-  guarded results, and recursive runtime observations across their consumers.
-- `internal/core/adt/package.go`, `existential_witness.go`, and
-  `binder_witness.go` implement existential residuals and sorted construction
-  and elimination of witnesses. `transport_plan.go` and
-  `transport_constraint.go` share scoped transport and retain source predicates.
-  `internal/core/subsume` separates sufficient inclusion checks from
-  implementation certification.
-- [The quantified test index](../cue/testdata/quantified/README.md) links every
-  layer's txtar fixtures and explains their assertions. Semantic cases run in
-  the ordinary evaluator corpus under `cue/testdata/quantified/`.
-- [The paper examples](../cue/testdata/quantified/paper/README.md) reproduce all
-  101 listings verbatim. An index test guards against missing or changed
-  listings, and executable cases run in the ordinary evaluator corpus.
-  Syntax templates and unimplemented profiles have explicit coverage notes.
-- [Additional examples](../cue/testdata/quantified/examples/) are standalone
-  regression tests.
-  Intentional errors and specification-only examples assert their errors or
-  residual status. Syntax-only cases live in the parser corpus.
-- Additional txtar fixtures cover refinement, impredicative instances, opacity,
-  identity,
-  file ordering, certification, and export. Small Go harnesses retain checks
-  requiring Go API operations or AST identity. Most inputs are txtar sections;
-  small API tables and generated resource stress cases also live in Go tests.
-  Parser, formatter, AST, exporter, and CLI corpora all have
-  `quantified` in their paths or filenames.
+Goals distinguish established evidence, checked rejection, pending work, and a
+quiet observation pass. Quietness is a completed search status, not a theorem.
+New information wakes dependent goals and invalidates quiet passes. Persistent
+certificates retain their target, scope, and support. Unsupported search does
+not become semantic bottom and cannot discard a union alternative.
 
-Run the semantic corpus and the API checks with:
+Proof work, region expansion, and evaluator callbacks consume the shared
+allowance. Exhaustion retains the obligations. Adding work resumes the graph
+and reuses proved certificates. Individual search attempts also have a finite
+allowance; renewed attempts may receive more work. Runtime recursion requires
+finite structural descent before executing another recursive activation.
+
+## Capabilities and observations
+
+Attaching `A -> B` to an implementation with domain `C` produces two distinct
+goals: coverage `A <= C`, and a body theorem at result `B` under input `A`.
+A successful call-local packet meet supplies neither theorem. All source
+requirements survive explicit selection, partial application, copying, and
+closure export. Defaults and label/omission rules belong to the implementation's
+protocol; an annotation does not insert an adapter.
+
+Explicit interfaces retain their observation roots through normalization.
+The finite kernel checks equal-domain and overlapping arrow regions, ground
+conflicts, field presence, tuples, constant intervals, rigid universals, and
+independently anchored instances. An empty result creates an input-emptiness
+demand. A verified witness in that region supplies a relevance refutation.
+An unresolved live input remains pending. Candidate witnesses are checked by
+membership and disjointness proofs, never accepted from upper bounds alone.
+
+Direct literal and parameter-return bodies can also retain result
+counterexamples. Other unproved bodies remain pending when the implemented
+finite rules cannot decide them. Negative checking evidence is a diagnostic
+about a scoped requirement; the corresponding partial arrow is not rewritten
+to the empty semantic type.
+
+Bodyless declarations supply conditional invocation evidence and result
+constraints. They do not materialize an implementation. The paper's native
+adapter example is tested as a conditional declaration: logical rejection is
+available, while execution remains incomplete without a linked implementation.
+Known builtins have explicit successful-result rules; a foreign signature alone
+does not supply arbitrary implementation evidence.
+
+## Validation, refinement, and export
+
+`Value.Err()` reports evaluation failures. `Value.Validate()` additionally
+checks explicit observations and supplied function bodies, including uncalled
+bodies. Missing or rejected proof goals are reported even without
+`cue.Concrete(true)`. Concrete validation additionally demands completed data,
+linked implementations, and runtime captures. `cue vet -c=false` still reports
+undischarged proof obligations.
+
+`Unify`, `FillPath`, source export, and reimport preserve the dependencies that
+can be refined later. A derived scalar is not permission to forget its argument
+packet or live result constraint. Source reconstruction retains code origins,
+lexical substitutions, captured values, defaults, and original obligations.
+Standalone closure export fails explicitly when a required capture cannot be
+represented faithfully. JSON output has no representation for a function or an
+unresolved implementation.
+
+## Code and verification
+
+- `internal/core/adt/propagate.go` owns goals, dependencies, suspension, and work.
+- `internal/core/subsume/propagate.go` installs scoped inference propagators.
+- `internal/core/subsume/infer*.go` contains the finite body derivation rules.
+- `internal/core/subsume/capability.go` separates activation from coverage.
+- `internal/core/subsume/relevance*.go` and `refutation.go` retain observations
+  and checked negative evidence.
+- `internal/core/adt/live.go`, `expr.go`, and `call_contract.go` retain live
+  references, fresh activations, and saved packet constraints.
+- `internal/core/compile/quantified.go` and `erasure.go` establish lexical type
+  scopes and check erased variables.
+- `internal/core/export` reconstructs faithful source and closure environments.
+
+Every listing in the current paper is indexed and reproduced verbatim in the
+[paper catalogue](../cue/testdata/quantified/paper/README.md). Syntax and
+pseudocode listings are distinguished from executable examples; the malformed
+call example has a compile-error check. Still-valid examples from older paper
+versions remain in `paper_history`.
+
+API regressions exercise later refinement, observation triggers, independent
+coverage, packet isolation, strict operands, closure identity, and repeated
+export. Kernel tests inspect refutation support and resume real proofs after
+budget exhaustion. [Independent oracles](oracle.md) cover finite semantics and
+preservation separately from these example tests.
 
 ```sh
-go test ./internal/core/adt -run TestEvalV3/quantified
-go test ./cue -run TestQuantified
+go test ./cue ./internal/core/...
+tools/test-quantified-oracles.sh fast
+go test ./...
 ```
-
-See [the test index](../cue/testdata/quantified/README.md) for focused commands
-for each layer. Run the complete regression suite with `go test ./...`.

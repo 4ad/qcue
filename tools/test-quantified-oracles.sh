@@ -24,14 +24,14 @@ case "$CUE_QUANTIFIED_ORACLE" in
 esac
 
 go test ./cue ./internal/core/adt \
-    -run '^TestQuantified(Oracle|Semantic|Boundary|CallErasure|ArgumentErasure|ResultErasure|PacketDomainModel$)' \
+    -run '^TestQuantified(Oracle|Semantic|Boundary|CallPacket|ArgumentConstraints|ResultErasure|PacketDomainModel$)' \
     -count=1 -v -timeout=15m
 
 if [ "$CUE_QUANTIFIED_ORACLE" = fast ]; then
     exit 0
 fi
 
-for target in FiniteOracle Preservation FeatureCombinations TransportBoundary PacketDomain; do
+for target in FiniteOracle Preservation FeatureCombinations PacketDomain; do
     package=./cue
     if [ "$target" = PacketDomain ]; then
         package=./internal/core/adt
