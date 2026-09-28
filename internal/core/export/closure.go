@@ -108,23 +108,22 @@ func referenceKey(x adt.Expr) ast.Node {
 func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 	params := adt.FunctionTypeParameters(t)
 	origin := e.functionOrigin(t.Fn, params)
-	g := e.graph()
-	if f := g.functions[t]; f != nil {
-		return e.closureReference(f)
-	}
-	f := e.closureField()
-	g.functions[t] = f
 	args := adt.FunctionTypeArguments(t)
+	live := func(ref adt.Expr) bool {
+		if r, ok := ref.(adt.Resolver); ok {
+			cell, _ := e.ctx.Lookup(t.Env, r)
+			return cell != nil && e.exposed[cell]
+		}
+		return false
+	}
 	value := func(ref adt.Expr, runtime bool) ast.Expr {
 		if r, ok := ref.(*adt.TypeReference); ok {
 			if v := args[r.Param.Src]; v != nil {
 				return e.predicateValue(v)
 			}
 		}
-		if r, ok := ref.(adt.Resolver); ok {
-			if cell, _ := e.ctx.Lookup(t.Env, r); cell != nil && e.exposed[cell] {
-				return e.innerExpr(t.Env, ref)
-			}
+		if live(ref) {
+			return e.innerExpr(t.Env, ref)
 		}
 		v, complete := e.ctx.Evaluate(t.Env, ref)
 		if !complete || v == nil || (runtime && !e.exportableCapture(v)) {
@@ -136,6 +135,22 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 		}
 		return e.predicateValue(v)
 	}
+	// Exposed captures are coordinates of the surrounding source record.
+	// Instantiate their environment at the use site so copying that record
+	// rebinds the references. Only code origins may be shared at file scope.
+	for _, refs := range [][]adt.Expr{origin.predicates, origin.captures} {
+		for _, ref := range refs {
+			if live(ref) {
+				return e.originApplication(origin, value)
+			}
+		}
+	}
+	g := e.graph()
+	if f := g.functions[t]; f != nil {
+		return e.closureReference(f)
+	}
+	f := e.closureField()
+	g.functions[t] = f
 	g.depth++
 	f.Value.(*ast.ParenExpr).X = e.originApplication(origin, value)
 	g.depth--

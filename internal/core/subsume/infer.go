@@ -67,6 +67,7 @@ func (p *inference) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bo
 }
 
 type proofScope struct {
+	presence map[adt.Feature]adt.ArcType
 	values   map[adt.Feature]adt.Value
 	optional map[adt.Feature]adt.Value
 	absent   map[adt.Feature]bool
@@ -856,6 +857,9 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			e = e.Up
 		}
 		if scope := p.scopes[e]; scope != nil {
+			if scope.presence[x.Label] == adt.ArcOptional {
+				return nil
+			}
 			if v := scope.values[x.Label]; v != nil {
 				if scope.fields[x.Label] != nil {
 					return p.bindingDescription(v)

@@ -32,6 +32,9 @@ func (p *inference) validateSourceOperations(env *adt.Environment, expr adt.Expr
 }
 
 func (p *inference) sourceOperations(env *adt.Environment, expr adt.Expr) bool {
+	if !sourceOperationSyntax(expr) {
+		return true
+	}
 	ok := true
 	seen := make(map[adt.Node]bool)
 	visitor := walk.Visitor{}
@@ -153,15 +156,46 @@ func (p *inference) sourceOperations(env *adt.Environment, expr adt.Expr) bool {
 	return ok
 }
 
+// Only operations introduced by this syntax need pre-projection checking.
+// References retain the observations of their source subjects. In particular,
+// collecting a pure data projection must not unfold a structural reference
+// cycle or evaluate a template before the ordinary evaluator copies it.
+func sourceOperationSyntax(expr adt.Expr) bool {
+	needed := false
+	seen := make(map[adt.Node]bool)
+	visitor := walk.Visitor{Before: func(node adt.Node) bool {
+		if node == nil || needed || seen[node] {
+			return false
+		}
+		seen[node] = true
+		switch x := node.(type) {
+		case *adt.Function:
+			return false
+		case *adt.Quantified:
+			if _, function := x.Body.(*adt.Function); function {
+				return false
+			}
+			needed = true
+		case *adt.CallExpr, *adt.AliasApplication:
+			needed = true
+		}
+		return !needed
+	}}
+	visitor.Elem(expr)
+	return needed
+}
+
 // Calls see all refinements of their record's fields, including contracts
 // and implementations supplied in separate record conjuncts.
 func (p *inference) sourceRecordOperations(record *proofRecord) bool {
-	for _, label := range record.labels {
-		bindings := record.scope.bindings[label]
-		for _, binding := range bindings {
-			if !p.sourceOperations(binding.env, binding.expr) {
-				return false
-			}
+	// Expanded references contribute declarations to the common scope, but
+	// are not newly executed constructors. Their source observations remain
+	// on the referenced graph. Rechecking their syntax here would run data
+	// computations in a synthetic copy before the evaluator has established
+	// that copy's presence, defaults, and structural-cycle dependencies.
+	for _, binding := range record.operations {
+		if !p.sourceOperations(binding.env, binding.expr) {
+			return false
 		}
 	}
 	return true
