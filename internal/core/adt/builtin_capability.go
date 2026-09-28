@@ -75,6 +75,16 @@ func (b *Builtin) Implementation() *Builtin {
 // that all admitted calls succeed; that requires a separate primitive rule.
 func (b *Builtin) Protocol(c *OpContext) *Function {
 	f := &Function{Quantified: true, Ret: &BasicType{K: b.Result}}
+	// Structural kinds need structural descriptions: a bare kind mask has
+	// no list tail or field inventory for subsequent eliminations.
+	switch b.Result {
+	case ListKind:
+		f.Ret = &ListLit{Elems: []Elem{&Ellipsis{}}}
+	case StructKind:
+		f.Ret = &StructLit{}
+	case BottomKind:
+		f.Ret = &Bottom{Code: EvalError, Err: c.Newf("builtin has no successful result")}
+	}
 	labels, _ := builtinParamLabels(b.declaredTypes())
 	for i, p := range b.Params {
 		param := FuncParam{Positional: true, Value: p.Value,

@@ -228,7 +228,7 @@ var recloseBuiltin = &adt.Builtin{
 var andBuiltin = &adt.Builtin{
 	Name:   "and",
 	Params: []adt.Param{listParam},
-	Result: adt.IntKind,
+	Result: adt.TopKind,
 	Func: func(call adt.BuiltinCallContext) adt.Expr {
 		c := call.OpContext()
 		list := c.RawList(call.Value(0))
@@ -246,7 +246,7 @@ var andBuiltin = &adt.Builtin{
 var orBuiltin = &adt.Builtin{
 	Name:        "or",
 	Params:      []adt.Param{listParam},
-	Result:      adt.IntKind,
+	Result:      adt.TopKind,
 	NonConcrete: true,
 	Func: func(call adt.BuiltinCallContext) adt.Expr {
 		c := call.OpContext()

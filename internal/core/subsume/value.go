@@ -94,14 +94,29 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		// node link.
 		return deref(a) == deref(b)
 	case *adt.RigidType:
-		if b.Bound != nil {
-			return s.values(a, b.Bound)
+		if adt.Unwrap(a) == b {
+			return true
+		}
+		// Compare compound targets before forgetting the subject's identity
+		// through its upper bound: A is a member of A | B even when A has
+		// no informative bound.
+		switch adt.Unwrap(a).(type) {
+		case *adt.Disjunction, *adt.Conjunction:
+			break
+		default:
+			if b.Bound != nil {
+				return s.values(a, b.Bound)
+			}
 		}
 	case *adt.LiveType:
-		if x, ok := a.(*adt.LiveType); ok {
+		if x, ok := adt.Unwrap(a).(*adt.LiveType); ok {
 			return x.SameReference(s.ctx, b)
 		}
-		return s.values(a, b.Upper)
+		switch adt.Unwrap(a).(type) {
+		case *adt.Disjunction, *adt.Conjunction:
+		default:
+			return s.values(a, b.Upper)
+		}
 	}
 
 	switch x := a.(type) {
@@ -209,6 +224,19 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 			if !ok {
 				return s.values(a, b)
 			}
+		}
+
+		// Several kind alternatives can jointly cover a native kind mask,
+		// for example int | float covers number. No individual arm need
+		// subsume that mask. Only unconstrained kinds supply this evidence.
+		var kinds adt.Kind
+		for _, alternative := range x.Values {
+			if basic, ok := adt.Unwrap(alternative).(*adt.BasicType); ok {
+				kinds |= basic.K
+			}
+		}
+		if basic, ok := b.(*adt.BasicType); ok && x.NumDefaults == 0 && basic.K&^kinds == 0 {
+			return true
 		}
 
 		// A Disjunction subsumes another Disjunction if all values of y are

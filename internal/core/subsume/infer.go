@@ -802,10 +802,10 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		// An unmaterialized pattern label still has the string kind.
 		return p.schema(env, x)
 	case *adt.ImportReference:
-		// Imported declarations provide the same conditional hypotheses as
-		// named captures. Supplied implementations retain their own proofs;
-		// selecting a builtin then uses its independently known contract.
-		return p.captured(p.schema(env, x))
+		// An import is a namespace, not one runtime record to materialize.
+		// Check the selected declaration as a capture below: unrelated
+		// package schemas can contain intentionally failing computations.
+		return p.schema(env, x)
 	case *adt.AliasApplication:
 		args := make([]adt.Value, len(x.Args))
 		for i, argument := range x.Args {
@@ -929,7 +929,11 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		return value
 	case *adt.SelectorExpr:
-		return p.project(p.expr(env, x.X), x.Sel)
+		v := p.project(p.expr(env, x.X), x.Sel)
+		if _, imported := x.X.(*adt.ImportReference); imported {
+			return p.captured(v)
+		}
+		return v
 	case *adt.IndexExpr:
 		v := p.expr(env, x.X)
 		composite, _ := v.(*adt.Vertex)
@@ -1680,6 +1684,8 @@ func (p *inference) apply(env *adt.Environment, callee adt.Value, call *adt.Call
 		switch builtin.Name {
 		case "len":
 			result = p.length(args[0])
+		case "and", "or":
+			result = p.listFold(args[0], builtin.Name == "and")
 		case "close":
 			// Apply the primitive to the checked description, retaining its
 			// field constraints while adding the explicit source closedness.
@@ -1736,6 +1742,14 @@ func (p *inference) partialCall(callee adt.Value, packet adt.FuncType) adt.Value
 }
 
 func (p *inference) callValue(callee adt.Value, target adt.FuncType) adt.Value {
+	if validator, ok := callee.(*adt.BuiltinValidator); ok && validator.Src == nil {
+		for _, param := range target.Fn.Params {
+			if param.Label != adt.InvalidLabel {
+				return nil
+			}
+		}
+		callee = validator.Builtin
+	}
 	if !p.step() {
 		return nil
 	}
@@ -1773,6 +1787,14 @@ func (p *inference) callValue(callee adt.Value, target adt.FuncType) adt.Value {
 		// its label and omission rules.
 		source.Fn = primitiveContract(p.ctx, f)
 		if source.Fn == nil || ValidateBuiltin(p.ctx, f) != nil {
+			return nil
+		}
+		// Native slots consume values of their declared types. Unlike a CUE
+		// activation, a native call cannot constrain an ill-typed argument
+		// into an empty packet and use that contradiction as result evidence.
+		protocol := *source.Fn
+		protocol.Ret = nil
+		if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol}) {
 			return nil
 		}
 	default:

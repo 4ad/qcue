@@ -3295,8 +3295,10 @@ func (x *Builtin) applyResultTypes(c *OpContext, v Value) Value {
 
 // A Builtin is a value representing a native function call.
 type Builtin struct {
-	// TODO:  make these values for better type checking.
 	Params []Param
+	// Result bounds every successful return of this native implementation.
+	// It is trusted by function checking, independently of client contracts.
+	// Use TopKind for primitives whose result depends on their arguments.
 	Result Kind
 
 	// NonConcrete should be set to true if a builtin supports non-concrete

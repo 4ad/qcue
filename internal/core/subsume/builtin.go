@@ -37,24 +37,12 @@ func ValidateBuiltin(c *adt.OpContext, b *adt.Builtin) *adt.Bottom {
 	return nil
 }
 
-// Only primitives with a known successful-result rule can discharge an arrow.
-// Native parameter/result kinds alone do not establish that rule.
+// Builtin descriptors are implementation-owned primitive contracts. Their
+// result kinds describe every successful return; errors and incomplete calls
+// do not promise a value. Client attachments are deliberately excluded from
+// Protocol. ExternalFunc, unlike Builtin, supplies no such contract.
 func primitiveContract(c *adt.OpContext, b *adt.Builtin) *adt.Function {
-	f := b.Protocol(c)
-	if b.Package == adt.InvalidLabel && b.Name == "len" {
-		f.Params[0].Value = &adt.BasicType{K: adt.StructKind | adt.ListKind | adt.StringKind | adt.BytesKind}
-		return f
-	}
-	if b.Package == adt.InvalidLabel && b.Name == "close" {
-		return f
-	}
-	if b.Package != adt.InvalidLabel && b.Package.StringValue(c) == "strings" {
-		switch b.Name {
-		case "ToUpper", "ToLower", "ToTitle", "Compare", "Contains", "ContainsAny", "HasPrefix", "HasSuffix":
-			return f
-		}
-	}
-	return nil
+	return b.Protocol(c)
 }
 
 func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
