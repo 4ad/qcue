@@ -200,7 +200,9 @@ outer:
 			return false
 		}
 
-		a := &adt.Vertex{Label: f}
+		// A pattern or ellipsis constrains a field if it exists; it does
+		// not require an optional source field to become present.
+		a := &adt.Vertex{Label: f, ArcType: b.ArcType}
 		x.MatchAndInsert(ctx, a)
 		if !a.HasConjuncts() {
 			// It is accepted and has no further constraints, so all good.
@@ -208,6 +210,7 @@ outer:
 		}
 
 		a.Finalize(ctx)
+		a.ArcType = b.ArcType
 
 		if !s.vertices(a, b) {
 			return false

@@ -23,6 +23,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/core/eval"
 	"cuelang.org/go/internal/core/export"
 	"cuelang.org/go/internal/core/runtime"
 	"cuelang.org/go/pkg"
@@ -34,8 +35,13 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 	r := runtime.New()
 	for _, ip := range pkg.ImportPaths() {
 		vertex := r.LoadBuiltin(ip)
-		if vertex == nil {
+		if vertex == nil && ip == "tool" {
+			// The tool package is injected into command files and has no
+			// importable builtin registration.
 			continue
+		}
+		if vertex == nil {
+			t.Fatalf("missing registered builtin package %q", ip)
 		}
 		for _, arc := range vertex.Arcs {
 			var b *adt.Builtin
@@ -48,12 +54,19 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 				continue
 			}
 			t.Run(ip+"/"+b.Name, func(t *testing.T) {
+				ctx := eval.NewContext(r, nil)
+				protocol := b.Protocol(ctx)
 				var params, args []string
 				for i, param := range b.Params {
 					name := fmt.Sprintf("a%d", i)
 					typ := builtinKindSyntax(param.Kind())
-					if _, basic := param.Value.(*adt.BasicType); !basic {
-						constraint := param.Value
+					if _, basic := protocol.Params[i].Value.(*adt.BasicType); !basic {
+						root := &adt.Environment{Vertex: &adt.Vertex{BaseValue: &adt.StructMarker{}}}
+						constraint, complete := ctx.Evaluate(root, protocol.Params[i].Value)
+						if !complete || constraint == nil {
+							t.Fatal("incomplete native parameter type")
+						}
+						constraint = adt.Unwrap(constraint)
 						if union, ok := constraint.(*adt.Disjunction); ok {
 							copy := *union
 							copy.NumDefaults, copy.HasDefaults = 0, false
@@ -106,7 +119,7 @@ func TestBuiltinFunctionChecking(t *testing.T) {
 						break
 					}
 				}
-				if b.IsValidator(len(b.Params) - 1) {
+				if len(b.Params) > 0 && b.IsValidator(len(b.Params)-1) {
 					constructor := fmt.Sprintf("import native %q\nf: func(%s) -> %s: native.%s(%s)",
 						ip, strings.Join(params[1:], ", "), builtinKindSyntax(b.Params[0].Kind()),
 						b.Name, strings.Join(args[1:], ", "))

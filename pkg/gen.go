@@ -37,6 +37,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"text/template"
@@ -487,7 +488,7 @@ func (g *goEmitter) constant(obj *types.Const, value string) {
 // with it.
 func (g *goEmitter) function(fn *types.Func) {
 	if !bareValidator(fn) {
-		fmt.Fprintf(g.sigs, "%s: %s\n", fn.Name(), deriveCallForm(fn))
+		fmt.Fprintf(g.sigs, "%s: %s\n", fn.Name(), deriveCallForm(fn, false))
 	}
 
 	g.nonConcrete = false
@@ -500,6 +501,9 @@ func (g *goEmitter) function(fn *types.Func) {
 	defer fmt.Fprintf(g.w, "}")
 
 	fmt.Fprintf(g.w, "Name: %q,\n", fn.Name())
+	if precise := deriveCallForm(fn, true); precise != deriveCallForm(fn, false) {
+		fmt.Fprintf(g.w, "Signature: %q,\n", precise)
+	}
 
 	needCallContext := false
 	args := []string{}
@@ -766,21 +770,23 @@ func (g *goEmitter) adtKind(typ types.Type) string {
 	return ""
 }
 
-// deriveCallForm returns the call form of fn's signature for the
-// runtime blob, at kind level — no tighter than the registered
-// parameter and result kinds. Its plain parameter names become the contract
-// labels of the raw builtin slots; it adds no value constraint the
-// registration does not already impose. The precise types are the business
-// of the hand-maintained definition file.
-func deriveCallForm(fn *types.Func) string {
+// deriveCallForm returns a native signature. The runtime blob retains its
+// existing kind constraints; precise checking metadata additionally preserves
+// Go container elements and converted record fields. Parameter names match the
+// native slots in both forms. Authored definitions may state further refinements
+// not expressible in Go signatures.
+func deriveCallForm(fn *types.Func, precise bool) string {
 	sign := fn.Signature()
 	params := sign.Params()
 	defParams := make([]string, params.Len())
 	for i := range defParams {
-		defParams[i] = defParam(fn.Name(), params.At(i))
+		defParams[i] = defParam(fn.Name(), params.At(i), precise)
 	}
-	return fmt.Sprintf("func(%s) -> %s",
-		strings.Join(defParams, ", "), cueResultType(sign.Results().At(0).Type()))
+	result := cueKindResultType(sign.Results().At(0).Type())
+	if precise {
+		result = cueResultType(sign.Results().At(0).Type())
+	}
+	return fmt.Sprintf("func(%s) -> %s", strings.Join(defParams, ", "), result)
 }
 
 // bareValidator reports whether the builtin registers as a bare
@@ -827,9 +833,12 @@ func paramHasDefault(funcName string, param *types.Var) bool {
 // typed pkg.Schema in Go, so deliberately accepting a non-concrete value —
 // carries the @schema() attribute, which the definition files declare as
 // well.
-func defParam(funcName string, param *types.Var) string {
+func defParam(funcName string, param *types.Var, precise bool) string {
 	name := param.Name()
-	typ := cueType(param.Type())
+	typ := cueKindType(param.Type())
+	if precise {
+		typ = cueType(param.Type())
+	}
 	switch param.Type().String() {
 	case "cuelang.org/go/internal/pkg.Schema":
 		typ += " @schema()"
@@ -867,7 +876,45 @@ func cueResultType(typ types.Type) string {
 	case isByteSlice(typ):
 		return "bytes"
 	}
+	switch t := typ.(type) {
+	case *types.Slice:
+		return cueListType(cueResultType(t.Elem()))
+	case *types.Map:
+		return "{[string]: " + cueResultType(t.Elem()) + "}"
+	}
+	switch typ.String() {
+	case "*cuelang.org/go/pkg/time.Parts", "*cuelang.org/go/pkg/net.ParsedCIDR":
+		record := typ.(*types.Pointer).Elem().Underlying().(*types.Struct)
+		var fields []string
+		for i := range record.NumFields() {
+			field := record.Field(i)
+			if !field.Exported() {
+				continue
+			}
+			tag := reflect.StructTag(record.Tag(i)).Get("json")
+			name, options, _ := strings.Cut(tag, ",")
+			if name == "-" {
+				continue
+			}
+			if name == "" {
+				name = field.Name()
+			}
+			presence := ""
+			if slices.Contains(strings.Split(options, ","), "omitempty") {
+				presence = "?"
+			}
+			fields = append(fields, fmt.Sprintf("%q%s: %s", name, presence, cueResultType(field.Type())))
+		}
+		return "{" + strings.Join(fields, ", ") + "}"
+	}
 	return cueType(typ)
+}
+
+func cueListType(element string) string {
+	if element == "_" {
+		return "[...]"
+	}
+	return "[..." + element + "]"
 }
 
 // isByteSlice reports whether typ is a Go []byte.
@@ -876,10 +923,9 @@ func isByteSlice(typ types.Type) bool {
 	return ok && slice.Elem() == typeByte
 }
 
-// cueType provides CUE syntax describing, at kind level, the values
-// accepted for the given Go type as a parameter. See [cueResultType]
-// for a result.
-func cueType(typ types.Type) string {
+// cueKindType describes the kind accepted for a native Go parameter.
+// cueType additionally retains container element types for checking.
+func cueKindType(typ types.Type) string {
 	switch typ := typ.(type) {
 	case *types.Slice:
 		if typ.Elem() == typeByte {
@@ -927,4 +973,23 @@ func cueType(typ types.Type) string {
 	}
 	log.Fatal("cueType: unhandled Go type ", typ.String())
 	return ""
+}
+
+// Keep runtime call constraints at their existing kind granularity. The
+// precise signature is evidence for checking, not a source of argument values.
+func cueKindResultType(typ types.Type) string {
+	if typ == typeError {
+		return "_"
+	}
+	if isByteSlice(typ) {
+		return "bytes"
+	}
+	return cueKindType(typ)
+}
+
+func cueType(typ types.Type) string {
+	if t, ok := typ.(*types.Slice); ok && !isByteSlice(typ) {
+		return cueListType(cueType(t.Elem()))
+	}
+	return cueKindType(typ)
 }

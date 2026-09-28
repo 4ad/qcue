@@ -41,7 +41,7 @@ ByteAt: func(b: bytes | string, i: int) -> int
 ByteSlice: func(b: bytes | string, start: int, end: int) -> bytes
 
 // Runes returns the Unicode code points of the given string.
-Runes: func(s: string) -> [...]
+Runes: func(s: string) -> [...int]
 
 // Repeat returns a new string consisting of count copies of the string s.
 Repeat: func(s: string, count: int) -> string

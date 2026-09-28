@@ -38,7 +38,9 @@ import (
 // defaults. A kind-level
 // derivation from the Go signatures is separately unified with the
 // builtins in each package's runtime CUE, rejecting a registration
-// that drifts from the Go sources.
+// that drifts from the Go sources. Separate checking signatures preserve Go
+// container elements and converted record fields without adding runtime
+// constraints that could materialize incomplete arguments.
 //
 // A builtin intended for use as a validator of its first argument,
 // which its Go signature declares by returning

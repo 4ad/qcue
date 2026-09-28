@@ -106,7 +106,7 @@ SplitList: func(path: string, os: string) -> [...string]
 // If there is no slash in path, Split returns an empty dir and file set to
 // path. The returned values have the property that path = dir+file.
 // The default value for os is Unix.
-Split: func(path: string, os: string = "unix") -> [...string]
+Split: func(path: string, os: string = "unix") -> [string, string]
 
 // Join joins any number of path elements into a single path,
 // separating them with an OS specific Separator. Empty elements

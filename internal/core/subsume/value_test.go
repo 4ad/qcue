@@ -47,6 +47,11 @@ func TestValues(t *testing.T) {
 		mode int
 	}
 	testCases := []subsumeTest{
+		// Pattern and ellipsis constraints do not assert field presence.
+		{in: `a: {...}, b: {s?: string}`},
+		{in: `a: {[string]: int}, b: {s?: int, [string]: int}`},
+		{in: `a: {[string]: int}, b: {s?: string, [string]: int}`},
+
 		// Top subsumes everything
 		{
 			in:  `a: _, b: _ `,

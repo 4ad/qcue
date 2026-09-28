@@ -42,7 +42,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Runes",
+		Name:      "Runes",
+		Signature: "func(s: string) -> [...int]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -222,7 +223,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "SplitN",
+		Name:      "SplitN",
+		Signature: "func(s: string, sep: string, n: int) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -236,7 +238,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "SplitAfterN",
+		Name:      "SplitAfterN",
+		Signature: "func(s: string, sep: string, n: int) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -250,7 +253,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Split",
+		Name:      "Split",
+		Signature: "func(s: string, sep: string) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -263,7 +267,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "SplitAfter",
+		Name:      "SplitAfter",
+		Signature: "func(s: string, sep: string) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -276,7 +281,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Fields",
+		Name:      "Fields",
+		Signature: "func(s: string) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -288,7 +294,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Join",
+		Name:      "Join",
+		Signature: "func(elems: [...string], sep: string) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.StringKind},

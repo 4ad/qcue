@@ -26,4 +26,4 @@ package csv
 Encode: func(x: _) -> string
 
 // Decode reads in a csv into a list of lists.
-Decode: func(r: bytes | string) -> [...]
+Decode: func(r: bytes | string) -> [...[...string]]

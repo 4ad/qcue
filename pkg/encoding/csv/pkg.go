@@ -27,7 +27,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Decode",
+		Name:      "Decode",
+		Signature: "func(r: bytes|string) -> [...[...string]]",
 		Params: []pkg.Param{
 			{Kind: adt.BytesKind | adt.StringKind},
 		},

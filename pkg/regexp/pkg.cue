@@ -75,13 +75,13 @@ FindAll: func(pattern: string, s: string, n: int) -> [...string]
 // FindAllNamedSubmatch is like [FindAllSubmatch], but returns a list of maps
 // with the names used in capturing groups. See [FindNamedSubmatch] for an
 // example on how to use named groups.
-FindAllNamedSubmatch: func(pattern: string, s: string, n: int) -> [...]
+FindAllNamedSubmatch: func(pattern: string, s: string, n: int) -> [...{[string]: string}]
 
 // FindAllSubmatch is the 'All' version of [FindSubmatch]; it returns a list
 // of all successive matches of the expression, as defined by the 'All'
 // description in the package comment.
 // A return value of bottom indicates no match.
-FindAllSubmatch: func(pattern: string, s: string, n: int) -> [...]
+FindAllSubmatch: func(pattern: string, s: string, n: int) -> [...[...string]]
 
 // FindNamedSubmatch is like [FindSubmatch], but returns a map with the names used
 // in capturing groups.
@@ -93,7 +93,7 @@ FindAllSubmatch: func(pattern: string, s: string, n: int) -> [...]
 // Output:
 //
 // 	{person: "World"}
-FindNamedSubmatch: func(pattern: string, s: string) -> {...}
+FindNamedSubmatch: func(pattern: string, s: string) -> {[string]: string}
 
 // FindSubmatch returns a list holding the text of the leftmost
 // match of the regular expression in s and the matches, if any, of its

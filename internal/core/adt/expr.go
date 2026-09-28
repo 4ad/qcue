@@ -3301,6 +3301,11 @@ type Builtin struct {
 	// Use TopKind for primitives whose result depends on their arguments.
 	Result Kind
 
+	// Signature optionally describes native parameters and results more
+	// precisely than their kind masks. It is implementation-owned evidence
+	// for checking, and does not add runtime argument or result constraints.
+	Signature *FuncType
+
 	// NonConcrete should be set to true if a builtin supports non-concrete
 	// arguments. By default, all arguments are checked to be concrete.
 	NonConcrete bool

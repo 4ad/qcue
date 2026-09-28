@@ -171,7 +171,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Avg",
+		Name:      "Avg",
+		Signature: "func(xs: [...number]) -> number",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -183,7 +184,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Max",
+		Name:      "Max",
+		Signature: "func(xs: [...number]) -> number",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -195,7 +197,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Min",
+		Name:      "Min",
+		Signature: "func(xs: [...number]) -> number",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -207,7 +210,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Product",
+		Name:      "Product",
+		Signature: "func(xs: [...number]) -> number",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -219,7 +223,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Range",
+		Name:      "Range",
+		Signature: "func(start: number, limit: number, step: number) -> [...number]",
 		Params: []pkg.Param{
 			{Kind: adt.NumberKind},
 			{Kind: adt.NumberKind},
@@ -233,7 +238,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Sum",
+		Name:      "Sum",
+		Signature: "func(xs: [...number]) -> number",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -271,7 +277,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "SortStrings",
+		Name:      "SortStrings",
+		Signature: "func(a: [...string]) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},
@@ -296,7 +303,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "IsSortedStrings",
+		Name:      "IsSortedStrings",
+		Signature: "func(a: [...string]) -> bool",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 		},

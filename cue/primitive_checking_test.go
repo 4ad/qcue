@@ -15,9 +15,11 @@
 package cue_test
 
 import (
+	"testing"
+
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"testing"
+	"cuelang.org/go/cue/format"
 )
 
 func TestPrimitiveDefinitionChecking(t *testing.T) {
@@ -45,6 +47,43 @@ f:func(n:int)->[...]:list.MinItems(n)`, true},
 f:func()->(string|bytes):json.Valid()`, true},
 		{"close_generic", `f(A:{a:int}):func(x:A)->A:close(x)`, true},
 		{"close_generic_bad_result", `f(A:{a:int}):func(x:A)->string:close(x)`, false},
+
+		{"split_elements", `import "strings"
+f:func(s:string)->[...string]:strings.Split(s,",")`, true},
+		{"split_elements_wrong", `import "strings"
+f:func(s:string)->[...int]:strings.Split(s,",")`, false},
+		{"split_projection", `import "strings"
+f:func(s:string)->string:strings.Split(s,",")[0]`, true},
+		{"rune_elements", `import "strings"
+f:func(s:string)->[...int]:strings.Runes(s)`, true},
+		{"join_elements", `import "strings"
+f:func(xs:[...string])->string:strings.Join(xs,",")`, true},
+		{"join_elements_wrong", `import "strings"
+f:func(xs:[...int])->string:strings.Join(xs,",")`, false},
+		{"bare_elements", `import "list"
+f:func(xs:[...string])->bool:list.IsSortedStrings(xs)`, true},
+		{"bare_elements_wrong", `import "list"
+f:func(xs:[...int])->bool:list.IsSortedStrings(xs)`, false},
+		{"nested_list_elements", `import "encoding/csv"
+f:func(s:string)->[...[...string]]:csv.Decode(s)`, true},
+		{"native_map_elements", `import "regexp"
+f:func(s:string)->[...{[string]:string}]:regexp.FindAllNamedSubmatch("(?P<x>.)",s,-1)`, true},
+		{"native_record_fields", `import "time"
+f:func(s:string)->int:time.Split(s).year`, true},
+		{"native_record_optional", `import "net"
+f:func(s:string)->{prefix_len:int,broadcast_addr?:string}:net.ParseCIDR(s)`, true},
+		{"native_record_optional_access", `import "net"
+f:func(s:string)->string:net.ParseCIDR(s).broadcast_addr`, false},
+		{"native_precise_capability", `import "strings"
+f:strings.Split & (func(string,string)->[...string])`, true},
+		{"path_tuple", `import "path"
+f:func(s:string)->[string,string]:path.Split(s)`, true},
+		{"path_projection", `import "path"
+f:func(s:string)->string:path.Split(s)[0]`, true},
+		{"path_join_wrong", `import "path"
+f:func(xs:[...int])->string:path.Join(xs)`, false},
+		{"bare_validator_typed_result", `import "list"
+f:func()->[...string]:list.IsSortedStrings()`, true},
 
 		{"and_nonempty", `f(A):func(xs:[A,...A])->A:and(xs)`, true},
 		{"and_maybe_empty", `f(A):func(xs:[...A])->A:and(xs)`, false},
@@ -115,6 +154,47 @@ y:choose(["ok"])
 		data, err := v.LookupPath(cue.ParsePath(field)).MarshalJSON()
 		if err != nil || string(data) != want {
 			t.Fatalf("%s: %s, %v; want %s", field, data, err, want)
+		}
+	}
+}
+
+func TestBuiltinPrecisionRoundTrip(t *testing.T) {
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`import "strings"
+f:func(s:string)->string:strings.Split(s,",")[0]
+input:string
+out:f(input)`)
+	for _, options := range [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}} {
+		if err := v.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		source, err := format.Node(v.Syntax(options...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rebuilt := ctx.CompileBytes(source)
+		filled := rebuilt.FillPath(cue.ParsePath("input"), "first,second")
+		got, err := filled.LookupPath(cue.ParsePath("out")).String()
+		if err != nil || got != "first" {
+			t.Fatalf("%s: got %q, %v", source, got, err)
+		}
+		bad := rebuilt.Unify(ctx.CompileString(`f:func(string)->int`))
+		if bad.Validate() == nil {
+			t.Fatalf("lost native result type after export: %s", source)
+		}
+	}
+}
+
+func TestBuiltinPrecisionPreservesIncompleteCalls(t *testing.T) {
+	for _, declaration := range []string{"", "@experiment(functions=false,quantified=false)\n"} {
+		v := cuecontext.New().CompileString(declaration + `import "strings"
+x:_
+y:strings.Join(x,",")`)
+		if err := v.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := v.LookupPath(cue.ParsePath("y")).MarshalJSON(); err == nil {
+			t.Fatal("checking metadata supplied the missing list argument")
 		}
 	}
 }

@@ -28,7 +28,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "FindAll",
+		Name:      "FindAll",
+		Signature: "func(pattern: string, s: string, n: int) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -42,7 +43,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "FindAllNamedSubmatch",
+		Name:      "FindAllNamedSubmatch",
+		Signature: "func(pattern: string, s: string, n: int) -> [...{[string]: string}]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -56,7 +58,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "FindAllSubmatch",
+		Name:      "FindAllSubmatch",
+		Signature: "func(pattern: string, s: string, n: int) -> [...[...string]]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -70,7 +73,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "FindNamedSubmatch",
+		Name:      "FindNamedSubmatch",
+		Signature: "func(pattern: string, s: string) -> {[string]: string}",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
@@ -83,7 +87,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "FindSubmatch",
+		Name:      "FindSubmatch",
+		Signature: "func(pattern: string, s: string) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},

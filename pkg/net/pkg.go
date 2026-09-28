@@ -15,7 +15,8 @@ var _ = adt.TopKind // in case the adt package isn't used
 
 var p = &pkg.Package{
 	Native: []*pkg.Builtin{{
-		Name: "SplitHostPort",
+		Name:      "SplitHostPort",
+		Signature: "func(s: string) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -58,7 +59,8 @@ var p = &pkg.Package{
 		Name:  "IPv6len",
 		Const: "16",
 	}, {
-		Name: "ParseIP",
+		Name:      "ParseIP",
+		Signature: "func(s: string) -> [...int]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
@@ -202,7 +204,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "ToIP4",
+		Name:      "ToIP4",
+		Signature: "func(ip: _) -> [...int]",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -214,7 +217,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "ToIP16",
+		Name:      "ToIP16",
+		Signature: "func(ip: _) -> [...int]",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},
@@ -264,7 +268,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "ParseCIDR",
+		Name:      "ParseCIDR",
+		Signature: "func(s: string) -> {\"prefix_mask\": string, \"prefix_len\": int, \"prefix_addr\": string, \"broadcast_addr\"?: string}",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},

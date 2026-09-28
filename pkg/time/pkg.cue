@@ -194,4 +194,4 @@ ToUnix: func(value: string) -> int
 ToUnixNano: func(value: string) -> int
 
 // Split parses a time string into its individual parts.
-Split: func(t: string) -> {...}
+Split: func(t: string) -> {year: int, month: int, day: int, hour: int, minute: int, second: int, nanosecond: int}

@@ -104,7 +104,7 @@ func (p *inference) builtinCall(f *adt.Builtin, target adt.FuncType) adt.Value {
 		if !(&subsumer{ctx: p.ctx, inference: p}).capabilitySignature(target, adt.FuncType{Fn: &protocol}) {
 			return nil
 		}
-		result := f.Params[0].Value
+		result := p.schema(nil, source.Fn.Params[0].Value)
 		if basic, ok := result.(*adt.BasicType); ok {
 			switch basic.K {
 			case adt.StructKind:

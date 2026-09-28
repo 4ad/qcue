@@ -253,7 +253,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Split",
+		Name:      "Split",
+		Signature: "func(t: string) -> {\"year\": int, \"month\": int, \"day\": int, \"hour\": int, \"minute\": int, \"second\": int, \"nanosecond\": int}",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},

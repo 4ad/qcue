@@ -43,7 +43,10 @@ import (
 //	[]T
 //	map[string]T
 type Builtin struct {
-	Name        string
+	Name string
+	// Signature is an optional precise native type used by the checker.
+	// It does not add runtime constraints that could complete an argument.
+	Signature   string
 	Pkg         adt.Feature
 	Params      []Param
 	Result      adt.Kind
@@ -92,7 +95,24 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) (*adt.Verte
 				return nil, err
 			}
 		} else {
-			v = ToBuiltin(&b)
+			native := ToBuiltin(&b)
+			if b.Signature != "" {
+				expr, err := mustParseConstBuiltin(ctx, b.Name, b.Signature)
+				if err != nil {
+					return nil, err
+				}
+				fn, ok := expr.(*adt.Function)
+				if !ok {
+					panic(fmt.Errorf("native signature for %s.%s is not a function", importPath, b.Name))
+				}
+				if err := adt.CheckBuiltinTightening(ctx, fn, native); err != nil {
+					panic(err.Err)
+				}
+				native.Signature = &adt.FuncType{
+					Fn: fn, Env: &adt.Environment{Vertex: obj},
+				}
+			}
+			v = native
 		}
 		st.Decls = append(st.Decls, &adt.Field{
 			Label: f,

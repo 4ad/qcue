@@ -47,8 +47,9 @@ func (r *cancelCompileRuntime) ConfigureOpCtx(ctx *adt.OpContext) {
 
 func TestBuiltinCompilationCancellation(t *testing.T) {
 	for name, p := range map[string]*pkg.Package{
-		"CUE":      {CUE: "value: 1"},
-		"constant": {Native: []*pkg.Builtin{{Name: "Value", Const: "42"}}},
+		"CUE":       {CUE: "value: 1"},
+		"constant":  {Native: []*pkg.Builtin{{Name: "Value", Const: "42"}}},
+		"signature": {Native: []*pkg.Builtin{{Name: "Value", Signature: "func() -> int", Result: adt.IntKind}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancelCause(context.Background())
@@ -87,8 +88,9 @@ func (c *cancelParseContext) Err() error {
 
 func TestBuiltinParsingCancellation(t *testing.T) {
 	for name, p := range map[string]*pkg.Package{
-		"CUE":      {CUE: "value: 1"},
-		"constant": {Native: []*pkg.Builtin{{Name: "Value", Const: "42"}}},
+		"CUE":       {CUE: "value: 1"},
+		"constant":  {Native: []*pkg.Builtin{{Name: "Value", Const: "42"}}},
+		"signature": {Native: []*pkg.Builtin{{Name: "Value", Signature: "func() -> int", Result: adt.IntKind}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancelCause(context.Background())

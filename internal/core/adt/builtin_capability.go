@@ -86,6 +86,11 @@ func (b *Builtin) Protocol(c *OpContext) *Function {
 		f.Ret = &Bottom{Code: EvalError, Err: c.Newf("builtin has no successful result")}
 	}
 	labels, _ := builtinParamLabels(b.declaredTypes())
+	contracts := b.declaredTypes()
+	signature := b.self().Signature
+	if signature != nil {
+		contracts = append(slices.Clone(contracts), *signature)
+	}
 	for i, p := range b.Params {
 		param := FuncParam{Positional: true, Value: p.Value,
 			Local: anonParamLabel(c, i), Default: p.Default()}
@@ -94,16 +99,37 @@ func (b *Builtin) Protocol(c *OpContext) *Function {
 				param.Label = label
 			}
 		}
-		for _, t := range b.declaredTypes() {
+		for _, t := range contracts {
 			for j, index := range matchBuiltinParamsWith(t.Fn, b, b.declaredTypes()) {
-				if index == i && t.Fn.Params[j].Default != nil {
-					param.Default, _ = c.Evaluate(t.Env, t.Fn.Params[j].Default)
+				if index != i {
+					continue
+				}
+				declared := t.Fn.Params[j]
+				if declared.Value != nil {
+					param.Value = builtinConstraint(param.Value, t.Env, declared.Value)
+				}
+				if declared.Default != nil && (signature == nil || t.Fn != signature.Fn) {
+					param.Default, _ = c.Evaluate(t.Env, declared.Default)
 				}
 			}
 		}
 		f.Params = append(f.Params, param)
 	}
+	for _, t := range contracts {
+		if t.Fn.Ret != nil {
+			f.Ret = builtinConstraint(f.Ret, t.Env, t.Fn.Ret)
+		}
+	}
 	return f
+}
+
+// Keep a package declaration in its own environment, including any named
+// schemas. Only frozen declarations contribute: a client's result annotation
+// cannot become implementation evidence through the native protocol.
+func builtinConstraint(raw Expr, env *Environment, declared Expr) Expr {
+	v := &Vertex{}
+	v.AddConjunct(MakeRootConjunct(env, declared))
+	return &BinaryExpr{Op: AndOp, X: raw, Y: v}
 }
 
 func (b *Builtin) capabilityApplies(c *OpContext, t FuncType, args []Value) (FuncType, proofResult) {

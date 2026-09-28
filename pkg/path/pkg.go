@@ -81,7 +81,8 @@ var p = &pkg.Package{
 		Plan9:   "plan9"
 	}`,
 	Native: []*pkg.Builtin{{
-		Name: "Split",
+		Name:      "Split",
+		Signature: "func(string, string) -> [string, string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
@@ -94,7 +95,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "SplitList",
+		Name:      "SplitList",
+		Signature: "func(string, string) -> [...string]",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: osRequired},
@@ -107,7 +109,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Join",
+		Name:      "Join",
+		Signature: "func([...string], string) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.StringKind, Value: unixDefault},

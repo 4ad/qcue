@@ -63,7 +63,7 @@ IPv6len: 16
 // or IPv6 ("2001:db8::68") form.
 // If s is not a valid textual representation of an IP address,
 // ParseIP returns an error.
-ParseIP: func(s: string) -> [...]
+ParseIP: func(s: string) -> [...int]
 
 // IPv4 reports whether ip is a valid IPv4 address.
 //
@@ -115,11 +115,11 @@ UnspecifiedIP: validator(#IP) | (func(ip: #IP) -> bool)
 
 // ToIP4 converts a given IP address, which may be a string or a list, to its
 // 4-byte representation.
-ToIP4: func(ip: #IP) -> [...]
+ToIP4: func(ip: #IP) -> [...int]
 
 // ToIP16 converts a given IP address, which may be a string or a list, to its
 // 16-byte representation.
-ToIP16: func(ip: #IP) -> [...]
+ToIP16: func(ip: #IP) -> [...int]
 
 // IPString returns the string form of the IP address ip. It returns one of 4 forms:
 //
@@ -142,7 +142,7 @@ AddIPCIDR: func(ip: #CIDR, offset: int) -> string
 // prefix_mask (e.g. "255.255.255.0"), prefix_len (e.g. 24),
 // prefix_addr (e.g. "10.20.30.0"), and broadcast_addr (e.g. "10.20.30.255").
 // broadcast_addr is only set for IPv4 CIDRs.
-ParseCIDR: func(s: string) -> {...}
+ParseCIDR: func(s: string) -> {prefix_mask: string, prefix_len: int, prefix_addr: string, broadcast_addr?: string}
 
 // InCIDR reports whether an IP address is contained a CIDR subnet string.
 InCIDR: (func(cidr: #CIDR) -> validator(#IP)) | (func(ip: #IP, cidr: #CIDR) -> bool)
