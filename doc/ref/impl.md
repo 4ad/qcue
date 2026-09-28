@@ -5,6 +5,8 @@ fork's implementation of universal types and live propagation is described in
 the [implementation guide](../implementation.md) and [paper](../paper.pdf).
 The [type reference](../types.md) documents current builtin, operator, and
 standard-library contracts.
+The [explainer](../explainer.md) develops the semantics for experienced CUE
+users, including live refinement and contravariant function inputs.
 
 
 > NOTE: this is a working document attempting to describe CUE in a way
@@ -339,4 +341,3 @@ The simple solution is to deploy a breadth-first evaluation strategy, rather tha
 the more traditional depth-first approach.
 Other approaches are possible, however, and implementations are free to choose
 which approach is deployed.
-

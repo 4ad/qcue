@@ -31,6 +31,7 @@ cue help experiments           # Inspect language experiment settings.
 Universal types and functions are enabled by default in this fork. Evaluation
 can leave data or proof obligations incomplete; exporting a selected result
 requires concrete data. Function values and unapplied function interfaces are
-not JSON data. The [implementation guide](../implementation.md) explains
+not JSON data. The [explainer](../explainer.md) introduces the language with
+worked examples. The [implementation guide](../implementation.md) explains
 validation and refinement, and the [type reference](../types.md) documents
 builtins, operators, standard-library functions, and tool-task schemas.

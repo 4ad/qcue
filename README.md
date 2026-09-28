@@ -24,6 +24,8 @@ contracts, and operator overloads.
 This repository contains the language implementation, the `cue` command, and
 the Go API under the existing `cuelang.org/go` module path.
 
+- [Universal types explained](doc/explainer.md): syntax, semantics, open
+  refinement, and worked examples for experienced CUE users.
 - [Design proposal](doc/paper.pdf) ([LaTeX source](doc/paper.tex)): the language
   design and formal semantics.
 - [Implementation guide](doc/implementation.md): supported features, checking

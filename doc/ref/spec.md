@@ -18,7 +18,8 @@
 
 This document describes the underlying CUE language. For this fork's universal
 types, function contracts, and live checking, see the
-[Quantified CUE paper](../paper.pdf), [implementation guide](../implementation.md),
+[explainer](../explainer.md), [Quantified CUE paper](../paper.pdf),
+[implementation guide](../implementation.md),
 and [builtin, operator, and standard-library type reference](../types.md).
 
 ## Introduction

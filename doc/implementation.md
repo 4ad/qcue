@@ -5,6 +5,9 @@ This fork implements the constraint-propagation design in version 9 of the
 available by default at every CUE language version, including standalone files
 and Go API calls. The module path remains `cuelang.org/go`.
 
+Start with [Universal types and functions in CUE](explainer.md) for the
+language's syntax, informal semantics, and worked examples.
+
 ```sh
 go install ./cmd/cue
 cue version

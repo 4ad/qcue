@@ -4,6 +4,9 @@ The contracts used by this fork's quantified function checker. Arrows describe
 successful returns; `&` combines supported interfaces. Operator names below
 label typing rules, not first-class operator values.
 
+The [explainer](explainer.md) introduces universal types, live refinement,
+and function checking through worked examples.
+
 - [Builtins](#builtins)
 - [Binary operators](#binary-operators)
 - [Unary operators](#unary-operators)
