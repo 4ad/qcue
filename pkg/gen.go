@@ -568,7 +568,9 @@ func (g *goEmitter) function(fn *types.Func) {
 	}
 	fmt.Fprintln(g.w, "if c.Do() {")
 	defer fmt.Fprintln(g.w, "}")
-	if results.Len() == 1 {
+	if results.Len() == 1 && results.At(0).Type() == typeError {
+		fmt.Fprintf(g.w, "c.Ret, c.Err = true, %s(%s)", name, argList)
+	} else if results.Len() == 1 {
 		fmt.Fprintf(g.w, "c.Ret = %s(%s)", name, argList)
 	} else {
 		fmt.Fprintf(g.w, "c.Ret, c.Err = %s(%s)", name, argList)
@@ -719,8 +721,12 @@ func (g *goEmitter) callCtxtGetter(typ types.Type) string {
 // [cuelang.org/go/internal/core/adt.Kind] value for a builtin's
 // result. It differs from a parameter's kind for a Go []byte: as an
 // argument that also accepts a string, which the builtin converts, but
-// as a result it is always bytes — nothing converts it back.
+// as a result it is always bytes — nothing converts it back. A lone error
+// result reports successful validation as a Boolean.
 func (g *goEmitter) adtResultKind(typ types.Type) string {
+	if typ == typeError {
+		return "adt.BoolKind"
+	}
 	if isByteSlice(typ) {
 		return "adt.BytesKind"
 	}
@@ -969,7 +975,7 @@ var nativeRefinements = map[string][]string{
 
 // bareValidator reports whether the builtin registers as a bare
 // validator: a single parameter with a boolean result — a plain bool,
-// a Validator, or an error alone, whose result kind is bottom. The
+// a Validator, or an error alone, whose successful result is true. The
 // evaluator wraps such a builtin at registration, so its kind is that
 // of the value it validates rather than func.
 func bareValidator(fn *types.Func) bool {
@@ -1044,16 +1050,12 @@ func defParam(fn *types.Func, param *types.Var, precise bool) string {
 // A Go []byte is bytes|string as an argument, which the builtin
 // converts, but always bytes as a result: nothing converts it back.
 //
-// A Go result of error alone is the value part of a (value, error)
-// pair with the value left out: the builtin reports whether its
-// argument is acceptable rather than what it is, so the value is
-// unconstrained. Bottom would instead say that every call fails. The
-// exact type is "anything that is not an error", which CUE has no way
-// to write, so it is _.
+// A Go result of error alone reports validation success as true.
+// Non-nil errors remain failures rather than successful false results.
 func cueResultType(typ types.Type) string {
 	switch {
 	case typ == typeError:
-		return "_"
+		return "true"
 	case isByteSlice(typ):
 		return "bytes"
 	}
@@ -1184,7 +1186,7 @@ func cueKindType(typ types.Type) string {
 // precise signature is evidence for checking, not a source of argument values.
 func cueKindResultType(typ types.Type) string {
 	if typ == typeError {
-		return "_"
+		return "bool"
 	}
 	if isByteSlice(typ) {
 		return "bytes"

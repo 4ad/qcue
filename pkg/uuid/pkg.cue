@@ -26,7 +26,7 @@
 package uuid
 
 // Valid ensures that s is a valid UUID which would be accepted by Parse.
-Valid: validator(string) | (func(s: string) -> _)
+Valid: validator(string) | (func(s: string) -> true)
 
 // Parse decodes s into a UUID or returns an error. Both the standard UUID forms
 // of xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx and

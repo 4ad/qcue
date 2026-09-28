@@ -16,15 +16,16 @@ var _ = adt.TopKind // in case the adt package isn't used
 var p = &pkg.Package{
 	Pure: true,
 	Native: []*pkg.Builtin{{
-		Name: "Valid",
+		Name:      "Valid",
+		Signature: "func(s: string) -> true",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
-		Result: adt.BottomKind,
+		Result: adt.BoolKind,
 		Func: func(c *pkg.CallCtxt) {
 			s := c.String(0)
 			if c.Do() {
-				c.Ret = Valid(s)
+				c.Ret, c.Err = true, Valid(s)
 			}
 		},
 	}, {
