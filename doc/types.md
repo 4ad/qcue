@@ -1958,6 +1958,8 @@ go test ./cue -run 'TestBuiltin|TestOperator|TestStdlib'
 
 `TestReferenceCurrent` detects catalogue drift, and `TestReferenceExamples`
 checks every example above, including rejected programs and stated results.
+`TestReferencePackageSyntax` checks that each rendered package builds and has
+the same syntax tree as its published declarations, ignoring source positions.
 The `pkg` tests verify that every registered package has declarations, that
 all declarations are embedded, and that signatures agree with native checking
 evidence, labels, defaults, and validator forms. The native inventory test
