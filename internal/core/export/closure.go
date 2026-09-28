@@ -53,7 +53,7 @@ func (e *exporter) graph() *closureGraph {
 	if e.closures == nil {
 		fields := &ast.StructLit{}
 		// A field provides stable bindings for recursive environments and
-		// generative seals. Keep it hidden so it is not part of the data
+		// distinct origins. Keep it hidden so it is not part of the data
 		// projection, and avoid a definition, which would close its values.
 		decl := &ast.Field{Label: ast.NewIdent(e.uniqueAlias("_CUEClosures")), Value: fields}
 		e.closures = &closureGraph{decl: decl, fields: fields,

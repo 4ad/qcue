@@ -2,4 +2,8 @@
 f:   forall (A) func(A) -> A
 out: f(3)
 -- out/export --
-f(3)
+{
+	_CUEClosures.CUEClosure(3)
+	CUECode(CUEType) = {CUEFunction: forall (A) func(A) -> A}
+	_CUEClosures: CUEClosure: (CUECode(_).CUEFunction)
+}

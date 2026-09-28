@@ -1,23 +1,23 @@
 # Standalone files accept functions and generic shorthand without attributes.
 exec cue eval fold.cue
-stdout 'sum:.*6'
-exec cue eval explicit.cue -e sum
+stdout 'sum:.*fold'
+exec cue export explicit.cue -e sum
 cmp stdout six
 
 # A module pinned to an older language version must behave the same way,
 # including when evaluating an absolute path outside that module.
 cd oldmodule
 exec cue eval $WORK/fold.cue
-stdout 'sum:.*6'
-exec cue eval $WORK/explicit.cue -e sum
+stdout 'sum:.*fold'
+exec cue export $WORK/explicit.cue -e sum
 cmp stdout $WORK/six
-exec cue eval $WORK/fold.cue -e 'fold(plus, 10, [4, 5])'
+exec cue export $WORK/fold.cue -e 'fold(plus, 10, [4, 5])'
 cmp stdout $WORK/nineteen
 
 # Definitions exported under the older version remain usable there.
 exec cue def $WORK/fold.cue
 cp stdout rebuilt.cue
-exec cue eval rebuilt.cue -e 'fold(plus, 10, [4, 5])'
+exec cue export rebuilt.cue -e 'fold(plus, 10, [4, 5])'
 cmp stdout $WORK/nineteen
 
 # Opting out of quantified semantics alone still leaves functions enabled.

@@ -321,6 +321,9 @@ func Value(r adt.Runtime, pkgID string, n adt.Value) (ast.Expr, errors.Error) {
 // TODO: Should take context.
 func (p *Profile) Value(r adt.Runtime, pkgID string, n adt.Value) (ast.Expr, errors.Error) {
 	e := newExporter(p, r, pkgID, n)
+	if vertex, ok := n.(*adt.Vertex); ok && e.hasInvocation(vertex, make(map[*adt.Vertex]bool)) {
+		e.initPivot(vertex)
+	}
 	v := e.value(n)
 
 	v = e.withOriginDecls(v)
@@ -336,8 +339,9 @@ func (p *Profile) Value(r adt.Runtime, pkgID string, n adt.Value) (ast.Expr, err
 }
 
 type exporter struct {
-	cfg  *Profile // Make value todo
-	errs errors.Error
+	invocations map[*adt.Vertex]bool
+	cfg         *Profile // Make value todo
+	errs        errors.Error
 
 	ctx *adt.OpContext
 

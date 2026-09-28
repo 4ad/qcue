@@ -79,6 +79,11 @@ func TestPropagationLaterRefinement(t *testing.T) {
 		{"bound", "A:number\nf:func(x:A)->int:x\na:f(2)", "A:int", 2, false},
 		{"result", "R:int\nf:func(_:int)->R:2\na:f(0)", "R:2", 2, false},
 		{"input_allowed", "Input:int\nf:func(x:Input)->int:2*x\na:f(2)", "Input:>=0", 4, false},
+		{"let_excluded", "Input:int\nf:func(x:Input)->int:2*x\nlet call=f(2)\na:call", "Input:>2", 0, true},
+		{"hidden_excluded", "_input:int\nf:func(x:_input)->int:2*x\na:f(2)", "_input:>2", 0, true},
+		{"list_projection_excluded", "Input:int\nf:func(x:Input)->int:2*x\na:[f(2)][0]", "Input:>2", 0, true},
+		{"embedded_excluded", "Input:int\nf:func(x:Input)->int:2*x\na:{f(2)}", "Input:>2", 0, true},
+		{"projection_excluded", "Input:int\nf:func(x:Input)->int:2*x\na:{value:f(2)}.value", "Input:>2", 0, true},
 		{"input_excluded", "Input:int\nf:func(x:Input)->int:2*x\na:f(2)", "Input:>2", 0, true},
 		{"ignored_input_excluded", "Input:int\nf:func(x:Input)->int:7\na:f(2)", "Input:>2", 0, true},
 		{"output_allowed", "Output:int\nf:func(x:int)->int:2*x\na:f(2)&Output", "Output:>=4", 4, false},
@@ -87,19 +92,20 @@ func TestPropagationLaterRefinement(t *testing.T) {
 		{"universal_bound", "Upper:number\nf(A:Upper):func(x:A)->A:x\na:f[Upper](2)", "Upper:int", 2, false},
 		{"result_excluded", "R:int\nf:func(_:int)->R:2\na:f(0)", "R:>2", 0, true},
 	} {
-		for _, export := range []bool{false, true} {
-			name := tt.name
-			if export {
-				name += "/export"
-			}
+		for _, mode := range []string{"direct", "source", "final"} {
+			name := tt.name + "/" + mode
 			t.Run(name, func(t *testing.T) {
 				ctx := cuecontext.New()
 				v := ctx.CompileString(tt.source)
 				// Observe before refinement to exercise caches and residuals.
 				_ = v.Validate()
 				_, _ = v.LookupPath(cue.ParsePath("a")).Int64()
-				if export {
-					text, err := format.Node(v.Syntax())
+				if mode != "direct" {
+					var options []cue.Option
+					if mode == "final" {
+						options = append(options, cue.Final())
+					}
+					text, err := format.Node(v.Syntax(options...))
 					if err != nil {
 						t.Fatal(err)
 					}

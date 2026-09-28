@@ -3,21 +3,21 @@
 
 exec cue eval in.cue
 ! stdout 'export incomplete'
-stdout 'sum:.*6'
+stdout 'sum:.*fold'
 cp stdout evaluated.cue
-exec cue eval evaluated.cue -e 'fold(plus, 10, [4, 5])'
+exec cue export evaluated.cue -e 'fold(plus, 10, [4, 5])'
 cmp stdout want
 
 exec cue def in.cue
 ! stdout 'export incomplete'
 cp stdout defined.cue
-exec cue eval defined.cue -e 'fold(plus, 10, [4, 5])'
+exec cue export defined.cue -e 'fold(plus, 10, [4, 5])'
 cmp stdout want
 
 exec cue eval in.cue -e '{renamed: fold}'
 ! stdout 'export incomplete'
 cp stdout selected.cue
-exec cue eval selected.cue -e 'renamed(func(x: int, y: int) -> int: x + y, 10, [4, 5])'
+exec cue export selected.cue -e 'renamed(func(x: int, y: int) -> int: x + y, 10, [4, 5])'
 cmp stdout want
 
 -- cue.mod/module.cue --

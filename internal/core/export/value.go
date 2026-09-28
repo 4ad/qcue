@@ -48,6 +48,9 @@ func (e *exporter) bareValue(v adt.Value) ast.Expr {
 // value with a reference in graph mode.
 
 func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
+	if e.hasInvocation(n, make(map[*adt.Vertex]bool)) {
+		return e.expr(nil, n)
+	}
 
 	if subject, argument := n.SubjectSelection(); subject != nil {
 		return e.subjectSelectionExpr(subject, argument)

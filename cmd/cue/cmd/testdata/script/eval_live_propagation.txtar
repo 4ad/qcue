@@ -1,0 +1,38 @@
+# Evaluation output retains live coordinates after computing a scalar.
+exec cue export live.cue -e a
+stdout '^4$'
+exec cue eval live.cue
+cp stdout residual.cue
+exec cue export residual.cue allowed.cue -e a
+stdout '^4$'
+! exec cue export residual.cue excluded.cue -e a
+stderr 'out of bound >2'
+
+# A later file can supply the missing body premise.
+! exec cue vet -c=false pending.cue
+stderr 'function conformance remains unproved'
+exec cue export pending.cue proof.cue -e answer
+stdout '^2$'
+
+# An unused operand keeps its packet demand.
+! exec cue export constant.cue excluded.cue -e a
+stderr 'out of bound >2'
+
+-- live.cue --
+Input: int
+f: func(x: Input) -> int: 2*x
+a: f(2)
+-- allowed.cue --
+Input: >=0
+-- excluded.cue --
+Input: >2
+-- pending.cue --
+A: number
+f: func(x: A) -> int: x
+answer: f(2)
+-- proof.cue --
+A: int
+-- constant.cue --
+Input: int
+f: func(x: Input) -> int: 7
+a: f(2)
