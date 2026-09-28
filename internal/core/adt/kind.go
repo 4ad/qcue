@@ -87,7 +87,6 @@ const (
 	FuncKind
 	ListKind
 	StructKind
-	OpaqueKind
 
 	allKinds
 
@@ -207,7 +206,6 @@ var kindStrs = map[Kind]string{
 	StringKind:  "string",
 	BytesKind:   "bytes",
 	FuncKind:    "func",
-	OpaqueKind:  "opaque",
 	StructKind:  "struct",
 	ListKind:    "list",
 	_numberKind: "number",
@@ -222,7 +220,6 @@ var typeStrs = map[Kind]string{
 	StringKind:  "string",
 	BytesKind:   "bytes",
 	FuncKind:    "_",
-	OpaqueKind:  "_",
 	StructKind:  "{...}",
 	ListKind:    "[...]",
 	_numberKind: "number",

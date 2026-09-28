@@ -123,38 +123,6 @@ func TestQuantifiedUnresolvedWitnessExport(t *testing.T) {
 	}
 }
 
-func TestQuantifiedInterfacePredicateExport(t *testing.T) {
-	for _, tt := range []struct{ name, predicate, good, bad string }{
-		{"closed", "{a?: int}", "{}", "{b: 1}"},
-		{"optional", "{a?: int}", "{a: 1}", `{a: "bad"}`},
-		{"required", "{a!: int}", "{a: 1}", "{}"},
-		{"default", "{a: *1 | 2}", "{}", "{a: 3}"},
-		{"pattern", "{[string]: int}", "{a: 1}", `{a: "bad"}`},
-		{"nested_closed", "{a: {b?: int}}", "{a: {}}", "{a: {c: 1}}"},
-	} {
-		for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
-			t.Run(tt.name, func(t *testing.T) {
-				ctx := cuecontext.New()
-				v := ctx.CompileString("#T: " + tt.predicate + "\nI: exists A {value: #T, zero: A}")
-				src, err := format.Node(v.LookupPath(cue.ParsePath("I")).Syntax(opts...))
-				if err != nil {
-					t.Fatal(err)
-				}
-				for _, good := range []bool{false, true} {
-					arg := tt.bad
-					if good {
-						arg = tt.good
-					}
-					r := ctx.CompileString("#T: _\nI: " + string(src) + "\np: seal I with (A = int) {value: " + arg + ", zero: 0}")
-					if err := r.LookupPath(cue.ParsePath("p")).Validate(cue.Concrete(true)); (err == nil) != good {
-						t.Fatalf("good=%v arg=%s export=%s: %v", good, arg, src, err)
-					}
-				}
-			})
-		}
-	}
-}
-
 func TestQuantifiedHiddenCaptureExport(t *testing.T) {
 	for _, source := range []string{
 		`r: {_secret: 7}; f: func() -> int: r._secret`,

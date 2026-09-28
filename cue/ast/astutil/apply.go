@@ -426,7 +426,6 @@ func applyCursor(v applyVisitor, c Cursor) {
 
 	case *ast.TypeParam:
 		apply(v, c, &n.Name)
-		applyIfNotNil(v, c, &n.Sort)
 		applyIfNotNil(v, c, &n.Bound)
 
 	case *ast.Quantifier:
@@ -436,17 +435,6 @@ func applyCursor(v applyVisitor, c Cursor) {
 	case *ast.ParametricAlias:
 		apply(v, c, &n.Name)
 		applyList(v, c, n.Params)
-		apply(v, c, &n.Body)
-
-	case *ast.SealExpr:
-		apply(v, c, &n.Interface)
-		applyList(v, c, n.Witnesses)
-		apply(v, c, &n.Body)
-
-	case *ast.OpenExpr:
-		apply(v, c, &n.Value)
-		apply(v, c, &n.Type)
-		apply(v, c, &n.View)
 		apply(v, c, &n.Body)
 
 	case *ast.Func:

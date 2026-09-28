@@ -1,0 +1,12 @@
+// Paper example 021: Function-local generics and parametric aliases
+
+#noformat
+#former-paper: 21
+#mode: evaluation
+
+-- paper.cue.txt --
+map: func<A, B>(func(A) -> B, [...A]) -> [...B]
+-- in.cue --
+@test(validate, at="map")
+
+map: func<A, B>(func(A) -> B, [...A]) -> [...B]

@@ -103,109 +103,81 @@ func oracleAtoms(mask uint8, width int) []string {
 
 // expression translates the model to CUE. The independent truth computation
 // above never calls this renderer or consults a compiled CUE value.
-func (m finiteOracle) expression(renamed, reverse bool) string {
-	names := []string{"x", "y", "z"}
-	if renamed {
-		names = []string{"outer", "middle", "inner"}
+func (m finiteOracle) expression(parenthesized, reverse bool) string {
+	// Enumerate the finite lattice in source, without evaluating its truth.
+	// CUE computes all membership tests and Boolean connectives; the Go
+	// model instead folds finite sets and relation bitmaps.
+	assignment := make([]string, m.depth)
+	atom := func(n int) string {
+		s := strconv.Itoa(n)
+		if parenthesized {
+			s = "(" + s + ")"
+		}
+		return s
 	}
-	var terms []string
-	for tuple := range m.tuples() {
-		if m.relation&(1<<tuple) == 0 {
-			continue
-		}
-		values := make([]int, m.depth)
-		n := tuple
-		for i := m.depth - 1; i >= 0; i-- {
-			values[i], n = n%m.width, n/m.width
-		}
-		var factors []string
-		for i, value := range values {
-			factors = append(factors, fmt.Sprintf("%s == %d", names[i], value))
+	join := func(terms []string, op, empty string) string {
+		if len(terms) == 0 {
+			return empty
 		}
 		if reverse {
-			slices.Reverse(factors)
+			slices.Reverse(terms)
 		}
-		terms = append(terms, "("+strings.Join(factors, " && ")+")")
+		return "(" + strings.Join(terms, op) + ")"
 	}
-	if reverse {
-		slices.Reverse(terms)
-	}
-	body := "false"
-	if len(terms) != 0 {
-		body = strings.Join(terms, " || ")
-	}
-	// Dependent value-range syntax belongs to profile D, which is not yet
-	// implemented. Encode those finite domains as guarded full-universe
-	// quantification. All full universes are nonempty, so a guard mentioning
-	// only preceding variables commutes through subsequent quantifiers.
-	dependent := false
-	for _, d := range m.domains {
-		dependent = dependent || d.refs != 0
-	}
-	if dependent {
-		for i := m.depth - 1; i >= 0; i-- {
-			d := m.domains[i]
+	var expand func(int) string
+	expand = func(level int) string {
+		if level == m.depth {
+			var terms []string
+			for tuple := range m.tuples() {
+				if m.relation&(1<<tuple) == 0 {
+					continue
+				}
+				n := tuple
+				var factors []string
+				for i := m.depth - 1; i >= 0; i-- {
+					factors = append(factors, assignment[i]+" == "+atom(n%m.width))
+					n /= m.width
+				}
+				terms = append(terms, join(factors, " && ", "true"))
+			}
+			return join(terms, " || ", "false")
+		}
+		d := m.domains[level]
+		all := m.universal&(1<<level) != 0
+		var branches []string
+		for value := range m.width {
+			x := atom(value)
+			assignment[level] = x
 			var members, excluded []string
-			for _, atom := range oracleAtoms(d.mask, m.width) {
-				members = append(members, names[i]+" == "+atom)
+			for _, member := range oracleAtoms(d.mask, m.width) {
+				members = append(members, x+" == "+member)
 			}
-			for j := range i {
-				if d.refs&(1<<j) != 0 {
-					if d.exclude {
-						excluded = append(excluded, names[i]+" != "+names[j])
-					} else {
-						members = append(members, names[i]+" == "+names[j])
-					}
+			for j := range level {
+				if d.refs&(1<<j) == 0 {
+					continue
 				}
-			}
-			guard := "false"
-			if len(members) != 0 {
-				guard = "(" + strings.Join(members, " || ") + ")"
-			}
-			if len(excluded) != 0 {
-				guard += " && " + strings.Join(excluded, " && ")
-			}
-			if m.universal&(1<<i) != 0 {
-				body = "!(" + guard + ") || (" + body + ")"
-			} else {
-				body = "(" + guard + ") && (" + body + ")"
-			}
-		}
-	}
-	body = "{ok: true & (" + body + ")}"
-	for i := m.depth - 1; i >= 0; i-- {
-		d := m.domains[i]
-		if dependent {
-			d = oracleDomain{mask: uint8((1 << m.width) - 1)}
-		}
-		atoms := oracleAtoms(d.mask, m.width)
-		var excluded []string
-		for j := range i {
-			if d.refs&(1<<j) != 0 {
 				if d.exclude {
-					excluded = append(excluded, " != "+names[j])
+					excluded = append(excluded, x+" != "+assignment[j])
 				} else {
-					atoms = append(atoms, names[j])
+					members = append(members, x+" == "+assignment[j])
 				}
 			}
+			guard := join(members, " || ", "false")
+			if len(excluded) != 0 {
+				guard = "(" + guard + " && " + join(excluded, " && ", "true") + ")"
+			}
+			if all {
+				branches = append(branches, "(!"+guard+" || "+expand(level+1)+")")
+			} else {
+				branches = append(branches, "("+guard+" && "+expand(level+1)+")")
+			}
 		}
-		if reverse {
-			slices.Reverse(atoms)
+		if all {
+			return join(branches, " && ", "true")
 		}
-		domain := "_|_"
-		if len(atoms) != 0 {
-			domain = strings.Join(atoms, " | ")
-		}
-		if len(excluded) != 0 {
-			domain = "(" + domain + ") & " + strings.Join(excluded, " & ")
-		}
-		kind := "exists"
-		if m.universal&(1<<i) != 0 {
-			kind = "forall"
-		}
-		body = fmt.Sprintf("%s (%s in %s) %s", kind, names[i], domain, body)
+		return join(branches, " || ", "false")
 	}
-	return "(" + body + ") & {ok: true}"
+	return "{ok: true & (" + expand(0) + ")}"
 }
 
 // Ordinary validation and concrete certification are separate observations.
@@ -445,7 +417,11 @@ func TestQuantifiedOracleNormalization(t *testing.T) {
 		{"[...n]", "[%d]", "[0, 1]"},
 	} {
 		ctx := cuecontext.New()
-		v := ctx.CompileString("@experiment(quantified)\nv: exists (n in 0|1|2) " + tt.body).LookupPath(cue.ParsePath("v"))
+		var alternatives []string
+		for n := range 3 {
+			alternatives = append(alternatives, strings.ReplaceAll(strings.ReplaceAll(tt.body, ": n", ": "+strconv.Itoa(n)), "...n", "..."+strconv.Itoa(n)))
+		}
+		v := ctx.CompileString("v: " + strings.Join(alternatives, " | ")).LookupPath(cue.ParsePath("v"))
 		for n := range 3 {
 			if err := v.Unify(ctx.CompileString(fmt.Sprintf(tt.single, n))).Validate(cue.Concrete(true)); err != nil {
 				t.Fatalf("%s lost assignment n=%d: %v", tt.body, n, err)
@@ -515,18 +491,15 @@ func TestQuantifiedOracleModel(t *testing.T) {
 }
 
 var finiteTransformations = []string{
-	"identity", "alpha", "reorder", "meet", "record-copy", "list-copy",
+	"identity", "parentheses", "reorder", "meet", "record-copy", "list-copy",
 	"unify", "fill", "source", "final-source",
 }
 
 func transformedFiniteOracle(m finiteOracle, transformation string) (cue.Value, error) {
 	ctx := cuecontext.New()
-	expr := m.expression(transformation == "alpha", transformation == "reorder")
+	expr := m.expression(transformation == "parentheses", transformation == "reorder")
 	source := "v: " + expr
 	switch transformation {
-	case "alpha":
-		// Hostile outer names must not capture the renamed bound variables.
-		source = "outer: 91\nmiddle: 92\ninner: 93\n" + source
 	case "meet":
 		source = "v: {ok: bool} & (" + expr + ") & {ok: true}"
 	case "record-copy":

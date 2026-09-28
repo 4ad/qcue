@@ -1,0 +1,21 @@
+// Paper example 104: Five presentations of one implementation constraint
+
+#noformat
+#former-paper: 104
+#mode: evaluation
+
+-- paper.cue.txt --
+positive: func(int) -> int
+positive: func(x: int) -> >0: x & >0
+-- in.cue --
+@test(validate, concrete, at="positive")
+@test(json, 3, at="ok")
+@test(validate, conflict, at="bad")
+@test(json, true, at="failed")
+
+positive: func(int) -> int
+positive: func(x: int) -> >0: x & >0
+
+ok: positive(3)
+bad: positive(0)
+failed: bad == _|_

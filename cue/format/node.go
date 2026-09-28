@@ -822,50 +822,13 @@ func (f *formatter) exprRaw(expr ast.Expr, prec1, depth int) {
 		}
 		f.after(nil)
 
-	case *ast.SealExpr:
-		f.print(x.Seal, "seal", blank)
-		f.expr0(x.Interface, depth)
-		f.print(blank, x.With, "with", blank, x.Lparen, token.LPAREN, noblank, indent)
-		f.before(nil)
-		for _, w := range x.Witnesses {
-			f.before(w)
-			comments := f.current.cg
-			f.current.cg = nil
-			f.funcParamDocComments(w.Expr)
-			f.expr0(w.Ident, depth)
-			f.print(blank, w.Equal, token.BIND, blank)
-			f.before(nil)
-			f.exprRaw(w.Expr, token.LowestPrec, depth)
-			f.after(nil)
-			f.print(comma, blank)
-			f.bindingComments(comments)
-			f.after(w)
-		}
-		f.after(nil)
-		f.print(unindent, trailcomma, noblank, x.Rparen, token.RPAREN, blank)
-		f.expr0(x.Body, depth)
-
-	case *ast.OpenExpr:
-		f.print(x.Open, "open", blank)
-		f.expr0(x.Value, depth)
-		f.print(blank, x.As, "as", blank, x.Lparen, token.LPAREN, noblank, indent)
-		f.before(x.Type)
-		f.exprRaw(x.Type, token.LowestPrec, depth)
-		f.print(token.COMMA, blank)
-		f.after(x.Type)
-		f.expr0(x.View, depth)
-		f.print(unindent, noblank, x.Rparen, token.RPAREN, blank)
-		f.expr0(x.Body, depth)
-
 	case *ast.Quantifier:
 		parens := prec1 > token.LowestPrec
 		if parens {
 			f.print(token.LPAREN, nooverride)
 		}
 		word := "forall"
-		if x.Exists {
-			word = "exists"
-		}
+
 		f.print(word, blank, x.Lparen, token.LPAREN, noblank, indent)
 		f.typeParams(x.Params, depth)
 		f.print(unindent, trailcomma, noblank, x.Rparen, token.RPAREN, blank)
@@ -1395,15 +1358,9 @@ func (f *formatter) typeParams(params []*ast.TypeParam, depth int) {
 		f.before(p)
 		comments := f.current.cg
 		f.current.cg = nil
-		f.funcParamDocComments(p.Sort)
 		f.funcParamDocComments(p.Bound)
 		f.expr0(p.Name, depth)
-		if p.Sort != nil {
-			f.print(blank, p.In, token.IN, blank)
-			f.before(nil)
-			f.exprRaw(p.Sort, token.LowestPrec, depth)
-			f.after(nil)
-		}
+
 		if p.Bound != nil {
 			f.print(p.Colon, token.COLON, blank)
 			f.before(nil)

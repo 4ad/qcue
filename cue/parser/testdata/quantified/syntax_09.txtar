@@ -1,4 +1,4 @@
+#error
+
 -- in.cue --
 p: seal #Showable with (A = int) {value: 7, show: func(x: int) -> string: "x"}
--- debug.txt --
-p: seal #Showable with (A=int) {value: 7, show: func(x: int) -> string: "x"}

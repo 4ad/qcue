@@ -1,0 +1,22 @@
+// Paper example 025: An explicitly impredicative instance
+
+#noformat
+#former-paper: 25
+#mode: evaluation
+
+-- paper.cue.txt --
+let Identity = forall A func(A) -> A
+id(A): func(x: A) -> A: x
+again: id[Identity](id)
+a: again[int](3)
+b: again[string]("three")
+-- in.cue --
+@test(validate, concrete, at="again")
+@test(json, 3, at="a")
+@test(json, "three", at="b")
+
+let Identity = forall A func(A) -> A
+id(A): func(x: A) -> A: x
+again: id[Identity](id)
+a: again[int](3)
+b: again[string]("three")

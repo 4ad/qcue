@@ -69,7 +69,7 @@ func (c *compiler) checkFunctionErasure(fn *adt.Function) {
 					return false
 				}
 			}
-			if x.Param.ValueRange == nil {
+			{
 				c.errf(x.Src, "erased type parameter %s cannot be used as a runtime value", x.Param.Src.Name.Name)
 			}
 			return false
@@ -111,9 +111,7 @@ func (c *compiler) checkFunctionErasure(fn *adt.Function) {
 				w.Elem(x.X)
 				return false
 			}
-		case *adt.PackageSeal:
-			w.Elem(x.Body)
-			return false
+
 		}
 		return true
 	}
@@ -144,7 +142,7 @@ func hasErasedParameter(expr adt.Expr, current *erasureScope) bool {
 					return false
 				}
 			}
-			found = x.Param.ValueRange == nil
+			found = true
 		case *adt.AliasApplication:
 			saved := current
 			current = current.bind(x)

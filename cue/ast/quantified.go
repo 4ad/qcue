@@ -16,14 +16,10 @@ package ast
 
 import "cuelang.org/go/cue/token"
 
-// A TypeParam declares a lexical quantifier parameter. Without a Sort it
-// ranges over semantic types; Bound, if present, is an upper bound on that
-// type. A Sort records an explicit "in" clause, including Type(n).
-// Bounds and sorts resolve before the parameter enters scope.
+// A TypeParam binds a semantic type. Bound is an optional upper bound,
+// resolved before this parameter enters scope.
 type TypeParam struct {
 	Name  *Ident
-	In    token.Pos
-	Sort  Expr
 	Colon token.Pos
 	Bound Expr
 
@@ -36,19 +32,15 @@ func (p *TypeParam) End() token.Pos {
 	if p.Bound != nil {
 		return p.Bound.End()
 	}
-	if p.Sort != nil {
-		return p.Sort.End()
-	}
 	return p.Name.End()
 }
 
-// A Quantifier constrains one subject at all (forall) or some (exists)
-// assignments to its parameters. Parameters bind from left to right.
+// A Quantifier constrains one subject at every assignment to its type
+// parameters. Parameters bind from left to right.
 // Quantified fields and function-local generics are represented using this
 // same expression, rather than introducing a separate binding discipline.
 type Quantifier struct {
 	Quantifier token.Pos
-	Exists     bool
 	Lparen     token.Pos
 	Params     []*TypeParam
 	Rparen     token.Pos
@@ -84,42 +76,3 @@ type ParametricAlias struct {
 func (a *ParametricAlias) Pos() token.Pos  { return a.Name.Pos() }
 func (a *ParametricAlias) pos() *token.Pos { return a.Name.pos() }
 func (a *ParametricAlias) End() token.Pos  { return a.Body.End() }
-
-// A SealExpr constructs an opaque view of an existential interface using
-// explicit private witnesses. Copying a seal preserves its identity.
-type SealExpr struct {
-	Seal      token.Pos
-	Interface Expr
-	With      token.Pos
-	Lparen    token.Pos
-	Witnesses []*Alias
-	Rparen    token.Pos
-	Body      Expr
-
-	comments
-	expr
-}
-
-func (s *SealExpr) Pos() token.Pos  { return s.Seal }
-func (s *SealExpr) pos() *token.Pos { return &s.Seal }
-func (s *SealExpr) End() token.Pos  { return s.Body.End() }
-
-// An OpenExpr opens one existential witness in a rigid lexical scope.
-// Type names the shared representation type; View names the opened subject.
-type OpenExpr struct {
-	Open   token.Pos
-	Value  Expr
-	As     token.Pos
-	Lparen token.Pos
-	Type   *Ident
-	View   *Ident
-	Rparen token.Pos
-	Body   Expr
-
-	comments
-	expr
-}
-
-func (o *OpenExpr) Pos() token.Pos  { return o.Open }
-func (o *OpenExpr) pos() *token.Pos { return &o.Open }
-func (o *OpenExpr) End() token.Pos  { return o.Body.End() }

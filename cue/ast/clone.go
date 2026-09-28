@@ -232,14 +232,6 @@ func (c *cloner) node(node Node) Node {
 		x.Elts = cloneList(c, n.Elts)
 		return x
 
-	case *OpenExpr:
-		x := shallow(c, n)
-		x.Value = clone(c, n.Value)
-		x.Type = clone(c, n.Type)
-		x.View = clone(c, n.View)
-		x.Body = clone(c, n.Body)
-		return x
-
 	case *Package:
 		x := shallow(c, n)
 		x.Name = clone(c, n.Name)
@@ -277,15 +269,7 @@ func (c *cloner) node(node Node) Node {
 	case *TypeParam:
 		x := shallow(c, n)
 		x.Name = clone(c, n.Name)
-		x.Sort = clone(c, n.Sort)
 		x.Bound = clone(c, n.Bound)
-		return x
-
-	case *SealExpr:
-		x := shallow(c, n)
-		x.Interface = clone(c, n.Interface)
-		x.Witnesses = cloneList(c, n.Witnesses)
-		x.Body = clone(c, n.Body)
 		return x
 
 	case *SelectorExpr:

@@ -310,11 +310,9 @@ func (w *printer) compactNode(n adt.Node) {
 		w.fn(x)
 
 	case *adt.Quantified:
-		if x.Src.Exists {
-			w.string("exists (")
-		} else {
-			w.string("forall (")
-		}
+
+		w.string("forall (")
+
 		for i, p := range x.Params {
 			if i > 0 {
 				w.string(", ")
@@ -331,22 +329,9 @@ func (w *printer) compactNode(n adt.Node) {
 	case *adt.TypeReference:
 		w.string(x.Src.Name)
 
-	case *adt.Existential:
-		w.node(x.Template)
-
 	case *adt.Universal:
 		w.node(x.Template)
 
-	case *adt.PackageSeal:
-		w.string("seal ")
-		w.node(x.Interface)
-
-	case *adt.PackageOpen:
-		w.string("open ")
-		w.node(x.Value)
-
-	case *adt.OpaqueType:
-		w.string("opaque type")
 	case *adt.RigidType:
 		w.string("rigid ")
 		w.string(x.Param.Src.Name.Name)
@@ -356,12 +341,6 @@ func (w *printer) compactNode(n adt.Node) {
 		w.string("singleton(")
 		w.node(x.Ref)
 		w.string(")")
-
-	case *adt.OpaqueValue:
-		w.string("opaque value")
-
-	case *adt.OpaqueCall, *adt.OpaqueScope:
-		w.string("opaque operation")
 
 	case *adt.AbstractResult:
 		w.string("pending function result")

@@ -81,14 +81,7 @@ func SelectFunctionType(c *OpContext, f *FuncValue, argument Value) (*FuncValue,
 // the residual protocol nor discharge the original universal obligations.
 func (f *FuncValue) BoundArgumentInstances(c *OpContext) []FuncType {
 	views := f.callViews
-	if boundary, ok := f.Fn.Body.(*OpaqueCall); ok && f.frontier == nil {
-		views = boundary.ProofAlternatives()
-		for _, view := range views {
-			if !sameOpaqueProtocol(f.Fn, view.Fn) {
-				return nil
-			}
-		}
-	}
+
 	if len(views) == 0 {
 		views = []*FuncValue{f}
 	}

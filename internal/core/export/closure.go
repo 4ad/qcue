@@ -188,9 +188,7 @@ func (e *exporter) predicateValue(v adt.Value) ast.Expr {
 	e.cfg = &profile
 	defer func() { e.cfg = saved }()
 	if v, ok := v.(*adt.Vertex); ok {
-		if v.IsOpaquePackage() {
-			return e.packageValue(v)
-		}
+
 		if v.Kind()&(adt.StructKind|adt.ListKind) == 0 && len(v.Arcs) == 0 && !v.HasSubjectSchemes() {
 			// Evaluated scalar predicates already carry their resolved
 			// bounds. Reusing their source could reintroduce a free name.
@@ -533,7 +531,7 @@ func captureTypeErases(expr adt.Expr) bool {
 			}
 			return false
 		case *adt.TypeReference:
-			ok = x.Param.ValueRange != nil
+			ok = false
 		}
 		return ok
 	}

@@ -1,0 +1,20 @@
+// Paper example 012: An empty value hypothesis
+
+#noformat
+#former-paper: 12
+#mode: evaluation
+
+-- paper.cue.txt --
+x: int
+x: bool                      // _|_, without a supplied value
+uninhabited(A): A             // _|_, by instantiation at bottom
+-- in.cue --
+@test(validate, conflict, at="x")
+@test(validate, conflict, at="uninhabited")
+@test(json, [true, true], at="failures")
+
+x: int
+x: bool                      // _|_, without a supplied value
+uninhabited(A): A             // _|_, by instantiation at bottom
+
+failures: [x == _|_, uninhabited == _|_]

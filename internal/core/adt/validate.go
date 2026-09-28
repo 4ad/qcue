@@ -112,22 +112,7 @@ type validator struct {
 	// TODO: we could also keep track of the number of references to a
 	// shared vertex. This would allow us to report more than a single error
 	// per shared vertex.
-	visited  map[*Vertex]bool
-	packages map[*sealedPackage]bool
-}
-
-func (v *validator) validatePackage(p *sealedPackage) {
-	if p == nil || !v.checkConcrete() || v.packages[p] {
-		return
-	}
-	if v.packages == nil {
-		v.packages = make(map[*sealedPackage]bool)
-	}
-	v.packages[p] = true
-	saved := v.Runtime
-	v.Runtime = true
-	v.validate(p.implementation)
-	v.Runtime = saved
+	visited map[*Vertex]bool
 }
 
 func (v *validator) addPositions(err *ValueError) {
@@ -252,28 +237,14 @@ func (v *validator) validate(x *Vertex) {
 			}
 		}
 	}
-	v.validatePackage(x.sealed)
 	if b, ok := x.BaseValue.(*Builtin); ok && b.capabilityMode() && v.CheckBuiltin != nil {
 		if err := v.CheckBuiltin(v.ctx, b); err != nil {
 			v.add(err)
 		}
 	}
-	if opaque, ok := x.BaseValue.(*OpaqueValue); ok {
-		v.validatePackage(opaque.carrier.owner)
-		// An opaque meet retains obligations from both representation
-		// graphs. They may include contracts acquired after the seal was
-		// created, so checking the original package alone is insufficient.
-		private, ok := opaque.private.(*Vertex)
-		if !ok {
-			private = v.ctx.newInlineVertex(nil, nil, MakeRootConjunct(nil, opaque.private))
-			private.Finalize(v.ctx)
-		}
-		v.validate(private)
-	}
+
 	if f, ok := x.BaseValue.(*FuncValue); ok && capabilityMode(f.Fn, f.Types) {
-		if boundary, ok := f.Fn.Body.(*OpaqueCall); ok {
-			v.validatePackage(boundary.owner)
-		}
+
 		if v.checkConcrete() && !concreteCapture(v.ctx, f) {
 			v.add(&Bottom{Src: f.Source(), Code: IncompleteError,
 				Err: v.ctx.Newf("function implementation or captured values remain unresolved")})

@@ -194,7 +194,7 @@ func (s *typeInference) arguments() map[*TypeParameter]Value {
 				}
 			}
 		}
-		if v == nil && p.ValueRange == nil {
+		if v == nil {
 			v = &Bottom{Code: EvalError, Err: s.c.Newf("empty type instance")}
 		}
 		args[p] = v

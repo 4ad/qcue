@@ -216,63 +216,6 @@ out: g(1)`,
 	}
 }
 
-// Pure membership evidence may justify elimination, but cannot become a new
-// seal or hide fields on the supplied value. Copies and call results preserve
-// the evidence needed to open a covariant existential again.
-func TestQuantifiedCallErasureExistentialEvidence(t *testing.T) {
-	for _, expr := range []string{"id({x: 1})", "make()", "id({x: 1}, ...)()", "saved()", "copy"} {
-		t.Run(expr, func(t *testing.T) {
-			v := semanticValue(t, `
-#M: exists A {x: A}
-id: func(p: #M) -> _: p
-make: func() -> #M: {x: 1}
-capture: func(p: #M) -> _: func() -> _: p
-saved: capture({x: 1})
-copy: make() & {extra: 2}
-value: `+expr+`
-out: (open value as (A, P) {value: 7}).value
-raw: value.x
-`)
-			semanticJSON(t, v, "out", "7")
-			semanticJSON(t, v, "raw", "1")
-			for _, path := range []string{"saved", "value"} {
-				for mode, options := range [][]cue.Option{nil, {cue.Final()}, {cue.Concrete(true)}} {
-					source, err := format.Node(v.LookupPath(cue.ParsePath(path)).Syntax(options...))
-					if err != nil {
-						t.Fatal(err)
-					}
-					use := path
-					if path == "saved" {
-						use += "()"
-					}
-					rebuilt := semanticValue(t, path+": "+string(source)+"\nout: (open "+use+" as (A, P) {value: 7}).value")
-					t.Logf("%s mode %d: %s", path, mode, source)
-					semanticJSON(t, rebuilt, "out", "7")
-				}
-			}
-		})
-	}
-}
-
-// Evidence can become inapplicable after refinement without becoming a new
-// constraint. Export must not resurrect it as an obligation on the value.
-func TestQuantifiedCallErasureRefinedEvidence(t *testing.T) {
-	v := semanticValue(t, `
-#M: exists A {x: A, optional?: 1}
-make: func() -> #M: {x: 1}
-out: make() & {optional: 2}
-`)
-	semanticJSON(t, v, "out", `{"x":1,"optional":2}`)
-	for _, options := range [][]cue.Option{nil, {cue.Final()}} {
-		source, err := format.Node(v.LookupPath(cue.ParsePath("out")).Syntax(options...))
-		if err != nil {
-			t.Fatal(err)
-		}
-		rebuilt := semanticValue(t, "out: "+string(source))
-		semanticJSON(t, rebuilt, "out", `{"x":1,"optional":2}`)
-	}
-}
-
 // An independent finite denotation checks both acceptance and erasure. A
 // packet has two presence bits and fields drawn from a finite alphabet; a
 // predicate has two presence requirements and sets of permitted field values.

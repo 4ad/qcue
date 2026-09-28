@@ -1,6 +1,6 @@
-// An existential binder requires a name.
+// A universal binder requires a name.
 
 #error
 
 -- in.cue --
-x: exists _ int
+x: forall _ int

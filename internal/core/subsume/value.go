@@ -113,18 +113,6 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		return false
 	case *adt.LiveType:
 		return x.Subsumes(s.ctx, b)
-	case *adt.OpaqueType:
-		return x.Subsumes(b)
-	case *adt.Existential:
-		if x.SubsumesPackage(s.ctx, b) {
-			return true
-		}
-		if witness := x.DataWitnessType(s.ctx); witness != nil {
-			return s.values(witness, b)
-		}
-		return false
-	case *adt.OpaqueValue:
-		return adt.Equal(s.ctx, x, b, adt.CheckStructural)
 
 	case *adt.Bottom:
 		// isBottom(b) was already tested above.

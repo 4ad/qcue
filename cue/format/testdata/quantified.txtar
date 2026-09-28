@@ -2,7 +2,7 @@
 bridge: extern func(int) -> int !bridge
 
 -- syntax02.input --
-codec: exists A {decode: func(bytes) -> A !decode}
+codec: forall A {decode: func(bytes) -> A !decode}
 
 -- syntax03.input --
 x: f[int, string](1)
@@ -15,16 +15,10 @@ f: func<A: number, B>(A) -> B
 
 -- syntax06.input --
 module(A): {
-exists State
+forall State
 empty: State
 push: func(A, State) -> State
 }
-
--- syntax07.input --
-p: seal #Counter with (State = int & >=0) {zero: 0}
-
--- syntax08.input --
-r: (open p as (A, P) {out: P.read(P.zero)}).out
 
 -- syntax09.input --
 id(A): func(x: A) -> A: x
@@ -33,19 +27,19 @@ id(A): func(x: A) -> A: x
 use: func(p: forall A func(A) -> A) -> [int, string]
 
 -- syntax11.input --
-p: exists (A: number, B: A) {value: B}
+p: forall (A: number, B: A) {value: B}
 
 -- syntax12.input --
 p: (forall A A) | int
 
 -- syntax13.input --
-p: (exists A {value: A}).value
+p: (forall A {value: A}).value
 
 -- syntax14.input --
-p: forall (A in Type(1): number) [...A]
+p: forall (A: number) [...A]
 -- syntax15.input --
 p: forall (A: number) >=0
-q: exists (A: number) -1
+q: forall (A: number) -1
 r: (forall(x: 1)) + 1
 -- multiline.input --
 Box(
@@ -53,20 +47,13 @@ Box(
     B: A,
 ) = {left:A,right:B}
 f: forall (
-    A in Type(1): number,
+    A: number,
     B: A,
 ) func(A)->B
-p: seal #Pair with (
-    A = int,
-    B = string,
-) {left:1,right:"x"}
-r: open p as (
-    A,
-    P) {out:P.left}
 -- binder_comments.input --
 f: forall (
     // first binder
-    A in Type(1): number, // after first binder
+    A: number, // after first binder
     B: A, // after last binder
 ) func(A)->B
 Box(
@@ -79,43 +66,23 @@ g: func<
     A: number, // last generic binder
 >(A)->A
 -- bound_comments.input --
-f: forall (A in Type(1):
+f: forall (A:
     // bound
     number, B: A) func(A)->B
-g: exists (A: // bound token
+g: forall (A: // bound token
     number) {value:A}
--- witness_comments.input --
-p: seal #Pair with (
-    // first witness
-    A = int, // after first witness
-    B = // witness bind token
-    string, // after last witness
-) {left:1,right:"x"}
-r: open p as (
-    // representation
-    A,
-    // interface
-    P) {out:P.left}
 -- nested_comments.input --
 f: forall ( // binder list
     A: { // bound record
         value: int // bound field
     },
-    B in Type( // universe call
-        1): // subtype bound
+    B: // subtype bound
         A, // binder end
 ) func(A)->B
-p: seal #Box with ( // witness list
-    A = { // witness record
-        value: int // witness field
-    },
-) {value:{value:1}}
-q: open p as (A, // opened representation
-    P) {value:P.value}
 -- prefix_comments.input --
 module(A): {
-    // private representation
-    exists State
+    // universal parameter
+    forall State
     // initial value
     zero: State
     read: func(State)->A
@@ -124,8 +91,8 @@ module(A): {
 // identity
 id(
     // first binder
-    A in Type(1): number, // bound
-    B: A, // dependent binder
+    A: number, // bound
+    B: A, // bounded binder
 ): // body follows
     func(x:B)->B:x @example()
 
@@ -138,7 +105,7 @@ nested(A): func(A)->(forall B func(B)->A)
 -- out/format/syntax01.golden --
 bridge: extern func(int) -> int !bridge
 -- out/format/syntax02.golden --
-codec: exists (A) {decode: func(bytes) -> A !decode}
+codec: forall (A) {decode: func(bytes) -> A !decode}
 -- out/format/syntax03.golden --
 x: f[int][string](1)
 -- out/format/syntax04.golden --
@@ -147,29 +114,25 @@ Box(A, B: A) = {left: A, right: B}
 f: forall (A: number, B) func(A) -> B
 -- out/format/syntax06.golden --
 module(A):
-	exists (State) {
+	forall (State) {
 		empty: State
 		push:  func(A, State) -> State
 	}
--- out/format/syntax07.golden --
-p: seal #Counter with (State = int & >=0) {zero: 0}
--- out/format/syntax08.golden --
-r: (open p as (A, P) {out: P.read(P.zero)}).out
 -- out/format/syntax09.golden --
 id(A): func(x: A) -> A: x
 -- out/format/syntax10.golden --
 use: func(p: forall (A) func(A) -> A) -> [int, string]
 -- out/format/syntax11.golden --
-p: exists (A: number, B: A) {value: B}
+p: forall (A: number, B: A) {value: B}
 -- out/format/syntax12.golden --
 p: (forall (A) A) | int
 -- out/format/syntax13.golden --
-p: (exists (A) {value: A}).value
+p: (forall (A) {value: A}).value
 -- out/format/syntax14.golden --
-p: forall (A in Type(1): number) [...A]
+p: forall (A: number) [...A]
 -- out/format/syntax15.golden --
 p: forall (A: number) >=0
-q: exists (A: number) -1
+q: forall (A: number) -1
 r: (forall(x: 1)) + 1
 -- out/format/multiline.golden --
 Box(
@@ -177,21 +140,14 @@ Box(
 	B: A,
 ) = {left: A, right: B}
 f: forall (
-	A in Type(1): number,
+	A: number,
 	B: A,
 ) func(A) -> B
-p: seal #Pair with (
-	A = int,
-	B = string,
-) {left: 1, right: "x"}
-r: open p as (
-	A,
-	P) {out: P.left}
 -- out/format/binder_comments.golden --
 f: forall (
 	// first binder
-	A in Type(1): number, // after first binder
-	B: A,                 // after last binder
+	A: number, // after first binder
+	B: A,      // after last binder
 ) func(A) -> B
 Box(
 	// alias binder
@@ -205,45 +161,23 @@ g: forall (
 -- out/format/bound_comments.golden --
 f: forall (
 	// bound
-	A in Type(1): number, B: A,
+	A: number, B: A,
 ) func(A) -> B
-g: exists (A: number, // bound token
+g: forall (A: number, // bound token
 ) {value: A}
--- out/format/witness_comments.golden --
-p: seal #Pair with (
-	// first witness
-	A = int,    // after first witness
-	B = string, // witness bind token
-	// after last witness
-) {left: 1, right: "x"}
-r: open p as (
-	// representation
-	A,
-	// interface
-	P) {out: P.left}
 -- out/format/nested_comments.golden --
 f: forall (
 	// binder list
 	A: { // bound record
 		value: int // bound field
 	},
-	B in Type( // universe call
-		1,
-	): A, // subtype bound
+	B: A, // subtype bound
 	// binder end
 ) func(A) -> B
-p: seal #Box with (
-	// witness list
-	A = { // witness record
-		value: int // witness field
-	},
-) {value: {value: 1}}
-q: open p as (A, // opened representation
-	P) {value: P.value}
 -- out/format/prefix_comments.golden --
 module(A):
-	exists (
-		// private representation
+	forall (
+		// universal parameter
 		State,
 	) {
 		// initial value
@@ -254,8 +188,8 @@ module(A):
 // identity
 id(
 	// first binder
-	A in Type(1): number, // bound
-	B: A,                 // dependent binder
+	A: number, // bound
+	B: A,      // bounded binder
 ):
 	func(x: B) -> B: x @example() // body follows
 

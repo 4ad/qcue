@@ -130,24 +130,10 @@ func (w *Visitor) node(n adt.Node) {
 	case *adt.OpenExpr:
 		w.node(x.X)
 
-	case *adt.PackageSeal:
-		w.node(x.Interface)
-		for _, a := range x.Witnesses {
-			w.node(a)
-		}
-		w.node(x.Body)
-
-	case *adt.PackageOpen:
-		w.node(x.Value)
-		w.node(x.Body)
-
-	case *adt.Existential:
-		w.node(x.Template)
-
 	case *adt.Universal:
 		w.node(x.Template)
 
-	case *adt.OpaqueType, *adt.OpaqueValue, *adt.OpaqueCall, *adt.OpaqueScope, *adt.AbstractResult:
+	case *adt.AbstractResult:
 	case *adt.RigidType:
 		w.node(x.Bound)
 	case *adt.LiveReference:
@@ -184,7 +170,6 @@ func (w *Visitor) node(n adt.Node) {
 	case *adt.Quantified:
 		for _, p := range x.Params {
 			w.node(p.Bound)
-			w.node(p.ValueRange)
 		}
 		w.node(x.Body)
 

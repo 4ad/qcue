@@ -69,9 +69,6 @@ func equalVertex(ctx *OpContext, x *Vertex, v Value, flags Flag) bool {
 	}
 	// Sealing contributes runtime identity even when the public view has
 	// no abstract fields. Opening changes lexical access, not that identity.
-	if x.sealed != y.sealed {
-		return false
-	}
 
 	xk := x.Kind()
 	yk := y.Kind()
@@ -167,13 +164,6 @@ func equalTerminal(ctx *OpContext, v, w Value, flags Flag) bool {
 		_, ok := w.(*Top)
 		return ok
 
-	case *OpaqueValue:
-		y, ok := w.(*OpaqueValue)
-		return ok && x.carrier == y.carrier && Equal(ctx, x.private, y.private, flags)
-
-	case *OpaqueType:
-		y, ok := w.(*OpaqueType)
-		return ok && x.carrier == y.carrier
 	case *RigidType:
 		return x == w
 	case *LiveType:

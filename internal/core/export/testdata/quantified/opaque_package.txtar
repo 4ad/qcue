@@ -1,9 +1,0 @@
--- in.cue --
-#I:  exists (A) {value: A}
-out: seal #I with (A = int) {value: 123456789}
--- out/export --
-{
-	CUEExport: _CUEClosures.CUEClosure
-	_CUEClosures: CUEClosure: (seal (#CUEType) with (A = int) {value: 123456789})
-	#CUEType: exists (A) {value: A}
-}.CUEExport

@@ -1,5 +1,5 @@
 // The supported universal fragment proves arrows with rigid type variables,
-// fixed records, covariant data, and finite binders. General Boolean predicates
+// fixed records, covariant data. General Boolean predicates
 // remain exact residual obligations. A uniformly inhabitable branch does not
 // silently discard the surrounding universal or certify an arbitrary subject.
 
@@ -7,10 +7,9 @@
 @test(validate, concrete, at="identity")
 @test(validate, concrete, at="record")
 @test(validate, concrete, at="empty")
-@test(validate, concrete, at="finite")
 @test(validate, concrete, incomplete, at="general")
 @test(validate, concrete, incomplete, at="generalBad")
-@test(json, [3, "value", [], 2], at="out")
+@test(json, [3, "value", []], at="out")
 
 identity:
 	forall (A) func(x: A) -> A: x
@@ -18,9 +17,7 @@ record:
 	forall (A) {id: func(x: A) -> A: x}
 empty:
 	forall (A) [...A]
-finite:     forall (n in 1 | 2) >=n
-finite:     2
 #General:   forall (A) ((func(A) -> A) | (func() -> int))
 general:    #General & (func() -> int: 0)
 generalBad: #General & (func() -> string: "wrong")
-out:        [identity(3), record[string].id("value"), empty, finite]
+out:        [identity(3), record[string].id("value"), empty]

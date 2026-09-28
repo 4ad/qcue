@@ -687,14 +687,6 @@ func (p *parser) parseOperand() (expr ast.Expr) {
 				return x
 			}
 		}
-		if p.quantifiedEnabled() && (p.lit == "seal" || p.lit == "open") {
-			if p.packageBoundaryAhead() {
-				if p.lit == "seal" {
-					return p.parseSeal()
-				}
-				return p.parseOpen()
-			}
-		}
 		ident := p.parseIdent()
 		// Check for optional reference marker (?)
 		// Don't consume ? if it's followed by : (that's a field constraint, not optional reference)
@@ -2162,8 +2154,7 @@ func (p *parser) checkExpr(x ast.Expr) ast.Expr {
 	case *ast.Interpolation:
 	case *ast.Func:
 	case *ast.Quantifier:
-	case *ast.SealExpr:
-	case *ast.OpenExpr:
+
 	case *ast.StructLit:
 	case *ast.ListLit:
 	case *ast.ParenExpr:

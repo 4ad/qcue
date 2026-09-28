@@ -1,3 +1,5 @@
+#error
+
 -- in.cue --
 p: open (
 // subject

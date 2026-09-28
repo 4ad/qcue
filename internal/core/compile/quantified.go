@@ -15,7 +15,6 @@
 package compile
 
 import (
-	"math"
 	"slices"
 
 	"cuelang.org/go/cue/ast"
@@ -109,37 +108,6 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 			continue
 		}
 		param := &adt.TypeParameter{Src: p}
-		if p.Sort != nil && !isTypeSort(p.Sort) {
-			if finiteValueRange(p.Sort) {
-				param.ValueRange = c.expr(p.Sort)
-				param.References = c.freeReferences(p, param.ValueRange, false)
-				c.typeParameters[p] = param
-				q.Params = append(q.Params, param)
-				continue
-			}
-			call, ok := p.Sort.(*ast.CallExpr)
-			if !ok || len(call.Args) != 1 {
-				return c.errf(p, "value binders require the dependent profile D")
-			}
-			name, ok := call.Fun.(*ast.Ident)
-			if !ok || name.Name != "Type" {
-				return c.errf(p, "value binders require the dependent profile D")
-			}
-			level, ok := call.Args[0].(*ast.BasicLit)
-			if !ok || level.Kind != token.INT {
-				return c.errf(p, "universe level must be a nonnegative integer literal")
-			}
-			num, ok := c.parse(level).(*adt.Num)
-			if !ok {
-				return c.errf(p, "invalid universe level")
-			}
-			n, err := num.X.Int64()
-			if err != nil || n < 0 || n >= math.MaxInt {
-				// Keep the accepted numeric spellings of legacy Type(n)
-				// declarations, without retaining a universe hierarchy.
-				return c.errf(p, "universe level exceeds the supported integer range")
-			}
-		}
 		param.Bound = c.typeExpr(p.Bound)
 		param.References = c.freeReferences(p, param.Bound, false)
 		c.typeParameters[p] = param
@@ -147,13 +115,6 @@ func (c *compiler) quantifiedTemplate(src *ast.Quantifier, scope ast.Node) adt.E
 	}
 	q.Body = c.expr(src.Body)
 	return q
-}
-
-// Type is a sort in binder syntax, not a runtime value. Legacy Type(n)
-// spellings are parsed above as aliases for this same impredicative sort.
-func isTypeSort(x ast.Expr) bool {
-	id, ok := x.(*ast.Ident)
-	return ok && id.Name == "Type"
 }
 
 func (c *compiler) typeExpr(x ast.Expr) adt.Expr {
@@ -176,11 +137,7 @@ func liveDescriptionReference(x adt.Expr) bool {
 		if x.Label.IsDef() {
 			return false
 		}
-		if x.Src != nil {
-			if scope, ok := x.Src.Scope.(*ast.OpenExpr); ok && x.Src.Node == scope.Type {
-				return false
-			}
-		}
+
 		return true
 	case *adt.SelectorExpr:
 		return !x.Sel.IsDef() && liveDescriptionReference(x.X)
@@ -188,20 +145,6 @@ func liveDescriptionReference(x adt.Expr) bool {
 		return liveDescriptionReference(x.X)
 	case *adt.LetReference:
 		return !x.IsPredicate && liveDescriptionReference(x.X)
-	}
-	return false
-}
-
-func finiteValueRange(x ast.Expr) bool {
-	switch x := x.(type) {
-	case *ast.BasicLit, *ast.BottomLit:
-		return true
-	case *ast.ParenExpr:
-		return finiteValueRange(x.X)
-	case *ast.UnaryExpr:
-		return (x.Op == token.ADD || x.Op == token.SUB) && finiteValueRange(x.X)
-	case *ast.BinaryExpr:
-		return x.Op == token.OR && finiteValueRange(x.X) && finiteValueRange(x.Y)
 	}
 	return false
 }

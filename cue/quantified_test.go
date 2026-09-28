@@ -78,21 +78,7 @@ func TestQuantifiedErasure(t *testing.T) {
 
 func TestQuantifiedMembershipRefinement(t *testing.T) {
 	ctx := cuecontext.New()
-	v := ctx.CompileString(quantifiedAPIText(t, "membership_refinement", "existential.cue"))
-	x := v.LookupPath(cue.ParsePath("x"))
-	if err := x.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := x.Validate(cue.Concrete(true)); err == nil {
-		t.Fatal("missing existential field was certified")
-	}
-	if _, err := x.MarshalJSON(); err == nil {
-		t.Fatal("missing existential field was exported")
-	}
-	if err := v.FillPath(cue.ParsePath("x.tag"), 1).Validate(cue.Concrete(true)); err != nil {
-		t.Fatalf("refined existential witness: %v", err)
-	}
-	v = ctx.CompileString(quantifiedAPIText(t, "membership_refinement", "singleton.cue"))
+	v := ctx.CompileString(quantifiedAPIText(t, "membership_refinement", "singleton.cue"))
 	if err := v.LookupPath(cue.ParsePath("out")).Validate(cue.Concrete(true)); err == nil {
 		t.Fatal("unresolved composite singleton was certified")
 	}
@@ -268,7 +254,7 @@ func TestQuantifiedAttachedSelectionDepth(t *testing.T) {
 }
 
 func TestQuantifiedResidualExport(t *testing.T) {
-	for _, name := range []string{"existential", "universal", "capture", "shadow", "bound"} {
+	for _, name := range []string{"universal", "capture", "shadow", "bound"} {
 		for _, final := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/final=%v", name, final), func(t *testing.T) {
 				ctx := cuecontext.New()
@@ -358,165 +344,6 @@ func TestQuantifiedBuiltinExport(t *testing.T) {
 					t.Fatalf("export %s: got %q, %v; want B", text, got, err)
 				}
 			})
-		}
-	}
-}
-
-func TestQuantifiedOpaqueExport(t *testing.T) {
-	for _, tc := range []struct{ name, check, want string }{
-		{"operation", `(open out as (A, P) {r: P.f(42)}).r`, "42"},
-		{"selected_operation", `out(42)`, "42"},
-		{"data", `(open out as (A, P) {r: P.tag}).r`, "1"},
-		{"abstract", `(open out as (A, P) {r: P.read(P.next(P.zero))}).r`, "1"},
-		{"captures", `(open out as (A, P) {r: P.f(40)}).r`, "42"},
-		{"nested_operation", `out(42)`, "42"},
-		{"list_operation", `out(42)`, "42"},
-		{"identity", `(out.f & out.alias & out.copy)(42)`, "42"},
-		{"factory", `(open out as (A, P) {r: P.f(40)}).r`, "42"},
-		{"capture_package", `out(42)`, "42"},
-		{"capture_operation", `out(42)`, "42"},
-		{"capture_record", `(open out as (A, P) {r: P.f(40)}).r`, "42"},
-		{"refinement", `(open out as (A, P) {r: P.extra}).r`, "2"},
-		{"hygiene", `(open out as (A, P) {r: P.f(40)}).r`, "42"},
-		{"generic_operation", `[out[int](42), out[string]("hi")]`, `[42,"hi"]`},
-		{"overloaded_operation", `[out(42), out("hi")]`, `[42,"hi"]`},
-	} {
-		for _, mode := range []string{"source", "final", "expression", "value"} {
-			t.Run(tc.name+"/"+mode, func(t *testing.T) {
-				source := quantifiedAPIText(t, "opaque_export", tc.name+".cue")
-				for round := range 3 {
-					ctx := cuecontext.New()
-					root := ctx.CompileString(source)
-					v := root.LookupPath(cue.ParsePath("out"))
-					if err := v.Validate(cue.Concrete(true)); err != nil {
-						t.Fatalf("round %d: %s\n%v", round, source, err)
-					}
-					checked := ctx.CompileString(source + "\ncheck: " + tc.check)
-					if got, err := checked.LookupPath(cue.ParsePath("check")).MarshalJSON(); err != nil || string(got) != tc.want {
-						t.Fatalf("round %d: %s\ngot %s, %v; want %s", round, source, got, err, tc.want)
-					}
-					if tc.name == "identity" {
-						for _, bad := range []string{"out.f & out.other", "out.f & out.fresh", "out.p & out.q", "out.p.f"} {
-							v := ctx.CompileString(source + "\nbad: " + bad).LookupPath(cue.ParsePath("bad"))
-							if err := v.Validate(); err == nil {
-								t.Fatalf("round %d: export lost opaque identity or access control: %s\n%s", round, bad, source)
-							}
-						}
-					}
-					if tc.name == "refinement" {
-						for _, bad := range []string{`out & {optional: "bad"}`, `out & {x: -1}`} {
-							v := ctx.CompileString(source + "\nbad: " + bad).LookupPath(cue.ParsePath("bad"))
-							if err := v.Validate(); err == nil {
-								t.Fatalf("round %d: lost refinement %s\n%s", round, bad, source)
-							}
-						}
-					}
-					if tc.name == "data" {
-						// A shared binding must not implicitly close an open package.
-						v := ctx.CompileString(source + `
-refined: out & {extra: 2}
-added: (open refined as (A, P) {r: P.extra}).r
-`)
-						if got, err := v.LookupPath(cue.ParsePath("added")).Int64(); err != nil || got != 2 {
-							t.Fatalf("round %d: package was closed by export: %s\n%v", round, source, err)
-						}
-					}
-					if round == 2 {
-						break
-					}
-					var node ast.Node
-					var err error
-					switch mode {
-					case "source":
-						node = v.Syntax()
-					case "final":
-						node = v.Syntax(cue.Final())
-					case "expression":
-						if err := root.Validate(); err != nil {
-							t.Fatal(err)
-						}
-						r, x := value.ToInternal(root)
-						node, err = export.Expr(r, "", x)
-					case "value":
-						r, x := value.ToInternal(v)
-						node, err = export.Value(r, "", x)
-					}
-					if err != nil {
-						t.Fatal(err)
-					}
-					text, err := format.Node(node)
-					if err != nil {
-						t.Fatal(err)
-					}
-					source = "out: " + string(text)
-					if mode == "expression" {
-						source = "root: " + string(text) + "\nout: root.out"
-					}
-				}
-			})
-		}
-	}
-}
-
-func TestQuantifiedOpaqueExportErrors(t *testing.T) {
-	for _, conflict := range []string{`p & q`, `p & {tag: 2}`} {
-		for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
-			ctx := cuecontext.New()
-			v := ctx.CompileString(`
-#I: exists A {tag: 1}
-p: seal #I with (A = int) {tag: 1}
-q: seal #I with (A = int) {tag: 1}
-out: ` + conflict).LookupPath(cue.ParsePath("out"))
-			if v.Validate() == nil {
-				t.Fatal("missing input conflict")
-			}
-			text, err := format.Node(v.Syntax(opts...))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if rebuilt := ctx.CompileString(string(text)); rebuilt.Validate() == nil {
-				t.Fatalf("export discarded a package conflict: %s", text)
-			}
-		}
-	}
-}
-
-func TestQuantifiedOpaquePredicateExport(t *testing.T) {
-	// The public function type is ordinary, and its result can escape. Its
-	// implementation syntax still refers to the opening's abstract type.
-	// Export must retain that lexical dependency even though it is erased
-	// from the runtime capture vector.
-	const source = `
-#M: exists A {zero: A}
-p: seal #M with (A = int) {zero: 0}
-out: (open p as (A, P) {
-	r: func() -> int: {ignored: func(x: A) -> A: x, value: 0}.value
-}).r
-result: out()
-`
-	// The previous fixture constructed an unimplemented required callback
-	// in the temporary record. Keep it as a blocked definition: selecting
-	// the other field must not supply the missing implementation proof.
-	unlinked := strings.Replace(source, "func(x: A) -> A: x", "func(A) -> A", 1)
-	if err := cuecontext.New().CompileString(unlinked).LookupPath(cue.ParsePath("out")).Validate(); err == nil {
-		t.Fatal("a local unimplemented callback escaped definition checking")
-	}
-	for _, opts := range [][]cue.Option{nil, {cue.Final()}} {
-		root := cuecontext.New().CompileString(source)
-		if got, err := root.LookupPath(cue.ParsePath("result")).Int64(); err != nil || got != 0 {
-			t.Fatalf("ordinary result: got %d, %v", got, err)
-		}
-		v := root.LookupPath(cue.ParsePath("out"))
-		if err := v.Validate(); err != nil {
-			t.Fatal(err)
-		}
-		if node := v.Syntax(opts...); node != nil {
-			if _, ok := node.(*ast.BadExpr); !ok {
-				src, _ := format.Node(node)
-				t.Fatalf("export emitted a free abstract dependency: %s", src)
-			}
-		} else {
-			t.Fatal("missing export result")
 		}
 	}
 }
@@ -628,24 +455,6 @@ func TestQuantifiedStandaloneRecursiveExport(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestQuantifiedScopeRefinement(t *testing.T) {
-	for _, name := range []string{"optional", "union", "pattern", "list"} {
-		t.Run(name, func(t *testing.T) {
-			ctx := cuecontext.New()
-			v := ctx.CompileString(quantifiedAPIText(t, "scope_refinement", "base.cue") + "\n" +
-				quantifiedAPIText(t, "scope_refinement", name+".cue"))
-			if err := v.Validate(); err != nil {
-				t.Fatal(err)
-			}
-			r := v.Unify(ctx.CompileString(quantifiedAPIText(t, "scope_refinement", name+"-refine.cue")))
-			out := r.LookupPath(cue.ParsePath("out"))
-			if err := out.Validate(); !out.Exists() || err == nil || !strings.Contains(err.Error(), "abstract type escapes") {
-				t.Fatalf("refinement lost the opening scope: %v", err)
-			}
-		})
 	}
 }
 

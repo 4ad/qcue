@@ -72,7 +72,7 @@ f: d.e?
 g: {h: 1}...
 h: func(_~x: int @attr(), y?: string) -> bool: x > 0
 i: h(1, y: "x")
-j: forall (A: number, B in Type(1): A) func(A) -> B
+j: forall (A: number, B: A) func(A) -> B
 Box(A) = {value: A}
 bridge: extern func(int) -> int !bridge
 k: seal #Interface with (A = int) {value: 1}

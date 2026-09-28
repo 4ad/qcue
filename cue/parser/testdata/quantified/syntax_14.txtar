@@ -1,4 +1,4 @@
 -- in.cue --
-p: exists A {value: A, show: func(A) -> string}
+p: forall A {value: A, show: func(A) -> string}
 -- debug.txt --
-p: exists (A) {value: A, show: func(A) -> string}
+p: forall (A) {value: A, show: func(A) -> string}

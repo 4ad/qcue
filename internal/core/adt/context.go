@@ -172,9 +172,6 @@ type OpContext struct {
 	// partial packet is checked against a residual clause.
 	CheckArgument func(*Environment, Expr) Value
 
-	// Shared only by one finite expansion and work it invokes. Retained
-	// lexical frames also carry it for bodies whose evaluation is deferred.
-	finiteExpansion  *finiteExpansionBudget
 	quantifiedScopes map[quantifiedScopeKey][]*Environment
 
 	cuedebug.Config
@@ -252,9 +249,6 @@ type OpContext struct {
 	// record the callee that produced them and are matched on that identity.
 	// See [FuncValue.call] and [funcCallResult].
 	funcCallResults     map[funcCallResultKey][]funcCallResult
-	sealedViews         map[sealKey]*Vertex
-	dataWitnessViews    map[dataWitnessKey]*Vertex
-	transportChecks     map[*TransportConstraint]bool
 	activeFunctionCalls []functionActivation
 	checkingClosures    map[closureComparison]bool
 

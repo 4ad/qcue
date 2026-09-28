@@ -3,4 +3,4 @@
 
 f:
 	forall (A) func(x: A) -> A: x
-out: f[forall (B in Type(2)) func(B) -> B]
+out: f[forall (B) func(B) -> B]

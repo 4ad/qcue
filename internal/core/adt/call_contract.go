@@ -49,12 +49,7 @@ func (f *FuncValue) CallClauses(c *OpContext) []FuncType {
 // choice but do not freeze it before the rest of the packet is available.
 func (f *FuncValue) CallClausesFor(c *OpContext, packet FuncType) []FuncType {
 	clauses := f.selectionClauses()
-	if boundary, ok := f.Fn.Body.(*OpaqueCall); ok && f.frontier == nil {
-		clauses = nil
-		for _, view := range boundary.ProofAlternatives() {
-			clauses = append(clauses, FuncType{Fn: view.Fn, Env: view.Env})
-		}
-	}
+
 	return f.residualClauses(c, clauses, packet)
 }
 

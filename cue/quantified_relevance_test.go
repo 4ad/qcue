@@ -53,17 +53,13 @@ func TestQuantifiedInterfaceRelevance(t *testing.T) {
 		{"refuted_list_guard", `f: ([func(int)->_|_] & []) | []`, false},
 		{"unresolved_guard", `f: {tag: int, cb: func(int)->_|_}`, true},
 		{"unused_bound", `f: forall (A: func(int)->_|_) func(string)->string`, true},
-		{"nested_bound_scope", "U: _\nW: _\nf: exists (T: U) forall (V: W) {value: T, transform: func(V)->V}", false},
 		{"generic", `meet(A, B): func(x:A, y:B)->(A&B): x&y`, false},
 		{"selected", "meet(A, B): func(x:A, y:B)->(A&B): x&y\nf: meet[int,bool]", false},
 		{"alias", "Arrow(A, B) = func(A)->B\nf: Arrow(int, int&bool)", true},
 		{"anchor", "quiet(A): func(A)->A\nquiet: func(int)->bool", true},
 		{"composite_universal", `f: forall A {cb: func(int)->_|_, data?: A}`, true},
-		{"composite_existential", `f: exists A {cb: func(int)->_|_, data: A}`, true},
 		{"nested_universal", `f: func(forall A {cb: func(int)->_|_, data?: A})->string`, true},
-		{"nested_existential", `f: func(exists A {cb: func(int)->_|_, data: A})->string`, true},
 		{"universal_generic", `f: forall (A, B) {cb: func(A, B)->(A&B)}`, false},
-		{"existential_generic", `f: exists (A, B) {cb: func(A, B)->(A&B)}`, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			v := cuecontext.New().CompileString(tt.source)

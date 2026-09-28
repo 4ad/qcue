@@ -149,20 +149,3 @@ f:func(x:int=1)->1`, "", false},
 		})
 	}
 }
-
-func TestQuantifiedCertificationPackageOpening(t *testing.T) {
-	for _, escape := range []bool{false, true} {
-		body := "P.show(P.value)"
-		result := "string"
-		if escape {
-			body, result = "P.value", "_"
-		}
-		v := cuecontext.New().CompileString(`
-#Showable: exists A {value: A, show: func(A) -> string}
-f: func(p: #Showable) -> ` + result + `: (open p as (A, P) {out: ` + body + `}).out
-`)
-		if err := v.LookupPath(cue.ParsePath("f")).Validate(cue.Concrete(true)); (err == nil) == escape {
-			t.Fatalf("escape=%v: %v", escape, err)
-		}
-	}
-}

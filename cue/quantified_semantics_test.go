@@ -141,23 +141,6 @@ out: f({_cb: strings.ToUpper})`)
 	})
 }
 
-func TestQuantifiedSemanticExistentialFields(t *testing.T) {
-	for _, label := range []string{"x", "_x", "#X", "_#X"} {
-		for _, nested := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/nested=%v", label, nested), func(t *testing.T) {
-				predicate, subject := fmt.Sprintf("{%s: 1}", label), fmt.Sprintf("{%s: 2}", label)
-				if nested {
-					predicate, subject = "{n:"+predicate+"}", "{n:"+subject+"}"
-				}
-				v := semanticValue(t, fmt.Sprintf("v: (exists A %s) & %s", predicate, subject))
-				if err := v.Validate(); err == nil {
-					t.Fatal("constant existential discarded a conflicting field")
-				}
-			})
-		}
-	}
-}
-
 func TestQuantifiedSemanticGuardPresence(t *testing.T) {
 	// A bottom comparison is not permission to invent a field absent from
 	// the parameter's static inventory. Retain these former runtime probes
@@ -178,63 +161,6 @@ out: f({})
 	}
 }
 
-func TestQuantifiedSemanticOpaqueOverlap(t *testing.T) {
-	for _, reverse := range []bool{false, true} {
-		t.Run(fmt.Sprint(reverse), func(t *testing.T) {
-			a, b := "func(x!: int) -> int", "func(x: int) -> A"
-			if reverse {
-				a, b = b, a
-			}
-			v := semanticValue(t, fmt.Sprintf(`
-#M: exists A {f: (%s) & (%s)}
-p: seal #M with (A = int) {f: func(x: int) -> int: x}
-`, a, b))
-			if err := v.Validate(cue.Concrete(true)); err == nil {
-				t.Fatal("certified incompatible transports on packet (x: 1)")
-			}
-		})
-	}
-}
-
-func TestQuantifiedSemanticOpaqueExportIdentity(t *testing.T) {
-	for _, inline := range []bool{false, true} {
-		for _, shared := range []bool{false, true} {
-			for _, alias := range []bool{false, true} {
-				t.Run(fmt.Sprintf("inline=%v/shared=%v/alias=%v", inline, shared, alias), func(t *testing.T) {
-					f := "#F"
-					if inline {
-						f = "func(int) -> int"
-					}
-					g := f
-					if alias {
-						g = "f"
-					}
-					implementation := "{f: h, g: h}"
-					if !shared {
-						implementation = "{f: func(x: int) -> int: x, g: func(x: int) -> int: x}"
-					}
-					v := semanticValue(t, fmt.Sprintf(`
-#F: func(int) -> int
-#M: exists A {f: %s, g: %s}
-h: func(x: int) -> int: x
-p: seal #M with (A = int) %s
-out: (open p as (A, P) {result: (P.f & P.g)(1)}).result
-`, f, g, implementation))
-					if alias && !shared {
-						if err := v.Validate(); err == nil {
-							t.Fatal("distinct implementations satisfied a declared alias")
-						}
-					} else if alias {
-						semanticJSON(t, v, "out", "1")
-					} else if err := v.LookupPath(cue.ParsePath("out")).Validate(); err == nil {
-						t.Fatal("independent public exports acquired equal identity")
-					}
-				})
-			}
-		}
-	}
-}
-
 func TestQuantifiedSemanticScalarSelection(t *testing.T) {
 	for _, body := range []string{"1", `"x"`, "true", "null", "{n: 1}", "[1]"} {
 		t.Run(body, func(t *testing.T) {
@@ -245,8 +171,8 @@ func TestQuantifiedSemanticScalarSelection(t *testing.T) {
 			}
 			semanticJSON(t, v, "out", string(want))
 			v = semanticValue(t, fmt.Sprintf(`
-poly: forall (A in Type(0)) %s
-f(T in Type(0)): func(x: T) -> T: x
+poly: forall (A) %s
+f(T): func(x: T) -> T: x
 out: f[poly](%s)
 `, body, body))
 			semanticJSON(t, v, "out", string(want))
@@ -374,7 +300,7 @@ func TestQuantifiedSemanticMembershipModel(t *testing.T) {
 							}
 							pred[i] = field + mark + ": " + strings.Join(values, " | ")
 						}
-						predicate := "(exists A {" + strings.Join(pred, ", ") + "})"
+						predicate := "(forall A {" + strings.Join(pred, ", ") + "})"
 						for x := -1; x < width; x++ {
 							for y := -1; y < width; y++ {
 								conflict, complete := false, true
@@ -428,7 +354,7 @@ func TestQuantifiedSemanticMembershipRefinement(t *testing.T) {
 					}
 					return x
 				}
-				v := ctx.CompileString("@experiment(quantified)\nv: (exists A " + record("1") + ") & " + record("int"))
+				v := ctx.CompileString("@experiment(quantified)\nv: (forall A " + record("1") + ") & " + record("int"))
 				if err := v.Validate(); err != nil {
 					t.Fatal(err)
 				}
@@ -454,45 +380,9 @@ func TestQuantifiedSemanticMembershipRefinement(t *testing.T) {
 	}
 }
 
-func TestQuantifiedSemanticOpaqueGraph(t *testing.T) {
-	for _, shared := range []bool{false, true} {
-		for _, reverse := range []bool{false, true} {
-			t.Run(fmt.Sprintf("shared=%v/reverse=%v", shared, reverse), func(t *testing.T) {
-				privateB := "h"
-				if !shared {
-					privateB = "func(x: int) -> int: x"
-				}
-				fields := "a: #N, b: #N, copy: a, alias: a.f"
-				if reverse {
-					fields = "alias: a.f, copy: a, b: #N, a: #N"
-				}
-				source := fmt.Sprintf(`
-#F: func(int) -> int
-#N: {f: #F, g: f}
-#M: exists A {%s}
-h: func(x: int) -> int: x
-p: seal #M with (A = int) {
-    a: {f: h, g: h}
-    b: {f: %s, g: f}
-    copy: a
-    alias: a.f
-}
-good: (open p as (A, P) {out: [(P.a.f & P.a.g)(1), (P.a.f & P.copy.f)(2), (P.a.f & P.alias)(3)]}).out
-bad: (open p as (A, P) {out: (P.a.f & P.b.f)(1)}).out
-`, fields, privateB)
-				v := semanticValue(t, source)
-				semanticJSON(t, v, "good", "[1,2,3]")
-				if err := v.LookupPath(cue.ParsePath("bad")).Validate(); err == nil {
-					t.Fatal("reusing a record predicate merged distinct export paths")
-				}
-			})
-		}
-	}
-}
-
 func TestQuantifiedSemanticRuntimeBoundaries(t *testing.T) {
 	for _, good := range []bool{false, true} {
-		for _, boundary := range []string{"packet", "capture", "package"} {
+		for _, boundary := range []string{"packet", "capture"} {
 			t.Run(fmt.Sprintf("%s/good=%v", boundary, good), func(t *testing.T) {
 				ret := "1"
 				if good {
@@ -504,8 +394,6 @@ func TestQuantifiedSemanticRuntimeBoundaries(t *testing.T) {
 					source = fmt.Sprintf("cb: func(x: int) -> int: {v: x}.v\nf: func(arg: {_cb: func(int) -> %s}) -> int: 0\nout: f({_cb: cb})", ret)
 				case "capture":
 					source = fmt.Sprintf("obj: {_cb: (func(x: int) -> int: {v: x}.v) & func(int) -> %s}\nf: func() -> int: obj._cb(1)", ret)
-				case "package":
-					source = fmt.Sprintf("#M: exists A {_f: func(int) -> %s}\np: seal #M with (A = int) {_f: func(x: int) -> int: {v: x}.v}", ret)
 				}
 				v := semanticValue(t, source)
 				if err := v.Validate(cue.Concrete(true)); (err == nil) != good {
@@ -521,62 +409,17 @@ func TestQuantifiedSemanticRuntimeBoundaries(t *testing.T) {
 // finite meets and joins with ordinary Go booleans, independently of ADT
 // normalization, environments and proof search.
 func TestQuantifiedSemanticFiniteQuantifierModel(t *testing.T) {
-	domain := func(mask int) string {
-		var values []string
-		for i := range 2 {
-			if mask&(1<<i) != 0 {
-				values = append(values, fmt.Sprint(i))
-			}
-		}
-		if len(values) == 0 {
-			return "_|_"
-		}
-		return strings.Join(values, " | ")
-	}
-	quantify := func(universal bool, mask int, body func(int) bool) bool {
-		result := universal
-		for i := range 2 {
-			if mask&(1<<i) != 0 {
-				if universal {
-					result = result && body(i)
-				} else {
-					result = result || body(i)
-				}
-			}
-		}
-		return result
-	}
 	ctx := cuecontext.New()
 	for relation := range 16 {
-		var terms []string
-		for x := range 2 {
-			for y := range 2 {
-				if relation&(1<<(2*x+y)) != 0 {
-					terms = append(terms, fmt.Sprintf("(x == %d && y == %d)", x, y))
-				}
-			}
-		}
-		body := "false"
-		if len(terms) > 0 {
-			body = strings.Join(terms, " || ")
-		}
 		for outer := range 4 {
 			for inner := range 4 {
-				for _, qx := range []string{"forall", "exists"} {
-					for _, qy := range []string{"forall", "exists"} {
-						want := quantify(qx == "forall", outer, func(x int) bool {
-							return quantify(qy == "forall", inner, func(y int) bool {
-								return relation&(1<<(2*x+y)) != 0
-							})
-						})
-						source := fmt.Sprintf("@experiment(quantified)\nv: (%s (x in %s) %s (y in %s) {ok: true & (%s)}) & {ok: true}", qx, domain(outer), qy, domain(inner), body)
-						v := ctx.CompileString(source)
-						if err := v.Validate(); (err == nil) != want {
-							t.Fatalf("finite denotation=%v: %s\n%v", want, source, err)
-						}
-						if err := v.Validate(cue.Concrete(true)); (err == nil) != want {
-							t.Fatalf("finite observation=%v: %s\n%v", want, source, err)
-						}
+				for prefix := range 4 {
+					m := finiteOracle{width: 2, depth: 2, universal: uint8(prefix), relation: uint32(relation)}
+					m.domains[0].mask, m.domains[1].mask = uint8(outer), uint8(inner)
+					source := "v: " + m.expression(false, false)
+					v := ctx.CompileString(source)
+					if message := finiteOracleMismatch(v, m.truth()); message != "" {
+						t.Fatalf("%s\n%s", message, source)
 					}
 				}
 			}
@@ -591,8 +434,8 @@ func TestQuantifiedSemanticImpredicativeNormalization(t *testing.T) {
 	} {
 		t.Run(expression, func(t *testing.T) {
 			v := semanticValue(t, fmt.Sprintf(`
-poly: forall (A in Type(0)) 1
-f(T in Type(0)): func(x: T) -> T: x
+poly: forall (A) 1
+f(T): func(x: T) -> T: x
 out: f[%s](1)
 `, expression))
 			semanticJSON(t, v, "out", "1")
@@ -602,11 +445,11 @@ out: f[%s](1)
 
 func TestQuantifiedSemanticMembershipConstraints(t *testing.T) {
 	for _, source := range []string{
-		`v: (exists A {x: 1}) & close({})`,
-		`v: (exists A {x: 1}) & {[string]: string}`,
-		`v: (exists A {x: 1}) & close({[=~"^y"]: int})`,
-		`v: (exists A [int, string]) & [1, ...int]`,
-		`v: (exists A [int, string]) & [1]`,
+		`v: (forall A {x: 1}) & close({})`,
+		`v: (forall A {x: 1}) & {[string]: string}`,
+		`v: (forall A {x: 1}) & close({[=~"^y"]: int})`,
+		`v: (forall A [int, string]) & [1, ...int]`,
+		`v: (forall A [int, string]) & [1]`,
 	} {
 		t.Run(source, func(t *testing.T) {
 			if err := semanticValue(t, source).Validate(); err == nil {
@@ -615,14 +458,14 @@ func TestQuantifiedSemanticMembershipConstraints(t *testing.T) {
 		})
 	}
 	ctx := cuecontext.New()
-	v := ctx.CompileString("@experiment(quantified)\nv: (exists A {x?: 1}) & {x?: 2}")
+	v := ctx.CompileString("@experiment(quantified)\nv: (forall A {x?: 1}) & {x?: 2}")
 	if err := v.Validate(cue.Concrete(true)); err != nil {
 		t.Fatalf("absent optional field: %v", err)
 	}
 	if err := v.FillPath(cue.ParsePath("v.x"), 1).Validate(); err == nil {
 		t.Fatal("later presence discarded the original optional constraint")
 	}
-	v = ctx.CompileString("@experiment(quantified)\nv: (exists A [int, string]) & [1, ...]")
+	v = ctx.CompileString("@experiment(quantified)\nv: (forall A [int, string]) & [1, ...]")
 	if err := v.Validate(); err != nil {
 		t.Fatalf("refinable list: %v", err)
 	}
@@ -643,7 +486,7 @@ func TestQuantifiedSemanticQualifiedLabels(t *testing.T) {
 		}
 		return ctx.BuildInstance(instance)
 	}
-	p := compile("first.test/p", "p", "constraint: exists A {_x: 1}\ngood: {_x: 1}")
+	p := compile("first.test/p", "p", "constraint: forall A {_x: 1}\ngood: {_x: 1}")
 	q := compile("second.test/q", "q", "data: {_x: 2}")
 	v := p.LookupPath(cue.ParsePath("constraint")).Unify(q.LookupPath(cue.ParsePath("data")))
 	if err := v.Validate(); err != nil {

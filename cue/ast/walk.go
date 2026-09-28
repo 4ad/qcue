@@ -85,7 +85,6 @@ func Walk(node Node, before func(Node) bool, after func(Node)) {
 
 	case *TypeParam:
 		Walk(n.Name, before, after)
-		walkIfNotNil(n.Sort, before, after)
 		walkIfNotNil(n.Bound, before, after)
 
 	case *Quantifier:
@@ -95,17 +94,6 @@ func Walk(node Node, before func(Node) bool, after func(Node)) {
 	case *ParametricAlias:
 		Walk(n.Name, before, after)
 		walkList(n.Params, before, after)
-		Walk(n.Body, before, after)
-
-	case *SealExpr:
-		Walk(n.Interface, before, after)
-		walkList(n.Witnesses, before, after)
-		Walk(n.Body, before, after)
-
-	case *OpenExpr:
-		Walk(n.Value, before, after)
-		Walk(n.Type, before, after)
-		Walk(n.View, before, after)
 		Walk(n.Body, before, after)
 
 	case *Func:

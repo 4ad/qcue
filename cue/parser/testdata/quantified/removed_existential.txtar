@@ -1,0 +1,4 @@
+#error
+
+-- in.cue --
+x: exists A {value: A}

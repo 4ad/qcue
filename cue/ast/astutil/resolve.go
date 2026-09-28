@@ -274,9 +274,7 @@ func newFuncScope(f *ast.File, outer *scope, fn *ast.Func) *scope {
 
 func (s *scope) resolveTypeParams(params []*ast.TypeParam) {
 	for _, p := range params {
-		if p.Sort != nil {
-			ast.Walk(p.Sort, s.Before, nil)
-		}
+
 		if p.Bound != nil {
 			ast.Walk(p.Bound, s.Before, nil)
 		}
@@ -454,31 +452,6 @@ func (s *scope) Before(n ast.Node) bool {
 		s = newScope(s.file, s, x, nil)
 		defer s.freeScope()
 		s.resolveTypeParams(x.Params)
-		ast.Walk(x.Body, s.Before, nil)
-		return false
-
-	case *ast.SealExpr:
-		ast.Walk(x.Interface, s.Before, nil)
-		for _, w := range x.Witnesses {
-			ast.Walk(w.Expr, s.Before, nil)
-		}
-		ast.Walk(x.Body, s.Before, nil)
-		return false
-
-	case *ast.OpenExpr:
-		ast.Walk(x.Value, s.Before, nil)
-		s = newScope(s.file, s, x, nil)
-		defer s.freeScope()
-		for _, id := range []*ast.Ident{x.Type, x.View} {
-			if id.Name == "_" || s.index[id.Name].node != nil {
-				s.errFn(id.Pos(), "opening requires distinct type and view names")
-				continue
-			}
-			if s.nameFn != nil {
-				s.nameFn(id.Name)
-			}
-			s.index[id.Name] = entry{node: id, link: id}
-		}
 		ast.Walk(x.Body, s.Before, nil)
 		return false
 

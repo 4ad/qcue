@@ -1,4 +1,4 @@
+#error
+
 -- in.cue --
 r: exists (n in 1 | 2) {value: n}
--- debug.txt --
-r: exists (n in 1|2) {value: n}

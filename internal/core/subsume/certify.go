@@ -175,10 +175,13 @@ func (p *certifier) schema(env *adt.Environment, x adt.Expr) adt.Value {
 		return nil
 	}
 	if vertex, ok := v.(*adt.Vertex); ok {
+		// The premise consumed below is the finalized value. Subscribe only
+		// after obtaining it: completing this read is not new evidence for
+		// the inference which is already using that completion.
+		vertex.Finalize(p.ctx)
 		if p.ctx.Propagation != nil {
 			p.ctx.Propagation.Observe(vertex)
 		}
-		vertex.Finalize(p.ctx)
 		if _, shared := vertex.BaseValue.(*adt.Vertex); shared && vertex.ClosedNonRecursive {
 			// close returns a wrapper whose closedness takes effect when
 			// inserted into a conjunct. A bare Evaluate result must not
@@ -331,13 +334,7 @@ func (p *certifier) captureType(v adt.Value, seen map[adt.Value]bool) bool {
 	}
 	if vertex, ok := v.(*adt.Vertex); ok {
 		cfg := &adt.ValidateConfig{Runtime: true}
-		_, opaque := adt.Unwrap(v).(*adt.OpaqueValue)
-		if opaque || vertex.IsOpaquePackage() {
-			// Opaque representations carry their own private implementation
-			// obligations, not just the visible fields walked below.
-			cfg.Concrete = true
-			cfg.CheckFunction, cfg.CheckBuiltin = p.validateFunction, ValidateBuiltin
-		}
+
 		if adt.Validate(p.ctx, vertex, cfg) != nil {
 			return false
 		}
@@ -572,21 +569,7 @@ func (p *certifier) function(f *adt.FuncValue, target adt.FuncType) (proved bool
 			target = adt.BindFunctionTypes(target, []adt.Value{&adt.RigidType{Param: param, Bound: bound}})
 		}
 	}
-	if boundary, ok := source.Fn.Body.(*adt.OpaqueCall); ok {
-		for _, alternative := range boundary.ProofAlternatives() {
-			target, source, ok := s.capabilityScopes(target, adt.FuncType{Fn: alternative.Fn, Env: alternative.Env})
-			if !ok {
-				continue
-			}
-			boundary := alternative.Fn.Body.(*adt.OpaqueCall)
-			advertised, implementation, required, ok := boundary.ProofTypes(p.ctx, source.Env)
-			if ok && s.capabilitySignature(target, advertised) && p.implementation(implementation) &&
-				p.function(implementation, required) {
-				return true
-			}
-		}
-		return false
-	}
+
 	target, source, ok := s.capabilityScopes(target, source)
 	if !ok {
 		return false
@@ -939,7 +922,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		}
 		return f
 	case *adt.Quantified:
-		if _, function := x.Body.(*adt.Function); function && !x.Src.Exists {
+		if _, function := x.Body.(*adt.Function); function {
 			// Creating the lexical telescope does not execute the body.
 			v := p.schema(env, x)
 			f, ok := adt.Unwrap(v).(*adt.FuncValue)
@@ -948,14 +931,10 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 			return f
 		}
-		if x.Src.Exists {
-			return nil
-		}
+
 		scope := x.CheckingScope(p.ctx, env)
 		for _, param := range x.Params {
-			if param.ValueRange != nil {
-				return nil
-			}
+
 			bound := p.schema(scope, param.Bound)
 			if bound == nil {
 				return nil
@@ -973,45 +952,7 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 		return p.schema(env, x)
 	case *adt.SliceExpr:
 		return p.slice(env, x)
-	case *adt.PackageSeal:
-		if !p.typeOperations(env, x.Interface) {
-			return nil
-		}
-		// Preserve all interface conjuncts: this introduction rule applies
-		// to one explicit existential, not to a refined conjunction whose
-		// other predicates would otherwise disappear from the obligation.
-		interfaceType, ok := adt.Unwrap(p.schema(env, x.Interface)).(*adt.Existential)
-		if !ok {
-			return nil
-		}
-		witnesses := make([]adt.Value, len(x.Witnesses))
-		for i, witness := range x.Witnesses {
-			if !p.typeOperations(env, witness) {
-				return nil
-			}
-			witnesses[i] = p.schema(env, witness)
-		}
-		body := p.expr(env, x.Body)
-		private := x.ProofTypes(p.ctx, interfaceType, witnesses)
-		if body == nil || private == nil || !p.proveInclusion(p.ctx, private, body) {
-			return nil
-		}
-		return interfaceType
-	case *adt.PackageOpen:
-		typ, view := x.ProofView(p.ctx, p.expr(env, x.Value))
-		if typ == nil || view == nil {
-			return nil
-		}
-		saved := p.hypotheses
-		p.hypotheses = maps.Clone(saved)
-		defer func() { p.hypotheses = saved }()
-		p.assume(view, make(map[adt.Value]bool))
-		e := p.frame(env, map[adt.Feature]adt.Value{x.Type: typ, x.View: view})
-		result := p.expr(e, x.Body)
-		if typ.Escapes(p.ctx, result) {
-			return nil
-		}
-		return result
+
 	case *adt.StructLit:
 		if value, handled := p.recordMeet([]proofBinding{{env, x}}); handled {
 			return value
@@ -1330,12 +1271,7 @@ func (p *certifier) typeOperations(env *adt.Environment, expr adt.Expr) bool {
 		case *adt.Quantified:
 			scope := x.CheckingScope(p.ctx, env)
 			for _, param := range x.Params {
-				if param.ValueRange != nil {
-					// Value-sorted expansion requires a separate finite witness
-					// proof; an arbitrary type variable cannot stand in for it.
-					ok = false
-					return false
-				}
+
 				if param.Bound != nil && !p.typeOperations(scope, param.Bound) {
 					ok = false
 					return false

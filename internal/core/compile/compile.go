@@ -654,9 +654,6 @@ func (c *compiler) resolve(n *ast.Ident) adt.Expr {
 		// Should have been handled above.
 		return c.errf(n, "unresolved identifier %v", n.Name)
 	}
-	if scope, ok := n.Scope.(*ast.OpenExpr); ok && (n.Node == scope.Type || n.Node == scope.View) {
-		return &adt.FieldReference{Src: n, UpCount: upCount, Label: c.label(n)}
-	}
 
 	switch f := n.Node.(type) {
 	// Local expressions
@@ -1347,25 +1344,6 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 
 	case *ast.Quantifier:
 		return c.quantifier(n)
-
-	case *ast.SealExpr:
-		s := &adt.PackageSeal{Src: n, Interface: c.expr(n.Interface), Body: c.expr(n.Body)}
-		for _, witness := range n.Witnesses {
-			s.Names = append(s.Names, witness.Ident.Name)
-			s.Witnesses = append(s.Witnesses, c.typeExpr(witness.Expr))
-		}
-		s.References = c.freeReferences(n, s, false)
-		s.Captures = c.freeReferences(n, s, true)
-		return s
-
-	case *ast.OpenExpr:
-		o := &adt.PackageOpen{Src: n, Value: c.expr(n.Value), Type: c.label(n.Type), View: c.label(n.View)}
-		c.pushScope(nil, 1, n)
-		o.Body = c.expr(n.Body)
-		c.popScope()
-		o.References = c.freeReferences(n, o, false)
-		o.Captures = c.freeReferences(n, o, true)
-		return o
 
 	case *ast.Func:
 		// Recompiling an abbreviation in a predicate context must not

@@ -3,7 +3,7 @@
 
 -- in.cue --
 x: forall (A: number) >=0
-y: exists (A: number) -1
+y: forall (A: number) -1
 z: forall (A: bool) !false
 ordinary: forall(x) + 1
 labeled: (forall(x: 1)) + 1

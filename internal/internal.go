@@ -330,7 +330,7 @@ func IsDefinition(label ast.Label) bool {
 // that have no corresponding node in the shorthand syntax.
 func FieldQuantifier(f *ast.Field) *ast.Quantifier {
 	q, ok := f.Value.(*ast.Quantifier)
-	if !ok || !q.Shorthand || q.Exists || len(ast.Comments(q)) > 0 ||
+	if !ok || !q.Shorthand || len(ast.Comments(q)) > 0 ||
 		f.Constraint != token.ILLEGAL || f.Alias != nil {
 		return nil
 	}

@@ -90,8 +90,7 @@ func (r *relevanceChecker) description(value adt.Value, seen map[adt.Value]bool)
 		}
 	case *adt.Universal:
 		return r.template(x.Template, x.Env, seen)
-	case *adt.Existential:
-		return r.template(x.Template, x.Env, seen)
+
 	case *adt.Disjunction:
 		for _, branch := range x.Values {
 			if err := r.description(branch, seen); err != nil {

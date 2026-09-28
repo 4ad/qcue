@@ -14,55 +14,11 @@
 
 package adt
 
-import "slices"
-
 // scopedPredicate is a proposition in its declaration scope. It is not a
 // runtime witness, even when its evaluation has a concrete approximation.
 type scopedPredicate struct {
 	env  *Environment
 	expr Expr
-}
-
-func mergeCallWitnesses(a, b []*Existential) []*Existential {
-	for _, witness := range b {
-		if !slices.ContainsFunc(a, func(e *Existential) bool {
-			return e.Template == witness.Template && e.Env == witness.Env
-		}) {
-			a = append(slices.Clone(a), witness)
-		}
-	}
-	return a
-}
-
-func (v *Vertex) addCallWitness(c *OpContext, predicate scopedPredicate) {
-	if predicate.expr == nil {
-		return
-	}
-	if e := existentialExprOf(c, predicate.env, predicate.expr, make(map[Expr]bool)); e != nil {
-		v.callWitnesses = mergeCallWitnesses(v.callWitnesses, []*Existential{e})
-	}
-}
-
-// HasCallWitnesses reports boundary proof provenance, including interfaces
-// invalidated by later refinement. Export must use the independently computed
-// value even when none of the old witnesses can be reconstructed anymore.
-func (v *Vertex) HasCallWitnesses() bool { return len(v.callWitnesses) != 0 }
-
-// CallWitnesses returns existential interfaces established at an execution
-// boundary that still hold after refinement. They are proof metadata, not
-// constraints on future refinements.
-// Source export can re-establish them with an identity call, preserving both
-// elimination and the original runtime value without conjoining a schema.
-func (v *Vertex) CallWitnesses(c *OpContext) []*Existential {
-	var witnesses []*Existential
-	for _, e := range v.callWitnesses {
-		saved := c.PushState(c.Env(0), e.Source())
-		b := e.validate(c, v)
-		if err := c.PopState(saved); b == nil && err == nil {
-			witnesses = append(witnesses, e)
-		}
-	}
-	return witnesses
 }
 
 // membershipCheck keeps the subject and the compatibility calculation apart.

@@ -1071,30 +1071,8 @@ func (c *converter) exprCore(x ast.Expr) doc {
 
 	case *ast.Quantifier:
 		word := "forall"
-		if x.Exists {
-			word = "exists"
-		}
+
 		return cats(stringLit(word+" "), c.typeParams(x, x.Lparen, x.Rparen, x.Params), spaceLit, c.expr(x.Body))
-
-	case *ast.SealExpr:
-		items := make([]bindingDoc, 0, len(x.Witnesses))
-		for _, w := range x.Witnesses {
-			items = append(items, bindingDoc{
-				node:     w,
-				body:     cats(c.exprCore(w.Ident), equalsSpaceLit, c.exprCore(w.Expr)),
-				comments: bindingComments(w, w.Ident, w.Expr),
-			})
-		}
-		return cats(stringLit("seal "), c.expr(x.Interface), stringLit(" with "),
-			c.bindingList(x, x.Lparen, x.Rparen, items, true), spaceLit, c.expr(x.Body))
-
-	case *ast.OpenExpr:
-		items := []bindingDoc{
-			{node: x.Type, body: c.exprCore(x.Type), comments: classifyComments(x.Type)},
-			{node: x.View, body: c.exprCore(x.View), comments: classifyComments(x.View)},
-		}
-		return cats(stringLit("open "), c.expr(x.Value), stringLit(" as "),
-			c.bindingList(x, x.Lparen, x.Rparen, items, false), spaceLit, c.expr(x.Body))
 
 	case *ast.Alias:
 		// In expression position (including inside pattern labels
@@ -3958,8 +3936,7 @@ func wrapEligibility(n ast.Node) (eligible, authored bool) {
 		return true, x.Lbrace.IsValid()
 	case *ast.ListLit:
 		return true, x.Lbrack.IsValid()
-	case *ast.File, *ast.Func, *ast.CallExpr, *ast.BinaryExpr, *ast.IndexExpr,
-		*ast.Quantifier, *ast.ParametricAlias, *ast.SealExpr, *ast.OpenExpr:
+	case *ast.File, *ast.Func, *ast.CallExpr, *ast.BinaryExpr, *ast.IndexExpr, *ast.Quantifier, *ast.ParametricAlias:
 		return true, true
 	}
 	return false, false
@@ -4943,13 +4920,11 @@ func (c *converter) typeParams(n ast.Node, lparen, rparen token.Pos, params []*a
 	items := make([]bindingDoc, 0, len(params))
 	for _, p := range params {
 		item := c.exprCore(p.Name)
-		if p.Sort != nil {
-			item = cats(item, stringLit(" in "), c.exprCore(p.Sort))
-		}
+
 		if p.Bound != nil {
 			item = cats(item, colonLit, spaceLit, c.exprCore(p.Bound))
 		}
-		items = append(items, bindingDoc{p, item, bindingComments(p, p.Name, p.Sort, p.Bound)})
+		items = append(items, bindingDoc{p, item, bindingComments(p, p.Name, p.Bound)})
 	}
 	return c.bindingList(n, lparen, rparen, items, true)
 }

@@ -24,9 +24,9 @@ func (p *parser) quantifiedEnabled() bool {
 }
 
 // quantifierAhead leaves ordinary uses of the contextual keywords alone,
-// including field labels, selectors, and references named forall or exists.
+// including field labels, selectors, and references named forall.
 func (p *parser) quantifierAhead(block bool) bool {
-	if p.tok != token.IDENT || (p.lit != "forall" && p.lit != "exists") {
+	if p.tok != token.IDENT || p.lit != "forall" {
 		return false
 	}
 	p.inLookahead = true
@@ -50,7 +50,7 @@ func (p *parser) quantifierAhead(block bool) bool {
 	}
 	for depth > 0 {
 		switch next() {
-		case token.IN, token.COLON:
+		case token.COLON:
 			if depth == 1 {
 				constrained = true
 			}
@@ -101,41 +101,10 @@ func (p *parser) quantifiedLookahead() func() token.Token {
 	}
 }
 
-func (p *parser) packageBoundaryAhead() bool {
-	p.inLookahead = true
-	defer func() { p.inLookahead = false }()
-	next := p.quantifiedLookahead()
-	tok := next()
-	if tok == token.IDENT || tok == token.LBRACE {
-		return true
-	}
-	if tok != token.LPAREN {
-		return false
-	}
-	depth := 1
-	for depth > 0 {
-		switch next() {
-		case token.LPAREN:
-			depth++
-		case token.RPAREN:
-			depth--
-		case token.EOF, token.INTERPOLATION:
-			return false
-		}
-	}
-	// An ordinary call ends here. A package boundary continues with the
-	// contextual separator "as" or "with", checked by the real parser.
-	return next() == token.IDENT
-}
-
 func (p *parser) parseTypeParam() (param *ast.TypeParam) {
 	c := p.openComments()
 	defer func() { c.closeNode(p, param) }()
 	param = &ast.TypeParam{Name: p.parseIdentDecl()}
-	if p.tok == token.IN {
-		param.In = p.expect(token.IN)
-		param.Sort = p.parseRHS()
-	}
 	if p.tok == token.COLON {
 		param.Colon = p.expect(token.COLON)
 		param.Bound = p.parseRHS()
@@ -166,7 +135,7 @@ func (p *parser) parseTypeParams(start, end token.Token) (lparen token.Pos, para
 func (p *parser) parseQuantifier() (expr ast.Expr) {
 	c := p.openComments()
 	defer func() { c.closeNode(p, expr) }()
-	q := &ast.Quantifier{Quantifier: p.pos, Exists: p.lit == "exists"}
+	q := &ast.Quantifier{Quantifier: p.pos}
 	if !p.quantifiedEnabled() {
 		p.errf(p.pos, "quantifier syntax requires @experiment(quantified)")
 	}
@@ -240,65 +209,13 @@ func (p *parser) parseQuantifiedField() ast.Decl {
 	return f
 }
 
-func (p *parser) expectContextual(word string) token.Pos {
-	pos := p.pos
-	if p.tok != token.IDENT || p.lit != word {
-		p.errorExpected(pos, word)
-	} else {
-		p.next()
-	}
-	return pos
-}
-
-func (p *parser) parseSeal() (expr ast.Expr) {
-	c := p.openComments()
-	defer func() { c.closeNode(p, expr) }()
-	s := &ast.SealExpr{Seal: p.expectContextual("seal")}
-	s.Interface = p.parseRHS()
-	s.With = p.expectContextual("with")
-	p.openList()
-	s.Lparen = p.expect(token.LPAREN)
-	for p.tok != token.RPAREN && p.tok != token.EOF {
-		c := p.openComments()
-		w := &ast.Alias{Ident: p.parseIdentDecl(), Equal: p.expect(token.BIND)}
-		w.Expr = p.parseRHS()
-		c.closeNode(p, w)
-		s.Witnesses = append(s.Witnesses, w)
-		if p.tok != token.COMMA {
-			break
-		}
-		p.next()
-	}
-	s.Rparen = p.expectClosing(token.RPAREN, "seal witnesses")
-	p.closeList()
-	s.Body = p.parseStruct()
-	return s
-}
-
-func (p *parser) parseOpen() (expr ast.Expr) {
-	c := p.openComments()
-	defer func() { c.closeNode(p, expr) }()
-	o := &ast.OpenExpr{Open: p.expectContextual("open")}
-	o.Value = p.parseRHS()
-	o.As = p.expectContextual("as")
-	p.openList()
-	o.Lparen = p.expect(token.LPAREN)
-	o.Type = p.parseIdentDecl()
-	p.expect(token.COMMA)
-	o.View = p.parseIdentDecl()
-	o.Rparen = p.expectClosing(token.RPAREN, "opened type and view")
-	p.closeList()
-	o.Body = p.parseStruct()
-	return o
-}
-
 // parseBlockPrefix reads the ordered binder prefix of a record. A quantifier
 // followed by an expression instead of a declaration separator is an ordinary
 // embedding, and is returned separately. Bounds can mention earlier binders;
 // resolution happens after the complete lexical tree has been assembled.
 func (p *parser) parseBlockPrefix() (prefix []*ast.Quantifier, first ast.Decl) {
 	for p.quantifiedEnabled() && p.quantifierAhead(true) {
-		q := &ast.Quantifier{Quantifier: p.pos, Exists: p.lit == "exists"}
+		q := &ast.Quantifier{Quantifier: p.pos}
 		p.next()
 		if p.tok == token.LPAREN {
 			q.Lparen, q.Params, q.Rparen = p.parseTypeParams(token.LPAREN, token.RPAREN)

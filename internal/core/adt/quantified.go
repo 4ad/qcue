@@ -27,11 +27,7 @@ import (
 type TypeParameter struct {
 	Src   *ast.TypeParam
 	Bound Expr
-	// ValueRange is non-nil for the finite value-binder fragment. General
-	// dependent ranges and signatures remain outside this profile.
-	ValueRange Expr
-	// References records lexical dependencies of the bound or value range
-	// for exporting a telescope at a different lexical position.
+	// References retains lexical dependencies of the bound.
 	References []Expr
 }
 
@@ -71,7 +67,6 @@ func (*TypeReference) elemNode()          {}
 type typeScope struct {
 	quantifier    *Quantified
 	arguments     map[*TypeParameter]Value
-	finite        *finiteExpansionBudget
 	erasedIndices map[*IndexExpr]bool
 }
 
@@ -166,14 +161,6 @@ func (index *IndexExpr) ErasedRuntimeIndex(env *Environment) bool {
 }
 
 func (q *Quantified) evaluate(c *OpContext, state Flags) Value {
-	for _, p := range q.Params {
-		if p.ValueRange != nil {
-			return q.evaluateFinite(c)
-		}
-	}
-	if q.Src.Exists {
-		return &Existential{Template: q, Env: c.Env(0)}
-	}
 	if !covariantData(q.Body) && !distributableUniversal(q.Body) {
 		return &Universal{Template: q, Env: c.Env(0)}
 	}
@@ -297,192 +284,6 @@ func universalDataMinimum(c *OpContext, x Expr, params map[*TypeParameter]bool) 
 		return &copy
 	}
 	return x
-}
-
-// Limit work, rather than the size of the result alone: many different
-// assignments can yield the same value. Exhaustion retains the entire scoped
-// predicate, never a partially enumerated conjunction or disjunction.
-const finiteExpansionLimit = 1024
-
-type finiteExpansionBudget struct {
-	remaining int
-	exhausted bool
-}
-
-func (q *Quantified) finiteResidual(env *Environment) Value {
-	if q.Src.Exists {
-		return &Existential{Template: q, Env: env}
-	}
-	return &Universal{Template: q, Env: env}
-}
-
-func (q *Quantified) evaluateFinite(c *OpContext) Value {
-	outer := c.Env(0)
-	for _, p := range q.Params {
-		if p.ValueRange == nil {
-			// Mixed prefixes are retained rather than commuting type and
-			// value scopes to force a finite expansion.
-			return q.finiteResidual(outer)
-		}
-	}
-	budget := c.finiteExpansion
-	for env := outer; budget == nil && env != nil; env = env.Up {
-		if env.types != nil {
-			budget = env.types.finite
-		}
-	}
-	if budget == nil {
-		budget = &finiteExpansionBudget{remaining: finiteExpansionLimit}
-	}
-	saved := c.finiteExpansion
-	c.finiteExpansion = budget
-	defer func() { c.finiteExpansion = saved }()
-	// A literal body is independent of every binder. Check each fixed range
-	// for emptiness, but one assignment suffices for each nonempty range.
-	independent := false
-	switch q.Body.(type) {
-	case *Top, *Bottom, *BasicType, *Null, *Bool, *Num, *String, *Bytes:
-		independent = true
-	}
-	for _, p := range q.Params {
-		independent = independent && fixedCapabilityExpr(p.ValueRange)
-	}
-	// Only immutable finite assignments may justify dropping an equivalent
-	// branch. Ordinary captured witnesses can acquire later constraints.
-	immutable := true
-	for _, ref := range q.References {
-		r, ok := ref.(*TypeReference)
-		immutable = immutable && ok && r.Param.ValueRange != nil
-	}
-	var expand func(*Environment, int) Value
-	expand = func(env *Environment, i int) Value {
-		if b := c.Cancelled(); b != nil {
-			return b
-		}
-		if budget.remaining == 0 || budget.exhausted {
-			budget.exhausted = true
-			return nil
-		}
-		budget.remaining--
-		if i == len(q.Params) {
-			v, _ := c.Evaluate(env, q.Body)
-			if vertex, ok := v.(*Vertex); ok {
-				// Discharge this finite assignment before forming the meet
-				// or join. Otherwise nested forall/exists prefixes create a
-				// Cartesian product of still-pending, already decidable
-				// branches, whose distinct scopes correctly prevent sharing.
-				vertex.Finalize(c)
-			}
-			return v
-		}
-		p := q.Params[i]
-		saved := c.PushState(env, p.Src)
-		rangeValue, _ := c.Evaluate(env, p.ValueRange)
-		if b := c.PopState(saved); b != nil {
-			rangeValue = b
-		}
-		var candidates []Value
-		switch v := Unwrap(rangeValue).(type) {
-		case *Bottom:
-			if v.IsIncomplete() {
-				return v
-			}
-		case *Disjunction:
-			candidates = v.Values
-		case *Null, *Bool, *Num, *String, *Bytes:
-			candidates = []Value{v}
-		default:
-			return &Bottom{Code: IncompleteError, Err: c.Newf("finite binder range remains unresolved")}
-		}
-		if len(candidates) == 0 {
-			if !q.Src.Exists {
-				return &Top{}
-			}
-			return c.NewErrf("existential binder has an empty range")
-		}
-		if independent {
-			candidates = candidates[:1]
-		}
-		values := make([]Value, 0, len(candidates))
-		var refuted *Bottom
-		for _, v := range candidates {
-			args := maps.Clone(env.types.arguments)
-			args[p] = v
-			frame := *env
-			frame.types = &typeScope{quantifier: q, arguments: args, finite: budget}
-			frame.cache = nil
-			value := expand(&frame, i+1)
-			if value == nil || budget.exhausted {
-				return nil
-			}
-			if b, ok := Unwrap(value).(*Bottom); ok && !b.IsIncomplete() {
-				if !q.Src.Exists {
-					return b
-				}
-				refuted = CombineErrors(q.Source(), refuted, b)
-				continue
-			}
-			if immutable && finiteGroundData(c, value, make(map[Value]bool)) &&
-				slices.ContainsFunc(values, func(previous Value) bool {
-					return finiteGroundData(c, previous, make(map[Value]bool)) &&
-						Equal(c, previous, value, CheckStructural)
-				}) {
-				continue
-			}
-			values = append(values, value)
-		}
-		if q.Src.Exists {
-			if len(values) == 0 && refuted != nil {
-				return refuted
-			}
-			return &Disjunction{Values: values}
-		}
-		return &Conjunction{Values: values}
-	}
-	env := &Environment{Up: outer, Vertex: c.newInlineVertex(nil, &StructMarker{}),
-		types: &typeScope{quantifier: q, arguments: make(map[*TypeParameter]Value), finite: budget}}
-	value := expand(env, 0)
-	if budget.exhausted {
-		return q.finiteResidual(outer)
-	}
-	if !q.Src.Exists && value != nil {
-		return retainSubjectIntroduction(c, value, env)
-	}
-	return value
-}
-
-// finiteGroundData admits fully evaluated data trees only. Optional fields,
-// patterns, callable values and retained introductions are predicates whose
-// equal approximations do not justify branch deduplication.
-func finiteGroundData(c *OpContext, value Value, seen map[Value]bool) bool {
-	if value == nil || seen[value] {
-		return false
-	}
-	seen[value] = true
-	defer delete(seen, value)
-	if v, ok := value.(*Vertex); ok {
-		v.Finalize(c)
-		if v.Bottom() != nil || v.HasSubjectSchemes() || v.sealed != nil ||
-			v.PatternConstraints != nil || !IsConcrete(v) ||
-			v.Kind() == ListKind && !v.IsClosedList() ||
-			Validate(c, v, &ValidateConfig{Concrete: true, Final: true, Runtime: true}) != nil {
-			return false
-		}
-		for _, a := range v.Arcs {
-			if a.Label.IsLet() || a.ArcType != ArcMember || !finiteGroundData(c, a, seen) {
-				return false
-			}
-		}
-		if v.Kind() == StructKind || v.Kind() == ListKind {
-			return true
-		}
-		value = Unwrap(v)
-	}
-	switch value.(type) {
-	case *Null, *Bool, *Num, *String, *Bytes:
-		return true
-	}
-	return false
 }
 
 // Universals commute with conjunction and fixed record projections, but
@@ -630,7 +431,7 @@ func (f *FuncValue) instantiate(c *OpContext, args map[*TypeParameter]Value) (*F
 			if v == nil {
 				continue
 			}
-			if b := p.checkWitness(c, e, v); b != nil {
+			if b := p.checkTypeArgument(c, e, v); b != nil {
 				return nil, b
 			}
 		}
@@ -793,7 +594,7 @@ func typeArgumentFits(c *OpContext, bound, arg Value) proofResult {
 	// as an inclusion check. A record literal is an extensible predicate,
 	// and conjoining a function contract does not prove its implementation.
 	switch arg.(type) {
-	case *Null, *Bool, *Num, *String, *Bytes, *OpaqueValue:
+	case *Null, *Bool, *Num, *String, *Bytes:
 		return capabilityMember(c, nil, bound, arg)
 	}
 	return proofUnknown

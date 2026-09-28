@@ -105,33 +105,6 @@ func capabilityHasCallable(v Value, seen map[Value]bool) bool {
 	return false
 }
 
-// recordCallResult retains certified interfaces for later existential and
-// quantified elimination. Annotations neither construct nor filter the body's
-// independently computed result; their implications were proved statically.
-func (f *FuncValue) recordCallResult(c *OpContext, packet callPacket, value Value) {
-	evidence := []scopedPredicate{{f.Env, f.Fn.Ret}}
-	for _, t := range f.Types {
-		if t.Fn.Body != nil {
-			continue
-		}
-		projected, result := packet.project(t, f.Fn)
-		var admitted *packetAdmission
-		if result == proofEstablished {
-			admitted, result = projected.admit(c, t, false)
-		}
-		switch result {
-		case proofEstablished:
-			t := admitted.clause
-			evidence = append(evidence, scopedPredicate{t.Env, t.Fn.Ret})
-		}
-	}
-	if v, ok := value.(*Vertex); ok {
-		for _, predicate := range evidence {
-			v.addCallWitness(c, predicate)
-		}
-	}
-}
-
 // capabilityMatches translates a residual packet back to the implementation
 // activation. The mask is fixed when the clause is attached, so later partial
 // applications preserve obligations over arguments they have since bound.

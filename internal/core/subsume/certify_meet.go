@@ -212,7 +212,7 @@ func (p *certifier) sourceDescription(value adt.Value) adt.Value {
 // It cannot introduce an executable import hypothesis by itself.
 func (p *certifier) functionAnnotation(env *adt.Environment, expr adt.Expr) (adt.Value, bool) {
 	body := expr
-	if q, ok := body.(*adt.Quantified); ok && !q.Src.Exists {
+	if q, ok := body.(*adt.Quantified); ok {
 		body = q.Body
 	}
 	f, ok := body.(*adt.Function)

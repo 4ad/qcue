@@ -1,0 +1,30 @@
+// Paper example 099: An annotation and an explicit assertion
+
+#noformat
+#former-paper: 99
+#mode: evaluation
+
+-- paper.cue.txt --
+positive: func(x: int) -> (int & >0): x
+// blocked: int does not imply >0
+
+positiveChecked: func(x: int) -> (int & >0): x & >0
+// accepted: the body explicitly establishes the refinement on success
+ok:  positiveChecked(3)   // 3
+bad: positiveChecked(0)   // _|_
+-- in.cue --
+@test(validate, blocked, at="positive")
+@test(validate, concrete, at="positiveChecked")
+@test(json, 3, at="ok")
+@test(validate, conflict, at="bad")
+@test(json, true, at="failed")
+
+positive: func(x: int) -> (int & >0): x
+// blocked: int does not imply >0
+
+positiveChecked: func(x: int) -> (int & >0): x & >0
+// accepted: the body explicitly establishes the refinement on success
+ok:  positiveChecked(3)   // 3
+bad: positiveChecked(0)   // _|_
+
+failed: bad == _|_

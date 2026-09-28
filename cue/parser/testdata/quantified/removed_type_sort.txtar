@@ -1,0 +1,4 @@
+#error
+
+-- in.cue --
+f: forall (A in Type(0)) func(A) -> A

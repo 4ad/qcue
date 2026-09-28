@@ -119,13 +119,6 @@ func (p *certifier) sourceOperations(env *adt.Environment, expr adt.Expr) bool {
 			// have been accumulated, even when no call observes them.
 			return false
 		case *adt.Quantified:
-			// Finite quantified data uses the finite expansion checker, not
-			// an arbitrary rigid type variable as a value witness.
-			for _, param := range x.Params {
-				if param.ValueRange != nil {
-					return false
-				}
-			}
 			if _, function := x.Body.(*adt.Function); function {
 				return false
 			}

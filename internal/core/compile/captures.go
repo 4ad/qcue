@@ -63,7 +63,7 @@ func (c *compiler) captureType(ref adt.Expr) adt.Expr {
 			// Recompiling a telescope would give already compiled literals
 			// different binder identities. Keep its existing dependency.
 			implementation = true
-		case *ast.OpenExpr, *ast.SealExpr, *ast.Comprehension:
+		case *ast.Comprehension:
 			implementation = true
 		case *ast.CallExpr:
 			id, ok := n.Fun.(*ast.Ident)
@@ -154,19 +154,7 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 			w.Elem(x.Body)
 			typePosition = saved
 			return false
-		case *adt.PackageSeal:
-			// The interface and representation witnesses are predicates;
-			// only the implementation contributes runtime captures.
-			saved := typePosition
-			typePosition = true
-			w.Elem(x.Interface)
-			for _, witness := range x.Witnesses {
-				w.Elem(witness)
-			}
-			typePosition = false
-			w.Elem(x.Body)
-			typePosition = saved
-			return false
+
 		case *adt.LiveReference:
 			// A value used as a singleton remains a runtime dependency.
 			// Other references in annotations describe erased predicates.
@@ -177,7 +165,7 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 			return false
 		}
 		if _, ok := n.(adt.Resolver); !ok {
-			if r, ok := n.(*adt.TypeReference); !ok || (runtimeOnly && r.Param.ValueRange == nil) {
+			if _, ok := n.(*adt.TypeReference); !ok || runtimeOnly {
 				return true
 			}
 		} else if runtimeOnly && typePosition {
@@ -187,17 +175,13 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 		if !ok || local[id.Scope] || local[id.Node] {
 			return true
 		}
-		if p, ok := id.Node.(*ast.TypeParam); ok && runtimeOnly {
-			if c.typeParameters[p].ValueRange == nil {
-				return false
-			}
+		if _, ok := id.Node.(*ast.TypeParam); ok && runtimeOnly {
+			return false
 		}
 		if _, imported := id.Node.(*ast.ImportSpec); imported {
 			return false
 		}
-		if scope, ok := id.Scope.(*ast.OpenExpr); ok && id.Node == scope.Type && runtimeOnly {
-			return false
-		}
+
 		key := id.Node
 		if key == nil {
 			key = id

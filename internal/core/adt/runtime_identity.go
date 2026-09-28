@@ -68,9 +68,7 @@ func compareRuntimeValues(c *OpContext, a, b Value, regularOnly bool) proofResul
 				return proofRefuted
 			}
 			x, y = x.DerefValue(), y.DerefValue()
-			if x.sealed != y.sealed {
-				return proofRefuted
-			}
+
 			if x.Kind()&(StructKind|ListKind) != 0 {
 				if x.Kind() != y.Kind() {
 					return proofRefuted
@@ -126,10 +124,7 @@ func compareRuntimeValues(c *OpContext, a, b Value, regularOnly bool) proofResul
 			if y, ok := b.(*Builtin); ok && x.self() == y.self() {
 				return proofEstablished
 			}
-		case *OpaqueValue:
-			if y, ok := b.(*OpaqueValue); ok && x.carrier == y.carrier {
-				return compare(x.private, y.private, false)
-			}
+
 		default:
 			if Equal(c, a, b, 0) {
 				return proofEstablished

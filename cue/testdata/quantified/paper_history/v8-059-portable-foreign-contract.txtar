@@ -1,0 +1,16 @@
+// Paper example 059: Portable foreign contract
+
+#noformat
+#former-paper: 59
+#mode: evaluation
+
+-- paper.cue.txt --
+externF: extern func(int) -> int !bridge
+// A native-range failure is a bridge outcome.
+// A fractional input is outside the logical domain.
+-- in.cue --
+@test(validate, at="externF")
+
+externF: extern func(int) -> int !bridge
+// A native-range failure is a bridge outcome.
+// A fractional input is outside the logical domain.

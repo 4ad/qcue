@@ -42,31 +42,11 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 	}
 	c.checkingClosures[key] = true
 	defer delete(c.checkingClosures, key)
-	a, b = transportIdentity(c, a), transportIdentity(c, b)
 	result := proofEstablished
 	if a.Fn != b.Fn {
-		x, xok := a.Fn.Body.(*OpaqueCall)
-		y, yok := b.Fn.Body.(*OpaqueCall)
-		if !xok || !yok || x.owner != y.owner || x.outward != y.outward {
-			return proofRefuted
-		}
-		if x.export != nil || y.export != nil {
-			if x.export != y.export {
-				return proofRefuted
-			}
-		} else {
-			// Higher-order transports carry supplied closure identity.
-			// Declared public exports instead use their interface graph;
-			// private code origins and sharing are unobservable there.
-			if x.origin() != y.origin() && x.signature != y.signature {
-				return proofRefuted
-			}
-			result = closureIdentity(c, x.private, y.private)
-			if result == proofRefuted {
-				return result
-			}
-		}
+		return proofRefuted
 	}
+
 	compare := func(x Expr, xe *Environment, y Expr, ye *Environment) {
 		if x == y && xe == ye {
 			return
@@ -103,67 +83,6 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 		}
 	}
 	return result
-}
-
-// Opposite transports through the same interface are the identity on a
-// callable descriptor. Normalize only the identity observation: retaining
-// the actual adapters preserves their attached contracts and runtime checks.
-func transportIdentity(c *OpContext, f *FuncValue) *FuncValue {
-	for !f.IsPartial() {
-		outer, ok := f.Fn.Body.(*OpaqueCall)
-		if !ok || outer.private.IsPartial() {
-			break
-		}
-		inner, ok := outer.private.Fn.Body.(*OpaqueCall)
-		if !ok || outer.owner != inner.owner || outer.outward == inner.outward ||
-			!sameTransportInterface(c, outer, inner) {
-			break
-		}
-		f = inner.private
-	}
-	return f
-}
-
-func sameTransportInterface(c *OpContext, a, b *OpaqueCall) bool {
-	x, y := a.origin().clauses, b.origin().clauses
-	if len(x) != len(y) {
-		return false
-	}
-	for _, t := range x {
-		if !slices.ContainsFunc(y, func(u FuncType) bool {
-			return sameTransportSignature(c, t.Fn, t.Env, u.Fn, u.Env)
-		}) {
-			return false
-		}
-	}
-	return true
-}
-
-func sameTransportSignature(c *OpContext, a *Function, ae *Environment, b *Function, be *Environment) bool {
-	if a == b && ae == be {
-		return true
-	}
-	if a.Open != b.Open || len(a.Params) != len(b.Params) ||
-		len(typeParameters(ae)) != 0 || len(typeParameters(be)) != 0 {
-		return false
-	}
-	same := func(x Expr, xe *Environment, y Expr, ye *Environment) bool {
-		if x == nil || y == nil {
-			return x == y
-		}
-		xv, xok := c.Evaluate(xe, x)
-		yv, yok := c.Evaluate(ye, y)
-		return xok && yok && xv != nil && yv != nil &&
-			c.provesInclusion(xv, yv) && c.provesInclusion(yv, xv)
-	}
-	for i, x := range a.Params {
-		y := b.Params[i]
-		if x.Label != y.Label || x.Positional != y.Positional || x.ArcType != y.ArcType ||
-			(x.Default == nil) != (y.Default == nil) || !same(x.Value, ae, y.Value, be) {
-			return false
-		}
-	}
-	return same(a.Ret, ae, b.Ret, be)
 }
 
 func concreteCapture(c *OpContext, v Value) bool {
@@ -215,9 +134,7 @@ func concreteCapture(c *OpContext, v Value) bool {
 			}
 			functions[key] = true
 			defer delete(functions, key)
-			if adapter, ok := f.Fn.Body.(*OpaqueCall); ok && !check(adapter.private) {
-				return false
-			}
+
 			for _, x := range f.Fn.Captures {
 				v, _ := c.Evaluate(f.Env, x)
 				if !check(v) {
@@ -267,12 +184,7 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 		}
 		m.Types = mergeFuncTypes(m.Types, []FuncType{t})
 	}
-	m.scopes = slices.Clone(a.scopes)
-	for _, p := range b.scopes {
-		if !slices.Contains(m.scopes, p) {
-			m.scopes = append(m.scopes, p)
-		}
-	}
+
 	m.identities = slices.Clone(a.identities)
 	if result == proofUnknown && !slices.Contains(m.identities, b) {
 		m.identities = append(m.identities, b)

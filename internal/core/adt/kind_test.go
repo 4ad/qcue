@@ -32,7 +32,7 @@ func TestKindString(t *testing.T) {
 	}, {
 		input:     TopKind,
 		want:      "_",
-		wantKinds: []Kind{NullKind, BoolKind, IntKind, FloatKind, StringKind, BytesKind, FuncKind, ListKind, StructKind, OpaqueKind},
+		wantKinds: []Kind{NullKind, BoolKind, IntKind, FloatKind, StringKind, BytesKind, FuncKind, ListKind, StructKind},
 	}, {
 		input:     IntKind | ListKind,
 		want:      `(int|[...])`,

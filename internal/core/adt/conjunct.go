@@ -376,7 +376,6 @@ func (n *nodeContext) markStructLit(s *StructLit, ci CloseInfo) {
 // scheduleVertexConjuncts injects the conjuncst of src n. If src was not fully
 // evaluated, it subscribes dst for future updates.
 func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo CloseInfo) {
-	n.node.callWitnesses = mergeCallWitnesses(n.node.callWitnesses, arc.callWitnesses)
 	for _, s := range arc.schemes {
 		found := false
 		for _, existing := range n.node.schemes {
@@ -386,23 +385,7 @@ func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo
 			n.node.schemes = append(n.node.schemes, s)
 		}
 	}
-	if arc.sealed != nil {
-		if n.node.sealed != nil && n.node.sealed != arc.sealed {
-			n.addBottom(n.ctx.NewErrf("conflicting opaque package identities"))
-			return
-		}
-		n.node.sealed = arc.sealed
-		n.node.sealedOpened = n.node.sealedOpened || arc.sealedOpened
-		if !arc.sealedOpened && arc.isFinal() {
-			// Copy a constructed package's public view, not its generative
-			// source conjuncts. Replaying those in a refinement's lexical
-			// environment would construct a fresh seal and conflict with the
-			// identity just retained above. A snapshot preserves optional
-			// fields and patterns as well as the concrete exported members.
-			n.insertValueConjunct(c.Env, &evaluatedSubject{arc}, closeInfo)
-			return
-		}
-	}
+
 	// A function call reference carries its payload on the reference itself:
 	// the anchor arc it resolves to exists only to give the structural cycle
 	// detector a stable identity per function and deliberately has no
@@ -593,20 +576,16 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 	ctx := n.ctx
 	subject, snapshot := v.(*evaluatedSubject)
 	if snapshot {
+		// Inserting evaluated components changes the local value. A live
+		// predicate may already have installed a shared reference here;
+		// materialize it before adding the subject's fields or list shape.
+		n.unshare()
 		v = subject.Vertex
 	}
 
 	switch x := v.(type) {
 	case *Vertex:
-		n.node.callWitnesses = mergeCallWitnesses(n.node.callWitnesses, x.callWitnesses)
-		if snapshot && x.sealed != nil {
-			if n.node.sealed != nil && n.node.sealed != x.sealed {
-				n.addBottom(ctx.NewErrf("conflicting opaque package identities"))
-				return
-			}
-			n.node.sealed = x.sealed
-			n.node.sealedOpened = n.node.sealedOpened || x.sealedOpened
-		}
+
 		if x.ClosedNonRecursive {
 			n.node.ClosedNonRecursive = true
 		} else if x.ClosedRecursive {
@@ -805,9 +784,8 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 		// only associated with a validator, we leave it to the validator to
 		// decide what fields are allowed.
 		if kind&(ListKind|StructKind) != 0 {
-			_, existential := x.(*Existential)
-			if b, ok := x.(*BuiltinValidator); existential || ok && b.Builtin.NonConcrete {
-				// Existential bodies may require fields that are not
+			if b, ok := x.(*BuiltinValidator); ok && b.Builtin.NonConcrete {
+				// Non-concrete validators may require fields that are not
 				// enumerated by the surrounding definition. Their validator,
 				// rather than that definition's partial field set, decides
 				// membership. An independent close(...) still applies.
@@ -956,25 +934,7 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 		n.updateCyclicStatus(id)
 
 		if y := n.scalar; y != nil {
-			if a, ok := x.(*OpaqueValue); ok {
-				if b, ok := y.(*OpaqueValue); ok {
-					switch runtimeValueIdentity(ctx, a, b) {
-					case proofRefuted:
-						n.reportConflict(x, y, x.Kind(), y.Kind(), n.scalarID, id.posInfo)
-					case proofUnknown:
-						n.addBottom(&Bottom{Code: IncompleteError,
-							Err: ctx.Newf("abstract value equality remains unresolved")})
-					case proofEstablished:
-						// Equality observes the runtime inhabitant. Keep both
-						// representation graphs and their contract obligations.
-						private := ctx.newInlineVertex(nil, nil,
-							MakeRootConjunct(nil, a.private), MakeRootConjunct(nil, b.private))
-						private.Finalize(ctx)
-						n.scalar = &OpaqueValue{carrier: a.carrier, private: private}
-					}
-					break
-				}
-			}
+
 			p1 := n.scalarID.Priority
 			p2 := id.Priority
 			if p1 != 0 && p2 != 0 {

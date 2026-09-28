@@ -107,7 +107,7 @@ func sameSubjectScope(c *OpContext, a, b *Environment) bool {
 		for e := env; e != nil; e = e.Up {
 			if e.types != nil {
 				for p, value := range e.types.arguments {
-					if p.ValueRange == nil {
+					{
 						out[p] = value
 					}
 				}
@@ -118,17 +118,7 @@ func sameSubjectScope(c *OpContext, a, b *Environment) bool {
 	if !maps.EqualFunc(erased(a.Up), erased(b.Up), equal) {
 		return false
 	}
-	q := a.types.quantifier
-	if !slices.ContainsFunc(q.Params, func(p *TypeParameter) bool { return p.ValueRange == nil }) {
-		// A completed finite expansion stores the entire meet in the
-		// subject's constraints. Those constraints are compared separately;
-		// this metadata adds only the remaining elimination domain. Requiring
-		// equal captured body inputs here would distinguish equal finite
-		// normal forms, including vacuous quantifiers over an empty range.
-		return true
-	}
-	predicate := &Existential{Template: q, Env: a.Up}
-	return predicate.sameEnvironment(c, b.Up)
+	return sameQuantifiedEnvironment(c, a.types.quantifier, a.Up, b.Up)
 }
 
 // SubjectSelection exposes an exact retained type elimination. Additional

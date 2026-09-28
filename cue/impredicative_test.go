@@ -22,7 +22,7 @@ import (
 )
 
 func TestQuantifiedImpredicativeIdentity(t *testing.T) {
-	for _, binder := range []string{"A", "A in Type", "A in Type(0)", "A in Type(3)"} {
+	for _, binder := range []string{"A"} {
 		for _, instance := range []string{"id[Identity](id)", "id(id)", "id[id](id)"} {
 			t.Run(binder+"/"+instance, func(t *testing.T) {
 				prefix := ""

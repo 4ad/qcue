@@ -120,7 +120,7 @@ func TestContextCancellationDuringEvaluation(t *testing.T) {
 		`[for x in [1,2,3] if stop() {x}]`,
 		`@experiment(try)
 {try x = stop() {a: x} else {a: false}}`,
-		`exists (n in 1 | 2) {a: stop(), b: n}`,
+		`{a: stop(), b: 1} | {a: stop(), b: 2}`,
 		`{a: stop(), b: {c: 1}}`,
 		`[stop(), {a: 1}]`,
 	} {

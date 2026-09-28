@@ -1143,10 +1143,7 @@ func (x *SelectorExpr) resolve(c *OpContext, state Flags) *Vertex {
 	if n == emptyNode {
 		return n
 	}
-	if n.sealed != nil && !n.sealedOpened {
-		c.AddErrf("sealed package must be opened before selecting a field")
-		return emptyNode
-	}
+
 	// TODO(eval): dynamic nodes should be fully evaluated here as the result
 	// will otherwise be discarded and there will be no other chance to check
 	// the struct is valid.
@@ -1236,10 +1233,7 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 	if n == emptyNode {
 		return n
 	}
-	if n.sealed != nil && !n.sealedOpened {
-		ctx.AddErrf("sealed package must be opened before selecting a field")
-		return emptyNode
-	}
+
 	// TODO(eval): dynamic nodes should be fully evaluated here as the result
 	// will otherwise be discarded and there will be no other chance to check
 	// the struct is valid.
@@ -1664,11 +1658,9 @@ type FuncParam struct {
 
 // A FuncValue is a function closure captured in an evaluation environment.
 //
-// Types holds scoped obligations attached by unification. In the quantified
-// profile, admitted packet guards have static conformance proofs, and
-// [FuncValue.recordCallResult] retains their evidence. The legacy profile conjoins
-// their parameter and result constraints during execution and may supply
-// labels for otherwise unnamed slots.
+// Types holds scoped obligations attached by unification. A call constrains
+// its own packet; conformance proofs establish the implementation obligations
+// independently of that packet.
 // For a bodyless FuncValue — itself a function type — Types holds the other
 // types it has been met with.
 type FuncValue struct {
@@ -1715,10 +1707,6 @@ type FuncValue struct {
 	// obligations constrain the same inhabitant; they are never additional
 	// implementations to execute and combine.
 	identities []*FuncValue
-
-	// scopes retain lexical non-escape obligations when a returned closure's
-	// result annotation is too weak to settle them at the opening boundary.
-	scopes []*sealedPackage
 }
 
 // A funcArg is an argument bound to a function parameter by a partial
@@ -2099,8 +2087,6 @@ func (n *nodeContext) scheduleFuncCall(ref *FuncCallRef, env *Environment, ci Cl
 				}
 				if capabilities && a.ArcType == ArcMember {
 					a.Finalize(n.ctx)
-					predicate := scopedPredicate{env.Up, p.Value}
-					a.addCallWitness(n.ctx, predicate)
 				}
 			}
 		}
@@ -2435,26 +2421,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 	resultKey := funcCallResultKey{call: call, env: c.Env(0)}
 	for i := range c.funcCallResults[resultKey] {
 		if r := &c.funcCallResults[resultKey][i]; r.matches(c, x) {
-			return x.checkResultScopes(c, r.result)
+			return r.result
 		}
-	}
-	if boundary, ok := x.Fn.Body.(*OpaqueCall); ok && boundary.dispatch {
-		result := boundary.callOverload(c, x, call, state)
-		complete := result != nil && !call.Partial
-		if v, ok := result.(*Vertex); ok && v.Bottom() != nil {
-			complete = false
-		}
-		if complete {
-			if _, failed := Unwrap(result).(*Bottom); !failed {
-				if c.funcCallResults == nil {
-					c.funcCallResults = make(map[funcCallResultKey][]funcCallResult)
-				}
-				c.funcCallResults[resultKey] = append(c.funcCallResults[resultKey],
-					funcCallResult{fn: x.Fn, env: x.Env, types: x.Types, args: x.args,
-						identities: x.identities, views: x.callViews, result: result})
-			}
-		}
-		return x.checkResultScopes(c, result)
 	}
 
 	bindings, unused, bindErr := x.bindCall(c, call)
@@ -2509,7 +2477,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		defer func() { c.activeFunctionCalls = c.activeFunctionCalls[:len(c.activeFunctionCalls)-1] }()
 	}
 
-	// Phase 2: complete the call.
+	// Activate the fully bound call.
 	//
 	// anchor is the stable vertex representing this function literal. Every
 	// call re-references it, so the regular structural cycle detector
@@ -2681,10 +2649,6 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		}
 	}
 
-	if capabilityMode(x.Fn, x.Types) {
-		x.recordCallResult(c, callPacket{args: bindings}, result)
-	}
-
 	// Memoize only a finalized, error-free result. An incomplete result may
 	// resolve differently once more information is available on a later
 	// evaluation, so it must not be cached (an incomplete argument arc
@@ -2710,7 +2674,7 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 				identities: callee.identities, views: callee.callViews, result: completed})
 	}
 
-	return x.checkResultScopes(c, completed)
+	return completed
 }
 
 // funcAnchor returns the stable anchor vertex for the given function literal

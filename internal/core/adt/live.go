@@ -33,9 +33,8 @@ func (x *LiveReference) evaluate(c *OpContext, state Flags) Value {
 		return v
 	}
 	switch Unwrap(v).(type) {
-	case *FuncValue, *OpaqueType, *Existential, *Universal, *BuiltinValidator:
-		// These descriptors already encode predicates. In particular an
-		// opened representation type is not an ordinary runtime witness.
+	case *FuncValue, *Universal, *BuiltinValidator:
+		// These descriptors already retain their predicate structure.
 		return v
 	}
 	if v.Kind()&(StructKind|ListKind) == 0 && concreteCapture(c, v) {

@@ -48,9 +48,7 @@ func (e *exporter) bareValue(v adt.Value) ast.Expr {
 // value with a reference in graph mode.
 
 func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
-	if n.IsOpaquePackage() {
-		return e.packageValue(n)
-	}
+
 	if subject, argument := n.SubjectSelection(); subject != nil {
 		return e.subjectSelectionExpr(subject, argument)
 	}
@@ -60,19 +58,7 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 		}
 		return e.predicateValue(n)
 	}
-	defer func() {
-		for _, witness := range n.CallWitnesses(e.ctx) {
-			// A proved existential permits opening this value, but must not
-			// become a data constraint during source reconstruction. An
-			// identity call re-establishes the proof on the exported packet.
-			name := e.uniqueAlias("CUEValue")
-			param := &ast.FuncParam{Label: ast.NewIdent(name), Value: e.predicateValue(witness)}
-			body := ast.NewIdent(name)
-			body.Node = param
-			fn := &ast.Func{Params: []*ast.FuncParam{param}, Ret: ast.NewIdent("_"), Body: body}
-			result = ast.NewCall(&ast.ParenExpr{X: fn}, result)
-		}
-	}()
+
 	// Guard against infinite recursion when a vertex cycles back to itself
 	// through BuiltinValidator arguments or other value-level cycles.
 	for i := range e.stack {
@@ -243,19 +229,12 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 			result = e.withFuncTypes(e.funcTypeSrc(adt.FuncType{Fn: x.Fn, Env: x.Env}), x.Types)
 		}
 
-	case *adt.Existential:
-		result = e.quantifierSrc(x.Template, x.Env)
-
 	case *adt.Universal:
 		result = e.quantifierSrc(x.Template, x.Env)
 
 	case *adt.AbstractResult:
 		result = e.quantifiedExportError("cannot export an unresolved function execution")
-	case *adt.TransportConstraint, *adt.TransportPatternExclusion:
-		result = e.quantifiedExportError("transported predicates require an interface codec for export")
 
-	case *adt.OpaqueType, *adt.OpaqueValue:
-		result = e.quantifiedExportError("opaque values require an interface codec for export")
 	case *adt.RigidType:
 		result = e.quantifiedExportError("proof variable cannot be exported")
 	case *adt.LiveType:
@@ -660,9 +639,7 @@ func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	if _, ok := e.quantifierCode[t.Fn]; ok {
 		return e.quantifiedExportError("shared composite code cannot be exported in separate lexical origins")
 	}
-	if call, ok := t.Fn.Body.(*adt.OpaqueCall); ok {
-		return e.packageOperation(call)
-	}
+
 	if !t.Fn.Quantified {
 		return e.funcSrc(t.Fn.Src)
 	}
@@ -694,17 +671,12 @@ func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functio
 	}
 	seen[value] = depth
 	defer delete(seen, value)
-	if value.Kind()&adt.OpaqueKind != 0 {
-		return false
-	}
 	if v, ok := value.(*adt.Vertex); ok {
 		v.Finalize(e.ctx)
 		if adt.Validate(e.ctx, v, &adt.ValidateConfig{Concrete: true}) != nil {
 			return false
 		}
-		if v.IsOpaquePackage() {
-			return v.PackageSource().Seal != nil
-		}
+
 		for _, a := range v.Arcs {
 			if a.Label.IsHidden() && a.Label.PkgID(e.ctx) != cmp.Or(e.pkgID, "_") {
 				// A hidden label from another package cannot be rebound by
@@ -724,10 +696,7 @@ func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functio
 		if adt.IsFuncType(f) || f.IsPartial() || !f.Fn.Quantified || f.Fn.Src == nil {
 			return false
 		}
-		if call, opaque := f.Fn.Body.(*adt.OpaqueCall); opaque {
-			source, _ := call.PackageProjection()
-			return source.Seal != nil
-		}
+
 		key := adt.FuncType{Fn: f.Fn, Env: f.Env}
 		functions[key] = true
 		defer delete(functions, key)

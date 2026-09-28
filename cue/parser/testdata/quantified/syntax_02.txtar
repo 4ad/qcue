@@ -1,4 +1,4 @@
 -- in.cue --
-codec: exists A {decode: func(bytes) -> A !decode}
+codec: forall A {decode: func(bytes) -> A !decode}
 -- debug.txt --
-codec: exists (A) {decode: func(bytes) -> A !decode}
+codec: forall (A) {decode: func(bytes) -> A !decode}

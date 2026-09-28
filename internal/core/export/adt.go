@@ -242,33 +242,7 @@ func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 		// An application may remain incomplete, for example inside an
 		// environment template. Retain its lexical alias declarations as
 		// well as the application; a bare copy would leave a free name.
-		return e.scopedSource(nil, x.Src, nil, nil)
-
-	case *adt.PackageSeal:
-		if v := e.packageResidual; v != nil {
-			if source := v.PackageSource(); source.Seal == x {
-				// The source traversal's structural frames may have been
-				// rebased by a refinement. The constructed seal retains its
-				// original lexical environment independently of that view.
-				return e.packageSource(source)
-			}
-		}
-		if env == nil {
-			return e.scopedSource(nil, x.Src, nil, nil)
-		}
-		return e.packageSource(adt.PackageSource{Seal: x, Env: env})
-	case *adt.PackageOpen:
-		if env == nil {
-			return e.scopedSource(nil, x.Src, nil, nil)
-		}
-		if v, complete := e.ctx.Evaluate(env, x); complete && v != nil {
-			return e.value(v)
-		}
-		return e.scopedSource(env, x.Src, x.References, x.Captures)
-	case *adt.OpaqueCall:
-		return e.packageOperation(x)
-	case *adt.OpaqueScope:
-		return e.quantifiedExportError("opaque boundaries cannot be unfolded for export")
+		return e.withLexicalAliases(ast.Clone(x.Src), nil, make(map[ast.Node]string))
 
 	case *adt.TypeReference:
 		return ast.Clone(x.Src)

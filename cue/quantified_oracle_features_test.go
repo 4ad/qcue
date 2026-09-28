@@ -39,7 +39,6 @@ const (
 	featureHidden = 1 << iota
 	featureNested
 	featurePartial
-	featureOpaque
 	featureReorder
 	featureRoundTrip
 	featureInvoke
@@ -77,30 +76,12 @@ func (m featureOracle) source(consumer string) string {
 	if m.flags&featurePartial != 0 {
 		invoke = fmt.Sprintf("consume[0|1|2][#D](%s, ...)(%d)", wrap("selected"), value)
 	}
-	var provider, out, distinct string
-	if m.flags&featureOpaque != 0 {
-		provider = `#M: exists State {
- seed: State
- f: forall A func(A) -> A
- alias: f
- other: forall A func(A) -> A
-}
-p: seal #M with (State = int) {
- seed: 2
- f: forall A func(x: A) -> A: x
- alias: f
- other: f
-}`
-		out = "out: (open p as (S, P) {\nlet copy = P\nlet selected = P.f[#D] & copy.alias[#D]\nv: " + invoke + "\n}).v"
-		distinct = "different: (open p as (S, P) {v: P.f & P.other}).v"
-	} else {
-		provider = "id(A): func(x: A) -> A: x\nalias: id"
-		out = "let selected = id[#D] & alias[#D]\nout: " + invoke
-	}
+	provider := "id(A): func(x: A) -> A: x\nalias: id"
+	out := "let selected = id[#D] & alias[#D]\nout: " + invoke
 	parts := []string{
 		"#D: " + strings.Join(oracleAtoms(m.domain, 3), " | "),
 		"#R: " + strings.Join(oracleAtoms(m.result, 3), " | "),
-		"consume: " + consumer, provider, out, distinct,
+		"consume: " + consumer, provider, out,
 	}
 	if m.flags&featureReorder != 0 {
 		slices.Reverse(parts)
@@ -109,7 +90,7 @@ p: seal #M with (State = int) {
 }
 
 // These finite scalar unions all use identity transport. Every independently
-// valid case must now certify and execute, including opaque combinations.
+// valid case must now certify and execute, including all combinations.
 // Unknown is not accepted as evidence for this supported vocabulary.
 func featureOracleObservation(m featureOracle) (outcome, mismatch string) {
 	ctx := cuecontext.New()
@@ -125,11 +106,6 @@ func featureOracleObservation(m featureOracle) (outcome, mismatch string) {
 	out := v.LookupPath(cue.ParsePath("out"))
 	if !out.Exists() {
 		return "", fmt.Sprintf("generated program did not compile: %v", v.Err())
-	}
-	if m.flags&featureOpaque != 0 {
-		if err := v.LookupPath(cue.ParsePath("different")).Validate(); err == nil {
-			return "", "private sharing identified distinct public exports"
-		}
 	}
 	want := m.domain & ^m.result == 0
 	ordinary, concrete := out.Validate(), out.Validate(cue.Concrete(true))
@@ -199,14 +175,14 @@ func checkFeatureOracle(t *testing.T, m featureOracle) string {
 func TestQuantifiedOracleFeatureCombinations(t *testing.T) {
 	extended := extendedQuantifiedOracle(t)
 	outcomes := make(map[string]int)
-	opaqueUnionControls := 0
+	unionControls := 0
 	check := func(m featureOracle) {
-		if m.domain & ^m.result == 0 && m.flags&featureOpaque != 0 && bits.OnesCount8(m.domain) > 1 {
-			opaqueUnionControls++
+		if m.domain & ^m.result == 0 && bits.OnesCount8(m.domain) > 1 {
+			unionControls++
 		}
 		outcomes[checkFeatureOracle(t, m)]++
 	}
-	for flags := range 128 {
+	for flags := range 64 {
 		if !extended {
 			m := featureOracle{domain: uint8(1 + flags*5%7), result: uint8(1 + flags*3%7), flags: uint8(flags)}
 			if flags%3 == 0 {
@@ -224,7 +200,7 @@ func TestQuantifiedOracleFeatureCombinations(t *testing.T) {
 	}
 	// Keep positive, negative, and overlapping ordinary-union controls.
 	// Regressing a proved identity transport to unknown must fail this suite.
-	if outcomes["established"] == 0 || outcomes["rejected"] == 0 || opaqueUnionControls == 0 {
+	if outcomes["established"] == 0 || outcomes["rejected"] == 0 || unionControls == 0 {
 		t.Fatalf("missing positive, negative or opaque-union controls: %v", outcomes)
 	}
 	t.Logf("feature combinations: established=%d rejected=%d residual=%d", outcomes["established"], outcomes["rejected"], outcomes["residual"])
@@ -238,6 +214,6 @@ func FuzzQuantifiedFeatureCombinations(f *testing.F) {
 		if len(data) < 3 || len(data) > 16 {
 			t.Skip()
 		}
-		checkFeatureOracle(t, featureOracle{1 + data[0]%7, 1 + data[1]%7, data[2] & 127})
+		checkFeatureOracle(t, featureOracle{1 + data[0]%7, 1 + data[1]%7, data[2] & 63})
 	})
 }

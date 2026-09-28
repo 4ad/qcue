@@ -1,4 +1,4 @@
 -- in.cue --
-r: forall (A in Type(1): number) [...A]
+r: forall (A: number) [...A]
 -- debug.txt --
-r: forall (A in Type(1): number) [...A]
+r: forall (A: number) [...A]

@@ -1,4 +1,0 @@
--- in.cue --
-@test(validate, concrete, conflict, at="out")
-
-out: (exists (A: int) A) & ("x")

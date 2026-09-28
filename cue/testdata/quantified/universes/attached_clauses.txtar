@@ -9,16 +9,16 @@
 @test(validate, at="nestedSelf")
 
 f:          func(x: _) -> _: x
-f:          forall (A in Type(0)) func(A) -> A
+f:          forall (A) func(A) -> A
 self:       f[f](f)
 nestedSelf: f[{value: f}]
 
 g: func(x: _) -> _: x
-g: forall (A in Type(1)) func(A) -> A
-Box(A in Type(1)) = {value: A}
-Large(A in Type(2)) = {value: A}
+g: forall (A) func(A) -> A
+Box(A) = {value: A}
+Large(A) = {value: A}
 baseSpelling:    Box(g)
 higherSpelling: Large(g)
 
-composite:         forall (A in Type(1)) {}
+composite:         forall (A) {}
 compositeInstance: Box(composite)

@@ -224,7 +224,7 @@ func (r *relevanceChecker) dependencies(value adt.Value, owned, used map[*adt.Ty
 		}
 	case *adt.LiveType:
 		return r.dependencies(x.Upper, owned, used, seen)
-	case *adt.Universal, *adt.Existential:
+	case *adt.Universal:
 		// These retained quantifiers are outside structural matching, but
 		// their free source dependencies still prevent false anchors.
 		var visitor walk.Visitor
@@ -250,13 +250,11 @@ func (r *relevanceChecker) dependencies(value adt.Value, owned, used map[*adt.Ty
 			case *adt.Universal:
 				visitor.Elem(y.Template)
 				return false
-			case *adt.Existential:
-				visitor.Elem(y.Template)
-				return false
+
 			}
 			return true
 		}
-		visitor.Elem(x.(adt.Value))
+		visitor.Elem(x)
 		return ok
 	}
 	return true

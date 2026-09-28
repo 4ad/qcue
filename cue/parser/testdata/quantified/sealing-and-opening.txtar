@@ -1,3 +1,5 @@
+#error
+
 -- in.cue --
 seal Interface with (HiddenType = Representation) {
     // implementation fields, checked with the private representation

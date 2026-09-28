@@ -1,0 +1,32 @@
+// Paper example 106: Invalid interfaces and scoped computation failure
+
+#noformat
+#former-paper: 106
+#mode: evaluation
+
+-- paper.cue.txt --
+q: func(int) -> int
+q: func(int) -> bool        // blocked: explicit relevant conflict
+
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+observed: meet(1, true)     // _|_: computation, not interface rejection
+
+stop(A): func(x: A) -> A: _|_
+// a closure with a failing body and a non-refuted generic interface
+-- in.cue --
+@test(validate, blocked, at="q")
+@test(validate, concrete, at="meet")
+@test(validate, conflict, at="observed")
+@test(validate, concrete, at="stop")
+@test(json, [true, true], at="failures")
+
+q: func(int) -> int
+q: func(int) -> bool        // blocked: explicit relevant conflict
+
+meet(A, B): func(x: A, y: B) -> (A & B): x & y
+observed: meet(1, true)     // _|_: computation, not interface rejection
+
+stop(A): func(x: A) -> A: _|_
+// a closure with a failing body and a non-refuted generic interface
+
+failures: [observed == _|_, stop(3) == _|_]

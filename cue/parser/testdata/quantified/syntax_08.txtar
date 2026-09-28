@@ -1,9 +1,9 @@
 -- in.cue --
 x: {
-exists T: U
+forall T: U
 forall V: W
 value: T
 transform: func(V) -> V
 }
 -- debug.txt --
-x: exists (T: U) forall (V: W) {value: T, transform: func(V) -> V}
+x: forall (T: U) forall (V: W) {value: T, transform: func(V) -> V}

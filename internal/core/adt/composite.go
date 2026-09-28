@@ -168,16 +168,6 @@ func (e *Environment) up(ctx *OpContext, count int32) *Environment {
 // It maintains source information such as a list of conjuncts that contributed
 // to the value.
 type Vertex struct {
-	// sealed is the shared existential package identity. It is preserved by
-	// copying and never contains observable private representation fields.
-	sealed       *sealedPackage
-	sealedOpened bool
-
-	// callWitnesses retains existential interfaces proved on an argument or
-	// result. Elimination rechecks membership after later refinement. These
-	// interfaces never add fields, constraints, defaults, or runtime identity.
-	callWitnesses []*Existential
-
 	// schemes retain universal introductions independently of runtime kind. Type
 	// selection changes its view, while the original value graph is shared.
 	schemes []subjectScheme
@@ -314,10 +304,6 @@ type Vertex struct {
 	// This information is used to compute the topological sort of arcs.
 	Structs []StructInfo
 }
-
-// IsOpaquePackage reports a retained sealing boundary, including its opened
-// lexical view. Exporters must preserve that boundary or report incompleteness.
-func (v *Vertex) IsOpaquePackage() bool { return v.DerefValue().sealed != nil }
 
 // HasSubjectSchemes reports type introductions that remain observable by
 // selecting a subject. Serializing only its evaluated data loses them.

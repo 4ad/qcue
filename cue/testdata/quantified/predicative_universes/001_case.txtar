@@ -1,5 +1,5 @@
 -- in.cue --
 @test(validate, at="out")
 
-Box(A in Type(0)) = {value: A}
+Box(A) = {value: A}
 out: Box(forall (B) func(B) -> B)

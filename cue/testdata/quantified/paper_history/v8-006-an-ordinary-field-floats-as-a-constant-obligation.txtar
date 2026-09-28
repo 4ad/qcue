@@ -1,0 +1,20 @@
+// Paper example 006: An ordinary field floats as a constant obligation
+
+#noformat
+#former-paper: 6
+#mode: evaluation
+
+-- paper.cue.txt --
+r(A): {id: func(A) -> A}
+r:    {label: "utilities"}
+
+// The type sort contains the empty predicate:
+r(A): {id: func(A) -> A, label: "utilities"}
+-- in.cue --
+@test(validate, concrete, incomplete, at="r")
+
+r(A): {id: func(A) -> A}
+r:    {label: "utilities"}
+
+// The type sort contains the empty predicate:
+r(A): {id: func(A) -> A, label: "utilities"}

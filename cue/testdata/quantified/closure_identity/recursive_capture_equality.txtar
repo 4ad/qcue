@@ -4,8 +4,6 @@
 -- in.cue --
 @test(validate, blocked, at="out")
 
-#P:     exists (A) {value: A}
-p:      seal #P with (A = int) {value: 42}
-labels: open p as (A, P) {[string]~(Self): func() -> string: Self}
+labels: {[string]~(Self): func() -> string: Self}
 labels: {word: _}
 out:    labels.word()

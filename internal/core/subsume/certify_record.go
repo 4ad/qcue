@@ -129,7 +129,7 @@ func (p *certifier) functionBinding(binding proofBinding, seen map[proofBinding]
 			return value
 		}
 	case *adt.Quantified:
-		if f, ok := x.Body.(*adt.Function); ok && f.Body != nil && !x.Src.Exists {
+		if f, ok := x.Body.(*adt.Function); ok && f.Body != nil {
 			value, _ := adt.Unwrap(p.schema(binding.env, x)).(*adt.FuncValue)
 			return value
 		}

@@ -1,8 +1,6 @@
 #skip
 #inlinetest:exclude Go API refinement tests in cue/quantified_test.go.
 
--- existential.cue --
-x: (exists (A) {tag: 1}) & {}
 -- singleton.cue --
 a:   {x: int}
 f:   func() -> a: {x: 1}

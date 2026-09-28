@@ -598,27 +598,13 @@ func DebugStr(x interface{}) (out string) {
 		q := DebugStr(&ast.Quantifier{Params: v.Params, Body: ast.NewIdent("")})
 		return v.Name.Name + strings.TrimPrefix(q, "forall ") + "= " + DebugStr(v.Body)
 
-	case *ast.SealExpr:
-		var ws []string
-		for _, w := range v.Witnesses {
-			ws = append(ws, DebugStr(w))
-		}
-		return "seal " + DebugStr(v.Interface) + " with (" + strings.Join(ws, ", ") + ") " + DebugStr(v.Body)
-
-	case *ast.OpenExpr:
-		return "open " + DebugStr(v.Value) + " as (" + v.Type.Name + ", " + v.View.Name + ") " + DebugStr(v.Body)
-
 	case *ast.Quantifier:
 		word := "forall"
-		if v.Exists {
-			word = "exists"
-		}
+
 		var params []string
 		for _, p := range v.Params {
 			s := DebugStr(p.Name)
-			if p.Sort != nil {
-				s += " in " + DebugStr(p.Sort)
-			}
+
 			if p.Bound != nil {
 				s += ": " + DebugStr(p.Bound)
 			}
