@@ -176,6 +176,12 @@ native contract still needs linked implementation evidence.
 
 ## Builtins and operators
 
+The [type reference](types.md) lists predeclared types and builtins, operator
+domains, and all standard-library interfaces, including task schemas and
+constants. Its package catalogue is generated from the declarations used by
+editor tooling and checked for drift. The rules below explain how those
+contracts interact with proof and evaluation.
+
 Native result kinds are conservative bounds on successful returns. Generated
 checking signatures additionally retain Go container elements, nested maps and
 lists, and converted record fields, including optional JSON fields. Frozen
@@ -379,8 +385,13 @@ check the resulting values. Kernel tests inspect refutation support and resume
 real proofs after budget exhaustion. [Independent oracles](oracle.md) cover
 finite semantics and preservation separately from these example tests.
 
+The [type-reference checks](../internal/cmd/gentypes/main_test.go) execute its
+examples and compare its catalogue with every published package declaration.
+The `pkg` tests check those declarations against registered native contracts.
+
 ```sh
 go test ./cue ./internal/core/...
+go test ./internal/cmd/gentypes ./pkg
 tools/test-quantified-oracles.sh fast
 go test ./...
 ```

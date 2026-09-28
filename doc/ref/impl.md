@@ -1,5 +1,11 @@
 # Implementing CUE
 
+This historical document explains the base CUE constraint model. The current
+fork's implementation of universal types and live propagation is described in
+the [implementation guide](../implementation.md) and [paper](../paper.pdf).
+The [type reference](../types.md) documents current builtin, operator, and
+standard-library contracts.
+
 
 > NOTE: this is a working document attempting to describe CUE in a way
 > relatable to existing graph unification systems. It is mostly

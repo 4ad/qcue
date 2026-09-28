@@ -75,7 +75,7 @@ import (
 //go:embed */pkg.cue */*/pkg.cue
 var defFS embed.FS
 
-// Source returns the CUE source of the generated definitions
+// Source returns the CUE source of the published definitions
 // describing the API of the standard library package with the given
 // import path, such as "strings" or "encoding/json". It reports false
 // if there is no such package.
