@@ -255,6 +255,9 @@ type OpContext struct {
 	funcCallResults     map[funcCallResultKey][]funcCallResult
 	activeFunctionCalls []functionActivation
 	checkingClosures    map[closureComparison]bool
+	// Native function views share a descriptor within a checking context.
+	// Their code identity across contexts is the canonical builtin itself.
+	nativeFunctions map[*Builtin]*FuncValue
 
 	// anonParamLabels caches the labels of the synthetic activation arcs
 	// that bind the arguments of anonymous positional function parameters,

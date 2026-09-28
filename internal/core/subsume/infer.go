@@ -39,6 +39,7 @@ func newInference(ctx *adt.OpContext) *inference {
 		constructors: make(map[*adt.Vertex]adt.Expr),
 		memberships:  make(map[adt.Value][]*adt.LiveType),
 		grounded:     make(map[*adt.Vertex]bool),
+		savedValues:  make(map[adt.Value]bool),
 		records:      make(map[proofRecordKey]*proofRecord),
 		completed:    make(map[proofKey]proofCertificate), refutations: make(map[proofKey]*refutation), remaining: 10000}
 }
@@ -106,7 +107,11 @@ type inference struct {
 	// Supplied concrete captures and evaluated native results have known
 	// data inventories, including record field order. A closed record type
 	// alone does not determine that order (which serializers can observe).
-	grounded    map[*adt.Vertex]bool
+	grounded map[*adt.Vertex]bool
+	// A symbolic partial packet already contains checked descriptions.
+	// Re-reading these as concrete captures could turn an open list or
+	// record description into the inventory of its visible prefix.
+	savedValues map[adt.Value]bool
 	records     map[proofRecordKey]*proofRecord
 	refutations map[proofKey]*refutation
 	completed   map[proofKey]proofCertificate
@@ -461,6 +466,12 @@ func (p *inference) savedPacket(f *adt.FuncValue) bool {
 		}
 		values[i] = v
 	}
+	if f.NativeBuiltin() != nil {
+		// Native saved slots must be covered by a selected call clause,
+		// including clauses introduced by an attached universal interface.
+		// Residual projection checks those slots without completing them.
+		return len(f.CallClauses(p.ctx)) != 0
+	}
 	for _, instance := range f.BoundArgumentInstances(p.ctx) {
 		admitted := true
 		for i, value := range values {
@@ -484,6 +495,9 @@ func (p *inference) savedPacket(f *adt.FuncValue) bool {
 // predicate would permit additional fields and lose evidence of an absent
 // optional argument field. Other saved values retain their capture checks.
 func (p *inference) boundArgument(env *adt.Environment, expr adt.Expr) adt.Value {
+	if value, ok := expr.(adt.Value); ok && p.savedValues[value] {
+		return value
+	}
 	if v, ok := expr.(*adt.Vertex); ok && p.constructors[v] != nil {
 		// Symbolic partial application has already checked this constructor.
 		// Preserve its source description as well as its exact inventory;
@@ -590,6 +604,23 @@ func (p *inference) deriveFunction(f *adt.FuncValue, target adt.FuncType) (prove
 		// Check each such obligation in its own type scope. Runtime capture
 		// equality is checked independently by the closure identity rules.
 		source.Env = target.Env
+	}
+	if native := f.NativeBuiltin(); native != nil {
+		// The native body is independent of its checking telescope. Prove
+		// each interface under that interface's own arbitrary inputs, even
+		// when it has a different number of binders from the primary scheme.
+		fn := *native.Protocol(p.ctx)
+		fn.Body = f.Fn.Body
+		if partial != nil {
+			params := fn.Params
+			fn.Params = nil
+			for i, param := range params {
+				if _, expr := partial.BoundArgument(i); expr == nil {
+					fn.Params = append(fn.Params, param)
+				}
+			}
+		}
+		source = adt.FuncType{Fn: &fn}
 	}
 	if len(adt.FunctionTypeParameters(source)) == 0 {
 		// Prove a universally constrained monomorphic implementation under
@@ -882,10 +913,18 @@ func (p *inference) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 				return nil
 			}
 			if v := scope.values[x.Label]; v != nil {
-				if scope.fields[x.Label] != nil {
+				if f, ok := adt.Unwrap(v).(*adt.FuncValue); ok && f.Fn.Body == nil &&
+					!p.hypotheses[f] && scope.fields[x.Label] != nil {
+					// A previous nested proof may have derived this callback
+					// from a supplied value and its separate annotations. Its
+					// hypothesis belongs to that proof. Recheck the source in
+					// the current scope instead of reviving the cached claim.
+					delete(scope.values, x.Label)
+				} else if scope.fields[x.Label] != nil {
 					return p.bindingDescription(v)
+				} else {
+					return v
 				}
-				return v
 			}
 			if scope.active[x.Label] {
 				if ref, ok := scope.fields[x.Label].(*adt.FieldReference); ok &&
@@ -1391,6 +1430,11 @@ func (p *inference) selectType(value, argument adt.Value) adt.Value {
 		return nil
 	}
 	switch x := adt.Unwrap(value).(type) {
+	case *adt.Builtin:
+		if ValidateBuiltin(p.ctx, x) != nil {
+			return nil
+		}
+		return p.selectType(x.FunctionValue(p.ctx), argument)
 	case *adt.Disjunction:
 		var results []adt.Value
 		for _, branch := range x.Values {
@@ -1682,6 +1726,11 @@ func (p *inference) partialCall(callee adt.Value, packet adt.FuncType) adt.Value
 		} else if !p.implementation(f) {
 			return nil
 		}
+		for _, param := range packet.Fn.Params {
+			if value, ok := param.Value.(adt.Value); ok {
+				p.savedValues[value] = true
+			}
+		}
 		bound, b := adt.BindFunctionPacket(p.ctx, f, packet)
 		if b != nil || !p.savedPacket(bound) {
 			return nil
@@ -1842,13 +1891,18 @@ func (p *inference) callPackets(target adt.FuncType, sources, results []adt.Func
 	seen := make(map[adt.FuncType]bool)
 	for _, source := range sources {
 		seen[source] = true
-		activation := function != nil && function.Fn.Body != nil && source.Fn == function.Fn
+		activation := function != nil && function.NativeBuiltin() == nil && function.Fn.Body != nil && source.Fn == function.Fn
 		if source, ok := admit(source, activation); ok {
 			admitted = true
 			addResult(source)
 		}
 	}
 	if !admitted {
+		if function != nil && function.NativeBuiltin() != nil {
+			// Native function views preserve strict operand coverage. They
+			// cannot constrain an incompatible argument into an empty packet.
+			return nil
+		}
 		// A bodyless hypothesis can constrain an open packet to its domain.
 		// Different possible domains describe alternative packets. Their
 		// results are joined; compatible guards are not simultaneous facts.

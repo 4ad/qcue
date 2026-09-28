@@ -108,6 +108,15 @@ func (s *subsumer) hasFunc(b *adt.FuncValue, t adt.FuncType) bool {
 		if t.Fn.Body == nil {
 			return u == t
 		}
+		a := &adt.FuncValue{Fn: t.Fn, Env: t.Env}
+		b := &adt.FuncValue{Fn: u.Fn, Env: u.Env}
+		if a.NativeBuiltin() != nil && b.NativeBuiltin() != nil && t.Partial() == nil && u.Partial() == nil {
+			// Native adapters are local to an operation context. Their
+			// immutable implementation identity survives reconstruction;
+			// each retained signature still needs its own inclusion proof.
+			same, known := adt.SameFunctionInstance(s.ctx, a, b)
+			return same && known && s.capabilitySignature(t, u)
+		}
 		return u.Fn == t.Fn && u.Env.Equal(s.ctx, t.Env)
 	}
 	return same(adt.FuncType{Fn: b.Fn, Env: b.Env}) || slices.ContainsFunc(b.Types, same)

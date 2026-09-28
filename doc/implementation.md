@@ -205,6 +205,16 @@ result evidence after its narrower domain is covered; it does not restrict the
 primary call domain. Published package interfaces are checked against this
 implementation-owned evidence.
 
+Generic native functions support explicit type arguments, such as
+`list.Reverse[int]`, as well as inferred instances. Selected views retain the
+native implementation's identity across captures, unification, and source
+export. Combining independently selected views preserves their separate call
+domains without reopening consumed type parameters. Bounds, original universal
+obligations, and client-added interfaces remain independently checked. Native
+calls and saved arguments require operand coverage; their checking descriptors
+cannot constrain incompatible inputs into an empty packet. Export restores the
+native import, selected arguments, and additional interfaces.
+
 List transformations additionally preserve known tuple positions and length
 bounds. `FlattenN` uses the supplied depth, while `Take` and `Drop` account for
 clamping at the actual input length. An open tail contributes possible elements

@@ -921,10 +921,13 @@ func bindBuiltinArgs(c *OpContext, b *Builtin, call *CallExpr) ([]Expr, bool) {
 // enforced on every ordinary full call. The legacy validator-constructor path
 // remains separate. A Bottom return describes an incompatible
 // signature. A nil, nil return indicates that b and f are conflicting
-// values, to be reported like any other conflicting scalars: a builtin
-// never unifies with a proper function value.
-func mergeBuiltinFunc(c *OpContext, b *Builtin, f *FuncValue) (*Builtin, *Bottom) {
+// values, to be reported like any other conflicting scalars. Native function
+// views retain the identity of their original builtin.
+func mergeBuiltinFunc(c *OpContext, b *Builtin, f *FuncValue) (Value, *Bottom) {
 	if !IsFuncType(f) {
+		if f.NativeBuiltin() != nil {
+			return mergeFuncValues(c, b.FunctionValue(c), f)
+		}
 		return nil, nil
 	}
 	add := append([]FuncType{{Fn: f.Fn, Env: f.Env}}, f.Types...)

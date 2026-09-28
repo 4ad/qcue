@@ -43,7 +43,7 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 	c.checkingClosures[key] = true
 	defer delete(c.checkingClosures, key)
 	result := proofEstablished
-	if a.Fn != b.Fn {
+	if !sameFunctionCode(a.Fn, b.Fn) {
 		return proofRefuted
 	}
 
@@ -166,8 +166,8 @@ func mergeClosureIdentities(c *OpContext, a, b *FuncValue) (*FuncValue, *Bottom)
 	m := *a
 	m.explicit = mergeFuncTypes(a.explicit, b.explicit)
 	m.Types = mergeFuncTypes(a.Types, b.Types)
-	if a.Fn == b.Fn && a.frontier != nil && b.frontier != nil &&
-		(a.Env != b.Env || len(a.callViews) != 0 || len(b.callViews) != 0) {
+	if sameFunctionCode(a.Fn, b.Fn) && a.frontier != nil && b.frontier != nil &&
+		(a.Fn != b.Fn || a.Env != b.Env || len(a.callViews) != 0 || len(b.callViews) != 0) {
 		m.frontier = mergeFuncTypes(a.frontier, b.frontier)
 		m.callViews = mergeCallViews(a, b)
 		m.selection, m.projection = nil, nil

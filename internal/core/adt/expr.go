@@ -1192,7 +1192,11 @@ func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
 			index = x.Index
 		}
 		if v := ctx.unifyNode(x.X, state); v != nil {
-			if f, ok := Unwrap(v).(*FuncValue); ok && f.hasTypeSelection() {
+			value := Unwrap(v)
+			if b, ok := value.(*Builtin); ok {
+				value = b.FunctionValue(ctx)
+			}
+			if f, ok := value.(*FuncValue); ok && f.hasTypeSelection() {
 				arg, _ := ctx.Evaluate(ctx.Env(0), index)
 				inst, b := f.selectType(ctx, arg)
 				if b != nil {
@@ -1634,6 +1638,10 @@ type Function struct {
 	// References also includes erased free predicates needed to reconstruct
 	// the code at a different lexical position during source export.
 	References []Expr
+
+	// nativeOrigin identifies the code of a builtin-backed function view.
+	// Body is its checking adapter; native execution never activates it.
+	nativeOrigin *Builtin
 }
 
 // FuncParam represents a compiled function parameter.
@@ -1668,6 +1676,11 @@ type FuncValue struct {
 	Fn    *Function
 	Env   *Environment
 	Types []FuncType
+
+	// native retains the executable primitive behind a function view.
+	// nativeTypes are the contracts already restored by importing it.
+	native      *Builtin
+	nativeTypes []FuncType
 
 	// explicit retains source declaration clauses in their introduction
 	// scopes. Unlike Types and frontier, it acquires no inferred or selected
@@ -2452,6 +2465,9 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			return b
 		}
 		x = inst
+	}
+	if x.NativeBuiltin() != nil {
+		return x.callNative(c, call, bindings, unused, state)
 	}
 	recursive := false
 	if x.Fn.Quantified {

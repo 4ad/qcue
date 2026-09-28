@@ -434,6 +434,18 @@ func (e *exporter) quantifiedFuncValue(f *adt.FuncValue) ast.Expr {
 		}
 		return e.withFuncTypes(x, extra)
 	}
+	if b := f.NativeBuiltin(); b != nil {
+		var x ast.Expr = e.builtin(b)
+		args := adt.FunctionTypeArguments(adt.FuncType{Fn: f.Fn, Env: f.Env})
+		for _, param := range adt.FunctionTypeParameters(b.CheckingType(e.ctx)) {
+			argument := args[param.Src]
+			if argument == nil {
+				break
+			}
+			x = &ast.IndexExpr{X: &ast.ParenExpr{X: x}, Index: e.predicateValue(argument)}
+		}
+		return e.withFuncTypes(x, f.AdditionalNativeTypes())
+	}
 	head := adt.FuncType{Fn: f.Fn, Env: f.Env}
 	origin := head
 	var types []adt.FuncType
@@ -639,6 +651,9 @@ func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	if t.Fn == nil {
 		return e.funcSrc(nil)
 	}
+	if f := (&adt.FuncValue{Fn: t.Fn, Env: t.Env}); f.NativeBuiltin() != nil {
+		return e.quantifiedFuncValue(f)
+	}
 	if _, ok := e.quantifierCode[t.Fn]; ok {
 		return e.quantifiedExportError("shared composite code cannot be exported in separate lexical origins")
 	}
@@ -696,7 +711,8 @@ func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functio
 		return true
 	}
 	if f, ok := value.(*adt.FuncValue); ok {
-		if adt.IsFuncType(f) || f.IsPartial() || !f.Fn.Quantified || f.Fn.Src == nil {
+		if adt.IsFuncType(f) || f.IsPartial() || !f.Fn.Quantified ||
+			f.Fn.Src == nil && f.NativeBuiltin() == nil {
 			return false
 		}
 

@@ -98,7 +98,7 @@ func (f *FuncValue) residualClauses(c *OpContext, clauses []FuncType, remaining 
 			// A static residual view may save an arbitrary admitted value,
 			// represented by its type. Concrete packet membership would
 			// wrongly demand that value's materialization here.
-			instance, ok := bound.typeAdmission(c, clause)
+			instance, ok := bound.typeAdmission(c, clause, f.NativeBuiltin() != nil)
 			if !ok {
 				continue
 			}
@@ -111,7 +111,7 @@ func (f *FuncValue) residualClauses(c *OpContext, clauses []FuncType, remaining 
 	return residual
 }
 
-func (packet callPacket) typeAdmission(c *OpContext, clause FuncType) (FuncType, bool) {
+func (packet callPacket) typeAdmission(c *OpContext, clause FuncType, strict bool) (FuncType, bool) {
 	if len(typeParameters(clause.Env)) != 0 {
 		instance, b := (&FuncValue{Fn: clause.Fn, Env: clause.Env}).inferInstance(c, packet.args)
 		if b != nil {
@@ -141,7 +141,7 @@ func (packet callPacket) typeAdmission(c *OpContext, clause FuncType) (FuncType,
 		if c.ProveInclusion(c, want, value) {
 			continue
 		}
-		if capabilityHasCallable(want, make(map[Value]bool)) {
+		if strict || capabilityHasCallable(want, make(map[Value]bool)) {
 			return clause, false
 		}
 

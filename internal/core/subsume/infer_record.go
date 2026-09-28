@@ -240,7 +240,12 @@ func (p *inference) bindingMeet(bindings []proofBinding) adt.Value {
 		return value
 	}
 	var value adt.Value
+	var annotations []adt.Value
 	for _, binding := range bindings {
+		if annotation, ok := p.functionAnnotation(binding.env, binding.expr); ok {
+			annotations = append(annotations, annotation)
+			continue
+		}
 		x := p.expr(binding.env, binding.expr)
 		if x == nil {
 			return nil
@@ -253,6 +258,12 @@ func (p *inference) bindingMeet(bindings []proofBinding) adt.Value {
 				return nil
 			}
 		}
+	}
+	// Separate field declarations have the same annotation semantics as a
+	// source conjunction. A bodyless arrow cannot supply an implementation;
+	// collect it as an obligation on the independently checked value.
+	for _, annotation := range annotations {
+		value = p.assertFunction(value, annotation)
 	}
 	return value
 }

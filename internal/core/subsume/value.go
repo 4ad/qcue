@@ -132,6 +132,9 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		return s.bound(x, b)
 
 	case *adt.Builtin:
+		if y, ok := b.(*adt.FuncValue); ok && y.NativeBuiltin() != nil {
+			return s.funcValues(x.FunctionValue(s.ctx), y)
+		}
 		y, ok := b.(*adt.Builtin)
 		return ok && adt.BuiltinSubsumes(x, y)
 
@@ -140,6 +143,9 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		case *adt.FuncValue:
 			return s.funcValues(x, y)
 		case *adt.Builtin:
+			if x.NativeBuiltin() != nil {
+				return s.funcValues(x, y.FunctionValue(s.ctx))
+			}
 			return s.funcBuiltin(x, y)
 		}
 		return false
