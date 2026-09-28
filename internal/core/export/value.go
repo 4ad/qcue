@@ -489,14 +489,49 @@ func (e *exporter) withFuncTypes(x ast.Expr, types []adt.FuncType) ast.Expr {
 	if _, ok := x.(*ast.Func); ok {
 		x = &ast.ParenExpr{X: x}
 	}
+	closed := make(map[string]bool)
 	for _, t := range types {
 		y := e.funcTypeSrc(t)
+		if scopeIndependentSignature(t) {
+			// Callback boundaries can retain several copies of the same
+			// closed predicate. They impose one obligation; emitting each
+			// copy multiplies that work on every subsequent round trip.
+			if source, err := format.Node(y); err == nil {
+				key := string(source)
+				if closed[key] {
+					continue
+				}
+				closed[key] = true
+			}
+		}
 		if _, ok := y.(*ast.Func); ok {
 			y = &ast.ParenExpr{X: y}
 		}
 		x = &ast.BinaryExpr{Op: token.AND, X: x, Y: y}
 	}
 	return x
+}
+
+// Only syntax without lexical references or implementation identities can
+// be copied or deduplicated independently of its declaration environment.
+func scopeIndependentSignature(t adt.FuncType) bool {
+	if t.Fn == nil || t.Fn.Src == nil || t.Fn.Body != nil ||
+		len(t.Fn.References) != 0 || len(adt.FunctionTypeParameters(t)) != 0 {
+		return false
+	}
+	independent := true
+	ast.Walk(t.Fn.Src, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.Func:
+			independent = independent && x.Body == nil
+		case *ast.Ident:
+			if _, imported := x.Node.(*ast.ImportSpec); imported {
+				independent = false
+			}
+		}
+		return independent
+	}, nil)
+	return independent
 }
 
 // funcSrc returns the syntax with which to render a function literal in
@@ -673,6 +708,12 @@ func (e *exporter) funcTypeSrc(t adt.FuncType) ast.Expr {
 	if t.Fn.Src == nil {
 		return e.quantifiedExportError("function source is unavailable for export")
 	}
+	if scopeIndependentSignature(t) {
+		// A closed signature has no code identity or lexical environment
+		// to reconstruct. Wrapping it in a closure would create new scoped
+		// copies of the same obligation on every export and reimport.
+		return e.funcSrc(t.Fn.Src)
+	}
 	return e.functionOriginValue(t)
 }
 
@@ -737,6 +778,12 @@ func (e *exporter) checkCapture(value adt.Value, seen map[adt.Value]int, functio
 		for i := range f.Fn.Params {
 			env, expr := f.BoundArgument(i)
 			if expr == nil {
+				continue
+			}
+			if f.NativeTemplateArgument(e.ctx, i) {
+				// NativeBinding exports the template's source and lexical
+				// references, checking private captures during that export.
+				// Its uninvoked local fields are intentionally incomplete.
 				continue
 			}
 			if ref, ok := expr.(adt.Resolver); ok {

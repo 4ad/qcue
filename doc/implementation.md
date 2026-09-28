@@ -225,7 +225,11 @@ result refinements. Saving every argument still leaves a zero-argument
 function. An explicit partial call of a Boolean native remains a function;
 the implicit validator constructor is a separate call form. Saved arguments
 remain live until supplied values make execution possible. Export preserves
-their captures, selected views, and pending equality obligations.
+their captures, selected views, and pending equality obligations. Interfaces
+on a full packet remain before argument saving; residual interfaces retain
+their saved-slot coordinates. Closed signatures without lexical dependencies
+or implementation identities are emitted once instead of accumulating copied
+closure environments across round trips.
 
 List transformations additionally preserve known tuple positions and length
 bounds. `FlattenN` uses the supplied depth, while `Take` and `Drop` account for
@@ -234,7 +238,16 @@ without promising that any are present. Large finite shape expansions can fall
 back to the generic element contract within the proof budget. Sort templates
 are checked with `x` and `y` supplied by the input element description; a known
 empty or singleton list has no comparator invocation. These rules also check
-attached interfaces and do not execute symbolic inputs as concrete lists.
+selected native views and calls with a previously saved list or comparator.
+A saved comparator retains its source and live captures: its uninvoked fields
+are not incomplete captured data. Repeated template proofs retain their input
+domain and callback hypotheses, and resumed proofs reread live captures.
+Sorting preserves incomplete comparison errors so later refinement can supply
+missing operands. Constructing an
+`IsSorted` validator checks the template without invoking a comparison; its
+later validated list supplies the comparison operands. Attached interfaces
+remain separately checked, and symbolic inputs are not executed as concrete
+lists.
 
 The structural primitives have additional rules. `len` preserves known length
 bounds. `close` preserves input constraints while adding closedness where its

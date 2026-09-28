@@ -57,7 +57,7 @@ func (s *subsumer) builtinCapability(target adt.FuncType, b *adt.Builtin) bool {
 		constructor.Ret = primitive.Params[0].Value
 		return s.capabilitySignature(target, adt.FuncType{Fn: &constructor, Env: source.Env})
 	}
-	if isListComparerBuiltin(s.ctx, b) {
+	if b.IsListComparer(s.ctx) {
 		return s.builtinBodyCapability(target, b)
 	}
 	if s.capabilitySignature(target, source) {

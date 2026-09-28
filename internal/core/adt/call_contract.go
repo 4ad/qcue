@@ -70,6 +70,21 @@ func (f *FuncValue) residualClauses(c *OpContext, clauses []FuncType, remaining 
 	}
 	var residual []FuncType
 	packet := callPacket{args: f.args}
+	if native := f.NativeBuiltin(); native != nil && c.CheckArgument != nil {
+		// Describe saved values in the primitive's original coordinates,
+		// before a named interface reorders or projects those slots.
+		packet.args = slices.Clone(packet.args)
+		for i, arg := range packet.args {
+			if arg.expr == nil {
+				continue
+			}
+			value := c.CheckArgument(native, i, arg.env, arg.expr)
+			if value == nil {
+				return nil
+			}
+			packet.args[i] = funcArg{expr: value}
+		}
+	}
 	for _, clause := range clauses {
 		bound, result := packet.project(clause, f.Fn)
 		if result != proofEstablished {
@@ -126,7 +141,7 @@ func (packet callPacket) typeAdmission(c *OpContext, clause FuncType, strict boo
 		var value Value
 		ok := false
 		if c.CheckArgument != nil {
-			value = c.CheckArgument(arg.env, arg.expr)
+			value = c.CheckArgument(nil, i, arg.env, arg.expr)
 			ok = value != nil
 		} else {
 			value, ok = c.Evaluate(arg.env, arg.expr)

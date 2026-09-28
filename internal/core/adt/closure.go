@@ -47,12 +47,21 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 		return proofRefuted
 	}
 
-	compare := func(x Expr, xe *Environment, y Expr, ye *Environment) {
+	compare := func(x Expr, xe *Environment, y Expr, ye *Environment, template bool) {
 		if x == y && xe == ye {
+			return
+		}
+		if template && x == y && sameTemplateEnvironment(c, xe, ye) {
 			return
 		}
 		xv, _ := c.Evaluate(xe, x)
 		yv, _ := c.Evaluate(ye, y)
+		if cell, ok := xv.(*Vertex); template && ok && cell == yv {
+			// A template consumes this schema cell itself, not an unknown
+			// inhabitant of its fields. The same live cell identifies the
+			// same saved template even before x and y have been supplied.
+			return
+		}
 		switch runtimeValueIdentity(c, xv, yv) {
 		case proofUnknown:
 			if result != proofRefuted {
@@ -64,7 +73,7 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 	}
 	if a.Env != b.Env {
 		for _, x := range a.Fn.Captures {
-			compare(x, a.Env, x, b.Env)
+			compare(x, a.Env, x, b.Env, false)
 		}
 	}
 	for i := range a.Fn.Params {
@@ -79,10 +88,27 @@ func closureIdentity(c *OpContext, a, b *FuncValue) proofResult {
 			return proofRefuted
 		}
 		if x.expr != nil {
-			compare(x.expr, x.env, y.expr, y.env)
+			compare(x.expr, x.env, y.expr, y.env,
+				a.NativeTemplateArgument(c, i) && b.NativeTemplateArgument(c, i))
 		}
 	}
 	return result
+}
+
+// Evaluation can copy an environment without changing any of its live cells.
+// Such copies identify the same schema, including its dynamic labels and
+// predicate arguments. Equal field descriptions alone are not sufficient.
+func sameTemplateEnvironment(c *OpContext, a, b *Environment) bool {
+	if !sameTypeEnvironment(c, a, b) {
+		return false
+	}
+	for a != b {
+		if a.DynamicLabel != b.DynamicLabel {
+			return false
+		}
+		a, b = a.Up, b.Up
+	}
+	return true
 }
 
 func concreteCapture(c *OpContext, v Value) bool {
@@ -141,8 +167,14 @@ func concreteCapture(c *OpContext, v Value) bool {
 					return false
 				}
 			}
-			for _, a := range f.args {
+			for i, a := range f.args {
 				if a.expr != nil {
+					if f.NativeTemplateArgument(c, i) {
+						// The native consumes this schema itself. Its local
+						// comparison fields are filled only on invocation;
+						// external operands remain live in that environment.
+						continue
+					}
 					v, _ := c.Evaluate(a.env, a.expr)
 					if !check(v) {
 						return false

@@ -84,9 +84,13 @@ func ConfigurePropagation(ctx *adt.OpContext) {
 			return proofEvidence(value, err)
 		}))
 	}
-	ctx.CheckArgument = func(env *adt.Environment, expr adt.Expr) adt.Value {
+	ctx.CheckArgument = func(native *adt.Builtin, slot int, env *adt.Environment, expr adt.Expr) adt.Value {
 		if p, ok := ctx.Inference.(*inference); ok {
-			return p.bindingDescription(p.boundArgument(env, expr))
+			value := p.bindingDescription(p.nativeArgument(native, slot, env, expr))
+			if value != nil && native != nil {
+				p.savedValues[value] = true
+			}
+			return value
 		}
 		value, _ := ctx.Evaluate(env, expr)
 		return value
@@ -127,6 +131,7 @@ func (p *inference) work(step func() adt.Evidence) func(*adt.Propagation) adt.Ev
 	allowance := 10000
 	return func(*adt.Propagation) adt.Evidence {
 		p.failure = nil
+		p.comparerProofs = make(map[comparerProofKey]proofCertificate)
 		// Field synthesis is a search snapshot. Retain old maps for the
 		// certificates and projections that cite them, but reread live
 		// source bindings in a resumed attempt. Packet assumptions have no

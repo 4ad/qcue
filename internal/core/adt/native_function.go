@@ -16,6 +16,22 @@ package adt
 
 import "slices"
 
+// IsListComparer identifies primitives which instantiate a comparison record
+// by supplying x and y. The comparison record is a schema argument: its local
+// fields need not be concrete before the primitive supplies an element pair.
+func (b *Builtin) IsListComparer(c *OpContext) bool {
+	return b.Package != InvalidLabel && b.Package.StringValue(c) == "list" &&
+		(b.Name == "Sort" || b.Name == "SortStable" || b.Name == "IsSorted")
+}
+
+// NativeTemplateArgument reports a saved slot consumed as a template rather
+// than as a completed data value. Its original source and environment remain
+// necessary for each invocation and for faithful export.
+func (f *FuncValue) NativeTemplateArgument(c *OpContext, slot int) bool {
+	b := f.NativeBuiltin()
+	return b != nil && slot == 1 && b.IsListComparer(c)
+}
+
 // nativeBinding retains the operation that saved native arguments, including
 // its lexical environment. It is export provenance, not checking evidence.
 type nativeBinding struct {
@@ -48,13 +64,25 @@ func (f *FuncValue) NativeBinding() (*Environment, *CallExpr, []FuncType) {
 		return nil, nil, nil
 	}
 	call := *b.call
-	call.Fun = b.subject
+	subject := b.subject
 	var extra []FuncType
 	for _, t := range f.Types {
 		if !slices.Contains(b.types, t) {
+			if t.partial == nil {
+				// Identity merging can recover an original full-packet
+				// clause in another environment. It still belongs before
+				// argument saving, even though it is absent from the local
+				// snapshot. NativeBinding carries it back through earlier
+				// stages until its full packet is available again.
+				copy := *subject
+				copy.Types = mergeFuncTypes(copy.Types, []FuncType{t})
+				subject = &copy
+				continue
+			}
 			extra = append(extra, t)
 		}
 	}
+	call.Fun = subject
 	for _, peer := range f.identities {
 		extra = append(extra, FuncType{Fn: peer.Fn, Env: peer.Env, inhabitant: peer})
 	}
@@ -135,7 +163,10 @@ func (f *FuncValue) callNative(c *OpContext, call *CallExpr, bindings []funcArg,
 		return unused
 	}
 	full := *call
-	native := f.NativeBuiltin()
+	// The function invocation already checked attached interfaces in the
+	// caller's protocol. This packet is normalized to native slot order;
+	// execute the implementation without reapplying those source protocols.
+	native := f.NativeBuiltin().Implementation()
 	full.Fun, full.Partial, full.ArgLabels = native, false, nil
 	full.Args = nil
 	for i, p := range f.Fn.Params {

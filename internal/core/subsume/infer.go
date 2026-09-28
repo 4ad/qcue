@@ -35,13 +35,15 @@ func (p *inference) enter() func() {
 func newInference(ctx *adt.OpContext) *inference {
 	return &inference{ctx: ctx, support: &assumptionStore{},
 		hypotheses: make(map[*adt.FuncValue]bool), scopes: make(map[*adt.Environment]*proofScope),
-		projections:  make(map[*adt.Vertex]map[adt.Feature]adt.Value),
-		constructors: make(map[*adt.Vertex]adt.Expr),
-		memberships:  make(map[adt.Value][]*adt.LiveType),
-		grounded:     make(map[*adt.Vertex]bool),
-		savedValues:  make(map[adt.Value]bool),
-		records:      make(map[proofRecordKey]*proofRecord),
-		completed:    make(map[proofKey]proofCertificate), refutations: make(map[proofKey]*refutation), remaining: 10000}
+		projections:    make(map[*adt.Vertex]map[adt.Feature]adt.Value),
+		constructors:   make(map[*adt.Vertex]adt.Expr),
+		memberships:    make(map[adt.Value][]*adt.LiveType),
+		grounded:       make(map[*adt.Vertex]bool),
+		savedValues:    make(map[adt.Value]bool),
+		comparers:      make(map[adt.Value]proofBinding),
+		comparerProofs: make(map[comparerProofKey]proofCertificate),
+		records:        make(map[proofRecordKey]*proofRecord),
+		completed:      make(map[proofKey]proofCertificate), refutations: make(map[proofKey]*refutation), remaining: 10000}
 }
 
 // Reuse the current proof context when validating captured composites.
@@ -112,13 +114,18 @@ type inference struct {
 	// Re-reading these as concrete captures could turn an open list or
 	// record description into the inventory of its visible prefix.
 	savedValues map[adt.Value]bool
-	records     map[proofRecordKey]*proofRecord
-	refutations map[proofKey]*refutation
-	completed   map[proofKey]proofCertificate
-	callProofs  map[*adt.FuncValue][]adt.FuncType
-	attempts    []*proofAttempt
-	remaining   int
-	failure     *adt.Bottom
+	// A comparator saved by a native is a template, not a completed record.
+	// Its storage description must be checked against the original source
+	// each time a native invocation supplies a list element domain.
+	comparers      map[adt.Value]proofBinding
+	comparerProofs map[comparerProofKey]proofCertificate
+	records        map[proofRecordKey]*proofRecord
+	refutations    map[proofKey]*refutation
+	completed      map[proofKey]proofCertificate
+	callProofs     map[*adt.FuncValue][]adt.FuncType
+	attempts       []*proofAttempt
+	remaining      int
+	failure        *adt.Bottom
 }
 
 type proofKey struct {
@@ -460,7 +467,7 @@ func (p *inference) savedPacket(f *adt.FuncValue) bool {
 		if expr == nil {
 			continue
 		}
-		v := p.boundArgument(env, expr)
+		v := p.nativeArgument(f.NativeBuiltin(), i, env, expr)
 		if v == nil {
 			return false
 		}
@@ -663,7 +670,7 @@ func (p *inference) deriveFunction(f *adt.FuncValue, target adt.FuncType) (prove
 			if expr == nil {
 				continue
 			}
-			v := p.boundArgument(env, expr)
+			v := p.nativeArgument(f.NativeBuiltin(), i, env, expr)
 			if f.NativeBuiltin() != nil {
 				// savedPacket already proved native operand coverage. Its
 				// description is evidence for the residual body, not an

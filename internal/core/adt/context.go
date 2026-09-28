@@ -173,8 +173,9 @@ type OpContext struct {
 	CheckSourceOperations func(*OpContext, *Environment, Expr) *Bottom
 
 	// CheckArgument retains source construction evidence when a saved
-	// partial packet is checked against a residual clause.
-	CheckArgument func(*Environment, Expr) Value
+	// partial packet is checked against a residual clause. Native slots may
+	// save a template whose invocation operands have not yet been supplied.
+	CheckArgument func(*Builtin, int, *Environment, Expr) Value
 
 	quantifiedScopes map[quantifiedScopeKey][]*Environment
 

@@ -20,85 +20,189 @@ import (
 	"cuelang.org/go/internal/core/adt"
 )
 
-func isListComparerBuiltin(c *adt.OpContext, b *adt.Builtin) bool {
-	return b.Package != adt.InvalidLabel && b.Package.StringValue(c) == "list" &&
-		(b.Name == "Sort" || b.Name == "SortStable" || b.Name == "IsSorted")
-}
-
 // The list sorting primitives invoke a record template by supplying x and y.
 // Check that template under exactly the element descriptions the native can
 // supply. Checking its uninstantiated comparisons would reject idiomatic
 // comparers such as list.Ascending, whose number|string fields become concrete
 // only when the native supplies an element pair.
 func (p *inference) listComparerArguments(env *adt.Environment, callee adt.Value, call *adt.CallExpr) (map[int]adt.Value, bool) {
-	b, ok := callee.(*adt.Builtin)
-	if !ok || !isListComparerBuiltin(p.ctx, b) || len(call.Args) != 2 {
+	var b *adt.Builtin
+	var saved *adt.FuncValue
+	switch f := callee.(type) {
+	case *adt.Builtin:
+		b = f
+	case *adt.FuncValue:
+		b, saved = f.NativeBuiltin(), f
+	}
+	if b == nil || !b.IsListComparer(p.ctx) {
 		return nil, false
 	}
+	if saved == nil && !call.Partial && b.IsValidator(len(call.Args)) {
+		// Construction saves the template without invoking a comparison.
+		// Check its source operations under the empty invocation domain;
+		// the eventual validated list supplies x and y at runtime.
+		if len(call.ArgLabels) != 0 && call.ArgLabels[0] != adt.InvalidLabel {
+			if i, ok := adt.BuiltinParamLabelIndex(b, call.ArgLabels[0]); !ok || i != 1 {
+				return nil, true
+			}
+		}
+		empty := p.schema(nil, &adt.ListLit{})
+		comparer := p.listComparer(empty, proofBinding{env: env, expr: call.Args[0]})
+		if comparer == nil {
+			return nil, true
+		}
+		return map[int]adt.Value{0: comparer}, true
+	}
+	// Normalize the residual call together with the saved arguments. Both
+	// packets use the primitive's original list and comparator coordinates.
+	bindings := [2]proofBinding{}
 	slots := [2]int{-1, -1}
+	if saved != nil {
+		for i := range bindings {
+			bindings[i].env, bindings[i].expr = saved.BoundArgument(i)
+		}
+	}
 	next := 0
-	for i := range call.Args {
+	for i, arg := range call.Args {
 		label := adt.InvalidLabel
 		if i < len(call.ArgLabels) {
 			label = call.ArgLabels[i]
 		}
+		index := -1
 		if label == adt.InvalidLabel {
-			for next < len(slots) && slots[next] >= 0 {
+			for next < len(bindings) && bindings[next].expr != nil {
 				next++
 			}
-			if next == len(slots) {
-				return nil, true
-			}
-			slots[next] = i
+			index = next
 		} else {
-			index, ok := adt.BuiltinParamLabelIndex(b, label)
-			if !ok || index >= len(slots) || slots[index] >= 0 {
+			var ok bool
+			index, ok = adt.BuiltinParamLabelIndex(b, label)
+			if !ok {
 				return nil, true
 			}
-			slots[index] = i
 		}
+		if index < 0 || index >= len(bindings) || bindings[index].expr != nil {
+			return nil, true
+		}
+		slots[index] = i
+		bindings[index] = proofBinding{env: env, expr: arg}
 	}
-	listIndex, comparerIndex := slots[0], slots[1]
-	if listIndex < 0 || comparerIndex < 0 || listIndex == comparerIndex {
-		return nil, true
+	if bindings[0].expr == nil && bindings[1].expr != nil && call.Partial {
+		comparer := p.deferredListComparer(bindings[1])
+		if comparer == nil {
+			return nil, true
+		}
+		contextual := make(map[int]adt.Value)
+		if slots[1] >= 0 {
+			contextual[slots[1]] = comparer
+		}
+		return contextual, true
 	}
-	list := p.expr(env, call.Args[listIndex])
+	if bindings[0].expr == nil || bindings[1].expr == nil {
+		return nil, false
+	}
+	var list adt.Value
+	if slots[0] >= 0 {
+		list = p.expr(bindings[0].env, bindings[0].expr)
+	} else {
+		list = p.boundArgument(bindings[0].env, bindings[0].expr)
+	}
 	if list == nil || list.Kind() != adt.ListKind {
 		return nil, true
 	}
+	comparer := p.listComparer(list, bindings[1])
+	if comparer == nil {
+		return nil, true
+	}
+	contextual := make(map[int]adt.Value)
+	if slots[0] >= 0 {
+		contextual[slots[0]] = list
+	}
+	if slots[1] >= 0 {
+		contextual[slots[1]] = comparer
+	}
+	return contextual, true
+}
+
+type comparerProofKey struct {
+	binding proofBinding
+	element adt.Value
+	kind    adt.Kind
+	unused  bool
+}
+
+func (p *inference) listComparer(list adt.Value, binding proofBinding) (result adt.Value) {
 	element := p.listFold(list, false)
 	if element == nil {
-		return nil, true
+		return nil
 	}
 	shape, shaped := p.nativeListShape(list)
 	unused := shaped && shape.tail == nil && len(shape.prefix) < 2
+	key := comparerProofKey{binding: binding, element: adt.Unwrap(element), unused: unused}
+	if unused {
+		key.element = nil
+	} else if basic, ok := key.element.(*adt.BasicType); ok {
+		// Base kinds have no scoped dependencies. Their fresh descriptions
+		// denote the same comparison domain across residual call proofs.
+		key.kind, key.element = basic.K, nil
+	}
+	if certificate, ok := p.comparerProofs[key]; ok {
+		available := true
+		for _, h := range certificate.required {
+			available = available && p.hypotheses[h]
+		}
+		if available {
+			for _, h := range certificate.required {
+				p.useHypothesis(h)
+			}
+			return certificate.result
+		}
+	}
+	// Residual interfaces can check the same template repeatedly. Retain
+	// its proof only for this source scope and comparison domain, with all
+	// required callback hypotheses. Resumption rereads live captures.
+	attempt := &proofAttempt{inherited: p.hypotheses, required: make(map[*adt.FuncValue]bool)}
+	p.attempts = append(p.attempts, attempt)
+	defer func() {
+		p.attempts = p.attempts[:len(p.attempts)-1]
+		if result != nil {
+			certificate := proofCertificate{result: result}
+			for h := range attempt.required {
+				certificate.required = append(certificate.required, h)
+			}
+			p.comparerProofs[key] = certificate
+		}
+	}()
 	if unused {
 		// Sorting fewer than two elements never invokes the template.
 		// Check its expressions under the empty comparison domain, while
 		// retaining the native setup requirement that less is present.
 		element = &adt.Bottom{Code: adt.EvalError, Err: p.ctx.Newf("empty comparison domain")}
 	}
-	if comparer := p.expr(env, call.Args[comparerIndex]); comparer != nil {
+	if comparer := p.expr(binding.env, binding.expr); comparer != nil {
+		if original := p.comparers[adt.Unwrap(comparer)]; original.expr != nil {
+			return p.listComparer(list, original)
+		}
 		if unused {
 			if p.project(comparer, p.ctx.StringLabel("less")) == nil {
-				return nil, true
+				return nil
 			}
-			return map[int]adt.Value{listIndex: list, comparerIndex: p.unusedListComparer()}, true
+			return p.unusedListComparer()
 		}
 		for _, name := range []string{"x", "y"} {
 			bound := p.project(comparer, p.ctx.StringLabel(name))
 			if bound == nil || !p.includes(bound, element) {
-				return nil, true
+				return nil
 			}
 		}
-		return map[int]adt.Value{listIndex: list, comparerIndex: comparer}, true
+		return comparer
 	}
-	bindings := []proofBinding{{env: env, expr: call.Args[comparerIndex]}}
+	bindings := []proofBinding{binding}
 	record := p.prepareRecord(bindings)
 	if record == nil {
 		// Imported templates retain their original declaration scopes.
 		// Inspect those declarations without materializing the comparator.
-		if v, ok := p.schema(env, call.Args[comparerIndex]).(*adt.Vertex); ok {
+		if v, ok := p.schema(binding.env, binding.expr).(*adt.Vertex); ok {
 			bindings = nil
 			for _, c := range v.Conjuncts {
 				bindings = append(bindings, proofBinding{c.Env, c.Expr()})
@@ -107,29 +211,51 @@ func (p *inference) listComparerArguments(env *adt.Environment, callee adt.Value
 		}
 	}
 	if record == nil {
-		return nil, true
+		return nil
 	}
 	if mode, present := record.scope.presence[p.ctx.StringLabel("less")]; unused && (!present || mode == adt.ArcOptional) {
-		return nil, true
+		return nil
 	}
 	packet := &adt.StructLit{}
 	for _, name := range []string{"x", "y"} {
 		label := p.ctx.StringLabel(name)
 		bound := p.expr(record.env, &adt.FieldReference{Label: label})
 		if !unused && (bound == nil || !p.includes(bound, element)) {
-			return nil, true
+			return nil
 		}
 		packet.Decls = append(packet.Decls, &adt.Field{Label: label, Value: element})
 	}
 	bindings = append(bindings, proofBinding{expr: packet})
 	comparer, ok := p.recordMeet(bindings)
 	if !ok || comparer == nil || !unused && refuted(comparer) {
-		return nil, true
+		return nil
 	}
 	if unused {
 		comparer = p.unusedListComparer()
 	}
-	return map[int]adt.Value{listIndex: list, comparerIndex: comparer}, true
+	return comparer
+}
+
+func (p *inference) nativeArgument(native *adt.Builtin, slot int, env *adt.Environment, expr adt.Expr) adt.Value {
+	if native != nil && slot == 1 && native.IsListComparer(p.ctx) {
+		return p.deferredListComparer(proofBinding{env: env, expr: expr})
+	}
+	return p.boundArgument(env, expr)
+}
+
+// Only native template storage consumes this description. It cannot establish
+// comparison results or replace the source during a later invocation.
+func (p *inference) deferredListComparer(binding proofBinding) adt.Value {
+	if value, ok := binding.expr.(adt.Value); ok {
+		if original := p.comparers[adt.Unwrap(value)]; original.expr != nil {
+			binding = original
+		}
+	}
+	value := p.listComparer(p.schema(nil, &adt.ListLit{}), binding)
+	if value != nil {
+		p.comparers[adt.Unwrap(value)] = binding
+	}
+	return value
 }
 
 // This is evidence for a template with no invocation packets. Its result

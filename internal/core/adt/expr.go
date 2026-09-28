@@ -2456,6 +2456,12 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		copy.args = bindings
 		return &copy
 	}
+	if x.NativeBuiltin() != nil {
+		// Invocation evidence has already checked the selected domains and
+		// templates. Native execution erases those type arguments; trying
+		// to infer them from an uninvoked template would demand its result.
+		return x.callNative(c, call, bindings, unused, state)
+	}
 	if len(x.callViews) != 0 {
 		view, b := x.admittedCallView(c, bindings)
 		if b != nil {
@@ -2469,9 +2475,6 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 			return b
 		}
 		x = inst
-	}
-	if x.NativeBuiltin() != nil {
-		return x.callNative(c, call, bindings, unused, state)
 	}
 	recursive := false
 	if x.Fn.Quantified {

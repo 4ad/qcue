@@ -27,6 +27,7 @@ import (
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/eval"
+	"cuelang.org/go/internal/value"
 )
 
 // valueSorter defines a sort.Interface; implemented in cue/builtinutil.go.
@@ -95,7 +96,9 @@ func (s *valueSorter) lessNew(i, j int) bool {
 
 	isLess := s.ctx.BoolValue(less)
 	if b := less.Err(s.ctx); b != nil && s.err == nil {
-		s.err = b.Err
+		// Keep the evaluator's error code: an unresolved capture may be
+		// completed later, and must not turn into a permanent native error.
+		s.err = value.Make(s.ctx, b).Err()
 		return true
 	}
 
