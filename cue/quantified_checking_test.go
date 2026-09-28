@@ -50,8 +50,10 @@ f:func(x:int=0)->int:x`, false},
 		{"wrong_literal", `f:func(x:int)->2:1`, false},
 		{"unknown_field", `f:func(r:{a:int})->int:r.b`, false},
 		{"optional_field", `f:func(r:{a?:int})->int:r.a`, false},
+		// A call creates a constrained packet. The body theorem may use its
+		// fields while execution retains the unresolved demand for b.
 		{"missing_argument_field", `get:func(r:{a:int,b:bool})->int:r.a
-f:func()->int:get({a:1})`, false},
+f:func()->int:get({a:1})`, true},
 		{"narrow_callback", `apply:func(g:func(number)->string)->string:g(1.5)
 ints:func(x:int)->string:"ok"
 f:func()->string:apply(ints)`, false},

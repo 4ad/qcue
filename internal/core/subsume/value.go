@@ -97,9 +97,9 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		if b.Bound != nil {
 			return s.values(a, b.Bound)
 		}
-	case *adt.WitnessType:
-		if x, ok := a.(*adt.WitnessType); ok {
-			return x.Ref == b.Ref && x.Env == b.Env
+	case *adt.LiveType:
+		if x, ok := a.(*adt.LiveType); ok {
+			return x.SameReference(s.ctx, b)
 		}
 		return s.values(a, b.Upper)
 	}
@@ -111,7 +111,7 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		// Only identity (handled above) proves inclusion in an arbitrary
 		// type. Its upper bound is never a substitute for that type.
 		return false
-	case *adt.WitnessType:
+	case *adt.LiveType:
 		return x.Subsumes(s.ctx, b)
 	case *adt.OpaqueType:
 		return x.Subsumes(b)

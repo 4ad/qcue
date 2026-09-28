@@ -175,6 +175,9 @@ func (p *certifier) schema(env *adt.Environment, x adt.Expr) adt.Value {
 		return nil
 	}
 	if vertex, ok := v.(*adt.Vertex); ok {
+		if p.ctx.Propagation != nil {
+			p.ctx.Propagation.Observe(vertex)
+		}
 		vertex.Finalize(p.ctx)
 		if _, shared := vertex.BaseValue.(*adt.Vertex); shared && vertex.ClosedNonRecursive {
 			// close returns a wrapper whose closedness takes effect when
@@ -196,7 +199,7 @@ func (p *certifier) includes(want, got adt.Value) bool {
 	if want == nil || got == nil {
 		return false
 	}
-	if _, ok := adt.Unwrap(want).(*adt.WitnessType); ok {
+	if _, ok := adt.Unwrap(want).(*adt.LiveType); ok {
 		got = p.constructorEvidence(got)
 		if got == nil {
 			return false
@@ -883,7 +886,11 @@ func (p *certifier) expr(env *adt.Environment, expr adt.Expr) adt.Value {
 			}
 			return nil
 		}
-		return p.captured(p.schema(env, x))
+		value := p.captured(p.schema(env, x))
+		if value != nil && !adt.IsConcrete(value) && !packetHasFunction(value, make(map[adt.Value]bool)) {
+			return &adt.LiveType{Ref: &adt.LiveReference{X: x}, Env: env, Upper: value}
+		}
+		return value
 	case *adt.SelectorExpr:
 		return p.project(p.expr(env, x.X), x.Sel)
 	case *adt.IndexExpr:
@@ -1499,7 +1506,7 @@ func (p *certifier) project(value adt.Value, label adt.Feature) adt.Value {
 		// A bound supplies a field inventory and the types of those fields,
 		// without identifying the arbitrary record with its upper bound.
 		return p.project(x.Bound, label)
-	case *adt.WitnessType:
+	case *adt.LiveType:
 		return p.project(x.Upper, label)
 	}
 	if union, ok := adt.Unwrap(value).(*adt.Disjunction); ok {
@@ -1839,7 +1846,7 @@ func (p *certifier) callPackets(target adt.FuncType, sources, results []adt.Func
 		}
 		noResult := *source.Fn
 		noResult.Ret = nil
-		return source, s.capabilitySignature(target, adt.FuncType{Fn: &noResult, Env: source.Env})
+		return source, s.activationSignature(target, adt.FuncType{Fn: &noResult, Env: source.Env})
 	}
 	admitted := false
 	var consequences []adt.Value

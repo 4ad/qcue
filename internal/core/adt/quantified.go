@@ -52,9 +52,8 @@ func (*Quantified) expr()              {}
 func (*Quantified) declNode()          {}
 func (*Quantified) elemNode()          {}
 
-// TypeReference is distinct from an ordinary CUE witness reference. A type
-// argument denotes its semantic predicate; an ordinary witness in a type
-// position still denotes the singleton of that witness.
+// TypeReference denotes a universally bound predicate. Ordinary source fields
+// used as types instead retain live description coordinates through LiveReference.
 type TypeReference struct {
 	Src     *ast.Ident
 	Param   *TypeParameter

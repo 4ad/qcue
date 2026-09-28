@@ -947,7 +947,7 @@ type LetReference struct {
 	Label   Feature // for informative purposes
 	X       Expr
 	// IsPredicate selects a separately compiled type-position abbreviation.
-	// Its ordinary references already carry singleton witness decoding.
+	// Its ordinary references retain live description coordinates.
 	IsPredicate bool
 }
 
@@ -1169,7 +1169,7 @@ type IndexExpr struct {
 	Src         *ast.IndexExpr
 	X           Expr
 	Index       Expr
-	TypeIndex   Expr // singleton decoding applies only to type application
+	TypeIndex   Expr // live descriptions apply to type selection
 	Optional    bool // true if index has ? suffix (e.g., foo[0]?)
 	Quantified  bool // permits explicit type application
 	ErasedIndex bool // an erased type dependency permits only type selection
@@ -2037,10 +2037,9 @@ func (x *FuncValue) Kind() Kind { return FuncKind }
 // to env.Up, preserving the documented scoping (e.g. `b: a` refers to an
 // outer `a`, not the sibling parameter).
 //
-// Only implementation defaults and the body contribute to computation in the
-// quantified profile. Parameter predicates retain certified argument evidence;
-// result predicates retain certified evidence through recordCallResult.
-// The legacy profile retains its relational constraint propagation.
+// Each parameter retains its live constraint on the activation. A checked
+// inclusion may represent membership by evidence; otherwise its conjunct
+// propagates in the packet. Result annotations are body goals, never filters.
 //
 // The default, legacy constraint, and body conjuncts carry ci, which includes the
 // anchor's cycle reference, so recursive calls in either the body or a
@@ -2081,8 +2080,22 @@ func (n *nodeContext) scheduleFuncCall(ref *FuncCallRef, env *Environment, ci Cl
 				if p.Default != nil && !funcArgBound(a, fn, ref.types) {
 					a.addConjunctUnchecked(MakeConjunct(env.Up, p.Default, ci))
 				}
-				if p.Value != nil && !capabilities {
-					a.addConjunctUnchecked(MakeConjunct(env.Up, p.Value, ci))
+				if p.Value != nil {
+					// A proved inclusion permits this membership conjunct to be
+					// represented by evidence, retaining its source on the call
+					// reference. Otherwise it remains an activation constraint.
+					// In particular, a live upper bound cannot justify erasing
+					// the opposite-direction membership obligation.
+					proved := false
+					if capabilities && a.ArcType == ArcMember {
+						argument := n.ctx.newInlineVertex(nil, nil, a.Conjuncts...)
+						argument.Finalize(n.ctx)
+						predicate, _ := n.ctx.Evaluate(env.Up, p.Value)
+						proved = n.ctx.provesInclusion(predicate, argument)
+					}
+					if !proved {
+						a.addConjunctUnchecked(MakeConjunct(env.Up, p.Value, ci))
+					}
 				}
 				if capabilities && a.ArcType == ArcMember {
 					a.Finalize(n.ctx)
@@ -2566,9 +2579,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		// The activation carries one arc per parameter. The argument is
 		// evaluated in the environment it was bound in — the caller's, or an
 		// earlier partial application's. Once the call passes cycle
-		// detection, scheduleFuncCall supplies an omitted default and checks
-		// the parameter predicate independently. Only the legacy profile
-		// appends that predicate as an activation conjunct.
+		// detection, scheduleFuncCall supplies an omitted default and
+		// installs the parameter's constraint or its membership evidence.
 		arc := &Vertex{
 			Label:     local,
 			ArcType:   ArcMember,
@@ -2649,8 +2661,8 @@ func (x *FuncValue) call(c *OpContext, call *CallExpr, state Flags) Value {
 		if x.Fn.Quantified && a.ArcType == ArcMember {
 			// Constraints can leave obligations below the argument root.
 			// An unused record argument must not hide a required field or
-			// an unresolved singleton witness in one of its children.
-			if b := Validate(c, a, &ValidateConfig{Final: true, Runtime: true, ReportIncomplete: true}); b != nil {
+			// an unresolved live constraint in one of its children.
+			if b := Validate(c, a, &ValidateConfig{Concrete: true, Final: true, Runtime: true, ReportIncomplete: true}); b != nil {
 				return b
 			}
 			if capabilityHasCallable(a, make(map[Value]bool)) {

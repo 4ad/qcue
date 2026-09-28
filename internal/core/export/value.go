@@ -258,7 +258,7 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 		result = e.quantifiedExportError("opaque values require an interface codec for export")
 	case *adt.RigidType:
 		result = e.quantifiedExportError("proof variable cannot be exported")
-	case *adt.WitnessType:
+	case *adt.LiveType:
 		result = e.innerExpr(x.Env, x.Ref.X)
 
 	case *adt.Vertex:

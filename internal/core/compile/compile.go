@@ -1340,8 +1340,8 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		return nil
 	case *ast.Ident:
 		x := c.resolve(n)
-		if c.typePosition && ordinaryWitnessReference(x) {
-			return &adt.WitnessReference{X: x}
+		if c.typePosition && liveDescriptionReference(x) {
+			return &adt.LiveReference{X: x}
 		}
 		return x
 
@@ -1504,8 +1504,8 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 			X:   x,
 			Sel: c.label(n.Sel),
 		}
-		if c.typePosition && ordinaryWitnessReference(r) {
-			return &adt.WitnessReference{X: r}
+		if c.typePosition && liveDescriptionReference(r) {
+			return &adt.LiveReference{X: r}
 		}
 		return r
 
@@ -1519,8 +1519,8 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		if r.Quantified {
 			r.TypeIndex = c.typeExpr(n.Index)
 		}
-		if c.typePosition && ordinaryWitnessReference(r) {
-			return &adt.WitnessReference{X: r}
+		if c.typePosition && liveDescriptionReference(r) {
+			return &adt.LiveReference{X: r}
 		}
 		return r
 

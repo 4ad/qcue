@@ -150,9 +150,9 @@ func (w *Visitor) node(n adt.Node) {
 	case *adt.OpaqueType, *adt.OpaqueValue, *adt.OpaqueCall, *adt.OpaqueScope, *adt.AbstractResult:
 	case *adt.RigidType:
 		w.node(x.Bound)
-	case *adt.WitnessReference:
+	case *adt.LiveReference:
 		w.node(x.X)
-	case *adt.WitnessType:
+	case *adt.LiveType:
 		w.node(x.Ref)
 
 	case *adt.CallExpr:

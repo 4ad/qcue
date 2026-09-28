@@ -141,6 +141,10 @@ type OpContext struct {
 	Runtime
 	format          func(Runtime, Node) string
 	inclusionChecks map[inclusionCheck]bool
+	// Propagation retains the goals and supported facts accumulated while
+	// evaluating this source graph. Proof production and data evaluation
+	// share its worklist; a suspended goal is not an acceptance phase.
+	Propagation *Propagation
 	// ProveInclusion establishes that every inhabitant of the second
 	// predicate satisfies the first. False means unproved, not disjoint.
 	// The runtime installs it to keep the evaluator independent of the
@@ -151,8 +155,9 @@ type OpContext struct {
 	// obligations of runtime arguments before a call can forget its packet.
 	// Proof procedures may temporarily replace these hooks to retain their
 	// active dependencies and work budget across evaluator callbacks.
-	CheckFunction func(*OpContext, *FuncValue) *Bottom
-	CheckBuiltin  func(*OpContext, *Builtin) *Bottom
+	CheckFunction   func(*OpContext, *FuncValue) *Bottom
+	CheckBuiltin    func(*OpContext, *Builtin) *Bottom
+	CheckInterfaces func(*OpContext, *Vertex) *Bottom
 
 	// CheckApplication derives the result interface from the supplied source
 	// packet. A declaration without an implementation may use this derivation

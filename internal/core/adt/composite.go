@@ -1083,6 +1083,7 @@ func addConjuncts(ctx *OpContext, dst *Vertex, src Value) {
 }
 
 func (v *Vertex) Finalize(c *OpContext) {
+	before, arcs := v.BaseValue, len(v.Arcs)
 	// Saving and restoring the error context prevents v from panicking in
 	// case the caller did not handle existing errors in the context.
 	err := c.errs
@@ -1094,6 +1095,9 @@ func (v *Vertex) Finalize(c *OpContext) {
 		checkTypos: true,
 	})
 	c.errs = err
+	if c.Propagation != nil && (before != v.BaseValue || arcs != len(v.Arcs)) {
+		c.Propagation.Notify(v)
+	}
 }
 
 func (v *Vertex) Unify(c *OpContext, flags Flags) {

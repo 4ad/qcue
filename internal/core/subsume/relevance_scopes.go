@@ -222,7 +222,7 @@ func (r *relevanceChecker) dependencies(value adt.Value, owned, used map[*adt.Ty
 				return false
 			}
 		}
-	case *adt.WitnessType:
+	case *adt.LiveType:
 		return r.dependencies(x.Upper, owned, used, seen)
 	case *adt.Universal, *adt.Existential:
 		// These retained quantifiers are outside structural matching, but

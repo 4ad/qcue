@@ -2355,7 +2355,7 @@ func (o *options) updateOptions(opts []Option) {
 // exists.
 //
 // Validation checks explicit function interfaces and requires supplied bodies
-// to satisfy their contracts, including uncalled bodies. These static checks
+// to satisfy their contracts, including uncalled bodies. Their constraint goals
 // apply even when [Value.Err] returns nil and [Concrete] is not requested.
 // Unimplemented declarations remain hypotheses unless [Concrete] is requested.
 //
@@ -2365,6 +2365,7 @@ func (o *options) updateOptions(opts []Option) {
 //
 // It honors the [Concrete], [DisallowCycles], and [Final] options.
 func (v Value) Validate(opts ...Option) error {
+	ctx := v.ctx()
 	o := options{}
 	o.updateOptions(opts)
 
@@ -2373,12 +2374,12 @@ func (v Value) Validate(opts ...Option) error {
 		Final:           o.final,
 		DisallowCycles:  o.disallowCycles,
 		AllErrors:       true,
-		CheckInterfaces: subsume.ValidateInterfaces,
-		CheckFunction:   subsume.ValidateFunction,
-		CheckBuiltin:    subsume.ValidateBuiltin,
+		CheckInterfaces: ctx.CheckInterfaces,
+		CheckFunction:   ctx.CheckFunction,
+		CheckBuiltin:    ctx.CheckBuiltin,
 	}
 
-	b := adt.Validate(v.ctx(), v.v, cfg)
+	b := adt.Validate(ctx, v.v, cfg)
 	if b != nil {
 		return v.toErr(b)
 	}

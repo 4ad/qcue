@@ -350,9 +350,9 @@ func (w *printer) compactNode(n adt.Node) {
 	case *adt.RigidType:
 		w.string("rigid ")
 		w.string(x.Param.Src.Name.Name)
-	case *adt.WitnessReference:
+	case *adt.LiveReference:
 		w.node(x.X)
-	case *adt.WitnessType:
+	case *adt.LiveType:
 		w.string("singleton(")
 		w.node(x.Ref)
 		w.string(")")

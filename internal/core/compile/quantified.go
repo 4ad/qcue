@@ -24,7 +24,7 @@ import (
 )
 
 // Alias bodies have the same two interpretations as ordinary abbreviations:
-// a value expression and a predicate that retains singleton dependencies.
+// a value expression and a predicate that retains live dependencies.
 // Both interpretations share lexical binders and function code origins.
 type aliasContext struct {
 	src       *ast.ParametricAlias
@@ -170,7 +170,7 @@ func (c *compiler) valueExpr(x ast.Expr) adt.Expr {
 	return c.expr(x)
 }
 
-func ordinaryWitnessReference(x adt.Expr) bool {
+func liveDescriptionReference(x adt.Expr) bool {
 	switch x := x.(type) {
 	case *adt.FieldReference:
 		if x.Label.IsDef() {
@@ -183,11 +183,11 @@ func ordinaryWitnessReference(x adt.Expr) bool {
 		}
 		return true
 	case *adt.SelectorExpr:
-		return !x.Sel.IsDef() && ordinaryWitnessReference(x.X)
+		return !x.Sel.IsDef() && liveDescriptionReference(x.X)
 	case *adt.IndexExpr:
-		return ordinaryWitnessReference(x.X)
+		return liveDescriptionReference(x.X)
 	case *adt.LetReference:
-		return !x.IsPredicate && ordinaryWitnessReference(x.X)
+		return !x.IsPredicate && liveDescriptionReference(x.X)
 	}
 	return false
 }

@@ -167,7 +167,7 @@ func (c *compiler) freeReferences(src ast.Node, expr adt.Expr, runtimeOnly bool)
 			w.Elem(x.Body)
 			typePosition = saved
 			return false
-		case *adt.WitnessReference:
+		case *adt.LiveReference:
 			// A value used as a singleton remains a runtime dependency.
 			// Other references in annotations describe erased predicates.
 			saved := typePosition

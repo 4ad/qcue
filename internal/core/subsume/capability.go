@@ -83,6 +83,18 @@ func (s *subsumer) capabilityValues(a, b *adt.FuncValue) bool {
 }
 
 func (s *subsumer) capabilitySignature(target, source adt.FuncType) bool {
+	return s.packetSignature(target, source, false)
+}
+
+// activationSignature validates one packet's calling protocol. Ordinary data
+// slots become constrained activation cells; higher-order slots additionally
+// require independent capability evidence. This relation must never be used
+// to prove coverage of an implementation's universally promised domain.
+func (s *subsumer) activationSignature(target, source adt.FuncType) bool {
+	return s.packetSignature(target, source, true)
+}
+
+func (s *subsumer) packetSignature(target, source adt.FuncType, activation bool) bool {
 	if target == source {
 		return true
 	}
@@ -125,8 +137,16 @@ func (s *subsumer) capabilitySignature(target, source adt.FuncType) bool {
 			q.ArcType != adt.ArcOptional && q.Default == nil {
 			return false
 		}
-		if !s.funcConstraint(source.Env, q.Value, target.Env, p.Value) {
-			return false
+		if activation {
+			want, wok := s.evalFuncConstraint(source.Env, q.Value)
+			got, gok := s.evalFuncConstraint(target.Env, p.Value)
+			if !wok || !gok || !s.packetMember(want, got) {
+				return false
+			}
+		} else {
+			if !s.funcConstraint(source.Env, q.Value, target.Env, p.Value) {
+				return false
+			}
 		}
 	}
 	for j, p := range b.Params {
@@ -135,6 +155,54 @@ func (s *subsumer) capabilitySignature(target, source adt.FuncType) bool {
 		}
 	}
 	return s.funcConstraint(target.Env, a.Ret, source.Env, b.Ret)
+}
+
+func (s *subsumer) packetMember(want, got adt.Value) bool {
+	if packetHasFunction(want, make(map[adt.Value]bool)) {
+		return s.values(want, got)
+	}
+	// The activation retains the meet and its demanded validations. No
+	// inclusion theorem follows from this ordinary first-order constraint.
+	if want.Kind()&got.Kind() == 0 && got.Kind() != adt.BottomKind {
+		return false
+	}
+	meet := unifyValue(s.ctx, want, got)
+	b, failed := adt.Unwrap(meet).(*adt.Bottom)
+	return !failed || b.IsIncomplete() || got.Kind() == adt.BottomKind
+}
+
+func packetHasFunction(value adt.Value, seen map[adt.Value]bool) bool {
+	if value == nil || seen[value] {
+		return false
+	}
+	seen[value] = true
+	switch x := adt.Unwrap(value).(type) {
+	case *adt.FuncValue, *adt.Builtin, *adt.Universal:
+		return true
+	case *adt.LiveType:
+		return packetHasFunction(x.Upper, seen)
+	case *adt.RigidType:
+		return packetHasFunction(x.Bound, seen)
+	case *adt.Conjunction:
+		for _, member := range x.Values {
+			if packetHasFunction(member, seen) {
+				return true
+			}
+		}
+	case *adt.Disjunction:
+		for _, member := range x.Values {
+			if packetHasFunction(member, seen) {
+				return true
+			}
+		}
+	case *adt.Vertex:
+		for _, field := range x.Arcs {
+			if packetHasFunction(field, seen) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // completeProtocol obtains an open contract's existential row from a supplied

@@ -1,0 +1,122 @@
+// Copyright 2026 CUE Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package cue_test
+
+import (
+	"testing"
+
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/format"
+)
+
+func TestLiveDescriptionPropagation(t *testing.T) {
+	for _, tt := range []struct {
+		name, source string
+		want         int64
+	}{
+		{"live_input", "Live: int\nf: func(x: Live)->int:2*x\na:f(2)", 4},
+		{"fixed_input", "let Fixed=int\nf:func(x:Fixed)->int:2*x\na:f(2)", 4},
+		{"refined_input", "Live:int\nLive:>=0\nf:func(x:Live)->int:2*x\na:f(2)", 4},
+		{"stronger_bound", "A:number\nf:func(x:A)->int:x\nA:int\na:f(2)", 2},
+		{"live_identity", "R:int\nf:func(x:R)->R:x\na:f(2)", 2},
+		{"live_assertion", "R:int\nf:func(x:int)->R:x&R\na:f(2)", 2},
+		{"singleton_result", "R:int\nR:2\nf:func(_:int)->R:2\na:f(0)", 2},
+		{"evaluation_premise", "seed:func(x:int)->int:x+1\nk:seed(2)\nshift:func(x:int)->int:x+k\nlimit:shift(1)\nf:func(x:int)->int:x&<=limit\na:f(3)", 3},
+		{"capture", "factor:int\nf:func(x:int)->int:factor*x\nfactor:3\na:f(4)", 12},
+		{"live_bound", "Upper:number\nchoose(A:Upper):func(x:A,y:A)->A:{if x<=y {out:x}\n if x>y {out:y}}.out\na:choose[Upper](2,5)", 2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString(tt.source)
+			a := v.LookupPath(cue.ParsePath("a"))
+			got, err := a.Int64()
+			if err != nil || got != tt.want {
+				t.Fatalf("a = %v, %v; want %d", a, err, tt.want)
+			}
+			if err := a.Validate(cue.Concrete(true)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestLiveDescriptionPendingGoals(t *testing.T) {
+	for _, tt := range []struct{ name, source, path string }{
+		{"domain", "A:number\nf:func(x:A)->int:x", "f"},
+		{"result", "R:int\nf:func(_:int)->R:2", "f"},
+		{"coverage", "Small:int\nlocal:func(x:Small)->int:x+1\nconsumer:func(g:func(int)->int)->int:g(2)\na:consumer(local)", "a"},
+		{"instance_bound", "Upper:number\nf(A:Upper):func(x:A)->A:x\na:f[int&>=0](2)", "a"},
+		{"proof_cycle", "k:f(0)\nf:func(x:int)->int:k\na:f(1)", "a"},
+		{"strict_unknown", "f:func(_:int)->int:7\na:f(_)", "a"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cuecontext.New().CompileString(tt.source).LookupPath(cue.ParsePath(tt.path))
+			if err := v.Validate(cue.Concrete(true)); err == nil {
+				t.Fatalf("unresolved goal was accepted: %v", v)
+			}
+		})
+	}
+}
+
+func TestPropagationLaterRefinement(t *testing.T) {
+	for _, tt := range []struct {
+		name, source, refinement string
+		want                     int64
+		fails                    bool
+	}{
+		{"bound", "A:number\nf:func(x:A)->int:x\na:f(2)", "A:int", 2, false},
+		{"result", "R:int\nf:func(_:int)->R:2\na:f(0)", "R:2", 2, false},
+		{"input_allowed", "Input:int\nf:func(x:Input)->int:2*x\na:f(2)", "Input:>=0", 4, false},
+		{"input_excluded", "Input:int\nf:func(x:Input)->int:2*x\na:f(2)", "Input:>2", 0, true},
+		{"ignored_input_excluded", "Input:int\nf:func(x:Input)->int:7\na:f(2)", "Input:>2", 0, true},
+		{"output_allowed", "Output:int\nf:func(x:int)->int:2*x\na:f(2)&Output", "Output:>=4", 4, false},
+		{"output_excluded", "Output:int\nf:func(x:int)->int:2*x\na:f(2)&Output", "Output:<4", 0, true},
+		{"capture", "factor:int\nf:func(x:int)->int:factor*x\na:f(4)", "factor:3", 12, false},
+	} {
+		for _, export := range []bool{false, true} {
+			name := tt.name
+			if export {
+				name += "/export"
+			}
+			t.Run(name, func(t *testing.T) {
+				ctx := cuecontext.New()
+				v := ctx.CompileString(tt.source)
+				// Observe before refinement to exercise caches and residuals.
+				_ = v.Validate()
+				_, _ = v.LookupPath(cue.ParsePath("a")).Int64()
+				if export {
+					text, err := format.Node(v.Syntax())
+					if err != nil {
+						t.Fatal(err)
+					}
+					v = ctx.CompileString(string(text))
+					if err := v.Err(); err != nil {
+						t.Fatalf("export %s: %v", text, err)
+					}
+				}
+				v = v.Unify(ctx.CompileString(tt.refinement))
+				a := v.LookupPath(cue.ParsePath("a"))
+				got, err := a.Int64()
+				if tt.fails {
+					if a.Validate(cue.Concrete(true)) == nil {
+						t.Fatalf("lost live constraint: %v", a)
+					}
+				} else if err != nil || got != tt.want {
+					t.Fatalf("after %s: a = %v, %v; want %d", tt.refinement, a, err, tt.want)
+				}
+			})
+		}
+	}
+}

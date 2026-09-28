@@ -751,7 +751,7 @@ func abstractEscapes(c *OpContext, value Value, owner *sealedPackage, seen map[V
 		return v.carrier.owner == owner
 	case *OpaqueType:
 		return v.carrier.owner == owner
-	case *WitnessType:
+	case *LiveType:
 		// A singleton retains the witness as a predicate dependency even
 		// when its current upper approximation looks like ordinary data.
 		witness, _ := c.Evaluate(v.Env, v.Ref.X)

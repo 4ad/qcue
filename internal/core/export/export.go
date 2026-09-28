@@ -390,6 +390,11 @@ type exporter struct {
 	originNames       map[string]ast.Node
 
 	pivotter *pivotter
+
+	// Exposed coordinates are available to subsequent source conjunction.
+	// Closure conversion must reference these cells rather than freeze their
+	// current values into a private environment.
+	exposed map[*adt.Vertex]bool
 }
 
 type fieldAndScope struct {
@@ -463,6 +468,18 @@ func newExporter(p *Profile, r adt.Runtime, pkgID string, v adt.Value) *exporter
 	}
 
 	e.markUsedFeatures(v)
+	e.exposed = make(map[*adt.Vertex]bool)
+	var expose func(*adt.Vertex)
+	expose = func(v *adt.Vertex) {
+		if v == nil || e.exposed[v] {
+			return
+		}
+		e.exposed[v] = true
+		for _, field := range v.Arcs {
+			expose(field)
+		}
+	}
+	expose(n)
 
 	return e
 }

@@ -121,6 +121,11 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 				return e.predicateValue(v)
 			}
 		}
+		if r, ok := ref.(adt.Resolver); ok {
+			if cell, _ := e.ctx.Lookup(t.Env, r); cell != nil && e.exposed[cell] {
+				return e.innerExpr(t.Env, ref)
+			}
+		}
 		v, complete := e.ctx.Evaluate(t.Env, ref)
 		if !complete || v == nil || (runtime && !e.exportableCapture(v)) {
 			id := ref.Source().(*ast.Ident)
