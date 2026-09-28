@@ -960,10 +960,14 @@ func nativeTuple(element string, length int) string {
 }
 
 var nativeParams = map[string]map[string]string{
+	"encoding/base64.EncodedLen":     {"encoding": "null"},
+	"encoding/base64.DecodedLen":     {"encoding": "null"},
+	"encoding/base64.Encode":         {"encoding": "null"},
+	"encoding/base64.Decode":         {"encoding": "null"},
 	"encoding/json.Marshal":          {"v": "null | bool | number | string | bytes | [...] | {...}"},
 	"encoding/yaml.Marshal":          {"v": "null | bool | number | string | bytes | [...] | {...}"},
 	"encoding/openapi.MarshalSchema": {"config": "{version: string, selfContained?: bool, expandReferences?: bool, info?: _}"},
-	"encoding/csv.Encode":            {"x": "[...[..._]]"},
+	"encoding/csv.Encode":            {"x": "[...[...(null | bool | number | string | bytes | [...] | {...})]]"},
 	"encoding/json.MarshalStream":    {"v": "[...]"},
 	"encoding/yaml.MarshalStream":    {"v": "[...]"},
 	"encoding/toml.Marshal":          {"v": "{...}"},
@@ -990,6 +994,7 @@ var nativeParams = map[string]map[string]string{
 	"net.CompareIP":                  {"ip1": "string | bytes | [...int]", "ip2": "string | bytes | [...int]"},
 	"strconv.FormatFloat":            {"fmtVal": "string | int"},
 	"text/tabwriter.Write":           {"data": "string | bytes | [...(string | bytes)]"},
+	"text/template.Execute":          {"data": "null | bool | number | string | bytes | [...] | {...}"},
 }
 
 // Refinements add conditional evidence without shrinking the primary domain.

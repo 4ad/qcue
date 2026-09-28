@@ -208,6 +208,11 @@ result evidence after its narrower domain is covered; it does not restrict the
 primary call domain. Published package interfaces are checked against this
 implementation-owned evidence.
 
+Manual conversion adapters also declare their accepted input domains. Base64
+operations require the supported `null` encoding selector. Template data and
+CSV cells admit scalar data, lists, and records; function values do not acquire
+serialization support from a broad Go `cue.Value` parameter.
+
 Generic native functions support explicit type arguments, such as
 `list.Reverse[int]`, as well as inferred instances. Selected views retain the
 native implementation's identity across captures, unification, and source

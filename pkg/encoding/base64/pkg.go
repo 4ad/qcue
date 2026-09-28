@@ -17,7 +17,7 @@ var p = &pkg.Package{
 	Pure: true,
 	Native: []*pkg.Builtin{{
 		Name:      "EncodedLen",
-		Signature: "func(encoding: _, n: int) -> int & >=-9223372036854775808 & <=9223372036854775807",
+		Signature: "func(encoding: null, n: int) -> int & >=-9223372036854775808 & <=9223372036854775807",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.IntKind},
@@ -31,7 +31,7 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name:      "DecodedLen",
-		Signature: "func(encoding: _, x: int) -> int & >=-9223372036854775808 & <=9223372036854775807",
+		Signature: "func(encoding: null, x: int) -> int & >=-9223372036854775808 & <=9223372036854775807",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.IntKind},
@@ -44,7 +44,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Encode",
+		Name:      "Encode",
+		Signature: "func(encoding: null, src: bytes|string) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.BytesKind | adt.StringKind},
@@ -57,7 +58,8 @@ var p = &pkg.Package{
 			}
 		},
 	}, {
-		Name: "Decode",
+		Name:      "Decode",
+		Signature: "func(encoding: null, s: string) -> bytes",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 			{Kind: adt.StringKind},

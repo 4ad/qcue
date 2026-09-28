@@ -23,7 +23,7 @@
 package template
 
 // Execute executes a Go-style template.
-Execute: func(templ: string, data: _) -> string
+Execute: func(templ: string, data: null | bool | number | string | bytes | [...] | {...}) -> string
 
 // HTMLEscape returns the escaped HTML equivalent of the plain text data s.
 HTMLEscape: func(s: string) -> string

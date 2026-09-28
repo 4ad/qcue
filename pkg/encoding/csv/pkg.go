@@ -17,7 +17,7 @@ var p = &pkg.Package{
 	Pure: true,
 	Native: []*pkg.Builtin{{
 		Name:      "Encode",
-		Signature: "func(x: [...[..._]]) -> string",
+		Signature: "func(x: [...[...(null | bool | number | string | bytes | [...] | {...})]]) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.TopKind},
 		},

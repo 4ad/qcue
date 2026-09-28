@@ -16,7 +16,8 @@ var _ = adt.TopKind // in case the adt package isn't used
 var p = &pkg.Package{
 	Pure: true,
 	Native: []*pkg.Builtin{{
-		Name: "Execute",
+		Name:      "Execute",
+		Signature: "func(templ: string, data: null | bool | number | string | bytes | [...] | {...}) -> string",
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.TopKind},
