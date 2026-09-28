@@ -16,31 +16,24 @@ package subsume
 
 import "cuelang.org/go/internal/core/adt"
 
-// ValidateInterfaces checks explicit descriptions without changing their
-// denotations. The returned Bottom is only a diagnostic carrier for Validate;
-// it must not be inserted into the evaluated graph. In particular, an invalid
-// arrow alternative is not an empty alternative that normalization can omit.
-func ValidateInterfaces(ctx *adt.OpContext, value *adt.Vertex) *adt.Bottom {
-	if value == nil {
-		return nil
-	}
-	p := newInference(ctx)
-	defer p.enter()()
-	return p.validateInterfaces(value)
-}
-
-func (p *inference) validateInterfaces(value *adt.Vertex) *adt.Bottom {
-	ctx := p.ctx
+func (p *inference) interfaceEvidence(value *adt.Vertex) adt.Evidence {
 	r := &relevanceChecker{p: p}
 	if err := r.description(value, make(map[adt.Value]bool)); err != nil {
 		source := err.source
 		if source == nil {
 			source = value
 		}
-		return &adt.Bottom{Src: source.Source(), Code: adt.BlockedError,
-			Err: ctx.NewPosf(adt.Pos(source), "%s", err)}
+		result := adt.Evidence{Err: &adt.Bottom{Src: source.Source(), Code: adt.BlockedError,
+			Err: p.ctx.NewPosf(adt.Pos(source), "%s", err)}}
+		if err.Refuted() {
+			result.Support = err.proof
+			if !err.guarded {
+				result.State = adt.Rejected
+			}
+		}
+		return result
 	}
-	return nil
+	return adt.Evidence{State: adt.Quiet}
 }
 
 func (r *relevanceChecker) description(value adt.Value, seen map[adt.Value]bool) (failure *RelevanceError) {
@@ -100,10 +93,20 @@ func (r *relevanceChecker) description(value adt.Value, seen map[adt.Value]bool)
 		return r.template(x.Template, x.Env, seen)
 
 	case *adt.Disjunction:
+		var first *RelevanceError
+		allRejected := len(x.Values) != 0
 		for _, branch := range x.Values {
-			if err := r.description(branch, seen); err != nil {
-				return err
+			err := r.description(branch, seen)
+			allRejected = allRejected && err != nil && err.Refuted() && !err.guarded
+			if first == nil && err != nil {
+				first = err
 			}
+		}
+		if first != nil {
+			// A local counterexample does not reject a different surviving
+			// alternative. Keep the guard and revisit current admission.
+			first.guarded = !allRejected
+			return first
 		}
 	case *adt.Conjunction:
 		for _, term := range x.Values {
@@ -118,6 +121,7 @@ func (r *relevanceChecker) description(value adt.Value, seen map[adt.Value]bool)
 			}
 			field.Finalize(r.p.ctx)
 			if err := r.description(field, seen); err != nil {
+				err.guarded = err.guarded || field.ArcType == adt.ArcOptional
 				return err
 			}
 		}

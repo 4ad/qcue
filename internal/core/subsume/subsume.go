@@ -75,16 +75,6 @@ func Value(ctx *adt.OpContext, a, b adt.Value) errors.Error {
 	return CUE.Value(ctx, a, b)
 }
 
-// ProveInclusion is the evaluator's sufficient predicate-inclusion check.
-// Unlike ordinary signature comparison, a concrete closure used as a type
-// argument needs an independent proof of its implementation's contracts.
-// Failure retains the original inclusion obligation in the evaluator.
-func ProveInclusion(ctx *adt.OpContext, bound, argument adt.Value) bool {
-	p := newInference(ctx)
-	defer p.enter()()
-	return p.proveInclusion(ctx, bound, argument)
-}
-
 func (p *inference) proveInclusion(ctx *adt.OpContext, bound, argument adt.Value) bool {
 	if !p.step() {
 		return false

@@ -45,7 +45,15 @@ func ConfigurePropagation(ctx *adt.OpContext) {
 		}
 		p := newInference(ctx)
 		goal := graph.Require(functionGoal{f}, p.work(func() adt.Evidence {
-			return proofEvidence(nil, p.validateFunction(ctx, f))
+			err := p.validateFunction(ctx, f)
+			if err != nil {
+				for _, target := range f.Obligations() {
+					if proof := p.refutations[proofKey{f, target}]; proof != nil {
+						return adt.Evidence{State: adt.Rejected, Err: err, Support: proof}
+					}
+				}
+			}
+			return proofEvidence(nil, err)
 		}))
 		return goalError(ctx, goal, f, "function conformance")
 	}
@@ -101,10 +109,7 @@ func ConfigurePropagation(ctx *adt.OpContext) {
 		p := newInference(ctx)
 		goal := graph.Require(observationGoal{v}, p.work(func() adt.Evidence {
 			graph.Observe(v)
-			if err := p.validateInterfaces(v); err != nil {
-				return proofEvidence(nil, err)
-			}
-			return adt.Evidence{State: adt.Quiet}
+			return p.interfaceEvidence(v)
 		}))
 		return goalError(ctx, goal, v, "interface observation")
 	}
@@ -119,13 +124,30 @@ type sourceGoal struct {
 // renewed after suspension, while proved certificates retain their explicit
 // hypothesis support. The graph accounts for both dispatch and kernel steps.
 func (p *inference) work(step func() adt.Evidence) func(*adt.Propagation) adt.Evidence {
+	allowance := 10000
 	return func(*adt.Propagation) adt.Evidence {
 		p.failure = nil
-		p.remaining = 10000
+		// Field synthesis is a search snapshot. Retain old maps for the
+		// certificates and projections that cite them, but reread live
+		// source bindings in a resumed attempt. Packet assumptions have no
+		// source fields and remain fixed in their original lexical stores.
+		for _, scope := range p.scopes {
+			if len(scope.fields) != 0 {
+				values := maps.Clone(scope.values)
+				for label := range scope.fields {
+					delete(values, label)
+				}
+				scope.values = values
+			}
+		}
+		p.remaining = allowance
 		defer p.enter()()
 		result := step()
 		if result.State == adt.Pending && p.remaining == 0 {
 			result.Wait = adt.WorkLimit
+			if allowance <= int(^uint(0)>>2) {
+				allowance *= 2
+			}
 		}
 		return result
 	}
@@ -178,8 +200,8 @@ func (p *inference) scopedWork(step func() adt.Evidence) func(*adt.Propagation) 
 	return func(*adt.Propagation) adt.Evidence {
 		oldSupport, oldHypotheses := p.support, p.hypotheses
 		oldActive, oldImplementing, oldAttempts := p.active, p.implementing, p.attempts
-		p.support, p.hypotheses = support, hypotheses
-		p.active, p.implementing, p.attempts = active, implementing, attempts
+		p.support, p.hypotheses = support, maps.Clone(hypotheses)
+		p.active, p.implementing, p.attempts = slices.Clone(active), slices.Clone(implementing), slices.Clone(attempts)
 		defer func() {
 			p.support, p.hypotheses = oldSupport, oldHypotheses
 			p.active, p.implementing, p.attempts = oldActive, oldImplementing, oldAttempts
@@ -204,13 +226,20 @@ func (p *inference) function(f *adt.FuncValue, target adt.FuncType) bool {
 	}
 	key := proofKey{f, target}
 	goal := p.ctx.Propagation.Require(scopedProof{p, p.support, key}, p.scopedWork(func() adt.Evidence {
+		delete(p.refutations, key)
 		if !p.deriveFunction(f, target) {
+			if proof := p.refutations[key]; proof != nil {
+				return adt.Evidence{State: adt.Rejected, Support: proof}
+			}
 			return adt.Evidence{}
 		}
 		certificate := p.completed[key]
 		return adt.Evidence{State: adt.Established, Value: certificate.result, Support: certificate}
 	}))
 	if goal.State != adt.Established {
+		if proof, ok := goal.Support.(*refutation); ok {
+			p.refutations[key] = proof
+		}
 		return false
 	}
 	certificate := goal.Support.(proofCertificate)
@@ -223,19 +252,21 @@ func (p *inference) function(f *adt.FuncValue, target adt.FuncType) bool {
 
 // Coverage is an independent premise of the body goal. Call-local packet
 // completion is deliberately absent from this propagator's assumptions.
-func (p *inference) coverage(target, source adt.FuncType) bool {
+func (p *inference) coverage(target, source adt.FuncType) *adt.Goal {
 	step := func() adt.Evidence {
 		s := &subsumer{ctx: p.ctx, inference: p}
 		if s.capabilitySignature(target, source) {
 			return adt.Evidence{State: adt.Established}
 		}
+		if proof := p.coverageRefutation(target, source); proof != nil {
+			return adt.Evidence{State: adt.Rejected, Support: proof}
+		}
 		return adt.Evidence{}
 	}
 	if p.ctx.Propagation == nil {
-		return step().State == adt.Established
+		return &adt.Goal{Evidence: step()}
 	}
-	goal := p.ctx.Propagation.Require(coverageGoal{p, p.support, target, source}, p.scopedWork(step))
-	return goal.State == adt.Established
+	return p.ctx.Propagation.Require(coverageGoal{p, p.support, target, source}, p.scopedWork(step))
 }
 
 type scopedApplication struct {

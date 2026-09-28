@@ -22,17 +22,6 @@ import (
 	"cuelang.org/go/internal/core/walk"
 )
 
-// ValidateFunction checks an implementation's contracts under arbitrary
-// packets and rigid type variables. Static validation calls this independently
-// of concrete checks on implementation identity and captured values.
-// Unsupported proofs remain blocked; successful concrete calls and the
-// target annotation itself are not evidence of universal conformance.
-func ValidateFunction(ctx *adt.OpContext, f *adt.FuncValue) *adt.Bottom {
-	p := newInference(ctx)
-	defer p.enter()()
-	return p.validateFunction(ctx, f)
-}
-
 // A derivation evaluates descriptions under its own assumption store. The
 // evaluator hooks remain installed throughout: their dispatch consults this
 // store, so nested reductions use the same hypotheses and accounted work.
@@ -50,7 +39,7 @@ func newInference(ctx *adt.OpContext) *inference {
 		constructors: make(map[*adt.Vertex]adt.Expr),
 		memberships:  make(map[adt.Value][]*adt.LiveType),
 		records:      make(map[proofRecordKey]*proofRecord),
-		completed:    make(map[proofKey]proofCertificate), remaining: 10000}
+		completed:    make(map[proofKey]proofCertificate), refutations: make(map[proofKey]*refutation), remaining: 10000}
 }
 
 // Reuse the current proof context when validating captured composites.
@@ -60,6 +49,12 @@ func (p *inference) validateFunction(_ *adt.OpContext, f *adt.FuncValue) *adt.Bo
 	if !p.implementation(f) {
 		if p.failure != nil {
 			return p.failure
+		}
+		for _, target := range f.Obligations() {
+			if p.refutations[proofKey{f, target}] != nil {
+				return &adt.Bottom{Src: f.Source(), Code: adt.BlockedError,
+					Err: p.ctx.Newf("function requirement refuted by a checked counterexample")}
+			}
 		}
 		if p.remaining == 0 {
 			return &adt.Bottom{Src: f.Source(), Code: adt.BlockedError,
@@ -107,6 +102,7 @@ type inference struct {
 	// Equal current data is not enough to manufacture one of these facts.
 	memberships map[adt.Value][]*adt.LiveType
 	records     map[proofRecordKey]*proofRecord
+	refutations map[proofKey]*refutation
 	completed   map[proofKey]proofCertificate
 	callProofs  map[*adt.FuncValue][]adt.FuncType
 	attempts    []*proofAttempt
@@ -277,7 +273,7 @@ func (p *inference) frame(up *adt.Environment, values map[adt.Feature]adt.Value)
 	return env
 }
 
-// Static capture types need not be materialized yet. Named imports supply
+// Bounds on captured values need not be materialized yet. Named imports supply
 // conditional hypotheses, while supplied implementations require their own
 // proofs. Concrete closure validation separately discharges these links and
 // requires every runtime capture to be complete.
@@ -498,9 +494,8 @@ func (p *inference) deriveFunction(f *adt.FuncValue, target adt.FuncType) (prove
 	}
 	if target.Fn.Body != nil && target.Fn != f.Fn {
 		// A concrete identity conjunct carries its own source contract.
-		// Opposite opaque transports can preserve that descriptor while
-		// exposing a narrower adapter protocol. Prove the unchanged source
-		// body only after independently establishing descriptor identity;
+		// Conjunction can retain another view of that descriptor. Prove the
+		// unchanged body only after establishing descriptor identity;
 		// an attached bodyless annotation cannot supply this evidence.
 		original := target.Inhabitant()
 		if original == nil {
@@ -611,7 +606,11 @@ func (p *inference) deriveFunction(f *adt.FuncValue, target adt.FuncType) (prove
 	// Prove coverage without using the implementation's result annotation.
 	a, b := *target.Fn, *source.Fn
 	a.Ret, b.Ret = nil, nil
-	if !p.coverage(adt.FuncType{Fn: &a, Env: target.Env}, adt.FuncType{Fn: &b, Env: source.Env}) {
+	coverage := p.coverage(adt.FuncType{Fn: &a, Env: target.Env}, adt.FuncType{Fn: &b, Env: source.Env})
+	if coverage.State != adt.Established {
+		if proof, ok := coverage.Support.(*refutation); ok {
+			p.refutations[key] = proof
+		}
 		return false
 	}
 	matches := adt.MatchFuncValueParams(target.Fn, &adt.FuncValue{Fn: source.Fn})
@@ -699,7 +698,13 @@ func (p *inference) deriveFunction(f *adt.FuncValue, target adt.FuncType) (prove
 	env := p.frame(source.Env, values)
 	p.scopes[env].optional, p.scopes[env].absent = optional, absent
 	body := p.expr(env, source.Fn.Body)
-	if !p.includes(p.schema(target.Env, target.Fn.Ret), body) {
+	want := p.schema(target.Env, target.Fn.Ret)
+	if !p.includes(want, body) {
+		if !f.IsPartial() {
+			if proof := p.resultRefutation(source, target, want); proof != nil {
+				p.refutations[key] = proof
+			}
+		}
 		return false
 	}
 	result = body
@@ -1836,8 +1841,8 @@ func (p *inference) callPackets(target adt.FuncType, sources, results []adt.Func
 			consequences = append(consequences, result)
 		}
 		// Only a visible implementation supplies body evidence. Recursive
-		// calls use their declared induction hypothesis; opaque adapters
-		// expose their certified interface without a private body summary.
+		// calls use their declared induction hypothesis. A linked hypothesis
+		// supplies an interface without manufacturing a body summary.
 		if function != nil && function.Fn.Body != nil && !p.recursing(function) {
 			proof := target
 			noResult := *source.Fn

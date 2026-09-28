@@ -41,8 +41,8 @@ func (s *erasureScope) bind(x *adt.AliasApplication) *erasureScope {
 	return next
 }
 
-// Type parameters may occur in checked signatures, type selection, and seal
-// witnesses. They cannot supply runtime results, arguments, or defaults. In
+// Type parameters may occur in signatures and type selection.
+// They cannot supply runtime results, arguments, or defaults. In
 // particular, a bound of int does not turn an erased type into an integer
 // argument. Finite value binders are different: closure conversion captures
 // their selected values as part of the runtime descriptor.

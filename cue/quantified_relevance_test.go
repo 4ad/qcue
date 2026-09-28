@@ -70,7 +70,7 @@ func TestQuantifiedInterfaceRelevance(t *testing.T) {
 			if (err != nil) != tt.blocked {
 				t.Fatalf("blocked=%v: %v", tt.blocked, err)
 			}
-			if err != nil && !strings.Contains(err.Error(), "interface relevance blocked") {
+			if err != nil && !strings.Contains(err.Error(), "interface relevance ") {
 				t.Fatal(err)
 			}
 			// Validation must leave the graph intact for later refinement and

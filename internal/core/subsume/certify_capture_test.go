@@ -20,7 +20,6 @@ import (
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/eval"
 	"cuelang.org/go/internal/core/runtime"
-	"cuelang.org/go/internal/core/subsume"
 )
 
 func TestConditionalCaptureCertificates(t *testing.T) {
@@ -76,11 +75,11 @@ f:func()->int:r.g(1)`, false, false},
 			if !ok {
 				t.Fatalf("missing function: %v", field.Bottom())
 			}
-			err := subsume.ValidateFunction(ctx, f)
+			err := ctx.CheckFunction(ctx, f)
 			if (err == nil) != tt.valid {
 				t.Fatalf("static certificate: valid=%v: %v", tt.valid, err)
 			}
-			err = adt.Validate(ctx, field, &adt.ValidateConfig{Concrete: true, Runtime: true, CheckFunction: subsume.ValidateFunction, CheckBuiltin: subsume.ValidateBuiltin})
+			err = adt.Validate(ctx, field, &adt.ValidateConfig{Concrete: true, Runtime: true, CheckFunction: ctx.CheckFunction, CheckBuiltin: ctx.CheckBuiltin})
 			if (err == nil) != tt.concrete {
 				t.Fatalf("concrete closure: valid=%v: %v", tt.concrete, err)
 			}

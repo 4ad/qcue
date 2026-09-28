@@ -16,15 +16,6 @@ package subsume
 
 import "cuelang.org/go/internal/core/adt"
 
-// ValidateApplication checks the source packet against the callee's available
-// interfaces. Its result describes successful computation, independently of
-// whether a linked implementation can execute the call.
-func ValidateApplication(ctx *adt.OpContext, env *adt.Environment, f adt.Value, call *adt.CallExpr) (adt.Value, *adt.Bottom) {
-	p := newInference(ctx)
-	defer p.enter()()
-	return p.validateApplication(ctx, env, f, call)
-}
-
 func (p *inference) validateApplication(ctx *adt.OpContext, env *adt.Environment, f adt.Value, call *adt.CallExpr) (adt.Value, *adt.Bottom) {
 	// A bodyless declaration is a conditional import hypothesis. Supplied
 	// bodies still pass their independent implementation checks in apply.

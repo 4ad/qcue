@@ -27,12 +27,23 @@ import (
 // the function type denotes bottom. Limit distinguishes incomplete checking
 // from a refuted result on a region the finite service could not refute.
 type RelevanceError struct {
-	Limit  bool
-	Reason string
-	source adt.Node
+	Limit   bool
+	Reason  string
+	source  adt.Node
+	proof   *refutation
+	guarded bool
 }
 
-func (e *RelevanceError) Error() string { return "interface relevance blocked: " + e.Reason }
+// Refuted reports a checked reachability and result-emptiness certificate.
+// False means pending search, not evidence that the interface is acceptable.
+func (e *RelevanceError) Refuted() bool { return e.proof != nil }
+
+func (e *RelevanceError) Error() string {
+	if e.Refuted() {
+		return "interface relevance rejected: " + e.Reason
+	}
+	return "interface relevance blocked: " + e.Reason
+}
 
 // CheckArrowRelevance checks one finite conjunction of explicit arrow clauses
 // in their supplied scopes. The caller must open universal declarations with
@@ -196,7 +207,11 @@ func (r *relevanceChecker) regions(clauses []observation, i int, positive []adt.
 	}
 	if i == len(clauses) {
 		if result != nil && refuted(result) && !r.covered(positive, negative) {
-			return r.blocked("empty successful result on a non-refuted input region")
+			if proof := r.p.reach(positive, negative); proof != nil {
+				proof.Result = result
+				return &RelevanceError{Reason: "empty successful result on a reachable input region", proof: proof}
+			}
+			return r.blocked("empty successful result on an unresolved input region")
 		}
 		if r.p.remaining == 0 {
 			return r.blocked("")

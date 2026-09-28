@@ -19,16 +19,6 @@ import (
 	"cuelang.org/go/internal/core/walk"
 )
 
-// ValidateSourceOperations preserves static call obligations when a data
-// projection discards part of its source constructor. Ordinary CUE data
-// constraints keep their existing semantics; quantified calls require the
-// same certificates as observed applications.
-func ValidateSourceOperations(ctx *adt.OpContext, env *adt.Environment, expr adt.Expr) *adt.Bottom {
-	p := newInference(ctx)
-	defer p.enter()()
-	return p.validateSourceOperations(env, expr)
-}
-
 func (p *inference) validateSourceOperations(env *adt.Environment, expr adt.Expr) *adt.Bottom {
 	ctx := p.ctx
 	if p.sourceOperations(env, expr) {

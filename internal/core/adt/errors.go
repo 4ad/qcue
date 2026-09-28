@@ -74,7 +74,7 @@ const (
 	// a concrete value.
 	CycleError // cycle
 
-	// A BlockedError is a static obligation without a certificate. It must
+	// A BlockedError reports an unresolved or rejected proof goal. It must
 	// be reported even when ordinary incomplete data is allowed. It proves
 	// no semantic contradiction and cannot eliminate a union alternative.
 	BlockedError // blocked

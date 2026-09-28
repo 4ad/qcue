@@ -133,7 +133,7 @@ func (m membershipCheck) packetMembership(c *OpContext) proofResult {
 		// The meet records callable contracts as obligations on the same
 		// implementation. Prove each from its body; merely comparing the
 		// combined signatures would assume the promised conformance. This
-		// also covers singleton witnesses and packages, whose membership
+		// also covers concrete callable descriptions, whose membership
 		// evidence is identity rather than structural arrow inclusion.
 		if c.CheckFunction == nil || c.CheckBuiltin == nil {
 			return proofUnknown

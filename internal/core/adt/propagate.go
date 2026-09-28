@@ -209,6 +209,11 @@ func (p *Propagation) Drain() {
 func (p *Propagation) AddBudget(n int) {
 	if n > 0 {
 		p.remaining += n
+		for _, g := range p.goals {
+			if g.State == Pending && g.Wait == WorkLimit {
+				p.enqueue(g)
+			}
+		}
 	}
 }
 
@@ -244,4 +249,17 @@ func (c *OpContext) invocationEvidence(f Value, call *CallExpr) *Goal {
 	}
 	return &Goal{Evidence: Evidence{Err: &Bottom{Src: call.Source(), Code: BlockedError,
 		Err: c.Newf("function propagation is not configured")}}}
+}
+
+// Remaining reports the work allowance shared by reduction and inference.
+func (p *Propagation) Remaining() int { return p.remaining }
+
+// Goals returns retained propositions for diagnostics and graph inspection.
+// Callers must not mutate the goals or interpret Quiet as logical evidence.
+func (p *Propagation) Goals() []*Goal {
+	out := make([]*Goal, 0, len(p.goals))
+	for _, g := range p.goals {
+		out = append(out, g)
+	}
+	return out
 }

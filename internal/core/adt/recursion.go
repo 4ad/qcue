@@ -134,7 +134,7 @@ func recursiveArgument(c *OpContext, value Value) Value {
 		v.Finalize(c)
 		if v.Bottom() != nil || v.HasSubjectSchemes() {
 			// A ground approximation is not the entire subject. Type
-			// introductions and sealing remain observable after a call,
+			// introductions remain observable after a call,
 			// including when nested inside a ground list.
 			return nil
 		}
