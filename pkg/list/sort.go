@@ -95,7 +95,9 @@ func (s *valueSorter) lessNew(i, j int) bool {
 	less.Finalize(s.ctx)
 
 	isLess := s.ctx.BoolValue(less)
-	if b := less.Err(s.ctx); b != nil && s.err == nil {
+	// BoolValue reports conversion errors on the context even when less is
+	// itself a valid constraint, such as bool, or a value of the wrong kind.
+	if b := adt.CombineErrors(nil, less.Err(s.ctx), s.ctx.Err()); b != nil && s.err == nil {
 		// Keep the evaluator's error code: an unresolved capture may be
 		// completed later, and must not turn into a permanent native error.
 		s.err = value.Make(s.ctx, b).Err()
@@ -183,9 +185,18 @@ func SortStrings(a []string) []string {
 // IsSorted tests whether a list is sorted.
 //
 // See Sort for an example comparator.
+// It returns false if the comparator cannot be evaluated.
 func IsSorted(list []cue.Value, cmp cue.Value) bool {
+	ok, err := isSorted(list, cmp)
+	return ok && err == nil
+}
+
+// The native CUE entry point retains comparison errors, including incomplete
+// captures that may be refined later. The Go predicate keeps its bool API.
+func isSorted(list []cue.Value, cmp cue.Value) (bool, error) {
 	s := makeValueSorter(list, cmp)
-	return sort.IsSorted(&s)
+	ok := sort.IsSorted(&s)
+	return ok, s.err
 }
 
 // IsSortedStrings tests whether a list is a sorted list of strings.

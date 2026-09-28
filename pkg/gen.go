@@ -550,6 +550,10 @@ func (g *goEmitter) function(fn *types.Func) {
 	}
 
 	name := fn.Name()
+	if adapter := nativeErrorAdapters[nativeName(fn)]; adapter != "" {
+		name = adapter
+		results = fn.Pkg().Scope().Lookup(adapter).(*types.Func).Signature().Results()
+	}
 	if needCallContext {
 		argList = "c.OpContext(), " + argList
 
@@ -833,6 +837,13 @@ func nativeName(fn *types.Func) string {
 	return strings.TrimPrefix(fn.Pkg().Path(), pkgParent+"/") + "." + fn.Name()
 }
 
+// Some public Go predicates predate CUE's need to distinguish a negative
+// result from an incomplete computation. Their native adapters preserve an
+// additional error result without changing the exported Go calling API.
+var nativeErrorAdapters = map[string]string{
+	"list.IsSorted": "isSorted",
+}
+
 // A renamed native or argument must not silently drop a checking contract.
 // Verify metadata against the loaded Go declarations before writing files.
 func checkNativeMetadata(pkgs []*packages.Package) error {
@@ -860,10 +871,26 @@ func checkNativeMetadata(pkgs []*packages.Package) error {
 	for name := range nativeParams {
 		names[name] = true
 	}
+	for name := range nativeErrorAdapters {
+		names[name] = true
+	}
 	for name := range names {
 		fn := functions[name]
 		if fn == nil {
 			return fmt.Errorf("checking metadata refers to unknown native %s", name)
+		}
+		if adapter := nativeErrorAdapters[name]; adapter != "" {
+			helper, ok := fn.Pkg().Scope().Lookup(adapter).(*types.Func)
+			if !ok || helper.Exported() {
+				return fmt.Errorf("native %s requires unexported error adapter %s", name, adapter)
+			}
+			a, b := fn.Signature(), helper.Signature()
+			if !types.Identical(a.Params(), b.Params()) || a.Variadic() != b.Variadic() ||
+				a.Results().Len() != 1 || b.Results().Len() != 2 ||
+				!types.Identical(a.Results().At(0).Type(), b.Results().At(0).Type()) ||
+				!types.Identical(b.Results().At(1).Type(), typeError) {
+				return fmt.Errorf("native %s error adapter %s must add only an error result", name, adapter)
+			}
 		}
 		for label := range nativeParams[name] {
 			found := false

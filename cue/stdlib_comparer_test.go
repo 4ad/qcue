@@ -213,3 +213,45 @@ b:make(true)`,
 		})
 	}
 }
+
+func TestStdlibIsSortedRefinement(t *testing.T) {
+	for _, call := range []string{
+		`list.IsSorted([1,2],cmp)`,
+		`list.IsSorted(cmp:cmp,...)([1,2])`,
+		`[1,2] & list.IsSorted(cmp)`,
+	} {
+		t.Run(call, func(t *testing.T) {
+			ctx := cuecontext.New()
+			v := ctx.CompileString(`import "list"
+reverse:bool
+cmp:{x:int,y:int,less:(x<y)!=reverse}
+out:` + call)
+			for _, opts := range [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}} {
+				if _, err := v.LookupPath(cue.ParsePath("out")).MarshalJSON(); err == nil {
+					t.Fatal("IsSorted completed an unresolved comparison")
+				}
+				if err := v.Validate(); err != nil {
+					t.Fatalf("unresolved comparison became a permanent error: %v", err)
+				}
+				good := v.FillPath(cue.ParsePath("reverse"), false)
+				if call[0] == '[' {
+					semanticJSON(t, good, "out", `[1,2]`)
+					if v.FillPath(cue.ParsePath("reverse"), true).Validate() == nil {
+						t.Fatal("IsSorted validator accepted descending order")
+					}
+				} else {
+					semanticJSON(t, good, "out", `true`)
+					semanticJSON(t, v.FillPath(cue.ParsePath("reverse"), true), "out", `false`)
+				}
+				source, err := format.Node(v.Syntax(opts...))
+				if err != nil {
+					t.Fatal(err)
+				}
+				v = ctx.CompileBytes(source)
+				if err := v.Err(); err != nil {
+					t.Fatalf("%s\n%v", source, err)
+				}
+			}
+		})
+	}
+}

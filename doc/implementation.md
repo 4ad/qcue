@@ -249,6 +249,11 @@ later validated list supplies the comparison operands. Attached interfaces
 remain separately checked, and symbolic inputs are not executed as concrete
 lists.
 
+`IsSorted` propagates comparison errors through its native adapter, including
+incomplete captures. It cannot certify a Boolean result or reject a validator
+input merely because a comparison is not yet resolved. The public Go predicate
+retains its Boolean API and returns false when a comparison cannot be evaluated.
+
 The structural primitives have additional rules. `len` preserves known length
 bounds. `close` preserves input constraints while adding closedness where its
 record description is known; a rigid or live input retains its identity.

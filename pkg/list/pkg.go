@@ -314,7 +314,7 @@ var p = &pkg.Package{
 		Func: func(c *pkg.CallCtxt) {
 			list, cmp := c.List(0), c.Value(1)
 			if c.Do() {
-				c.Ret = IsSorted(list, cmp)
+				c.Ret, c.Err = isSorted(list, cmp)
 			}
 		},
 	}, {

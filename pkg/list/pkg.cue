@@ -168,6 +168,7 @@ SortStrings: forall (A: string) func(a: [...A]) -> [...A]
 // IsSorted tests whether a list is sorted.
 //
 // See Sort for an example comparator.
+// Comparison errors propagate, and unresolved comparisons remain incomplete.
 IsSorted: func(list: [...], cmp: {x: _, y: _, less: bool}) -> bool
 
 // IsSortedStrings tests whether a list is a sorted list of strings.
