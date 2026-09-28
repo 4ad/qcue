@@ -23,6 +23,54 @@ import (
 	"cuelang.org/go/cue/format"
 )
 
+func TestQuantifiedForwardedCaptureExport(t *testing.T) {
+	for _, tc := range []struct{ name, source, path string }{
+		{"scalar", `x:int
+f:func()->int:x`, "x"},
+		{"record", `x:{a:int}
+f:func()->int:x.a`, "x.a"},
+		{"constrained", `x:int
+f:{captured:x & >0, get:func()->int:captured}.get`, "x"},
+		{"nested_forwarding", `x:int
+f:{a:x & >0, b:a & <3, get:func()->int:b}.get`, "x"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := cuecontext.New()
+			v := ctx.CompileString(tc.source + "\nout:f()")
+			for round := 0; round < 6; round++ {
+				if err := v.Validate(); err != nil {
+					t.Fatalf("round %d: %v", round, err)
+				}
+				if _, err := v.LookupPath(cue.ParsePath("out")).Int64(); err == nil {
+					t.Fatal("unresolved capture acquired a concrete value")
+				}
+				for _, n := range []int{1, 2} {
+					got, err := v.FillPath(cue.ParsePath(tc.path), n).LookupPath(cue.ParsePath("out")).Int64()
+					if err != nil || got != int64(n) {
+						t.Fatalf("round %d, capture %d: got %d, %v", round, n, got, err)
+					}
+				}
+				if tc.name == "constrained" || tc.name == "nested_forwarding" {
+					if err := v.FillPath(cue.ParsePath(tc.path), 0).Validate(); err == nil {
+						t.Fatal("forwarding discarded the capture's lower bound")
+					}
+				}
+				if tc.name == "nested_forwarding" {
+					if err := v.FillPath(cue.ParsePath(tc.path), 3).Validate(); err == nil {
+						t.Fatal("forwarding discarded the capture's upper bound")
+					}
+				}
+				opts := [][]cue.Option{nil, {cue.Raw()}, {cue.Final()}}
+				source, err := format.Node(v.Syntax(opts[round%len(opts)]...))
+				if err != nil {
+					t.Fatal(err)
+				}
+				v = ctx.CompileBytes(source)
+			}
+		})
+	}
+}
+
 // Check observations after rebuilding exported source, including a hostile
 // destination scope. Formatting alone cannot detect lost lexical constraints.
 func TestQuantifiedLexicalExport(t *testing.T) {

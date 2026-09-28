@@ -17,6 +17,7 @@ package export
 import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
+	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/walk"
@@ -109,12 +110,27 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 	params := adt.FunctionTypeParameters(t)
 	origin := e.functionOrigin(t.Fn, params)
 	args := adt.FunctionTypeArguments(t)
+	liveValues := make(map[adt.Expr]ast.Expr)
 	live := func(ref adt.Expr) bool {
+		if x, ok := liveValues[ref]; ok {
+			return x != nil
+		}
 		if r, ok := ref.(adt.Resolver); ok {
 			cell, _ := e.ctx.Lookup(t.Env, r)
-			return cell != nil && e.exposed[cell]
+			if cell != nil && e.exposed[cell] {
+				liveValues[ref] = e.innerExpr(t.Env, ref)
+				return true
+			}
 		}
-		return false
+		// Completed private captures already have a faithful graph export.
+		// Forward references only when that graph cannot supply a value.
+		if v, complete := e.ctx.Evaluate(t.Env, ref); complete && e.exportableCapture(v) {
+			liveValues[ref] = nil
+			return false
+		}
+		x := e.exposedCapture(t.Env, ref)
+		liveValues[ref] = x
+		return x != nil
 	}
 	value := func(ref adt.Expr, runtime bool) ast.Expr {
 		if r, ok := ref.(*adt.TypeReference); ok {
@@ -123,7 +139,7 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 			}
 		}
 		if live(ref) {
-			return e.innerExpr(t.Env, ref)
+			return liveValues[ref]
 		}
 		v, complete := e.ctx.Evaluate(t.Env, ref)
 		if !complete || v == nil || (runtime && !e.exportableCapture(v)) {
@@ -155,6 +171,112 @@ func (e *exporter) functionOriginValue(t adt.FuncType) ast.Expr {
 	f.Value.(*ast.ParenExpr).X = e.originApplication(origin, value)
 	g.depth--
 	return e.closureReference(f)
+}
+
+// An environment emitted by a previous export may forward a public capture
+// through a private field, such as CUECapture: int & x. Preserve that live
+// reference and every intervening constraint. Only unfold reference chains
+// and scope-independent constraints; arbitrary private computations still
+// need a completed runtime capture before they can be exported independently.
+func (e *exporter) exposedCapture(env *adt.Environment, ref adt.Expr) ast.Expr {
+	type term struct {
+		env  *adt.Environment
+		expr adt.Expr
+		live bool
+	}
+	var terms []term
+	seenTerms := make(map[term]bool)
+	active := make(map[*adt.Vertex]bool)
+	seenCells := make(map[*adt.Vertex]bool)
+	live := false
+	var collect func(*adt.Environment, adt.Expr) bool
+	collect = func(env *adt.Environment, expr adt.Expr) bool {
+		if b, ok := expr.(*adt.BinaryExpr); ok && b.Op == adt.AndOp {
+			return collect(env, b.X) && collect(env, b.Y)
+		}
+		isLive := false
+		if r, ok := expr.(adt.Resolver); ok {
+			cell, _ := e.ctx.Lookup(env, r)
+			if cell == nil {
+				return false
+			}
+			if e.exposed[cell] {
+				live = true
+				if seenCells[cell] {
+					return true
+				}
+				seenCells[cell] = true
+				isLive = true
+			} else {
+				if active[cell] {
+					return false
+				}
+				active[cell] = true
+				defer delete(active, cell)
+				found := false
+				for c := range cell.LeafConjuncts() {
+					found = true
+					if !collect(c.Env, c.Expr()) {
+						return false
+					}
+				}
+				return found
+			}
+		} else {
+			independent := true
+			seen := make(map[adt.Node]bool)
+			w := walk.Visitor{Before: func(n adt.Node) bool {
+				if n == nil || seen[n] || !independent {
+					return false
+				}
+				seen[n] = true
+				switch x := n.(type) {
+				case adt.Resolver, *adt.AliasApplication:
+					independent = false
+				case *adt.Function:
+					if x.Body != nil {
+						independent = false
+					}
+				}
+				return independent
+			}}
+			w.Elem(expr)
+			if !independent {
+				return false
+			}
+		}
+		t := term{env, expr, isLive}
+		if !seenTerms[t] {
+			seenTerms[t] = true
+			terms = append(terms, t)
+		}
+		return true
+	}
+	if !collect(env, ref) || !live {
+		return nil
+	}
+	var result ast.Expr
+	constraints := make(map[string]bool)
+	for _, t := range terms {
+		x := e.innerExpr(t.env, t.expr)
+		if !t.live {
+			// Scope-independent constraints carry no code identity. Avoid
+			// accumulating copies of capture declarations on each export.
+			if source, err := format.Node(x); err == nil {
+				key := string(source)
+				if constraints[key] {
+					continue
+				}
+				constraints[key] = true
+			}
+		}
+		if result == nil {
+			result = x
+		} else {
+			result = ast.NewBinExpr(token.AND, result, x)
+		}
+	}
+	return result
 }
 
 // Runtime environments contain all fields observable by the code, including

@@ -235,6 +235,9 @@ on a full packet remain before argument saving; residual interfaces retain
 their saved-slot coordinates. Closed signatures without lexical dependencies
 or implementation identities are emitted once instead of accumulating copied
 closure environments across round trips.
+Private capture fields introduced by an earlier export retain references to
+public fields while their values remain unresolved. Forwarding preserves every
+intervening constraint, so later refinement still checks captured bounds.
 
 List transformations additionally preserve known tuple positions and length
 bounds. `FlattenN` uses the supplied depth, while `Take` and `Drop` account for
